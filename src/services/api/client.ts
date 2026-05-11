@@ -29,13 +29,21 @@ apiClient.interceptors.request.use(
       // Use the singleton auth instance
       if (!auth) return config;
       
-      // Definitively wait for auth to be ready if it's not
-      // This is the gold standard for fixing Firebase race conditions
+      // Definitively wait for auth to be ready
       if (typeof auth.authStateReady === 'function') {
         await auth.authStateReady();
       }
       
-      const user = auth.currentUser;
+      let user = auth.currentUser;
+      
+      // Intensive retry loop for intermittent null states (up to 2 seconds)
+      if (!user) {
+        for (let i = 0; i < 20; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          user = auth.currentUser;
+          if (user) break;
+        }
+      }
 
       if (user) {
         const token = await user.getIdToken();
@@ -44,7 +52,7 @@ apiClient.interceptors.request.use(
           // console.log(`[API Client] Attached token for ${config.url}`);
         }
       } else {
-        console.warn(`[API Client] No user found for ${config.url} after authStateReady - request may fail with 403`);
+        console.warn(`[API Client] No user found for ${config.url} after intensive retries - request may fail with 403`);
       }
     } catch (error) {
       console.error("Error fetching Firebase token for request", error);
