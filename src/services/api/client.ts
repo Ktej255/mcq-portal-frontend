@@ -12,18 +12,26 @@ export const apiClient = axios.create({
   },
 });
 
-// We will use a custom hook to inject the Firebase ID token into this client for authenticated requests
-export const setupAxiosInterceptors = (getToken: () => Promise<string | null>) => {
-  apiClient.interceptors.request.use(
-    async (config) => {
-      const token = await getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+import { getAuth } from 'firebase/auth';
+
+// Add the interceptor immediately upon creation
+apiClient.interceptors.request.use(
+  async (config) => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
+    } catch (error) {
+      console.error("Error fetching Firebase token for request", error);
     }
-  );
-};
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
