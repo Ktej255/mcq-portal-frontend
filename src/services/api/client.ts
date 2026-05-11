@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { env } from '@/env';
 
-const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL;
-const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
+const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
+const normalizedBaseUrl = rawBaseUrl ? (rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`) : '/api/v1/';
 
 // Base Axios instance
 export const apiClient = axios.create({
