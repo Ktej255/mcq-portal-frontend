@@ -2,7 +2,15 @@ import axios from 'axios';
 import { env } from '@/env';
 
 const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
-const normalizedBaseUrl = rawBaseUrl ? (rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`) : '/api/v1/';
+// Ensure baseURL ends with /api/v1/ if it's pointing to the root domain
+let normalizedBaseUrl = rawBaseUrl;
+if (normalizedBaseUrl && !normalizedBaseUrl.includes('/api/v1')) {
+  normalizedBaseUrl = normalizedBaseUrl.endsWith('/') ? `${normalizedBaseUrl}api/v1/` : `${normalizedBaseUrl}/api/v1/`;
+} else if (!normalizedBaseUrl) {
+  normalizedBaseUrl = '/api/v1/';
+} else if (!normalizedBaseUrl.endsWith('/')) {
+  normalizedBaseUrl = `${normalizedBaseUrl}/`;
+}
 
 // Base Axios instance
 export const apiClient = axios.create({
