@@ -23,43 +23,50 @@ export const apiClient = axios.create({
 import { auth } from '@/lib/firebase/config';
 
 // Add the interceptor immediately upon creation
+// Request interceptor: Attach tokens
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // Use the singleton auth instance
       if (!auth) return config;
       
-      // Definitively wait for auth to be ready
+      // Wait for auth to be ready
       if (typeof auth.authStateReady === 'function') {
         await auth.authStateReady();
       }
       
-      let user = auth.currentUser;
-      
-      // Intensive retry loop for intermittent null states (up to 2 seconds)
-      if (!user) {
-        for (let i = 0; i < 20; i++) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          user = auth.currentUser;
-          if (user) break;
-        }
-      }
-
+      const user = auth.currentUser;
       if (user) {
         const token = await user.getIdToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          // console.log(`[API Client] Attached token for ${config.url}`);
         }
-      } else {
-        console.warn(`[API Client] No user found for ${config.url} after intensive retries - request may fail with 403`);
       }
     } catch (error) {
-      console.error("Error fetching Firebase token for request", error);
+      console.error("Error attaching token", error);
     }
     return config;
   },
-  (error) => {
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor: Retry on 401/403
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+      originalRequest._retry = true;
+      await new Promise(resolve => setTimeout(resolve, 800));
+      try {
+        if (auth?.currentUser) {
+          const token = await auth.currentUser.getIdToken(true);
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }
+      } catch (retryError) {
+        console.error("Retry failed", retryError);
+      }
+    }
     return Promise.reject(error);
   }
 );

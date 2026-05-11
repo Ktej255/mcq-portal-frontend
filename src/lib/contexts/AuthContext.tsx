@@ -30,12 +30,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+    
+    let unsubscribe: (() => void) | undefined;
 
-    return () => unsubscribe();
+    const initAuth = async () => {
+      try {
+        // Wait for Firebase to definitively determine auth state (v10.3+)
+        if (typeof auth.authStateReady === 'function') {
+          await auth.authStateReady();
+        }
+      } catch (err) {
+        console.error("Firebase authStateReady failed", err);
+      }
+
+      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        setLoading(false);
+      });
+    };
+
+    initAuth();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
