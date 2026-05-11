@@ -29,13 +29,13 @@ apiClient.interceptors.request.use(
       // Use the singleton auth instance
       if (!auth) return config;
       
-      let user = auth.currentUser;
-      
-      // If user is null, wait briefly to see if it's an initialization race condition
-      if (!user) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        user = auth.currentUser;
+      // Definitively wait for auth to be ready if it's not
+      // This is the gold standard for fixing Firebase race conditions
+      if (typeof auth.authStateReady === 'function') {
+        await auth.authStateReady();
       }
+      
+      const user = auth.currentUser;
 
       if (user) {
         const token = await user.getIdToken();
@@ -44,7 +44,7 @@ apiClient.interceptors.request.use(
           // console.log(`[API Client] Attached token for ${config.url}`);
         }
       } else {
-        console.warn(`[API Client] No user found for ${config.url} - request may fail with 403`);
+        console.warn(`[API Client] No user found for ${config.url} after authStateReady - request may fail with 403`);
       }
     } catch (error) {
       console.error("Error fetching Firebase token for request", error);
