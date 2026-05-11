@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 import { dashboardService, HistoryItem } from "@/services/api/dashboardService";
 import { useRouter } from "next/navigation";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -12,12 +13,17 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { isLoaded, isSignedIn } = useApiConfig();
+
   useEffect(() => {
     const fetchHistory = async () => {
+      if (!isLoaded || !isSignedIn) return;
+      
       try {
         setLoading(true);
         const data = await dashboardService.getHistory();
         setHistory(data);
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch history:", err);
         setError("Failed to load attempt history.");
@@ -27,7 +33,7 @@ export default function HistoryPage() {
     };
 
     fetchHistory();
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   if (loading) return (
     <div className="space-y-6 animate-pulse">

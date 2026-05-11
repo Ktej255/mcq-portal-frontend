@@ -4,18 +4,24 @@ import { useEffect, useState } from "react";
 import { dashboardService, DashboardSummary } from "@/services/api/dashboardService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, BookOpen, CheckCircle, Clock } from "lucide-react";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export default function DashboardHome() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { isLoaded, isSignedIn } = useApiConfig();
+
   useEffect(() => {
     const fetchSummary = async () => {
+      if (!isLoaded || !isSignedIn) return;
+      
       try {
         setLoading(true);
         const data = await dashboardService.getSummary();
         setSummary(data);
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch dashboard summary:", err);
         setError("Failed to load dashboard data. Please try again later.");
@@ -25,7 +31,7 @@ export default function DashboardHome() {
     };
 
     fetchSummary();
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   if (loading) return (
     <div className="space-y-6 animate-pulse">
