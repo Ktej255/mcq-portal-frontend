@@ -20,19 +20,31 @@ export const apiClient = axios.create({
   },
 });
 
-import { getAuth } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
 
 // Add the interceptor immediately upon creation
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      const auth = getAuth();
-      const user = auth.currentUser;
+      // Use the singleton auth instance
+      if (!auth) return config;
+      
+      let user = auth.currentUser;
+      
+      // If user is null, wait briefly to see if it's an initialization race condition
+      if (!user) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        user = auth.currentUser;
+      }
+
       if (user) {
         const token = await user.getIdToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          // console.log(`[API Client] Attached token for ${config.url}`);
         }
+      } else {
+        console.warn(`[API Client] No user found for ${config.url} - request may fail with 403`);
       }
     } catch (error) {
       console.error("Error fetching Firebase token for request", error);
