@@ -31,17 +31,36 @@ export interface HistoryItem {
 export const dashboardService = {
   getSummary: async (): Promise<DashboardSummary> => {
     const response = await apiClient.get('/dashboard/summary');
-    return response.data;
+    // Backend wraps all responses: { success, message, data: <payload> }
+    const payload = response.data?.data ?? response.data;
+    return {
+      totalTestsTaken: payload?.totalTestsTaken ?? 0,
+      averageScore: payload?.averageScore ?? 0,
+      recentTests: payload?.recentTests ?? [],
+    };
   },
 
   getHistory: async (): Promise<HistoryItem[]> => {
     const response = await apiClient.get('/attempts/history');
-    return response.data;
+    const payload = response.data?.data ?? response.data;
+    if (!Array.isArray(payload)) return [];
+    // Backend uses status "SUBMITTED" — normalise to "COMPLETED" for the UI
+    return payload.map((item: Record<string, unknown>) => ({
+      ...item,
+      status: item.status === 'SUBMITTED' ? 'COMPLETED' : item.status,
+    })) as HistoryItem[];
   },
 
   getReport: async (attemptId?: string): Promise<PerformanceReport> => {
     const url = attemptId ? `/reports/${attemptId}` : '/reports/aggregate';
     const response = await apiClient.get(url);
-    return response.data;
-  }
+    const payload = response.data?.data ?? response.data;
+    return {
+      subjectScores: payload?.subjectScores ?? [],
+      confidenceAnalytics: Array.isArray(payload?.confidenceAnalytics)
+        ? payload.confidenceAnalytics
+        : [],
+      scoreTrends: payload?.scoreTrends ?? [],
+    };
+  },
 };
