@@ -43,7 +43,7 @@ export interface SaveAnswerPayload {
 
 export const examService = {
   getAvailableTests: async (): Promise<TestMetadata[]> => {
-    const response = await apiClient.get('/tests/available');
+    const response = await apiClient.get('tests/available');
     // Backend wraps: { success, message, data: <payload> }
     const payload = response.data?.data ?? response.data;
     if (!Array.isArray(payload)) return [];
@@ -51,12 +51,12 @@ export const examService = {
   },
   
   getTestById: async (testId: string): Promise<TestMetadata> => {
-    const response = await apiClient.get(`/tests/${testId}`);
+    const response = await apiClient.get(`tests/${testId}`);
     return response.data?.data ?? response.data;
   },
 
   startAttempt: async (testId: string): Promise<AttemptData> => {
-    const response = await apiClient.post(`/attempts/start`, { test_id: parseInt(testId) });
+    const response = await apiClient.post(`attempts/start`, { test_id: parseInt(testId) });
     const payload = response.data?.data ?? response.data;
     // Backend returns attempt_id (snake_case) — normalise to camelCase
     return {
@@ -68,7 +68,7 @@ export const examService = {
   },
 
   getQuestions: async (testId: string): Promise<QuestionData[]> => {
-    const response = await apiClient.get(`/tests/${testId}/questions`);
+    const response = await apiClient.get(`tests/${testId}/questions`);
     const payload = response.data?.data ?? response.data;
     if (!Array.isArray(payload)) return [];
     return payload;
@@ -78,7 +78,7 @@ export const examService = {
     // Backend expects a single answer per request — send the last answer
     const last = answers[answers.length - 1];
     if (!last) return;
-    const response = await apiClient.put(`/attempts/${attemptId}/answers`, {
+    const response = await apiClient.put(`attempts/${attemptId}/answers`, {
       question_id: parseInt(last.questionId),
       selected_option: last.selectedOptionId,
       time_taken_seconds: last.timeSpentSeconds,
@@ -90,7 +90,7 @@ export const examService = {
   },
 
   submitTest: async (attemptId: string) => {
-    const response = await apiClient.post(`/attempts/${attemptId}/submit`);
+    const response = await apiClient.post(`attempts/${attemptId}/submit`);
     return response.data?.data ?? response.data;
   }
 };

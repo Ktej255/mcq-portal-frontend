@@ -30,7 +30,7 @@ export interface HistoryItem {
 
 export const dashboardService = {
   getSummary: async (): Promise<DashboardSummary> => {
-    const response = await apiClient.get('/dashboard/summary');
+    const response = await apiClient.get('dashboard/summary');
     // Backend wraps all responses: { success, message, data: <payload> }
     const payload = response.data?.data ?? response.data;
     return {
@@ -41,7 +41,7 @@ export const dashboardService = {
   },
 
   getHistory: async (): Promise<HistoryItem[]> => {
-    const response = await apiClient.get('/attempts/history');
+    const response = await apiClient.get('attempts/history');
     const payload = response.data?.data ?? response.data;
     if (!Array.isArray(payload)) return [];
     // Backend uses status "SUBMITTED" — normalise to "COMPLETED" for the UI
@@ -52,7 +52,7 @@ export const dashboardService = {
   },
 
   getReport: async (attemptId?: string): Promise<PerformanceReport> => {
-    const url = attemptId ? `/reports/${attemptId}` : '/reports/aggregate';
+    const url = attemptId ? `reports/${attemptId}` : 'reports/aggregate';
     const response = await apiClient.get(url);
     const payload = response.data?.data ?? response.data;
     return {
