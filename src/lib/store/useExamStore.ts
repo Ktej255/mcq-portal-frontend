@@ -35,6 +35,7 @@ export const useExamStore = create<ExamState>()(
       answers: {},
 
   initializeTest: (testId, questionIds) => {
+    const initialAnswers: Record<string, AnswerRecord> = {};
     questionIds.forEach(id => {
       const stringId = String(id);
       initialAnswers[stringId] = {
@@ -58,7 +59,7 @@ export const useExamStore = create<ExamState>()(
     return {
       answers: {
         ...state.answers,
-        [questionId]: {
+        [stringId]: {
           ...existing,
           status: 'UNANSWERED',
         }
@@ -79,7 +80,7 @@ export const useExamStore = create<ExamState>()(
     return {
       answers: {
         ...state.answers,
-        [questionId]: {
+        [stringId]: {
           ...existing,
           selectedOptionId: optionId,
           confidence,
@@ -100,7 +101,7 @@ export const useExamStore = create<ExamState>()(
     return {
       answers: {
         ...state.answers,
-        [questionId]: {
+        [stringId]: {
           ...existing,
           status: newStatus,
         }
@@ -121,7 +122,7 @@ export const useExamStore = create<ExamState>()(
     return {
       answers: {
         ...state.answers,
-        [questionId]: {
+        [stringId]: {
           ...existing,
           selectedOptionId: null,
           confidence: null,
@@ -139,7 +140,7 @@ export const useExamStore = create<ExamState>()(
     return {
       answers: {
         ...state.answers,
-        [questionId]: {
+        [stringId]: {
           ...existing,
           timeSpentSeconds: existing.timeSpentSeconds + timeSpent,
         }

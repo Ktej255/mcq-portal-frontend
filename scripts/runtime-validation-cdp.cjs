@@ -92,15 +92,29 @@ async function requireAuthenticated(page) {
   }
 }
 
+async function requirePageUsable(page, label) {
+  const text = await bodyText(page);
+  if (/This page couldn.t load|Reload to try again|Application error|Critical Error/i.test(text)) {
+    await shot(page, `${label}-unusable`);
+    throw new Error(`${label} is not usable: ${text.slice(0, 300)}`);
+  }
+}
+
+async function requireClick(page, selectors, label, options = {}) {
+  const clicked = await clickFirst(page, selectors, label, options);
+  if (!clicked) throw new Error(`Required click failed: ${label}`);
+  return clicked;
+}
+
 async function answerCurrentQuestion(page, label, confidenceText) {
-  await clickFirst(page, [
+  await requireClick(page, [
     "label:has([role='radio'])",
     "[role='radio']",
     "input[type='radio']",
   ], `${label}-select-answer`);
   await settle(page, 700);
   if (confidenceText) {
-    await clickFirst(page, [
+    await requireClick(page, [
       `button:has-text("${confidenceText}")`,
       `text=${confidenceText}`,
       "button:has-text('Fairly')",
@@ -198,18 +212,19 @@ async function currentExamState(page, label) {
   await settle(page, 4000);
   await shot(page, "03-exam-open");
   await snapshot(page, "exam-open");
+  await requirePageUsable(page, "exam-open");
   await currentExamState(page, "exam-initial-state");
 
   await answerCurrentQuestion(page, "q1", "Educated");
   await shot(page, "04-q1-answered-autosaved");
   await currentExamState(page, "q1-after-autosave");
 
-  await clickFirst(page, ["button:has-text('Next')"], "navigate-next-q2");
+  await requireClick(page, ["button:has-text('Next')"], "navigate-next-q2");
   await settle(page, 1000);
   await answerCurrentQuestion(page, "q2", "Fairly");
   await shot(page, "05-q2-answered-autosaved");
 
-  await clickFirst(page, ["button:has-text('Review & Next')", "button:has-text('Review')"], "mark-review-q2");
+  await requireClick(page, ["button:has-text('Review & Next')", "button:has-text('Review')"], "mark-review-q2");
   await settle(page, 2800);
   await shot(page, "06-review-mark-navigation");
   await currentExamState(page, "after-review-mark");
@@ -218,6 +233,7 @@ async function currentExamState(page, label) {
   await page.reload({ waitUntil: "domcontentloaded" });
   await settle(page, 4500);
   await shot(page, "07-refresh-recovery");
+  await requirePageUsable(page, "refresh-recovery");
   const afterRefresh = await currentExamState(page, "after-refresh");
   evidence.flow.refreshRecovery = {
     sameUrl: beforeRefresh.url === afterRefresh.url,
@@ -237,15 +253,15 @@ async function currentExamState(page, label) {
     await settle(page, 350);
   }
   await shot(page, "08-final-question-cta");
-  await clickFirst(page, ["button:has-text('Review & Submit')"], "open-review-screen");
+  await requireClick(page, ["button:has-text('Review & Submit')"], "open-review-screen");
   await settle(page, 1800);
   await shot(page, "09-review-screen");
   await snapshot(page, "review-screen");
 
-  await clickFirst(page, ["#confirm-submit", "input[type='checkbox']"], "confirm-final-submit");
+  await requireClick(page, ["#confirm-submit", "input[type='checkbox']"], "confirm-final-submit");
   await settle(page, 500);
-  await clickFirst(page, ["button:has-text('Submit Final Test')"], "submit-final-test");
-  await page.waitForURL(/\/reports\?attemptId=/, { timeout: 60000 }).catch(() => {});
+  await requireClick(page, ["button:has-text('Submit Final Test')"], "submit-final-test");
+  await page.waitForURL(/\/reports\?attemptId=/, { timeout: 60000 });
   await settle(page, 6500);
   await shot(page, "10-report-after-submit");
   await snapshot(page, "report-after-submit");

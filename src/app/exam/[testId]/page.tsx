@@ -70,7 +70,7 @@ export default function ExamInterface() {
     if (questions[currentQuestionIndex] && attemptId) {
       eventsService.record({
         event_type: 'QUESTION_VIEWED',
-        question_id: questions[currentQuestionIndex].id
+        question_id: parseInt(questions[currentQuestionIndex].id, 10)
       }, attemptId);
     }
   }, [currentQuestionIndex, questions, attemptId]);
@@ -87,6 +87,15 @@ export default function ExamInterface() {
     }
   }, [lastViolation, attemptId]);
 
+  const question = questions[currentQuestionIndex];
+  const currentAnswer = question ? answers[question.id] : null;
+
+  useEffect(() => {
+    if (question?.id) {
+      visitQuestion(question.id);
+    }
+  }, [question?.id, visitQuestion]);
+
   if (loading) return (
     <div className="flex flex-col h-screen items-center justify-center space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -100,15 +109,6 @@ export default function ExamInterface() {
       <Button onClick={() => window.location.reload()}>Retry</Button>
     </div>
   );
-
-  const question = questions[currentQuestionIndex];
-  const currentAnswer = question ? answers[question.id] : null;
-
-  useEffect(() => {
-    if (question?.id) {
-      visitQuestion(question.id);
-    }
-  }, [question?.id, visitQuestion]);
 
   if (!question) return null;
 
@@ -147,7 +147,7 @@ export default function ExamInterface() {
     if (attemptId) {
       eventsService.record({
         event_type: isChange ? 'ANSWER_CHANGED' : 'ANSWER_SELECTED',
-        question_id: question.id,
+        question_id: parseInt(question.id, 10),
         payload: { option_id: optionId, old_id: currentAnswer?.selectedOptionId }
       }, attemptId);
     }
@@ -158,7 +158,7 @@ export default function ExamInterface() {
     if (attemptId) {
       eventsService.record({
         event_type: 'CONFIDENCE_UPDATED',
-        question_id: question.id,
+        question_id: parseInt(question.id, 10),
         payload: { level }
       }, attemptId);
     }
@@ -359,7 +359,7 @@ export default function ExamInterface() {
                     if (attemptId) {
                       eventsService.record({
                         event_type: 'MARKED_FOR_REVIEW',
-                        question_id: question.id,
+                        question_id: parseInt(question.id, 10),
                         payload: { status: true }
                       }, attemptId);
                     }
