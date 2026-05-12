@@ -1,0 +1,110 @@
+{
+  "startedAt": "2026-05-12T06:23:16.867Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "backend": "https://mcq-backend-822862054564.us-central1.run.app",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-23-16-865Z\\00-initial.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-23-16-865Z\\01-dashboard-after-login.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-23-16-865Z\\02-dashboard.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-23-16-865Z\\03-tests.png"
+  ],
+  "api": [],
+  "consoleErrors": [
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=1996646408&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=1996646408&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard&_rsc=zEDo8fYcSbGT65Cz",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard&_rsc=zEDo8fYcSbGT65Cz",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/tests&_rsc=z7EHmZ1Ysy2mPhuF",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "label": "google-login",
+      "clicked": "button:has-text('Continue with Google')"
+    },
+    {
+      "label": "authenticated-session",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "M\nMCQ Intelligence Portal\n\nAuthorized access only. Use your official Google account to sign in.\n\nContinue with Google\n\nENTERPRISE GRADE SECURITY"
+      }
+    },
+    {
+      "label": "02-dashboard",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "M\nMCQ Intelligence Portal\n\nAuthorized access only. Use your official Google account to sign in.\n\nContinue with Google\n\nENTERPRISE GRADE SECURITY"
+      }
+    },
+    {
+      "label": "03-tests",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/tests",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "M\nMCQ Intelligence Portal\n\nAuthorized access only. Use your official Google account to sign in.\n\nContinue with Google\n\nENTERPRISE GRADE SECURITY"
+      }
+    },
+    {
+      "label": "start-test",
+      "clicked": null
+    }
+  ],
+  "fatal": {
+    "message": "No Start Test button found on /tests",
+    "stack": "Error: No Start Test button found on /tests\n    at D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:180:11"
+  }
+}

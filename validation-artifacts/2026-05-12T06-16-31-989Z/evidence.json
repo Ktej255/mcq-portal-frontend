@@ -1,0 +1,73 @@
+{
+  "startedAt": "2026-05-12T06:16:31.991Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "backend": "https://mcq-backend-822862054564.us-central1.run.app",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-16-31-989Z\\00-initial.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-16-31-989Z\\01-dashboard-after-login.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-16-31-989Z\\02-dashboard.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-16-31-989Z\\03-tests.png"
+  ],
+  "api": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "observations": [
+    {
+      "label": "authenticated-session",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "Initializing exam portal..."
+      }
+    },
+    {
+      "label": "02-dashboard",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "Initializing exam portal..."
+      }
+    },
+    {
+      "label": "03-tests",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/tests",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": ""
+      }
+    },
+    {
+      "label": "start-test",
+      "clicked": null
+    }
+  ],
+  "fatal": {
+    "message": "No Start Test button found on /tests",
+    "stack": "Error: No Start Test button found on /tests\n    at D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:180:11"
+  }
+}

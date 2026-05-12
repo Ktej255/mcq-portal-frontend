@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-05-12T06:26:08.495Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "backend": "https://mcq-backend-822862054564.us-central1.run.app",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T06-26-08-494Z\\00-initial.png"
+  ],
+  "api": [],
+  "consoleErrors": [
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=8231353823&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=8231353823&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "Cross-Origin-Opener-Policy policy would block the window.closed call."
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "Cross-Origin-Opener-Policy policy would block the window.closed call."
+    }
+  ],
+  "pageErrors": [
+    {
+      "page": "https://accounts.google.com/v3/signin/identifier?opparams=%253Fcontext_uri%253Dhttps%25253A%25252F%25252Fmcq-portal-frontend.vercel.app&dsh=S-602344212%3A1778567006961715&client_id=822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com&o2v=1&redirect_uri=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com%2F__%2Fauth%2Fhandler&response_type=code&scope=openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+profile&service=lso&state=AMbdmDmkFsasyTE-grJIHH5loN2tHAI9KEyOSkk3r4XPU68rnUT_m8DQaOVe2_v1E_hU345-S4RQt5OrSkxvkJQ1WnAJ6QtWB4yvRNaqxoKcwRBr9VgsFIE2JrKCmT8I36PLdUkE7GgwHx6a8obMUimYUuPGEk1y6UHPXQIQ92QXCdOCk_XLsqvH-6GnzPpirB7gYJA5yUz09hcSDcwwEeMhm35_wOcFmQisueIUjnbRqbE-FVMabhGwkGoPxDW5dctyOV-Hsr8X0_FLq7ygmum8erZgYdksP1IdTThDLe0gVWWceXFYSIyR52wbIUmIquZgKLwlJQybx33pgkybb0C-&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAMoeX1biR4gokX-JqA9malfc9zmPX1S6MYpXqj1n3ulin-QFiPErcVBqClDaF6h-ASaL3otB8myjKsL6A2CS8WVNq_oC_7KSxS2y9kFG4Sgv2g3OhZW8kyABdJsbWMKCHj5l_cab2cAqrHjbKBT3iaDB9ELfpZiPn3j7Cn0EZvSxTZTXcCDN9jsW27dIFkbCH8gMiD-ntcr_N175g8q4trXXIS-mIATyIurLfsxcOf5QdTLBAOH7uppBFXvhgOCS6OPfF5SOGza-eNMxhGBqxnAsoQPdCeFP0W1RzGpaVUBQCRCbg0f6N0VKEmt--QtCV87K3nYrs82tW2i5NAfP28cV5lYPxA1zhhzzBSUiESNtThlgsxgId-UMC4zR9NVeE03Ph9PTzWnqn-F4WdeF-8jskp3d6E-C3fjbQXUwNZyQsI1mqnrxm9-RJMFJgyK5TPO8pTlQZdkmXg_1NnWhDnl3gD4vJQmQZ2uycI2NT6hag7iSaWCjbulPo1dzsuUjd_p_6hk%26flowName%3DGeneralOAuthFlow%26as%3DS-602344212%253A1778567006961715%26client_id%3D822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com&rart=ANgoxcffUi-bPJFbxAuTV-RHNgr0VApZ7h9mMvXctIt6VvM0xt7kFfR5DF8b9n3ea92qZ7Tr4Kl9n2L6UOQWnn3bKMUbkk33Z8lwHzBWB2NTQ4DP6KJ0H9A",
+      "message": "_.wg",
+      "stack": ""
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/tests&_rsc=z7EHmZ1Ysy2mPhuF",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "label": "initial-google-login",
+      "clicked": "button:has-text('Continue with Google')"
+    }
+  ],
+  "fatal": {
+    "message": "page.waitForFunction: Timeout 300000ms exceeded.",
+    "stack": "page.waitForFunction: Timeout 300000ms exceeded.\n    at ensureAuthenticated (D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:103:14)\n    at async D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:192:3"
+  }
+}

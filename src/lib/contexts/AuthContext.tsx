@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "../firebase/config";
+import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
@@ -26,71 +27,95 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
+    console.log("FORENSIC | AuthProvider Mount | Auth Initialized:", !!auth);
     if (!auth) {
+      console.error("FORENSIC | Auth Not Found during mount");
       setLoading(false);
       return;
     }
     
-    let unsubscribe: (() => void) | undefined;
+    // Explicitly set persistence
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => console.log("FORENSIC | Persistence set to local"))
+      .catch((err) => console.error("FORENSIC | Error setting persistence:", err));
 
-    const initAuth = async () => {
-      try {
-        // Wait for Firebase to definitively determine auth state (v10.3+)
-        if (auth && typeof auth.authStateReady === 'function') {
-          await auth.authStateReady();
+    let settled = false;
+
+    console.log("FORENSIC | Registering onAuthStateChanged listener");
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      console.log("FORENSIC | onAuthStateChanged Fired | User exists:", !!currentUser);
+      if (currentUser) {
+        console.log("FORENSIC | Current User Details | UID:", currentUser.uid, "Email:", currentUser.email);
+        try {
+          const token = await currentUser.getIdToken();
+          console.log("FORENSIC | Token retrieved on state change | Length:", token?.length);
+        } catch (tokenErr) {
+          console.error("FORENSIC | Token retrieval error on state change:", tokenErr);
         }
-      } catch (err) {
-        console.error("Firebase authStateReady failed", err);
       }
+      settled = true;
+      setUser(currentUser);
+      setLoading(false);
+    });
 
-      if (auth) {
-        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-          setLoading(false);
-        });
-      } else {
+    const fallback = window.setTimeout(() => {
+      if (!settled) {
+        console.warn("FORENSIC | Firebase auth state did not settle in 5s; force-finishing loading.");
         setLoading(false);
       }
-    };
-
-    initAuth();
+    }, 5000);
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      console.log("FORENSIC | AuthProvider Unmount");
+      window.clearTimeout(fallback);
+      unsubscribe();
     };
   }, []);
 
   const signInWithGoogle = async () => {
+    console.log("FORENSIC | signInWithGoogle triggered");
     if (!auth) {
-      console.error("Auth not initialized");
+      console.error("FORENSIC | Auth not initialized in signInWithGoogle");
       return;
     }
     try {
-      await signInWithPopup(auth, googleProvider);
+      console.log("FORENSIC | Opening signInWithPopup...");
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("FORENSIC | signInWithPopup SUCCESS | User:", result.user.email);
+      
+      const token = await result.user.getIdToken();
+      console.log("FORENSIC | Post-login Token Check | Length:", token?.length);
+      
+      setUser(result.user);
       router.push("/dashboard");
-    } catch (error) {
-      console.error("Error signing in with Google", error);
+    } catch (error: any) {
+      console.error("FORENSIC | signInWithPopup ERROR | Code:", error.code, "Message:", error.message);
+      console.error("FORENSIC | Full Error Object:", error);
       throw error;
     }
   };
 
   const logout = async () => {
+    console.log("FORENSIC | logout triggered");
     if (!auth) return;
     try {
       await signOut(auth);
+      console.log("FORENSIC | signOut SUCCESS");
       // Clear persisted stores
       localStorage.removeItem('mcq-timer-storage');
       localStorage.removeItem('mcq-exam-storage');
       router.push("/login");
     } catch (error) {
-      console.error("Error signing out", error);
+      console.error("FORENSIC | logout ERROR", error);
     }
   };
 
   const getToken = async () => {
     if (auth && auth.currentUser) {
+      console.log("FORENSIC | getToken called | currentUser present");
       return await auth.currentUser.getIdToken(true);
     }
+    console.warn("FORENSIC | getToken called | currentUser NULL");
     return null;
   };
 
