@@ -1,5 +1,14 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  getRedirectResult,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  onAuthStateChanged,
+  User,
+} from "firebase/auth";
 
 import { env } from "@/env";
 
@@ -16,4 +25,13 @@ const app = !getApps().length && firebaseConfig.apiKey ? initializeApp(firebaseC
 const auth = app ? getAuth(app) : null;
 const googleProvider = new GoogleAuthProvider();
 
-export { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, type User };
+export {
+  auth,
+  googleProvider,
+  getRedirectResult,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  onAuthStateChanged,
+  type User,
+};

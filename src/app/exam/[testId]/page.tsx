@@ -34,6 +34,7 @@ export default function ExamInterface() {
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
     const fetchExamData = async () => {
@@ -88,19 +89,17 @@ export default function ExamInterface() {
   };
 
   const handleSubmit = async () => {
-    if (confirm("Are you sure you want to submit the test?")) {
-      try {
-        if (attemptId) {
-          await examService.submitTest(attemptId);
-          toast.success("Test submitted successfully!");
-          router.push(`/reports?attemptId=${attemptId}`);
-        } else {
-          router.push('/dashboard');
-        }
-      } catch (err) {
-        console.error("Submission failed:", err);
-        toast.error("Failed to submit test. Please check your connection and try again.");
+    try {
+      if (attemptId) {
+        await examService.submitTest(attemptId);
+        toast.success("Test submitted successfully!");
+        router.push(`/reports?attemptId=${attemptId}`);
+      } else {
+        router.push('/dashboard');
       }
+    } catch (err) {
+      console.error("Submission failed:", err);
+      toast.error("Failed to submit test. Please check your connection and try again.");
     }
   };
 
@@ -258,7 +257,11 @@ export default function ExamInterface() {
                   variant="secondary" 
                   onClick={() => {
                     markForReview(question.id);
-                    handleNext();
+                    if (currentQuestionIndex < questions.length - 1) {
+                      handleNext();
+                    } else {
+                      setShowReview(true);
+                    }
                   }}
                   className="gap-2 bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
                 >
@@ -277,15 +280,26 @@ export default function ExamInterface() {
                   <ChevronLeft className="w-4 h-4" />
                   Previous
                 </Button>
-                <Button 
-                  variant="default" 
-                  onClick={handleNext}
-                  disabled={currentQuestionIndex === questions.length - 1}
-                  className="gap-2 px-8"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                
+                {currentQuestionIndex === questions.length - 1 ? (
+                  <Button 
+                    variant="default" 
+                    onClick={() => setShowReview(true)}
+                    className="gap-2 px-8 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
+                  >
+                    Review & Submit
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="default" 
+                    onClick={handleNext}
+                    className="gap-2 px-8"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -293,7 +307,181 @@ export default function ExamInterface() {
 
         {/* Right Sidebar (Palette) */}
         <div className="w-80 border-l hidden xl:block bg-muted/10">
-          <QuestionPalette questionIds={questions.map(q => q.id)} />
+          <QuestionPalette 
+            questionIds={questions.map(q => q.id)} 
+            onQuestionSelect={(idx) => setCurrentQuestion(idx)}
+          />
+        </div>
+      </div>
+
+      {/* Full Screen Review Overlay */}
+      {showReview && (
+        <ExamReviewOverlay 
+          questions={questions}
+          answers={answers}
+          onBack={() => setShowReview(false)}
+          onNavigate={(idx) => {
+            setCurrentQuestion(idx);
+            setShowReview(false);
+          }}
+          onSubmit={handleSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+function ExamReviewOverlay({ 
+  questions, 
+  answers, 
+  onBack, 
+  onNavigate, 
+  onSubmit 
+}: { 
+  questions: QuestionData[], 
+  answers: Record<string, any>, 
+  onBack: () => void, 
+  onNavigate: (idx: number) => void, 
+  onSubmit: () => Promise<void> 
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const stats = {
+    total: questions.length,
+    attempted: Object.values(answers).filter(a => a.selectedOptionId).length,
+    unattempted: questions.length - Object.values(answers).filter(a => a.selectedOptionId).length,
+    marked: Object.values(answers).filter(a => a.status === 'MARKED_FOR_REVIEW' || a.status === 'ANSWERED_AND_MARKED').length,
+  };
+
+  const handleFinalSubmit = async () => {
+    setSubmitting(true);
+    await onSubmit();
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-background flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="border-b p-4 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950">
+        <h2 className="text-xl font-bold">Exam Final Review</h2>
+        <Button variant="ghost" onClick={onBack}>Back to Exam</Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 md:p-12">
+        <div className="max-w-5xl mx-auto space-y-12">
+          
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total</p>
+              <p className="text-3xl font-bold">{stats.total}</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800">
+              <p className="text-sm text-green-600 dark:text-green-400 font-medium">Attempted</p>
+              <p className="text-3xl font-bold">{stats.attempted}</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800">
+              <p className="text-sm text-muted-foreground font-medium">Unattempted</p>
+              <p className="text-3xl font-bold">{stats.unattempted}</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
+              <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Review</p>
+              <p className="text-3xl font-bold">{stats.marked}</p>
+            </div>
+          </div>
+
+          {/* Detailed Palette */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              Question Response Status
+            </h3>
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-12 gap-3">
+              {questions.map((q, idx) => {
+                const ans = answers[q.id];
+                const status = ans?.status || 'UNANSWERED';
+                
+                let bgColor = "bg-zinc-100 dark:bg-zinc-800 text-zinc-400";
+                let borderColor = "border-zinc-200 dark:border-zinc-700";
+                
+                if (status === 'ANSWERED') {
+                  bgColor = "bg-green-600 text-white";
+                  borderColor = "border-green-700";
+                } else if (status === 'MARKED_FOR_REVIEW') {
+                  bgColor = "bg-purple-600 text-white";
+                  borderColor = "border-purple-700";
+                } else if (status === 'ANSWERED_AND_MARKED') {
+                  bgColor = "bg-purple-600 text-white ring-2 ring-purple-400 ring-offset-2 dark:ring-offset-zinc-900";
+                  borderColor = "border-purple-700";
+                }
+
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => onNavigate(idx)}
+                    className={`w-10 h-10 rounded-lg border text-sm font-bold flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${bgColor} ${borderColor}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Legends */}
+          <div className="flex flex-wrap gap-6 p-4 bg-muted/30 rounded-xl text-xs font-medium">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-green-600"></div>
+              <span>Answered</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+              <span>Not Answered</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-purple-600"></div>
+              <span>Marked for Review</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-purple-600 ring-1 ring-purple-400 ring-offset-1"></div>
+              <span>Answered & Marked</span>
+            </div>
+          </div>
+
+          {/* Submission Final Actions */}
+          <div className="pt-12 border-t flex flex-col items-center space-y-6 text-center">
+            <div className="max-w-md space-y-3">
+              <h3 className="text-2xl font-bold text-destructive">Ready to submit?</h3>
+              <p className="text-muted-foreground">
+                Once you submit the test, you will not be able to change your answers. 
+                Please ensure you have reviewed all marked questions.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-4 w-full max-w-sm">
+              <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/50 rounded-xl">
+                <input 
+                  type="checkbox" 
+                  id="confirm-submit" 
+                  checked={confirmed} 
+                  onChange={(e) => setConfirmed(e.target.checked)}
+                  className="w-5 h-5 accent-destructive"
+                />
+                <label htmlFor="confirm-submit" className="text-sm font-medium cursor-pointer">
+                  I understand that I cannot resume this test after submission.
+                </label>
+              </div>
+
+              <Button 
+                onClick={handleFinalSubmit} 
+                disabled={!confirmed || submitting}
+                className="h-14 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-500/20 transition-all disabled:opacity-50 disabled:grayscale"
+              >
+                {submitting ? "Submitting Exam..." : "Submit Final Test"}
+              </Button>
+              <Button variant="ghost" onClick={onBack}>Return to Question Paper</Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

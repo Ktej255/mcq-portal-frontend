@@ -1,7 +1,15 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "../firebase/config";
+import {
+  auth,
+  googleProvider,
+  getRedirectResult,
+  signInWithRedirect,
+  signOut,
+  onAuthStateChanged,
+  User,
+} from "../firebase/config";
 import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
@@ -41,6 +49,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     let settled = false;
 
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log("FORENSIC | getRedirectResult SUCCESS | User:", result.user.email);
+        }
+      })
+      .catch((err) => {
+        console.error("FORENSIC | getRedirectResult ERROR | Code:", err.code, "Message:", err.message);
+      });
+
     console.log("FORENSIC | Registering onAuthStateChanged listener");
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log("FORENSIC | onAuthStateChanged Fired | User exists:", !!currentUser);
@@ -56,6 +74,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       settled = true;
       setUser(currentUser);
       setLoading(false);
+      if (currentUser && window.location.pathname.startsWith("/login")) {
+        const params = new URLSearchParams(window.location.search);
+        router.replace(params.get("redirect") || "/dashboard");
+      }
     });
 
     const fallback = window.setTimeout(() => {
@@ -79,17 +101,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
     try {
-      console.log("FORENSIC | Opening signInWithPopup...");
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log("FORENSIC | signInWithPopup SUCCESS | User:", result.user.email);
-      
-      const token = await result.user.getIdToken();
-      console.log("FORENSIC | Post-login Token Check | Length:", token?.length);
-      
-      setUser(result.user);
-      router.push("/dashboard");
+      console.log("FORENSIC | Starting signInWithRedirect...");
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
-      console.error("FORENSIC | signInWithPopup ERROR | Code:", error.code, "Message:", error.message);
+      console.error("FORENSIC | signInWithRedirect ERROR | Code:", error.code, "Message:", error.message);
       console.error("FORENSIC | Full Error Object:", error);
       throw error;
     }

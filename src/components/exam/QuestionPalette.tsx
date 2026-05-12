@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 
 interface QuestionPaletteProps {
   questionIds: string[];
+  onQuestionSelect?: (index: number) => void;
 }
 
-export function QuestionPalette({ questionIds }: QuestionPaletteProps) {
+export function QuestionPalette({ questionIds, onQuestionSelect }: QuestionPaletteProps) {
   const { answers, currentQuestionIndex, setCurrentQuestion } = useExamStore();
 
   const getStatusColor = (status: QuestionStatus) => {
@@ -42,7 +43,13 @@ export function QuestionPalette({ questionIds }: QuestionPaletteProps) {
                 key={id}
                 variant="outline"
                 className={`w-full aspect-square p-0 rounded-md font-medium transition-all ${getStatusColor(status)} ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-                onClick={() => setCurrentQuestion(index)}
+                onClick={() => {
+                  if (onQuestionSelect) {
+                    onQuestionSelect(index);
+                  } else {
+                    setCurrentQuestion(index);
+                  }
+                }}
               >
                 {index + 1}
               </Button>

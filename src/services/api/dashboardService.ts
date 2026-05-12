@@ -13,9 +13,18 @@ export interface DashboardSummary {
 }
 
 export interface PerformanceReport {
+  attemptId?: string;
+  totalScore: number;
+  accuracy: number;
+  correctCount: number;
+  incorrectCount: number;
+  unattemptedCount: number;
   subjectScores: { subject: string; score: number; total: number }[];
   confidenceAnalytics: { level: string; accuracy: number; count: number }[];
   scoreTrends: { date: string; score: number }[];
+  topicWiseAnalysis?: Record<string, { correct: number; incorrect: number; unattempted: number; total: number }>;
+  subjectWisePerformance?: Record<string, { correct: number; incorrect: number; unattempted: number; total: number }>;
+  averageTimePerQuestion?: number;
 }
 
 export interface HistoryItem {
@@ -56,11 +65,20 @@ export const dashboardService = {
     const response = await apiClient.get(url);
     const payload = response.data?.data ?? response.data;
     return {
+      attemptId: payload?.attemptId,
+      totalScore: payload?.total_score ?? payload?.totalScore ?? 0,
+      accuracy: payload?.accuracy ?? 0,
+      correctCount: payload?.correct_count ?? payload?.correctCount ?? 0,
+      incorrectCount: payload?.incorrect_count ?? payload?.incorrectCount ?? 0,
+      unattemptedCount: payload?.unattempted_count ?? payload?.unattemptedCount ?? 0,
       subjectScores: payload?.subjectScores ?? [],
-      confidenceAnalytics: Array.isArray(payload?.confidenceAnalytics)
-        ? payload.confidenceAnalytics
+      confidenceAnalytics: Array.isArray(payload?.confidence_analysis || payload?.confidenceAnalytics)
+        ? (payload.confidence_analysis || payload.confidenceAnalytics)
         : [],
       scoreTrends: payload?.scoreTrends ?? [],
+      topicWiseAnalysis: payload?.topic_wise_analysis || payload?.topicWiseAnalysis,
+      subjectWisePerformance: payload?.subject_wise_performance || payload?.subjectWisePerformance,
+      averageTimePerQuestion: payload?.average_time_per_question || payload?.averageTimePerQuestion,
     };
   },
 };
