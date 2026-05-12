@@ -1,0 +1,117 @@
+{
+  "startedAt": "2026-05-12T07:54:00.527Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "backend": "https://mcq-backend-822862054564.us-central1.run.app",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T07-54-00-501Z\\00-initial.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T07-54-00-501Z\\01-dashboard-after-login.png"
+  ],
+  "api": [],
+  "consoleErrors": [
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=0527562645&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=0527562645&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaPopup&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&eventId=6045378659&providerId=google.com&scopes=profile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "Cross-Origin-Opener-Policy policy would block the window.closed call."
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "Cross-Origin-Opener-Policy policy would block the window.closed call."
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "FORENSIC | signInWithPopup ERROR | Code: auth/popup-closed-by-user Message: Firebase: Error (auth/popup-closed-by-user)."
+    },
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "type": "error",
+      "text": "FORENSIC | Full Error Object: FirebaseError: Firebase: Error (auth/popup-closed-by-user).\n    at ex (https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:26481)\n    at eM (https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:25844)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:92869"
+    }
+  ],
+  "pageErrors": [
+    {
+      "page": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+      "message": "Firebase: Error (auth/popup-closed-by-user).",
+      "stack": "FirebaseError: Firebase: Error (auth/popup-closed-by-user).\n    at ex (https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:26481)\n    at eM (https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:25844)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/00z8ah8bisa8j.js:1:92869"
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard&_rsc=zEDo8fYcSbGT65Cz",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://accounts.google.com/restart?app_domain=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com&client_id=822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAPJp42ICtghqwIAryGMLKhrPFmzgQbriwmqMOVacLzhovrJbf4TpIiNohCoHYuz2SHzqLBNtX4chk9x7uVaa4hbVa-1NkIpAN61fOzuZjjQK4nQUGp01XylVSvBxr3nh2ks7sWic_e0LXsO9JW39BnSd3rLBUDtIWRxQqDoT1skUTIaet696XC9d5Y-Hry1AsCVOsol9JEe7pBVlMNxLJwlO4XP1wYZWWW0dYLetveISenOlPeUd6j3W5KJcv1nqcPOHI0WNAbcGRjI1dMD5Cfq-7G2GUzMUGUEE0zT4FYxTvAcPdfmndhZ27IdBCNk6ePHhbH6zw9GbnPHfHpeYYkfYML-7U4RxIt96COHIDWKxJqYDHryn2nssNWlAQtiyraLDQwD7RwzLRBRsGD76qLLDqsxk-Tejez91kOKrH8bdxEc9KHQyVVoh7I7DMxihit_-6Dpnlqkw3M8h1fkKl7qLyY085XbQxPHUG4l80ElB79Wz7sU8zwhRPpKM1-swwGVRbly%26flowName%3DGeneralOAuthFlow%26as%3DS-1020706345%253A1778572469641961%26client_id%3D822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&dsh=S-1020706345%3A1778572469641961&flowName=GeneralOAuthFlow&o2v=1&opparams=%253Fcontext_uri%253Dhttps%25253A%25252F%25252Fmcq-portal-frontend.vercel.app&rart=ANgoxcfHNPK91DrDGVs-oCW6qi4QEh95kj8rRT1FAXxqObVWFRogQZYdOBPP7ZzG6UFq24vNCKCeCLVr6iprAH5EAcS41SBmm_V1Z7ovRUgR5DkhaZ4o2II&redirect_uri=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com%2F__%2Fauth%2Fhandler&response_type=code&scope=openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20profile&service=lso&state=AMbdmDneOc8fDirsCHtphf1Bhz8TTmtWAWmj0iSanUdkjWLWJ306NV1yR9jSMYnQZwV7Q79ZDfZrPJFXBYi0p_dX6NqvVDnRCYU1_mp4h5-pBXZ29GeXhyOm-FH-pH31r30yxRh35VXydFzcl9DQwPPRv4nbgdKxMpNWmxeehaO50GdjO9WiZysfHIcdW9lZ3w_H3YDUMsCSC58OXkQ8Zzzvzr6ZGTTNVem2psPqh63FFucoyKC40t3ppQATGHrprxegd3--mUFpxxs6s0brWI94jLhqbOkR1NjK8NEpNYjOblmltSoKxHeCRih3nPASGbVIVC286pZH6sgrdDgQGYiR",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://accounts.google.com/restart?app_domain=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com&client_id=822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAPJp42ICtghqwIAryGMLKhrPFmzgQbriwmqMOVacLzhovrJbf4TpIiNohCoHYuz2SHzqLBNtX4chk9x7uVaa4hbVa-1NkIpAN61fOzuZjjQK4nQUGp01XylVSvBxr3nh2ks7sWic_e0LXsO9JW39BnSd3rLBUDtIWRxQqDoT1skUTIaet696XC9d5Y-Hry1AsCVOsol9JEe7pBVlMNxLJwlO4XP1wYZWWW0dYLetveISenOlPeUd6j3W5KJcv1nqcPOHI0WNAbcGRjI1dMD5Cfq-7G2GUzMUGUEE0zT4FYxTvAcPdfmndhZ27IdBCNk6ePHhbH6zw9GbnPHfHpeYYkfYML-7U4RxIt96COHIDWKxJqYDHryn2nssNWlAQtiyraLDQwD7RwzLRBRsGD76qLLDqsxk-Tejez91kOKrH8bdxEc9KHQyVVoh7I7DMxihit_-6Dpnlqkw3M8h1fkKl7qLyY085XbQxPHUG4l80ElB79Wz7sU8zwhRPpKM1-swwGVRbly%26flowName%3DGeneralOAuthFlow%26as%3DS-1020706345%253A1778572469641961%26client_id%3D822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&dsh=S-1020706345%3A1778572469641961&flowName=GeneralOAuthFlow&o2v=1&opparams=%253Fcontext_uri%253Dhttps%25253A%25252F%25252Fmcq-portal-frontend.vercel.app&rart=ANgoxcfHNPK91DrDGVs-oCW6qi4QEh95kj8rRT1FAXxqObVWFRogQZYdOBPP7ZzG6UFq24vNCKCeCLVr6iprAH5EAcS41SBmm_V1Z7ovRUgR5DkhaZ4o2II&redirect_uri=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com%2F__%2Fauth%2Fhandler&response_type=code&scope=openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20profile&service=lso&state=AMbdmDneOc8fDirsCHtphf1Bhz8TTmtWAWmj0iSanUdkjWLWJ306NV1yR9jSMYnQZwV7Q79ZDfZrPJFXBYi0p_dX6NqvVDnRCYU1_mp4h5-pBXZ29GeXhyOm-FH-pH31r30yxRh35VXydFzcl9DQwPPRv4nbgdKxMpNWmxeehaO50GdjO9WiZysfHIcdW9lZ3w_H3YDUMsCSC58OXkQ8Zzzvzr6ZGTTNVem2psPqh63FFucoyKC40t3ppQATGHrprxegd3--mUFpxxs6s0brWI94jLhqbOkR1NjK8NEpNYjOblmltSoKxHeCRih3nPASGbVIVC286pZH6sgrdDgQGYiR",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://accounts.google.com/restart?app_domain=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com&client_id=822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAP2829FoK0gZkRvlShqW51O1F86pjs923BkwhBNMjwF1Y7tYn0tnil52q3m3R8UzP8qjTHF99THe8xX5JI7zHlv8mVOUDMFd0c-hydt1IZCTQyXN-sBn253DnU8b5NrEq7FTAqiva9zuU4te4LRIifW2aU_swFkySJRbTRW-qaOSOHOT0INaG_zVB5Ixrdx3vrCiGMBLdl2CXR7uEthih1xVUGUSMH4lZNvDGEfwP-jH27uJ3jzqj9k90QNMpW9ahihn02uBwp0HQFLegUWrZglP9hgeV_98kJDjLCm7jKnJfB-jiuN8IUKL68fmlyuH-12PmUJdHtAgIMt-kK1MZzFvZehV8ucuG-4vf0nU3zyCOQmvbqGX-qD5QlU7WNwL6DFgzAaHuBRhSVv6sgN5a6eJi3wOfCpF8YQiNFlDM_Rf28kmAmtc0S5vP2woD_RtegFqVruuISkz28h6bHDJdYUmlDMaqvuKnFB8xFswXzNgP7AV9YVbz9u6vfywstEw9Cig-U1%26flowName%3DGeneralOAuthFlow%26as%3DS-804447998%253A1778572485128543%26client_id%3D822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&dsh=S-804447998%3A1778572485128543&flowName=GeneralOAuthFlow&o2v=1&opparams=%253Fcontext_uri%253Dhttps%25253A%25252F%25252Fmcq-portal-frontend.vercel.app&rart=ANgoxccplXJdSVoJ4QO_1OiGP79rHZinkAhSoXFEUKxDHwbNqrRsS7AyxKx5EIJReK0HGy5Xwon4C7AT17nK9CrI7iHHdawsF2YhV4IbsVZ_AR__v3Xz0cg&redirect_uri=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com%2F__%2Fauth%2Fhandler&response_type=code&scope=openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20profile&service=lso&state=AMbdmDneOc8fDirsCHtphf1Bhz8TTmtWAWmj0iSanUdkjWLWJ306NV1yR9jSMYnQZwV7Q79ZDfZrPJFXBYi0p_dX6NqvVDnRCYU1_mp4h5-pBXZ29GeXhyOm-FH-pH31r30yxRh35VXydFzcl9DQwPPRv4nbgdKxMpNWmxeehaO50GdjO9WiZysfHIcdW9lZ3w_H3YDUMsCSC58OXkQ8Zzzvzr6ZGTTNVem2psPqh63FFucoyKC40t3ppQATGHrprxegd3--mUFpxxs6s0brWI94jLhqbOkR1NjK8NEpNYjOblmltSoKxHeCRih3nPASGbVIVC286pZH6sgrdDgQGYiR",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "url": "https://accounts.google.com/restart?app_domain=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com&client_id=822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAP2829FoK0gZkRvlShqW51O1F86pjs923BkwhBNMjwF1Y7tYn0tnil52q3m3R8UzP8qjTHF99THe8xX5JI7zHlv8mVOUDMFd0c-hydt1IZCTQyXN-sBn253DnU8b5NrEq7FTAqiva9zuU4te4LRIifW2aU_swFkySJRbTRW-qaOSOHOT0INaG_zVB5Ixrdx3vrCiGMBLdl2CXR7uEthih1xVUGUSMH4lZNvDGEfwP-jH27uJ3jzqj9k90QNMpW9ahihn02uBwp0HQFLegUWrZglP9hgeV_98kJDjLCm7jKnJfB-jiuN8IUKL68fmlyuH-12PmUJdHtAgIMt-kK1MZzFvZehV8ucuG-4vf0nU3zyCOQmvbqGX-qD5QlU7WNwL6DFgzAaHuBRhSVv6sgN5a6eJi3wOfCpF8YQiNFlDM_Rf28kmAmtc0S5vP2woD_RtegFqVruuISkz28h6bHDJdYUmlDMaqvuKnFB8xFswXzNgP7AV9YVbz9u6vfywstEw9Cig-U1%26flowName%3DGeneralOAuthFlow%26as%3DS-804447998%253A1778572485128543%26client_id%3D822862054564-nqa567r3ka4cd3t6oiulruf7rlldqs7s.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&dsh=S-804447998%3A1778572485128543&flowName=GeneralOAuthFlow&o2v=1&opparams=%253Fcontext_uri%253Dhttps%25253A%25252F%25252Fmcq-portal-frontend.vercel.app&rart=ANgoxccplXJdSVoJ4QO_1OiGP79rHZinkAhSoXFEUKxDHwbNqrRsS7AyxKx5EIJReK0HGy5Xwon4C7AT17nK9CrI7iHHdawsF2YhV4IbsVZ_AR__v3Xz0cg&redirect_uri=https%3A%2F%2Fmcq-intelligence-portal.firebaseapp.com%2F__%2Fauth%2Fhandler&response_type=code&scope=openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20profile&service=lso&state=AMbdmDneOc8fDirsCHtphf1Bhz8TTmtWAWmj0iSanUdkjWLWJ306NV1yR9jSMYnQZwV7Q79ZDfZrPJFXBYi0p_dX6NqvVDnRCYU1_mp4h5-pBXZ29GeXhyOm-FH-pH31r30yxRh35VXydFzcl9DQwPPRv4nbgdKxMpNWmxeehaO50GdjO9WiZysfHIcdW9lZ3w_H3YDUMsCSC58OXkQ8Zzzvzr6ZGTTNVem2psPqh63FFucoyKC40t3ppQATGHrprxegd3--mUFpxxs6s0brWI94jLhqbOkR1NjK8NEpNYjOblmltSoKxHeCRih3nPASGbVIVC286pZH6sgrdDgQGYiR",
+      "method": "GET",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "label": "authenticated-session",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/login?redirect=/dashboard",
+        "debug": {
+          "lastRequest": null,
+          "lastResponse": null,
+          "authState": "INITIALIZING",
+          "tokenPresent": false,
+          "user": null,
+          "errors": []
+        },
+        "localStorageKeys": [],
+        "bodyText": "M\nMCQ Intelligence Portal\n\nAuthorized access only. Use your official Google account to sign in.\n\nContinue with Google\n\nENTERPRISE GRADE SECURITY"
+      }
+    },
+    {
+      "label": "02-dashboard-google-login",
+      "clicked": "button:has-text('Continue with Google')"
+    }
+  ],
+  "fatal": {
+    "message": "page.waitForFunction: Target page, context or browser has been closed",
+    "stack": "page.waitForFunction: Target page, context or browser has been closed\n    at ensureAuthenticated (D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:106:14)\n    at async gotoAndCapture (D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:76:3)\n    at async D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:205:3"
+  }
+}

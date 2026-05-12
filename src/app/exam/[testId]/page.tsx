@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useExamStore, ConfidenceLevel } from '@/lib/store/useExamStore';
 import { useTimerStore } from '@/lib/store/useTimerStore';
 import { useAutoSave } from '@/lib/hooks/useAutoSave';
