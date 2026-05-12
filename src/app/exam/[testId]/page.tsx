@@ -18,6 +18,7 @@ import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
 import { examService, QuestionData } from '@/services/api/examService';
 import { eventsService } from '@/services/api/eventsService';
+import { normalizeOptionId, normalizeConfidence } from '@/services/api/contracts';
 import { toast } from 'sonner';
 
 export default function ExamInterface() {
@@ -79,9 +80,7 @@ export default function ExamInterface() {
   useEffect(() => {
     if (lastViolation && attemptId) {
       eventsService.record({
-        event_type: lastViolation.includes('Tab') ? 'TAB_SWITCHED' : 
-                    lastViolation.includes('Context') ? 'CONTEXT_MENU_BLOCKED' : 
-                    lastViolation.includes('Copy') ? 'COPY_PASTE_BLOCKED' : 'TAB_SWITCHED',
+        event_type: lastViolation.includes('Fullscreen') ? 'FULLSCREEN_EXIT' : 'TAB_SWITCH',
         payload: { violation: lastViolation }
       }, attemptId);
     }
@@ -146,9 +145,9 @@ export default function ExamInterface() {
     
     if (attemptId) {
       eventsService.record({
-        event_type: isChange ? 'ANSWER_CHANGED' : 'ANSWER_SELECTED',
+        event_type: 'ANSWER_CHANGED',
         question_id: parseInt(question.id, 10),
-        payload: { option_id: optionId, old_id: currentAnswer?.selectedOptionId }
+        payload: { option_id: normalizeOptionId(optionId), old_id: normalizeOptionId(currentAnswer?.selectedOptionId) }
       }, attemptId);
     }
   };
@@ -157,9 +156,9 @@ export default function ExamInterface() {
     setAnswer(question.id, currentAnswer?.selectedOptionId || null, level);
     if (attemptId) {
       eventsService.record({
-        event_type: 'CONFIDENCE_UPDATED',
+        event_type: 'CONFIDENCE_SELECTED',
         question_id: parseInt(question.id, 10),
-        payload: { level }
+        payload: { level: normalizeConfidence(level) }
       }, attemptId);
     }
   };
@@ -358,7 +357,7 @@ export default function ExamInterface() {
                     markForReview(question.id);
                     if (attemptId) {
                       eventsService.record({
-                        event_type: 'MARKED_FOR_REVIEW',
+                        event_type: 'REVIEW_MARKED',
                         question_id: parseInt(question.id, 10),
                         payload: { status: true }
                       }, attemptId);
@@ -482,6 +481,11 @@ function ExamReviewOverlay({
 
   const handleFinalSubmit = async () => {
     setSubmitting(true);
+    const attemptId = new URLSearchParams(window.location.search).get('attemptId');
+    if (attemptId) {
+      eventsService.record({ event_type: 'SUBMIT_CLICKED' }, attemptId);
+      await eventsService.flush(attemptId);
+    }
     await onSubmit();
     setSubmitting(false);
   };

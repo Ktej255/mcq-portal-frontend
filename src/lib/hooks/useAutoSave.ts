@@ -11,7 +11,9 @@ export const useAutoSave = (attemptId: string | null) => {
   
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const retryCount = useRef(0);
-  const lastSavedAnswers = useRef<string>('');
+  const lastSavedByQuestion = useRef<Record<string, string>>({});
+  const inFlight = useRef(false);
+  const queued = useRef(false);
   const wasOffline = useRef(false);
 
   const syncToBackendRef = useRef<(isRetry?: boolean) => Promise<void>>(() => Promise.resolve());
@@ -21,20 +23,30 @@ export const useAutoSave = (attemptId: string | null) => {
 
     const payload = Object.values(answers).filter(answer => answer.status !== 'NOT_VISITED');
     if (payload.length === 0) return;
-    const payloadString = JSON.stringify(payload);
+    const changedPayload = payload.filter((answer: any) => {
+      const key = String(answer.questionId);
+      return JSON.stringify(answer) !== lastSavedByQuestion.current[key];
+    });
 
-    // Deduplication
-    if (!isRetry && payloadString === lastSavedAnswers.current) {
+    if (!isRetry && changedPayload.length === 0) {
+      return;
+    }
+    if (inFlight.current) {
+      queued.current = true;
       return;
     }
 
+    const payloadToSave = isRetry ? payload : changedPayload;
+    inFlight.current = true;
     setIsSaving(true);
     setSaveError(null);
 
     try {
-      await examService.saveAnswers(attemptId, payload);
+      await examService.saveAnswers(attemptId, payloadToSave);
       setLastSaved(new Date());
-      lastSavedAnswers.current = payloadString;
+      payloadToSave.forEach((answer: any) => {
+        lastSavedByQuestion.current[String(answer.questionId)] = JSON.stringify(answer);
+      });
       retryCount.current = 0; // Reset on success
       
       if (wasOffline.current) {
@@ -57,7 +69,12 @@ export const useAutoSave = (attemptId: string | null) => {
         }
       }
     } finally {
+      inFlight.current = false;
       setIsSaving(false);
+      if (queued.current) {
+        queued.current = false;
+        syncToBackendRef.current(false);
+      }
     }
   }, [answers, attemptId]);
 

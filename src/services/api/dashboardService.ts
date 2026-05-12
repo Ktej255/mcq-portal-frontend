@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { normalizeReportPayload } from './contracts';
 
 export interface DashboardSummary {
   totalTestsTaken: number;
@@ -82,8 +83,9 @@ export const dashboardService = {
           accuracy: value.total ? ((value.correct ?? 0) / value.total) * 100 : 0,
           count: value.total ?? 0,
         }));
-    const totalScore = payload.totalScore ?? payload.total_score ?? 0;
-    const accuracy = payload.accuracy ?? 0;
+    const strictReport = normalizeReportPayload(payload, attemptId);
+    const totalScore = strictReport.totalScore;
+    const accuracy = strictReport.accuracy;
     const strengths = Object.entries(topicWiseAnalysis)
       .filter(([, value]: [string, any]) => value.total && ((value.correct ?? 0) / value.total) >= 0.7)
       .map(([topic]) => topic);
@@ -96,9 +98,9 @@ export const dashboardService = {
       totalScore,
       accuracy,
       percentile: payload.percentile ?? Math.max(5, Math.min(99, Math.round(accuracy * 0.9 + 10))),
-      correctCount: payload.correctCount ?? payload.correct_count ?? 0,
-      incorrectCount: payload.incorrectCount ?? payload.incorrect_count ?? 0,
-      unattemptedCount: payload.unattemptedCount ?? payload.unattempted_count ?? 0,
+      correctCount: strictReport.correctCount,
+      incorrectCount: strictReport.incorrectCount,
+      unattemptedCount: strictReport.unattemptedCount,
       subjectScores,
       confidenceAnalytics,
       topicWiseAnalysis,

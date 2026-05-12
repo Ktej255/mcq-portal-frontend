@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import { ConfidenceLevel, QuestionStatus } from '@/lib/store/useExamStore';
+import { normalizeConfidence, normalizeOptionId } from './contracts';
 
 export interface TestMetadata {
   id: string;
@@ -7,7 +8,10 @@ export interface TestMetadata {
   description: string;
   durationMinutes: number;
   totalQuestions: number;
-  subjects: string[];
+  subject: string;
+  attemptCount: number;
+  lastAttemptStatus: 'IN_PROGRESS' | 'SUBMITTED' | null;
+  lastAttemptDate: string | null;
 }
 
 export interface QuestionData {
@@ -83,9 +87,9 @@ export const examService = {
     for (const answer of saveableAnswers) {
       const response = await apiClient.put(`attempts/${attemptId}/answers`, {
         question_id: parseInt(answer.questionId),
-        selected_option: answer.selectedOptionId,
+        selected_option: normalizeOptionId(answer.selectedOptionId),
         time_taken_seconds: answer.timeSpentSeconds,
-        confidence_level: answer.confidence,
+        confidence_level: normalizeConfidence(answer.confidence),
         is_skipped: answer.status === 'UNANSWERED',
         marked_for_review: answer.status === 'MARKED_FOR_REVIEW' || answer.status === 'ANSWERED_AND_MARKED',
       });
