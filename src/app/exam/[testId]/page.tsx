@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
 import { useSearchParams } from 'next/navigation';
@@ -146,7 +145,7 @@ export default function ExamInterface() {
           testName="Exam in Progress" 
           totalQuestions={questions.length} 
           durationSeconds={10800} 
-          onSubmit={handleSubmit}
+        onSubmit={() => setShowReview(true)}
           onRequestFullscreen={requestFullscreen}
         />
       </div>
@@ -157,28 +156,40 @@ export default function ExamInterface() {
           
           {/* Mobile Palette Toggle */}
           <div className="xl:hidden fixed bottom-24 right-6 z-40">
-            <Sheet open={mobilePaletteOpen} onOpenChange={setMobilePaletteOpen}>
-              <SheetTrigger asChild>
-                <Button size="icon" className="w-14 h-14 rounded-full shadow-2xl bg-primary text-primary-foreground border-4 border-white dark:border-zinc-900">
-                  <Menu className="w-6 h-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
-                <SheetHeader className="p-6 border-b">
-                  <SheetTitle>Question Navigator</SheetTitle>
-                </SheetHeader>
-                <div className="h-full overflow-y-auto">
-                  <QuestionPalette 
-                    questionIds={questions.map(q => q.id)} 
+            <Button
+              size="icon"
+              onClick={() => setMobilePaletteOpen(true)}
+              className="w-14 h-14 rounded-full shadow-2xl bg-primary text-primary-foreground border-4 border-white dark:border-zinc-900"
+            >
+              <Menu className="w-6 h-6" />
+            </Button>
+          </div>
+
+          {mobilePaletteOpen && (
+            <div className="fixed inset-0 z-[180] xl:hidden">
+              <button
+                type="button"
+                aria-label="Close question navigator"
+                className="absolute inset-0 bg-black/45"
+                onClick={() => setMobilePaletteOpen(false)}
+              />
+              <aside className="absolute right-0 top-0 h-full w-[min(88vw,380px)] bg-background shadow-2xl border-l">
+                <div className="flex items-center justify-between border-b p-4">
+                  <h2 className="text-lg font-bold">Question Navigator</h2>
+                  <Button variant="ghost" size="sm" onClick={() => setMobilePaletteOpen(false)}>Close</Button>
+                </div>
+                <div className="h-[calc(100%-65px)] overflow-y-auto p-3">
+                  <QuestionPalette
+                    questionIds={questions.map(q => q.id)}
                     onQuestionSelect={(idx) => {
                       setCurrentQuestion(idx);
                       setMobilePaletteOpen(false);
                     }}
                   />
                 </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+              </aside>
+            </div>
+          )}
 
           {/* Auto Save Status */}
           <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
@@ -334,8 +345,8 @@ export default function ExamInterface() {
                     onClick={() => setShowReview(true)}
                     className="h-11 px-5 sm:px-8 bg-green-600 hover:bg-green-700 text-white shadow-lg"
                   >
-                    Finish
-                    <ChevronRight className="w-4 h-4 ml-2" />
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Review & Submit
                   </Button>
                 ) : (
                   <Button 
@@ -368,6 +379,7 @@ export default function ExamInterface() {
           questions={questions}
           answers={answers}
           onBack={() => setShowReview(false)}
+          timeLeft={timeLeft}
           onNavigate={(idx) => {
             setCurrentQuestion(idx);
             setShowReview(false);
@@ -383,23 +395,39 @@ function ExamReviewOverlay({
   questions, 
   answers, 
   onBack, 
+  timeLeft,
   onNavigate, 
   onSubmit 
 }: { 
   questions: QuestionData[], 
   answers: Record<string, any>, 
   onBack: () => void, 
+  timeLeft: number,
   onNavigate: (idx: number) => void, 
   onSubmit: () => Promise<void> 
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const answerValues = Object.values(answers);
+  const visited = answerValues.filter(a => a.status !== 'NOT_VISITED').length;
+  const attempted = answerValues.filter(a => a.status === 'ANSWERED' || a.status === 'ANSWERED_AND_MARKED').length;
+  const unattempted = answerValues.filter(a => a.status === 'UNANSWERED' || a.status === 'MARKED_FOR_REVIEW').length;
+  const notVisited = questions.length - visited;
   const stats = {
     total: questions.length,
-    attempted: Object.values(answers).filter(a => a.selectedOptionId).length,
-    unattempted: questions.length - Object.values(answers).filter(a => a.selectedOptionId).length,
-    marked: Object.values(answers).filter(a => a.status === 'MARKED_FOR_REVIEW' || a.status === 'ANSWERED_AND_MARKED').length,
+    attempted,
+    unattempted,
+    notVisited,
+    progress: questions.length ? Math.round((visited / questions.length) * 100) : 0,
+    marked: answerValues.filter(a => a.status === 'MARKED_FOR_REVIEW' || a.status === 'ANSWERED_AND_MARKED').length,
+  };
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleFinalSubmit = async () => {
@@ -418,6 +446,24 @@ function ExamReviewOverlay({
       <div className="flex-1 overflow-y-auto p-6 md:p-12">
         <div className="max-w-5xl mx-auto space-y-12">
           
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-zinc-900">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Time Remaining</p>
+              <p className="mt-2 font-mono text-3xl font-black">{formatTime(timeLeft)}</p>
+            </div>
+            <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-zinc-900">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Visited Progress</p>
+              <p className="mt-2 text-3xl font-black">{stats.progress}%</p>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="h-full bg-blue-600 transition-all" style={{ width: `${stats.progress}%` }} />
+              </div>
+            </div>
+            <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-zinc-900">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Not Visited</p>
+              <p className="mt-2 text-3xl font-black">{stats.notVisited}</p>
+            </div>
+          </div>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
@@ -428,7 +474,7 @@ function ExamReviewOverlay({
               <p className="text-sm text-green-600 dark:text-green-400 font-medium">Attempted</p>
               <p className="text-3xl font-bold">{stats.attempted}</p>
             </div>
-            <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800">
+            <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800">
               <p className="text-sm text-muted-foreground font-medium">Unattempted</p>
               <p className="text-3xl font-bold">{stats.unattempted}</p>
             </div>
@@ -447,7 +493,7 @@ function ExamReviewOverlay({
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-12 gap-3">
               {questions.map((q, idx) => {
                 const ans = answers[q.id];
-                const status = ans?.status || 'UNANSWERED';
+                const status = ans?.status || 'NOT_VISITED';
                 
                 let bgColor = "bg-zinc-100 dark:bg-zinc-800 text-zinc-400";
                 let borderColor = "border-zinc-200 dark:border-zinc-700";
@@ -461,6 +507,9 @@ function ExamReviewOverlay({
                 } else if (status === 'ANSWERED_AND_MARKED') {
                   bgColor = "bg-purple-600 text-white ring-2 ring-purple-400 ring-offset-2 dark:ring-offset-zinc-900";
                   borderColor = "border-purple-700";
+                } else if (status === 'UNANSWERED') {
+                  bgColor = "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300";
+                  borderColor = "border-rose-200 dark:border-rose-800";
                 }
 
                 return (
@@ -483,8 +532,8 @@ function ExamReviewOverlay({
               <span>Answered</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-zinc-200 dark:bg-zinc-700"></div>
-              <span>Not Answered</span>
+              <div className="w-3 h-3 rounded bg-rose-50 border border-rose-200"></div>
+              <span>Unanswered</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded bg-purple-600"></div>
@@ -493,6 +542,10 @@ function ExamReviewOverlay({
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded bg-purple-600 ring-1 ring-purple-400 ring-offset-1"></div>
               <span>Answered & Marked</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-zinc-100 border border-zinc-200"></div>
+              <span>Not Visited</span>
             </div>
           </div>
 

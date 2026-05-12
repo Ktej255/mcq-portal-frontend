@@ -65,8 +65,8 @@ export function ExamHeader({
           )}
           <LanguageSwitcher />
           <ExamTimer testId={testId} initialTimeSeconds={durationSeconds} onTimeUp={onSubmit} />
-          <Button variant="default" onClick={onSubmit} className="font-semibold shadow-sm">
-            Submit Test
+          <Button variant="default" onClick={onSubmit} className="font-semibold shadow-sm bg-green-600 hover:bg-green-700 text-white">
+            Review & Submit
           </Button>
         </div>
       </div>
