@@ -15,7 +15,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const pathname = usePathname();
 
   // Mock role for now - in production this comes from user metadata or backend
-  const userRole = user?.email?.endsWith('@admin.com') ? 'ADMIN' : 'STUDENT';
+  const isAdmin = user?.email?.endsWith('@admin.com') || user?.email === 'sarit.kumar.dev@gmail.com';
+  const userRole = isAdmin ? 'ADMIN' : 'STUDENT';
 
   useEffect(() => {
     if (!loading) {

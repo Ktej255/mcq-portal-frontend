@@ -31,7 +31,7 @@ export function ExamHeader({
     a => a.status === 'ANSWERED' || a.status === 'ANSWERED_AND_MARKED'
   ).length;
 
-  const progressPercentage = (answeredCount / totalQuestions) * 100;
+  const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

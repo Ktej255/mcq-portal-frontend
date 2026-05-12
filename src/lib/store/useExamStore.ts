@@ -35,10 +35,10 @@ export const useExamStore = create<ExamState>()(
       answers: {},
 
   initializeTest: (testId, questionIds) => {
-    const initialAnswers: Record<string, AnswerRecord> = {};
     questionIds.forEach(id => {
-      initialAnswers[id] = {
-        questionId: id,
+      const stringId = String(id);
+      initialAnswers[stringId] = {
+        questionId: stringId,
         selectedOptionId: null,
         confidence: null,
         status: 'NOT_VISITED',
@@ -51,7 +51,8 @@ export const useExamStore = create<ExamState>()(
   setCurrentQuestion: (index) => set({ currentQuestionIndex: index }),
 
   visitQuestion: (questionId) => set((state) => {
-    const existing = state.answers[questionId];
+    const stringId = String(questionId);
+    const existing = state.answers[stringId];
     if (!existing || existing.status !== 'NOT_VISITED') return state;
 
     return {
@@ -66,7 +67,8 @@ export const useExamStore = create<ExamState>()(
   }),
 
   setAnswer: (questionId, optionId, confidence) => set((state) => {
-    const existing = state.answers[questionId];
+    const stringId = String(questionId);
+    const existing = state.answers[stringId];
     if (!existing) return state;
 
     const newStatus: QuestionStatus = 
@@ -88,7 +90,8 @@ export const useExamStore = create<ExamState>()(
   }),
 
   markForReview: (questionId) => set((state) => {
-    const existing = state.answers[questionId];
+    const stringId = String(questionId);
+    const existing = state.answers[stringId];
     if (!existing) return state;
 
     const newStatus: QuestionStatus = 
@@ -106,7 +109,8 @@ export const useExamStore = create<ExamState>()(
   }),
 
   clearResponse: (questionId) => set((state) => {
-    const existing = state.answers[questionId];
+    const stringId = String(questionId);
+    const existing = state.answers[stringId];
     if (!existing) return state;
 
     const newStatus: QuestionStatus = 
@@ -128,7 +132,8 @@ export const useExamStore = create<ExamState>()(
   }),
 
   recordTime: (questionId, timeSpent) => set((state) => {
-    const existing = state.answers[questionId];
+    const stringId = String(questionId);
+    const existing = state.answers[stringId];
     if (!existing) return state;
 
     return {

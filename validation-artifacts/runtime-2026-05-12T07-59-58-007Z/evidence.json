@@ -1,0 +1,1646 @@
+{
+  "startedAt": "2026-05-12T07:59:58.012Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "cdpEndpoint": "http://127.0.0.1:9222",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\01-dashboard.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\02-tests.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\03-exam-open.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\04-q1-answered-autosaved.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\05-q2-answered-autosaved.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\06-review-mark-navigation.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\07-refresh-recovery.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\08-final-question-cta.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\09-review-screen.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\10-report-after-submit.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\11-history.png",
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\runtime-2026-05-12T07-59-58-007Z\\12-aggregate-report.png"
+  ],
+  "requests": [
+    {
+      "at": "2026-05-12T08:00:01.060Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/dashboard/summary",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    },
+    {
+      "at": "2026-05-12T08:00:05.048Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/available",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    },
+    {
+      "at": "2026-05-12T08:00:08.705Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/attempts/start",
+      "method": "POST",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json"
+      },
+      "postData": "{\"test_id\":1}"
+    },
+    {
+      "at": "2026-05-12T08:00:09.481Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/1/questions",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    },
+    {
+      "at": "2026-05-12T08:00:26.161Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/1/questions",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    },
+    {
+      "at": "2026-05-12T08:01:40.635Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/attempts/history",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    },
+    {
+      "at": "2026-05-12T08:01:44.403Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/reports/aggregate",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg2OGU0YWNlMGI2NTE2ZDM2YjlmNTZkZThjZTQ5Nzg4ZmNjZGFjNDMiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiVGVqIEJhaGFkdXIiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFRkSzNUNDFaV29YR0pDamExQURxbENZbzY1Zms2cVRyV1BTZ2xfYXppNm5NQ2NMWnA9czk2LWMiLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbWNxLWludGVsbGlnZW5jZS1wb3J0YWwiLCJhdWQiOiJtY3EtaW50ZWxsaWdlbmNlLXBvcnRhbCIsImF1dGhfdGltZSI6MTc3ODU3MTcyMCwidXNlcl9pZCI6IkdmdkU1bXhWQlpRbFBmMUpEbHgwUUY3YVh3STIiLCJzdWIiOiJHZnZFNW14VkJaUWxQZjFKRGx4MFFGN2FYd0kyIiwiaWF0IjoxNzc4NTcxNzIwLCJleHAiOjE3Nzg1NzUzMjAsImVtYWlsIjoia3RlajI1NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExMzEwMDM1NDI2NDY1ODYxMzM5NCJdLCJlbWFpbCI6WyJrdGVqMjU1QGdtYWlsLmNvbSJdfSwic2lnbl9pbl9wcm92aWRlciI6Imdvb2dsZS5jb20ifX0.fSz5XlF0PH4gPtSGU5yPkIgIVZ22aCNZRlj93uBFlUOypXRSgygy4LjSOaSGDeTSO9y-vBB3wJZ4WNx6XOYLszgZ7fyRW5Og7eKouJ8fkILcCCx-9L5yQavl4eoTd62_ISWIcj-p1fNAv6cCClHA9A6xHoeyMS648sEZRk1jEAKK3dpzhTwpT1S8Pt1qMdS1Rtt1v5Te3Xi6AVdz0IwQk193FC1oceEVYFQJQ7YLonLnrW87oYpy9VWNzURtLwhxyaCmdmSab_nwwNWJvmeu4avsQ4RDocL_JeLQbSJ3mO_sHQMu6Z4AmxR6j1mdMXtPvL6vyxz1W-RJPWKkmpJzrA",
+        "referer": "https://mcq-portal-frontend.vercel.app/",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "accept": "application/json, text/plain, */*",
+        "sec-ch-ua": "\"Chromium\";v=\"148\", \"Google Chrome\";v=\"148\", \"Not/A)Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "postData": null
+    }
+  ],
+  "responses": [
+    {
+      "at": "2026-05-12T08:00:01.460Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/dashboard/summary",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.05070853233337402",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "352",
+        "date": "Tue, 12 May 2026 08:00:02 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "35dff1ba8e1c73014b00f6c5a2a76ae0;o=1",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Dashboard summary retrieved",
+        "data": {
+          "totalTestsTaken": 2,
+          "averageScore": -0.5,
+          "recentTests": [
+            {
+              "attemptId": "2",
+              "testTitle": "Physics Mock Test 1",
+              "score": 0,
+              "maxScore": 4,
+              "date": "2026-05-12T07:03:07.835537"
+            },
+            {
+              "attemptId": "1",
+              "testTitle": "Physics Mock Test 1",
+              "score": -1,
+              "maxScore": 4,
+              "date": "2026-05-12T06:50:49.863140"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-05-12T08:00:05.466Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/available",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.029695510864257812",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "241",
+        "date": "Tue, 12 May 2026 08:00:06 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "3dc2c7f434713c879cb76b415c10bc0d",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Tests retrieved successfully",
+        "data": [
+          {
+            "id": "1",
+            "title": "Physics Mock Test 1",
+            "description": "Comprehensive kinematics and thermodynamics mock test.",
+            "durationMinutes": 30,
+            "totalQuestions": 2,
+            "subjects": [
+              "Physics"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-05-12T08:00:09.081Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/attempts/start",
+      "method": "POST",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.03144478797912598",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "354",
+        "date": "Tue, 12 May 2026 08:00:09 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "dc6fc31f34248c459cb76b415c10ba99",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Attempt started successfully",
+        "data": {
+          "attempt_id": 3,
+          "test": {
+            "id": 1,
+            "title": "Physics Mock Test 1",
+            "description": "Comprehensive kinematics and thermodynamics mock test.",
+            "duration_minutes": 30,
+            "correct_marks": 4,
+            "negative_marking_value": 1,
+            "total_questions": 2
+          },
+          "start_time": "2026-05-12T07:39:19.957116",
+          "status": "IN_PROGRESS"
+        }
+      }
+    },
+    {
+      "at": "2026-05-12T08:00:09.815Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/1/questions",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.026340246200561523",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "1319",
+        "date": "Tue, 12 May 2026 08:00:10 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "64b93fa1d32002a49cb76b415c10bf70",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Questions retrieved successfully",
+        "data": [
+          {
+            "id": "1",
+            "textEn": "A car accelerates from rest at a constant rate of 2 m/s² for 5 seconds. What is its final velocity?",
+            "textHi": "एक कार विश्राम अवस्था से 2 m/s² की स्थिर दर से 5 सेकंड तक त्वरित होती है। इसका अंतिम वेग क्या है?",
+            "subject": "Physics",
+            "topic": "Kinematics",
+            "difficulty": "Easy",
+            "positiveMarks": 4,
+            "negativeMarks": 1,
+            "options": [
+              {
+                "id": "1_opt_A",
+                "textEn": "5 m/s",
+                "textHi": "5 m/s"
+              },
+              {
+                "id": "1_opt_B",
+                "textEn": "10 m/s",
+                "textHi": "10 m/s"
+              },
+              {
+                "id": "1_opt_C",
+                "textEn": "15 m/s",
+                "textHi": "15 m/s"
+              },
+              {
+                "id": "1_opt_D",
+                "textEn": "20 m/s",
+                "textHi": "20 m/s"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "textEn": "Which of the following is a scalar quantity?",
+            "textHi": "निम्नलिखित में से कौन सी एक अदिश राशि है?",
+            "subject": "Physics",
+            "topic": "Kinematics",
+            "difficulty": "Easy",
+            "positiveMarks": 4,
+            "negativeMarks": 1,
+            "options": [
+              {
+                "id": "2_opt_A",
+                "textEn": "Velocity",
+                "textHi": "वेग"
+              },
+              {
+                "id": "2_opt_B",
+                "textEn": "Acceleration",
+                "textHi": "त्वरण"
+              },
+              {
+                "id": "2_opt_C",
+                "textEn": "Speed",
+                "textHi": "चाल"
+              },
+              {
+                "id": "2_opt_D",
+                "textEn": "Displacement",
+                "textHi": "विस्थापन"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-05-12T08:00:26.511Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/tests/1/questions",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.02556133270263672",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "1319",
+        "date": "Tue, 12 May 2026 08:00:27 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "80ef8e6b7fdeb6dfc70ccc6a654dc732;o=1",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Questions retrieved successfully",
+        "data": [
+          {
+            "id": "1",
+            "textEn": "A car accelerates from rest at a constant rate of 2 m/s² for 5 seconds. What is its final velocity?",
+            "textHi": "एक कार विश्राम अवस्था से 2 m/s² की स्थिर दर से 5 सेकंड तक त्वरित होती है। इसका अंतिम वेग क्या है?",
+            "subject": "Physics",
+            "topic": "Kinematics",
+            "difficulty": "Easy",
+            "positiveMarks": 4,
+            "negativeMarks": 1,
+            "options": [
+              {
+                "id": "1_opt_A",
+                "textEn": "5 m/s",
+                "textHi": "5 m/s"
+              },
+              {
+                "id": "1_opt_B",
+                "textEn": "10 m/s",
+                "textHi": "10 m/s"
+              },
+              {
+                "id": "1_opt_C",
+                "textEn": "15 m/s",
+                "textHi": "15 m/s"
+              },
+              {
+                "id": "1_opt_D",
+                "textEn": "20 m/s",
+                "textHi": "20 m/s"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "textEn": "Which of the following is a scalar quantity?",
+            "textHi": "निम्नलिखित में से कौन सी एक अदिश राशि है?",
+            "subject": "Physics",
+            "topic": "Kinematics",
+            "difficulty": "Easy",
+            "positiveMarks": 4,
+            "negativeMarks": 1,
+            "options": [
+              {
+                "id": "2_opt_A",
+                "textEn": "Velocity",
+                "textHi": "वेग"
+              },
+              {
+                "id": "2_opt_B",
+                "textEn": "Acceleration",
+                "textHi": "त्वरण"
+              },
+              {
+                "id": "2_opt_C",
+                "textEn": "Speed",
+                "textHi": "चाल"
+              },
+              {
+                "id": "2_opt_D",
+                "textEn": "Displacement",
+                "textHi": "विस्थापन"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-05-12T08:01:41.439Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/attempts/history",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.03562331199645996",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "509",
+        "date": "Tue, 12 May 2026 08:01:42 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "114a60b568972b6b814c21a2e352eed8",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "History retrieved",
+        "data": [
+          {
+            "attemptId": "3",
+            "title": "Physics Mock Test 1",
+            "date": "2026-05-12T07:39:19.957116",
+            "status": "IN_PROGRESS",
+            "score": null,
+            "maxScore": 8,
+            "accuracy": "0.0%"
+          },
+          {
+            "attemptId": "2",
+            "title": "Physics Mock Test 1",
+            "date": "2026-05-12T06:58:56.296750",
+            "status": "SUBMITTED",
+            "score": 0,
+            "maxScore": 8,
+            "accuracy": "0.0%"
+          },
+          {
+            "attemptId": "1",
+            "title": "Physics Mock Test 1",
+            "date": "2026-05-12T06:08:59.933868",
+            "status": "SUBMITTED",
+            "score": -1,
+            "maxScore": 8,
+            "accuracy": "0.0%"
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-05-12T08:01:44.745Z",
+      "url": "https://mcq-backend-822862054564.us-central1.run.app/api/v1/reports/aggregate",
+      "method": "GET",
+      "status": 200,
+      "headers": {
+        "x-process-time": "0.014775991439819336",
+        "access-control-allow-credentials": "true",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "x-content-type-options": "nosniff",
+        "access-control-allow-origin": "https://mcq-portal-frontend.vercel.app",
+        "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+        "content-length": "263",
+        "date": "Tue, 12 May 2026 08:01:45 GMT",
+        "content-type": "application/json",
+        "vary": "Origin",
+        "server": "Google Frontend",
+        "x-cloud-trace-context": "007d737973db87cacf96a74df37f238b",
+        "x-frame-options": "DENY"
+      },
+      "body": {
+        "success": true,
+        "message": "Aggregate report retrieved",
+        "data": {
+          "subjectScores": [
+            {
+              "subject": "General Knowledge",
+              "score": 80,
+              "total": 100
+            }
+          ],
+          "confidenceAnalytics": [
+            {
+              "level": "HUNDRED_PERCENT",
+              "accuracy": 90,
+              "count": 10
+            }
+          ],
+          "scoreTrends": [
+            {
+              "date": "2026-05-10",
+              "score": 80
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "console": [
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Mount | Auth Initialized: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | Registering onAuthStateChanged listener"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | onAuthStateChanged Fired | User exists: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | Current User Details | UID: GfvE5mxVBZQlPf1JDlx0QF7aXwI2 Email: ktej255@gmail.com"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | Token retrieved on state change | Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: dashboard/summary"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "FORENSIC | Persistence set to local"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: dashboard/summary {success: true, message: Dashboard summary retrieved, data: Object}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Mount | Auth Initialized: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | Registering onAuthStateChanged listener"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | onAuthStateChanged Fired | User exists: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | Current User Details | UID: GfvE5mxVBZQlPf1JDlx0QF7aXwI2 Email: ktej255@gmail.com"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | Token retrieved on state change | Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: tests/available"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "FORENSIC | Persistence set to local"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: tests/available {success: true, message: Tests retrieved successfully, data: Array(1)}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: attempts/start"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/tests",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: attempts/start {success: true, message: Attempt started successfully, data: Object}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: tests/1/questions"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: tests/1/questions {success: true, message: Questions retrieved successfully, data: Array(2)}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Unmount"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Mount | Auth Initialized: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | Registering onAuthStateChanged listener"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | onAuthStateChanged Fired | User exists: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | Current User Details | UID: GfvE5mxVBZQlPf1JDlx0QF7aXwI2 Email: ktej255@gmail.com"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | Token retrieved on state change | Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: tests/1/questions"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | Persistence set to local"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: tests/1/questions {success: true, message: Questions retrieved successfully, data: Array(2)}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Unmount"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Mount | Auth Initialized: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | Registering onAuthStateChanged listener"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | onAuthStateChanged Fired | User exists: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | Current User Details | UID: GfvE5mxVBZQlPf1JDlx0QF7aXwI2 Email: ktej255@gmail.com"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | Token retrieved on state change | Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: attempts/history"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "FORENSIC | Persistence set to local"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/history",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: attempts/history {success: true, message: History retrieved, data: Array(3)}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | AuthProvider Mount | Auth Initialized: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | Registering onAuthStateChanged listener"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | onAuthStateChanged Fired | User exists: true"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | Current User Details | UID: GfvE5mxVBZQlPf1JDlx0QF7aXwI2 Email: ktej255@gmail.com"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | Token retrieved on state change | Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Starting token retrieval polling..."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Token acquired on attempt 1. Length: 1169"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Request Authorized: reports/aggregate"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer eyJhbGciOi...[len:1169]"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "FORENSIC | Persistence set to local"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "log",
+      "text": "[MCQ_DEBUG] Response 200: reports/aggregate {success: true, message: Aggregate report retrieved, data: Object}"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width."
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/reports",
+      "type": "warning",
+      "text": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width."
+    }
+  ],
+  "pageErrors": [
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "message": "Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "stack": "Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at aP (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:65130)\n    at a4 (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:71587)\n    at Object.a5 [as useEffect] (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:71812)\n    at r.useEffect (https://mcq-portal-frontend.vercel.app/_next/static/chunks/02~smcd9k4wtq.js:1:9598)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/16ng0kqusnyz_.js:1:39913\n    at ay (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:63845)\n    at oJ (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:84102)\n    at iu (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:95704)\n    at sd (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:138944)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:138789"
+    },
+    {
+      "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+      "message": "Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "stack": "Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at aP (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:65130)\n    at a4 (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:71587)\n    at Object.a5 [as useEffect] (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:71812)\n    at r.useEffect (https://mcq-portal-frontend.vercel.app/_next/static/chunks/02~smcd9k4wtq.js:1:9598)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/16ng0kqusnyz_.js:1:39913\n    at ay (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:63845)\n    at oJ (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:84102)\n    at iu (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:95704)\n    at sd (https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:138944)\n    at https://mcq-portal-frontend.vercel.app/_next/static/chunks/07lhk_q6pmm3r.js:1:138789"
+    }
+  ],
+  "failedRequests": [],
+  "observations": [
+    {
+      "label": "dashboard-session-restore",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/dashboard",
+        "title": "MCQ Intelligence Portal",
+        "bodyText": "MCQ Portal\nDashboard\nAvailable Tests\nTest History\nAnalytics\n\nTej Bahadur\n\nStudent Account\n\nSettings\nSign Out\nStudent Dashboard\nEnglish\nWelcome Back\nTotal Tests\n2\nAverage Score\n-0.5%\nTime Spent\n14h 20m\nAccuracy\n82%\nRecent Tests\n\nPhysics Mock Test 1\n\n2026-05-12T07:03:07.835537\n\n0 / 4\n\nScore\n\nPhysics Mock Test 1\n\n2026-05-12T06:50:49.863140\n\n-1 / 4\n\nScore",
+        "debug": {
+          "lastRequest": {
+            "url": "dashboard/summary",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:00:01.033Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Dashboard summary retrieved",
+              "data": {
+                "totalTestsTaken": 2,
+                "averageScore": -0.5,
+                "recentTests": [
+                  {
+                    "attemptId": "2",
+                    "testTitle": "Physics Mock Test 1",
+                    "score": 0,
+                    "maxScore": 4,
+                    "date": "2026-05-12T07:03:07.835537"
+                  },
+                  {
+                    "attemptId": "1",
+                    "testTitle": "Physics Mock Test 1",
+                    "score": -1,
+                    "maxScore": 4,
+                    "date": "2026-05-12T06:50:49.863140"
+                  }
+                ]
+              }
+            },
+            "headers": {
+              "content-length": "352",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "tests-loaded",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/tests",
+        "title": "MCQ Intelligence Portal",
+        "bodyText": "MCQ Portal\nDashboard\nAvailable Tests\nTest History\nAnalytics\n\nTej Bahadur\n\nStudent Account\n\nSettings\nSign Out\nStudent Dashboard\nEnglish\nAvailable Tests\nPhysics Mock Test 1\n\nComprehensive kinematics and thermodynamics mock test.\n\nPhysics\n2 Questions\n30 mins\nStart Test",
+        "debug": {
+          "lastRequest": {
+            "url": "tests/available",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:00:05.031Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Tests retrieved successfully",
+              "data": [
+                {
+                  "id": "1",
+                  "title": "Physics Mock Test 1",
+                  "description": "Comprehensive kinematics and thermodynamics mock test.",
+                  "durationMinutes": 30,
+                  "totalQuestions": 2,
+                  "subjects": [
+                    "Physics"
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "content-length": "241",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "start-test",
+      "clicked": "button:has-text('Start Test')"
+    },
+    {
+      "label": "exam-open",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "title": "",
+        "bodyText": "This page couldn’t load\n\nReload to try again, or go back.\n\nReload\nBack",
+        "debug": {
+          "lastRequest": {
+            "url": "tests/1/questions",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:00:09.446Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Questions retrieved successfully",
+              "data": [
+                {
+                  "id": "1",
+                  "textEn": "A car accelerates from rest at a constant rate of 2 m/s² for 5 seconds. What is its final velocity?",
+                  "textHi": "एक कार विश्राम अवस्था से 2 m/s² की स्थिर दर से 5 सेकंड तक त्वरित होती है। इसका अंतिम वेग क्या है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "1_opt_A",
+                      "textEn": "5 m/s",
+                      "textHi": "5 m/s"
+                    },
+                    {
+                      "id": "1_opt_B",
+                      "textEn": "10 m/s",
+                      "textHi": "10 m/s"
+                    },
+                    {
+                      "id": "1_opt_C",
+                      "textEn": "15 m/s",
+                      "textHi": "15 m/s"
+                    },
+                    {
+                      "id": "1_opt_D",
+                      "textEn": "20 m/s",
+                      "textHi": "20 m/s"
+                    }
+                  ]
+                },
+                {
+                  "id": "2",
+                  "textEn": "Which of the following is a scalar quantity?",
+                  "textHi": "निम्नलिखित में से कौन सी एक अदिश राशि है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "2_opt_A",
+                      "textEn": "Velocity",
+                      "textHi": "वेग"
+                    },
+                    {
+                      "id": "2_opt_B",
+                      "textEn": "Acceleration",
+                      "textHi": "त्वरण"
+                    },
+                    {
+                      "id": "2_opt_C",
+                      "textEn": "Speed",
+                      "textHi": "चाल"
+                    },
+                    {
+                      "id": "2_opt_D",
+                      "textEn": "Displacement",
+                      "textHi": "विस्थापन"
+                    }
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "content-length": "1319",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "exam-initial-state",
+      "state": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "timerText": null,
+        "storageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+        "storageTimer": null,
+        "buttons": [
+          {
+            "text": "Reload",
+            "className": "",
+            "disabled": false
+          },
+          {
+            "text": "Back",
+            "className": "",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "q1-select-answer",
+      "clicked": null
+    },
+    {
+      "label": "q1-confidence",
+      "clicked": null
+    },
+    {
+      "label": "q1-after-autosave",
+      "state": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "timerText": null,
+        "storageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+        "storageTimer": null,
+        "buttons": [
+          {
+            "text": "Reload",
+            "className": "",
+            "disabled": false
+          },
+          {
+            "text": "Back",
+            "className": "",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "navigate-next-q2",
+      "clicked": null
+    },
+    {
+      "label": "q2-select-answer",
+      "clicked": null
+    },
+    {
+      "label": "q2-confidence",
+      "clicked": null
+    },
+    {
+      "label": "mark-review-q2",
+      "clicked": null
+    },
+    {
+      "label": "after-review-mark",
+      "state": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "timerText": null,
+        "storageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+        "storageTimer": null,
+        "buttons": [
+          {
+            "text": "Reload",
+            "className": "",
+            "disabled": false
+          },
+          {
+            "text": "Back",
+            "className": "",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "before-refresh",
+      "state": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "timerText": null,
+        "storageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+        "storageTimer": null,
+        "buttons": [
+          {
+            "text": "Reload",
+            "className": "",
+            "disabled": false
+          },
+          {
+            "text": "Back",
+            "className": "",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-refresh",
+      "state": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "timerText": null,
+        "storageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+        "storageTimer": null,
+        "buttons": [
+          {
+            "text": "Reload",
+            "className": "",
+            "disabled": false
+          },
+          {
+            "text": "Back",
+            "className": "",
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "goto-final-0",
+      "clicked": null
+    },
+    {
+      "label": "open-review-screen",
+      "clicked": null
+    },
+    {
+      "label": "review-screen",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "title": "",
+        "bodyText": "This page couldn’t load\n\nReload to try again, or go back.\n\nReload\nBack",
+        "debug": {
+          "lastRequest": {
+            "url": "tests/1/questions",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:00:26.143Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Questions retrieved successfully",
+              "data": [
+                {
+                  "id": "1",
+                  "textEn": "A car accelerates from rest at a constant rate of 2 m/s² for 5 seconds. What is its final velocity?",
+                  "textHi": "एक कार विश्राम अवस्था से 2 m/s² की स्थिर दर से 5 सेकंड तक त्वरित होती है। इसका अंतिम वेग क्या है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "1_opt_A",
+                      "textEn": "5 m/s",
+                      "textHi": "5 m/s"
+                    },
+                    {
+                      "id": "1_opt_B",
+                      "textEn": "10 m/s",
+                      "textHi": "10 m/s"
+                    },
+                    {
+                      "id": "1_opt_C",
+                      "textEn": "15 m/s",
+                      "textHi": "15 m/s"
+                    },
+                    {
+                      "id": "1_opt_D",
+                      "textEn": "20 m/s",
+                      "textHi": "20 m/s"
+                    }
+                  ]
+                },
+                {
+                  "id": "2",
+                  "textEn": "Which of the following is a scalar quantity?",
+                  "textHi": "निम्नलिखित में से कौन सी एक अदिश राशि है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "2_opt_A",
+                      "textEn": "Velocity",
+                      "textHi": "वेग"
+                    },
+                    {
+                      "id": "2_opt_B",
+                      "textEn": "Acceleration",
+                      "textHi": "त्वरण"
+                    },
+                    {
+                      "id": "2_opt_C",
+                      "textEn": "Speed",
+                      "textHi": "चाल"
+                    },
+                    {
+                      "id": "2_opt_D",
+                      "textEn": "Displacement",
+                      "textHi": "विस्थापन"
+                    }
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "content-length": "1319",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "confirm-final-submit",
+      "clicked": null
+    },
+    {
+      "label": "submit-final-test",
+      "clicked": null
+    },
+    {
+      "label": "report-after-submit",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3",
+        "title": "",
+        "bodyText": "This page couldn’t load\n\nReload to try again, or go back.\n\nReload\nBack",
+        "debug": {
+          "lastRequest": {
+            "url": "tests/1/questions",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:00:26.143Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Questions retrieved successfully",
+              "data": [
+                {
+                  "id": "1",
+                  "textEn": "A car accelerates from rest at a constant rate of 2 m/s² for 5 seconds. What is its final velocity?",
+                  "textHi": "एक कार विश्राम अवस्था से 2 m/s² की स्थिर दर से 5 सेकंड तक त्वरित होती है। इसका अंतिम वेग क्या है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "1_opt_A",
+                      "textEn": "5 m/s",
+                      "textHi": "5 m/s"
+                    },
+                    {
+                      "id": "1_opt_B",
+                      "textEn": "10 m/s",
+                      "textHi": "10 m/s"
+                    },
+                    {
+                      "id": "1_opt_C",
+                      "textEn": "15 m/s",
+                      "textHi": "15 m/s"
+                    },
+                    {
+                      "id": "1_opt_D",
+                      "textEn": "20 m/s",
+                      "textHi": "20 m/s"
+                    }
+                  ]
+                },
+                {
+                  "id": "2",
+                  "textEn": "Which of the following is a scalar quantity?",
+                  "textHi": "निम्नलिखित में से कौन सी एक अदिश राशि है?",
+                  "subject": "Physics",
+                  "topic": "Kinematics",
+                  "difficulty": "Easy",
+                  "positiveMarks": 4,
+                  "negativeMarks": 1,
+                  "options": [
+                    {
+                      "id": "2_opt_A",
+                      "textEn": "Velocity",
+                      "textHi": "वेग"
+                    },
+                    {
+                      "id": "2_opt_B",
+                      "textEn": "Acceleration",
+                      "textHi": "त्वरण"
+                    },
+                    {
+                      "id": "2_opt_C",
+                      "textEn": "Speed",
+                      "textHi": "चाल"
+                    },
+                    {
+                      "id": "2_opt_D",
+                      "textEn": "Displacement",
+                      "textHi": "विस्थापन"
+                    }
+                  ]
+                }
+              ]
+            },
+            "headers": {
+              "content-length": "1319",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "history-after-submit",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/history",
+        "title": "MCQ Intelligence Portal",
+        "bodyText": "MCQ Portal\nDashboard\nAvailable Tests\nTest History\nAnalytics\n\nTej Bahadur\n\nStudent Account\n\nSettings\nSign Out\nStudent Dashboard\nEnglish\nAttempt History\nTest Name\tDate\tStatus\tScore\tAccuracy\tAction\nPhysics Mock Test 1\t2026-05-12T07:39:19.957116\tIN_PROGRESS\t-\t0.0%\t\nPhysics Mock Test 1\t2026-05-12T06:58:56.296750\tCOMPLETED\t0/8\t0.0%\tView Report\nPhysics Mock Test 1\t2026-05-12T06:08:59.933868\tCOMPLETED\t-1/8\t0.0%\tView Report",
+        "debug": {
+          "lastRequest": {
+            "url": "attempts/history",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:01:40.628Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "History retrieved",
+              "data": [
+                {
+                  "attemptId": "3",
+                  "title": "Physics Mock Test 1",
+                  "date": "2026-05-12T07:39:19.957116",
+                  "status": "IN_PROGRESS",
+                  "score": null,
+                  "maxScore": 8,
+                  "accuracy": "0.0%"
+                },
+                {
+                  "attemptId": "2",
+                  "title": "Physics Mock Test 1",
+                  "date": "2026-05-12T06:58:56.296750",
+                  "status": "SUBMITTED",
+                  "score": 0,
+                  "maxScore": 8,
+                  "accuracy": "0.0%"
+                },
+                {
+                  "attemptId": "1",
+                  "title": "Physics Mock Test 1",
+                  "date": "2026-05-12T06:08:59.933868",
+                  "status": "SUBMITTED",
+                  "score": -1,
+                  "maxScore": 8,
+                  "accuracy": "0.0%"
+                }
+              ]
+            },
+            "headers": {
+              "content-length": "509",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    },
+    {
+      "label": "aggregate-analytics",
+      "snapshot": {
+        "url": "https://mcq-portal-frontend.vercel.app/reports",
+        "title": "MCQ Intelligence Portal",
+        "bodyText": "MCQ Portal\nDashboard\nAvailable Tests\nTest History\nAnalytics\n\nTej Bahadur\n\nStudent Account\n\nSettings\nSign Out\nStudent Dashboard\nEnglish\nCOGNITIVE PERFORMANCE REPORT\nAttempt Analysis\nDownload PDF\nReview Detailed Solutions\nFinal Score\n\n0.0\n\npts\nAccuracy\n\n0.0\n\n%\nAvg Time\n\n0m 0s\n\nQuestions\n0\nCORRECT\n0\nWRONG\n0\nSKIPPED\nSubject Performance\nGeneral Knowledge\n0\n20\n40\n60\n80\nTopic-wise Breakdown\nAI Insights\n\nGathering more data for deeper insights...\n\nIMPROVEMENT STRATEGY\nFocus on Topic-wise speed drills for Physics.\nRevisit concepts where confidence was high but answer was wrong.\nNext recommended test: Modern Physics Batch 2\nConfidence Matrix\nHUNDRED_PERCENT\n\nHigher accuracy at higher confidence indicates strong conceptual calibration.\n\nHUNDRED_PERCENT",
+        "debug": {
+          "lastRequest": {
+            "url": "reports/aggregate",
+            "method": "get",
+            "headers": {
+              "Accept": "application/json, text/plain, */*",
+              "Content-Type": "application/json"
+            },
+            "timestamp": "2026-05-12T08:01:44.398Z"
+          },
+          "lastResponse": {
+            "status": 200,
+            "data": {
+              "success": true,
+              "message": "Aggregate report retrieved",
+              "data": {
+                "subjectScores": [
+                  {
+                    "subject": "General Knowledge",
+                    "score": 80,
+                    "total": 100
+                  }
+                ],
+                "confidenceAnalytics": [
+                  {
+                    "level": "HUNDRED_PERCENT",
+                    "accuracy": 90,
+                    "count": 10
+                  }
+                ],
+                "scoreTrends": [
+                  {
+                    "date": "2026-05-10",
+                    "score": 80
+                  }
+                ]
+              }
+            },
+            "headers": {
+              "content-length": "263",
+              "content-type": "application/json"
+            }
+          },
+          "authState": "SIGNED_IN",
+          "tokenPresent": true,
+          "user": {
+            "uid": "GfvE5mxVBZQlPf1JDlx0QF7aXwI2",
+            "email": "ktej255@gmail.com"
+          },
+          "errors": []
+        },
+        "localStorage": {
+          "mcq-exam-storage": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+          "mcq-timer-storage": null
+        }
+      }
+    }
+  ],
+  "flow": {
+    "refreshRecovery": {
+      "sameUrl": true,
+      "beforeTimer": null,
+      "afterTimer": null,
+      "beforeStorageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+      "afterStorageExam": "{\"state\":{\"testId\":\"1\",\"currentQuestionIndex\":0,\"answers\":{\"1\":{\"questionId\":\"1\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0},\"2\":{\"questionId\":\"2\",\"selectedOptionId\":null,\"confidence\":null,\"status\":\"NOT_VISITED\",\"timeSpentSeconds\":0}}},\"version\":0}",
+      "beforeStorageTimer": null,
+      "afterStorageTimer": null
+    },
+    "attemptId": "3",
+    "reportUrl": "https://mcq-portal-frontend.vercel.app/exam/1?attemptId=3"
+  },
+  "finishedAt": "2026-05-12T08:01:47.665Z"
+}
