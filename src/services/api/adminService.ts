@@ -2,7 +2,7 @@ import { apiClient } from './client';
 
 export interface Subject {
   id: number;
-  name: str;
+  name: string;
 }
 
 export interface Topic {

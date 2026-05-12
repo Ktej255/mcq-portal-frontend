@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { dashboardService, DashboardSummary } from "@/services/api/dashboardService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, BookOpen, CheckCircle, Clock } from "lucide-react";
+import { Activity, BookOpen, CheckCircle, Clock, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { DebugPanel } from "@/components/shared/DebugPanel";
 
 export default function DashboardHome() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [recommendations, setRecommendations] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any | null>(null);
 
@@ -20,8 +23,12 @@ export default function DashboardHome() {
       
       try {
         setLoading(true);
-        const data = await dashboardService.getSummary();
-        setSummary(data);
+        const [summaryData, recsData] = await Promise.all([
+          dashboardService.getSummary(),
+          dashboardService.getRecommendations()
+        ]);
+        setSummary(summaryData);
+        setRecommendations(recsData);
         setError(null);
       } catch (err) {
         console.error("Failed to fetch dashboard summary:", err);
@@ -112,21 +119,52 @@ export default function DashboardHome() {
         </Card>
       </div>
 
-      <h2 className="text-xl font-semibold mt-8 mb-4">Recent Tests</h2>
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border shadow-sm">
-        <div className="p-4 grid gap-4">
-          {summary?.recentTests.map(test => (
-            <div key={test.attemptId} className="flex items-center justify-between p-4 border rounded-md">
-              <div>
-                <p className="font-medium">{test.testTitle}</p>
-                <p className="text-sm text-muted-foreground">{test.date}</p>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-yellow-500" />
+            AI Learning Path
+          </h2>
+          <div className="space-y-3">
+            {recommendations?.recommendations?.map((rec: any, i: number) => (
+              <div key={i} className="p-4 bg-white dark:bg-zinc-900 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-2">
+                  <Badge variant={rec.priority === 'HIGH' ? 'destructive' : 'secondary'} className="text-[10px]">
+                    {rec.priority}
+                  </Badge>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">{rec.type}</span>
+                </div>
+                <h3 className="font-bold text-sm">{rec.topic}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{rec.reason}</p>
+                <Button variant="ghost" size="sm" className="w-full mt-3 text-xs h-8 text-primary hover:bg-primary/5">
+                  Start Revision
+                </Button>
               </div>
-              <div className="text-right">
-                <p className="font-bold">{test.score} / {test.maxScore}</p>
-                <p className="text-sm text-muted-foreground">Score</p>
+            ))}
+            {(!recommendations?.recommendations || recommendations.recommendations.length === 0) && (
+              <div className="p-8 text-center border rounded-xl bg-muted/30">
+                <p className="text-sm text-muted-foreground">Take a test to unlock your AI roadmap.</p>
               </div>
-            </div>
-          ))}
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Recent Tests</h2>
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border shadow-sm divide-y">
+            {summary?.recentTests.map(test => (
+              <div key={test.attemptId} className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors">
+                <div>
+                  <p className="font-semibold text-sm">{test.testTitle}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(test.date).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-lg text-primary">{test.score} / {test.maxScore}</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Points</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

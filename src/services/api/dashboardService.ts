@@ -27,6 +27,7 @@ export interface PerformanceReport {
   generatedAt?: string;
   strengths: string[];
   weaknesses: string[];
+  narrative?: string;
 }
 
 export interface HistoryItem {
@@ -105,6 +106,7 @@ export const dashboardService = {
       generatedAt: payload.generatedAt ?? payload.generated_at,
       strengths,
       weaknesses,
+      narrative: payload.narrative,
     };
   },
 
@@ -115,6 +117,11 @@ export const dashboardService = {
 
   getBehavioralAnalysis: async (attemptId: string) => {
     const response = await apiClient.get(`reports/${attemptId}/behavior`);
+    return response.data?.data;
+  },
+
+  getRecommendations: async () => {
+    const response = await apiClient.get('dashboard/recommendations');
     return response.data?.data;
   }
 };

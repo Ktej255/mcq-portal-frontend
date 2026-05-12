@@ -16,8 +16,8 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
-import { useSearchParams } from 'next/navigation';
 import { examService, QuestionData } from '@/services/api/examService';
+import { eventsService } from '@/services/api/eventsService';
 import { toast } from 'sonner';
 
 export default function ExamInterface() {
@@ -58,7 +58,34 @@ export default function ExamInterface() {
     };
 
     if (testId) fetchExamData();
-  }, [testId, storeTestId, initializeTest]);
+
+    if (attemptId) {
+      eventsService.init(attemptId);
+      return () => eventsService.stop(attemptId);
+    }
+  }, [testId, storeTestId, initializeTest, attemptId]);
+
+  // Record QUESTION_VIEWED when currentQuestionIndex changes
+  useEffect(() => {
+    if (questions[currentQuestionIndex] && attemptId) {
+      eventsService.record({
+        event_type: 'QUESTION_VIEWED',
+        question_id: questions[currentQuestionIndex].id
+      }, attemptId);
+    }
+  }, [currentQuestionIndex, questions, attemptId]);
+
+  // Record Integrity Violations
+  useEffect(() => {
+    if (lastViolation && attemptId) {
+      eventsService.record({
+        event_type: lastViolation.includes('Tab') ? 'TAB_SWITCHED' : 
+                    lastViolation.includes('Context') ? 'CONTEXT_MENU_BLOCKED' : 
+                    lastViolation.includes('Copy') ? 'COPY_PASTE_BLOCKED' : 'TAB_SWITCHED',
+        payload: { violation: lastViolation }
+      }, attemptId);
+    }
+  }, [lastViolation, attemptId]);
 
   if (loading) return (
     <div className="flex flex-col h-screen items-center justify-center space-y-4">
@@ -113,12 +140,28 @@ export default function ExamInterface() {
   };
 
   const handleOptionChange = (optionId: string) => {
+    const isChange = !!currentAnswer?.selectedOptionId && currentAnswer.selectedOptionId !== optionId;
     const conf = currentAnswer?.confidence || 'EDUCATED_GUESS';
     setAnswer(question.id, optionId, conf);
+    
+    if (attemptId) {
+      eventsService.record({
+        event_type: isChange ? 'ANSWER_CHANGED' : 'ANSWER_SELECTED',
+        question_id: question.id,
+        payload: { option_id: optionId, old_id: currentAnswer?.selectedOptionId }
+      }, attemptId);
+    }
   };
 
   const handleConfidenceSelect = (level: ConfidenceLevel) => {
     setAnswer(question.id, currentAnswer?.selectedOptionId || null, level);
+    if (attemptId) {
+      eventsService.record({
+        event_type: 'CONFIDENCE_UPDATED',
+        question_id: question.id,
+        payload: { level }
+      }, attemptId);
+    }
   };
 
   return (
@@ -313,6 +356,13 @@ export default function ExamInterface() {
                   size="sm"
                   onClick={() => {
                     markForReview(question.id);
+                    if (attemptId) {
+                      eventsService.record({
+                        event_type: 'MARKED_FOR_REVIEW',
+                        question_id: question.id,
+                        payload: { status: true }
+                      }, attemptId);
+                    }
                     if (currentQuestionIndex < questions.length - 1) {
                       handleNext();
                     } else {

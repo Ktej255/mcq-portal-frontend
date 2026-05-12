@@ -13,6 +13,7 @@ import {
   CheckCircle2, XCircle, HelpCircle, ArrowRight
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6'];
 
@@ -274,8 +275,42 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* SECTION 4 — COGNITIVE CONFIDENCE ANALYSIS */}
+        {/* SECTION 4 — COGNITIVE COACH INSIGHT */}
         <div className="space-y-8">
+          {report.narrative && (
+            <div className="p-10 rounded-[2.5rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-1000">
+                <BrainCircuit className="w-48 h-48" />
+              </div>
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
+                    <Zap className="w-8 h-8 text-yellow-300" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black tracking-tight">AI Cognitive Coach</h2>
+                    <p className="text-white/80 font-medium">Personalized Behavioral Analysis</p>
+                  </div>
+                </div>
+                
+                <div className="prose prose-invert max-w-none">
+                  <div className="text-lg leading-relaxed font-medium whitespace-pre-wrap opacity-95">
+                    {report.narrative}
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/20 flex flex-wrap gap-6">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-yellow-400 text-blue-900 font-bold border-none">GUESSING: {((report as any).behavioral?.guessing_rate || 0).toFixed(0)}%</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-green-400 text-green-900 font-bold border-none">HESITATION: {((report as any).behavioral?.hesitation_index || 0).toFixed(0)}%</Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="p-8 rounded-3xl bg-primary/5 border border-primary/10 shadow-sm">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
               <BrainCircuit className="w-6 h-6 text-primary" />
@@ -408,7 +443,6 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 }
