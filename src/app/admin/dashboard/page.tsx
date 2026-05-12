@@ -4,8 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { adminService } from '@/services/api/adminService';
 import { 
   Users, FileText, CheckCircle2, TrendingUp, 
-  BarChart3, Target, Clock, AlertTriangle 
+  BarChart3, Target, Clock, AlertTriangle, ShieldAlert
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell 
@@ -21,6 +23,7 @@ export default function AdminDashboard() {
     avgScore: 74.5,
     completionRate: 88,
   });
+  const [pipelineHealth, setPipelineHealth] = useState<any>(null);
 
   const chartData = [
     { name: 'Physics', value: 85 },
@@ -28,6 +31,18 @@ export default function AdminDashboard() {
     { name: 'Maths', value: 68 },
     { name: 'Biology', value: 91 },
   ];
+
+  useEffect(() => {
+    const fetchAdminStats = async () => {
+      try {
+        const health = await adminService.getPipelineObservability();
+        setPipelineHealth(health);
+      } catch (err) {
+        console.error("Failed to fetch admin stats:", err);
+      }
+    };
+    fetchAdminStats();
+  }, []);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -136,6 +151,47 @@ export default function AdminDashboard() {
               <p className="text-[10px] text-muted-foreground">75% of ingestion capacity utilized.</p>
             </div>
           </div>
+
+          {/* PHASE 6: PIPELINE OBSERVABILITY */}
+          {pipelineHealth && (
+            <div className={`p-8 rounded-3xl border shadow-sm ${pipelineHealth.accuracy_drift?.quality_baseline_status === 'ATTENTION_REQUIRED' ? 'bg-red-50 border-red-200' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}>
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <ShieldAlert className="w-6 h-6 text-primary" />
+                Pipeline Health
+              </h2>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Processed</p>
+                    <p className="text-xl font-black">{pipelineHealth.pipeline?.total_processed}</p>
+                  </div>
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Failures</p>
+                    <p className={`text-xl font-black ${pipelineHealth.pipeline?.failure_rate > 5 ? 'text-red-500' : ''}`}>
+                      {pipelineHealth.pipeline?.failure_rate.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Narrative Quality (Hallucination)</span>
+                    <Badge variant={pipelineHealth.accuracy_drift?.avg_hallucination_score > 0.2 ? 'destructive' : 'secondary'}>
+                      {pipelineHealth.accuracy_drift?.avg_hallucination_score.toFixed(2)}
+                    </Badge>
+                  </div>
+                  <Progress value={(1 - pipelineHealth.accuracy_drift?.avg_hallucination_score) * 100} className="h-1.5" />
+                </div>
+
+                {pipelineHealth.pipeline?.pending_tasks > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-800 text-xs font-medium">
+                    <Clock className="w-4 h-4 animate-spin" />
+                    {pipelineHealth.pipeline?.pending_tasks} analysis tasks in queue
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

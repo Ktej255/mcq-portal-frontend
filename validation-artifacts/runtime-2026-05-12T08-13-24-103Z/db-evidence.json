@@ -1,0 +1,190 @@
+{
+  "attempt_id": 3,
+  "source": "direct Cloud SQL via Python Connector",
+  "schema_columns": [
+    {
+      "table_name": "attempt_answers",
+      "column_name": "id"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "attempt_id"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "question_id"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "selected_option"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "is_correct"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "time_taken_seconds"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "confidence_level"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "is_skipped"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "is_changed"
+    },
+    {
+      "table_name": "attempt_answers",
+      "column_name": "marked_for_review"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "id"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "user_id"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "test_id"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "start_time"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "end_time"
+    },
+    {
+      "table_name": "attempts",
+      "column_name": "status"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "id"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "attempt_id"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "total_score"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "accuracy"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "correct_count"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "incorrect_count"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "unattempted_count"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "topic_wise_analysis"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "confidence_analysis"
+    },
+    {
+      "table_name": "reports",
+      "column_name": "generated_at"
+    }
+  ],
+  "attempt": [
+    {
+      "id": 3,
+      "user_id": 4,
+      "email": "ktej255@gmail.com",
+      "test_id": 1,
+      "status": "SUBMITTED",
+      "start_time": "2026-05-12T07:39:19.957116",
+      "end_time": "2026-05-12T08:14:01.085450",
+      "test_title": "Physics Mock Test 1"
+    }
+  ],
+  "answers": [
+    {
+      "id": 3,
+      "attempt_id": 3,
+      "question_id": 1,
+      "selected_option": "1_opt_A",
+      "is_correct": false,
+      "time_taken_seconds": 0,
+      "confidence_level": "EDUCATED_GUESS",
+      "is_skipped": false,
+      "is_changed": true,
+      "marked_for_review": true
+    },
+    {
+      "id": 4,
+      "attempt_id": 3,
+      "question_id": 2,
+      "selected_option": "2_opt_A",
+      "is_correct": false,
+      "time_taken_seconds": 0,
+      "confidence_level": "FAIRLY_SURE",
+      "is_skipped": false,
+      "is_changed": false,
+      "marked_for_review": true
+    }
+  ],
+  "report": [
+    {
+      "id": 3,
+      "attempt_id": 3,
+      "total_score": -2.0,
+      "accuracy": 0.0,
+      "correct_count": 0,
+      "incorrect_count": 2,
+      "unattempted_count": 0,
+      "topic_wise_analysis": {
+        "Kinematics": {
+          "correct": 0,
+          "incorrect": 2,
+          "unattempted": 0,
+          "total": 2
+        }
+      },
+      "confidence_analysis": {
+        "EDUCATED_GUESS": {
+          "correct": 0,
+          "incorrect": 1,
+          "total": 1
+        },
+        "FAIRLY_SURE": {
+          "correct": 0,
+          "incorrect": 1,
+          "total": 1
+        }
+      },
+      "generated_at": "2026-05-12T08:14:01.127787"
+    }
+  ],
+  "exam_events_table": [
+    {
+      "exam_events_table": null
+    }
+  ],
+  "duplicate_in_progress_check": [
+    {
+      "in_progress_same_user_test": 0
+    }
+  ]
+}

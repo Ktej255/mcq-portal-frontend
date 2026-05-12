@@ -77,5 +77,9 @@ export const adminService = {
   bulkCreateQuestions: async (questions: any[]) => {
     const response = await apiClient.post('admin/questions/bulk', { questions });
     return response.data?.data;
+  },
+  getPipelineObservability: async () => {
+    const response = await apiClient.get('admin/observability/pipeline');
+    return response.data?.data;
   }
 };
