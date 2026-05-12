@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, History, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, History, BarChart3, Settings, BookOpen, Database, ShieldAlert, UploadCloud } from 'lucide-react';
 
 const studentNavItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -14,7 +14,11 @@ const studentNavItems = [
 
 const adminNavItems = [
   { name: 'Admin Home', href: '/admin/dashboard', icon: LayoutDashboard },
+  { name: 'Manage Subjects', href: '/admin/subjects', icon: BookOpen },
   { name: 'Manage Tests', href: '/admin/tests', icon: FileText },
+  { name: 'Question Bank', href: '/admin/questions', icon: Database },
+  { name: 'Bulk Upload', href: '/admin/questions/bulk', icon: UploadCloud },
+  { name: 'Integrity Logs', href: '/admin/integrity', icon: ShieldAlert },
   { name: 'Student Analytics', href: '/admin/analytics', icon: BarChart3 },
 ];
 

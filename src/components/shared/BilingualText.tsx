@@ -10,12 +10,12 @@ interface BilingualTextProps {
   hybridContainerClassName?: string;
 }
 
-export function BilingualText({ 
+export const BilingualText = React.memo(({ 
   textEn, 
   textHi, 
   className = "", 
   hybridContainerClassName = "flex flex-col gap-2"
-}: BilingualTextProps) {
+}: BilingualTextProps) => {
   const mode = useLanguageStore((state) => state.mode);
 
   if (!textEn && !textHi) return null;
@@ -39,4 +39,6 @@ export function BilingualText({
       )}
     </div>
   );
-}
+});
+
+BilingualText.displayName = "BilingualText";

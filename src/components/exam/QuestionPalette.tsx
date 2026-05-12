@@ -21,8 +21,10 @@ export function QuestionPalette({ questionIds, onQuestionSelect }: QuestionPalet
       case 'ANSWERED_AND_MARKED':
         return 'bg-purple-600 text-white hover:bg-purple-700 border-transparent relative overflow-hidden before:absolute before:bottom-0 before:right-0 before:w-0 before:h-0 before:border-b-[12px] before:border-l-[12px] before:border-b-green-400 before:border-l-transparent';
       case 'UNANSWERED':
+        return 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200';
+      case 'NOT_VISITED':
       default:
-        return 'bg-secondary text-secondary-foreground hover:bg-secondary/80';
+        return 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700';
     }
   };
 
@@ -64,8 +66,8 @@ export function QuestionPalette({ questionIds, onQuestionSelect }: QuestionPalet
           <span>Answered</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm bg-secondary border" />
-          <span>Not Answered</span>
+          <div className="w-3 h-3 rounded-sm bg-rose-50 border border-rose-200" />
+          <span>Unanswered</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-sm bg-purple-500" />
@@ -74,6 +76,10 @@ export function QuestionPalette({ questionIds, onQuestionSelect }: QuestionPalet
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-sm bg-purple-600 relative overflow-hidden before:absolute before:bottom-0 before:right-0 before:w-0 before:h-0 before:border-b-[8px] before:border-l-[8px] before:border-b-green-400 before:border-l-transparent" />
           <span>Ans & Review</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-zinc-100 border border-zinc-200" />
+          <span>Not Visited</span>
         </div>
       </div>
     </div>

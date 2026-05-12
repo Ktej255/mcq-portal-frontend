@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-05-12T07:00:41.704Z",
+  "frontend": "https://mcq-portal-frontend.vercel.app",
+  "backend": "https://mcq-backend-822862054564.us-central1.run.app",
+  "screenshots": [
+    "D:\\Development\\MCQ Portal\\frontend\\validation-artifacts\\2026-05-12T07-00-41-689Z\\00-initial.png"
+  ],
+  "api": [],
+  "consoleErrors": [],
+  "pageErrors": [
+    {
+      "page": "https://mcq-intelligence-portal.firebaseapp.com/__/auth/handler?apiKey=AIzaSyBpgopi6X1ctyP1Zl40UgnzQFIb6hpVFdg&appName=%5BDEFAULT%5D&authType=signInViaRedirect&redirectUrl=https%3A%2F%2Fmcq-portal-frontend.vercel.app%2Flogin%3Fredirect%3D%2Fdashboard&v=12.13.0&providerId=google.com&scopes=profile",
+      "message": "Cannot read properties of null (reading 'innerText')",
+      "stack": "TypeError: Cannot read properties of null (reading 'innerText')\n    at eval (eval at predicate (eval at evaluate (:302:30)), <anonymous>:2:32)\n    at predicate (eval at evaluate (:302:30), <anonymous>:7:27)\n    at next (eval at evaluate (:302:30), <anonymous>:29:33)\n    at eval (eval at evaluate (:302:30), <anonymous>:42:13)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
+    }
+  ],
+  "failedRequests": [],
+  "observations": [
+    {
+      "label": "initial-google-login",
+      "clicked": "button:has-text('Continue with Google')"
+    }
+  ],
+  "fatal": {
+    "message": "page.waitForFunction: TypeError: Cannot read properties of null (reading 'innerText')\n    at eval (eval at predicate (eval at evaluate (:302:30)), <anonymous>:2:32)\n    at predicate (eval at evaluate (:302:30), <anonymous>:7:27)\n    at next (eval at evaluate (:302:30), <anonymous>:29:33)\n    at eval (eval at evaluate (:302:30), <anonymous>:42:13)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+    "stack": "page.waitForFunction: TypeError: Cannot read properties of null (reading 'innerText')\n    at eval (eval at predicate (eval at evaluate (:302:30)), <anonymous>:2:32)\n    at predicate (eval at evaluate (:302:30), <anonymous>:7:27)\n    at next (eval at evaluate (:302:30), <anonymous>:29:33)\n    at eval (eval at evaluate (:302:30), <anonymous>:42:13)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)\n    at ensureAuthenticated (D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:103:14)\n    at async D:\\Development\\MCQ Portal\\frontend\\scripts\\prod-validation.cjs:192:3"
+  }
+}

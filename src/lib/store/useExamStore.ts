@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type ConfidenceLevel = 'BLIND_GUESS' | 'FIFTY_FIFTY' | 'EDUCATED_GUESS' | 'FAIRLY_SURE' | 'HUNDRED_PERCENT';
 
-export type QuestionStatus = 'UNANSWERED' | 'ANSWERED' | 'MARKED_FOR_REVIEW' | 'ANSWERED_AND_MARKED';
+export type QuestionStatus = 'NOT_VISITED' | 'UNANSWERED' | 'ANSWERED' | 'MARKED_FOR_REVIEW' | 'ANSWERED_AND_MARKED';
 
 export interface AnswerRecord {
   questionId: string;
@@ -20,6 +20,7 @@ interface ExamState {
   
   initializeTest: (testId: string, questionIds: string[]) => void;
   setCurrentQuestion: (index: number) => void;
+  visitQuestion: (questionId: string) => void;
   setAnswer: (questionId: string, optionId: string | null, confidence: ConfidenceLevel | null) => void;
   markForReview: (questionId: string) => void;
   clearResponse: (questionId: string) => void;
@@ -40,7 +41,7 @@ export const useExamStore = create<ExamState>()(
         questionId: id,
         selectedOptionId: null,
         confidence: null,
-        status: 'UNANSWERED',
+        status: 'NOT_VISITED',
         timeSpentSeconds: 0,
       };
     });
@@ -48,6 +49,21 @@ export const useExamStore = create<ExamState>()(
   },
 
   setCurrentQuestion: (index) => set({ currentQuestionIndex: index }),
+
+  visitQuestion: (questionId) => set((state) => {
+    const existing = state.answers[questionId];
+    if (!existing || existing.status !== 'NOT_VISITED') return state;
+
+    return {
+      answers: {
+        ...state.answers,
+        [questionId]: {
+          ...existing,
+          status: 'UNANSWERED',
+        }
+      }
+    };
+  }),
 
   setAnswer: (questionId, optionId, confidence) => set((state) => {
     const existing = state.answers[questionId];

@@ -6,7 +6,7 @@ import { ExamTimer } from './ExamTimer';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Maximize2 } from 'lucide-react';
 
 interface ExamHeaderProps {
   testId: string;
@@ -14,9 +14,17 @@ interface ExamHeaderProps {
   totalQuestions: number;
   durationSeconds: number;
   onSubmit: () => void;
+  onRequestFullscreen?: () => void;
 }
 
-export function ExamHeader({ testId, testName, totalQuestions, durationSeconds, onSubmit }: ExamHeaderProps) {
+export function ExamHeader({ 
+  testId, 
+  testName, 
+  totalQuestions, 
+  durationSeconds, 
+  onSubmit,
+  onRequestFullscreen
+}: ExamHeaderProps) {
   const { answers } = useExamStore();
   
   const answeredCount = Object.values(answers).filter(
@@ -44,6 +52,17 @@ export function ExamHeader({ testId, testName, totalQuestions, durationSeconds, 
         </div>
 
         <div className="flex items-center gap-4">
+          {onRequestFullscreen && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRequestFullscreen}
+              className="hidden sm:flex gap-2 text-xs font-bold bg-primary/5 border-primary/20 hover:bg-primary/10"
+            >
+              <Maximize2 className="w-4 h-4" />
+              Secure Mode
+            </Button>
+          )}
           <LanguageSwitcher />
           <ExamTimer testId={testId} initialTimeSeconds={durationSeconds} onTimeUp={onSubmit} />
           <Button variant="default" onClick={onSubmit} className="font-semibold shadow-sm">

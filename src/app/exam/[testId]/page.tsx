@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useExamStore, ConfidenceLevel } from '@/lib/store/useExamStore';
+import { useTimerStore } from '@/lib/store/useTimerStore';
 import { useAutoSave } from '@/lib/hooks/useAutoSave';
 import { ExamHeader } from '@/components/exam/ExamHeader';
 import { QuestionPalette } from '@/components/exam/QuestionPalette';
@@ -12,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
 import { useSearchParams } from 'next/navigation';
@@ -26,15 +28,17 @@ export default function ExamInterface() {
   const { testId } = params;
   const attemptId = searchParams.get('attemptId');
 
-  const { testId: storeTestId, initializeTest, currentQuestionIndex, setCurrentQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
+  const { testId: storeTestId, initializeTest, currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
+  const { timeLeft } = useTimerStore();
 
   const { isSaving, saveError } = useAutoSave(attemptId);
-  const { warningsCount, isWarningVisible, dismissWarning } = useExamIntegrity();
+  const { warningsCount, isWarningVisible, lastViolation, dismissWarning, requestFullscreen } = useExamIntegrity();
 
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
+  const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
 
   useEffect(() => {
     const fetchExamData = async () => {
@@ -73,6 +77,12 @@ export default function ExamInterface() {
 
   const question = questions[currentQuestionIndex];
   const currentAnswer = question ? answers[question.id] : null;
+
+  useEffect(() => {
+    if (question?.id) {
+      visitQuestion(question.id);
+    }
+  }, [question?.id, visitQuestion]);
 
   if (!question) return null;
 
@@ -114,29 +124,62 @@ export default function ExamInterface() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {isWarningVisible && (
-        <div className="bg-destructive text-destructive-foreground p-3 flex justify-between items-center z-[100]">
-          <span className="font-semibold text-sm">
-            Warning: Suspicious activity detected. Tab switching or minimizing is tracked. ({warningsCount} occurrences)
-          </span>
-          <Button variant="outline" size="sm" onClick={dismissWarning} className="text-destructive hover:text-destructive">
-            Acknowledge
-          </Button>
-        </div>
-      )}
+      <div className="sticky top-0 z-50 flex flex-col">
+        {isWarningVisible && (
+          <div className="bg-destructive text-destructive-foreground p-3 flex justify-between items-center z-[100] animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 animate-pulse" />
+              <span className="font-semibold text-xs sm:text-sm">
+                Integrity Warning: {lastViolation || "Suspicious activity detected"}. ({warningsCount})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={dismissWarning} className="hover:bg-white/10 h-8 px-2 text-xs">
+                Acknowledge
+              </Button>
+            </div>
+          </div>
+        )}
 
-      <ExamHeader 
-        testId={testId as string}
-        testName="Exam in Progress" 
-        totalQuestions={questions.length} 
-        durationSeconds={10800} // 3 hours
-        onSubmit={handleSubmit}
-      />
+        <ExamHeader 
+          testId={testId as string}
+          testName="Exam in Progress" 
+          totalQuestions={questions.length} 
+          durationSeconds={10800} 
+          onSubmit={handleSubmit}
+          onRequestFullscreen={requestFullscreen}
+        />
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-background/50 relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-background relative">
           
+          {/* Mobile Palette Toggle */}
+          <div className="xl:hidden fixed bottom-24 right-6 z-40">
+            <Sheet open={mobilePaletteOpen} onOpenChange={setMobilePaletteOpen}>
+              <SheetTrigger asChild>
+                <Button size="icon" className="w-14 h-14 rounded-full shadow-2xl bg-primary text-primary-foreground border-4 border-white dark:border-zinc-900">
+                  <Menu className="w-6 h-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] p-0">
+                <SheetHeader className="p-6 border-b">
+                  <SheetTitle>Question Navigator</SheetTitle>
+                </SheetHeader>
+                <div className="h-full overflow-y-auto">
+                  <QuestionPalette 
+                    questionIds={questions.map(q => q.id)} 
+                    onQuestionSelect={(idx) => {
+                      setCurrentQuestion(idx);
+                      setMobilePaletteOpen(false);
+                    }}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
           {/* Auto Save Status */}
           <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
             {saveError ? (
@@ -241,20 +284,22 @@ export default function ExamInterface() {
           </div>
 
           {/* Bottom Actions */}
-          <div className="border-t bg-background p-4 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] z-10">
-            <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="sticky bottom-0 border-t bg-background p-3 md:p-4 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)] z-30">
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
+                  size="sm"
                   onClick={() => clearResponse(question.id)}
                   disabled={!currentAnswer?.selectedOptionId && currentAnswer?.status !== 'MARKED_FOR_REVIEW'}
-                  className="gap-2"
+                  className="h-11 px-3 sm:px-4"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  <span className="hidden sm:inline-block">Clear</span>
+                  <RotateCcw className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Clear</span>
                 </Button>
                 <Button 
                   variant="secondary" 
+                  size="sm"
                   onClick={() => {
                     markForReview(question.id);
                     if (currentQuestionIndex < questions.length - 1) {
@@ -263,41 +308,44 @@ export default function ExamInterface() {
                       setShowReview(true);
                     }
                   }}
-                  className="gap-2 bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
+                  className="h-11 px-3 sm:px-4 bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200"
                 >
-                  <Bookmark className="w-4 h-4" />
-                  <span className="hidden sm:inline-block">Review & Next</span>
+                  <Bookmark className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Review & Next</span>
                 </Button>
               </div>
 
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
+                  size="sm"
                   onClick={handlePrevious}
                   disabled={currentQuestionIndex === 0}
-                  className="gap-2"
+                  className="h-11 px-3 sm:px-4"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
+                  <ChevronLeft className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Prev</span>
                 </Button>
                 
                 {currentQuestionIndex === questions.length - 1 ? (
                   <Button 
                     variant="default" 
+                    size="sm"
                     onClick={() => setShowReview(true)}
-                    className="gap-2 px-8 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
+                    className="h-11 px-5 sm:px-8 bg-green-600 hover:bg-green-700 text-white shadow-lg"
                   >
-                    Review & Submit
-                    <ChevronRight className="w-4 h-4" />
+                    Finish
+                    <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
                   <Button 
                     variant="default" 
+                    size="sm"
                     onClick={handleNext}
-                    className="gap-2 px-8"
+                    className="h-11 px-5 sm:px-8 shadow-md"
                   >
                     Next
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 )}
               </div>

@@ -19,7 +19,8 @@ export const useAutoSave = (attemptId: string | null) => {
   const syncToBackend = useCallback(async (isRetry = false) => {
     if (!attemptId) return;
 
-    const payload = Object.values(answers);
+    const payload = Object.values(answers).filter(answer => answer.status !== 'NOT_VISITED');
+    if (payload.length === 0) return;
     const payloadString = JSON.stringify(payload);
 
     // Deduplication

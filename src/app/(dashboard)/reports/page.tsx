@@ -21,7 +21,10 @@ export default function ReportsPage() {
   const attemptId = searchParams.get("attemptId");
   
   const [report, setReport] = useState<PerformanceReport | null>(null);
+  const [reviewData, setReviewData] = useState<any[]>([]);
+  const [showReview, setShowReview] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingReview, setLoadingReview] = useState(false);
   const [error, setError] = useState<any | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
@@ -109,6 +112,20 @@ export default function ReportsPage() {
 
   const insights = generateInsights();
 
+  const handleFetchReview = async () => {
+    if (!attemptId) return;
+    try {
+      setLoadingReview(true);
+      const data = await dashboardService.getReportReview(attemptId);
+      setReviewData(data);
+      setShowReview(true);
+    } catch (err) {
+      toast.error("Failed to load detailed review.");
+    } finally {
+      setLoadingReview(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-10 p-4 pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -118,7 +135,13 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => window.print()} className="hidden sm:flex">Download PDF</Button>
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">Review All Answers</Button>
+          <Button 
+            onClick={handleFetchReview} 
+            disabled={loadingReview}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+          >
+            {loadingReview ? "Loading..." : "Review Detailed Solutions"}
+          </Button>
         </div>
       </div>
       
@@ -306,7 +329,86 @@ export default function ReportsPage() {
             </p>
           </div>
         </div>
-      </div>
+        </div>
+
+      {/* SECTION 5 — DETAILED REVIEW */}
+      {showReview && (
+        <div className="mt-12 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-extrabold tracking-tight">Question-wise Analysis</h2>
+            <Button variant="ghost" onClick={() => setShowReview(false)}>Close Review</Button>
+          </div>
+          
+          <div className="grid gap-6">
+            {reviewData.map((q, idx) => (
+              <div key={q.id} className="p-8 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Question {idx + 1}</span>
+                    <h3 className="text-xl font-bold leading-snug">{q.text_en}</h3>
+                    {q.text_hi && <p className="text-lg text-zinc-500 dark:text-zinc-400 mt-2 font-medium">{q.text_hi}</p>}
+                  </div>
+                  <Badge variant={q.is_correct ? "default" : "destructive"} className="shrink-0 px-4 py-1">
+                    {q.is_correct ? "Correct" : q.selected_option ? "Incorrect" : "Skipped"}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(q.options_en).map(([key, value]) => {
+                    const isSelected = q.selected_option === key;
+                    const isCorrect = q.correct_option === key;
+                    
+                    let bgClass = "bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800";
+                    if (isCorrect) bgClass = "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-900 dark:text-green-400";
+                    if (isSelected && !isCorrect) bgClass = "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-400";
+
+                    return (
+                      <div key={key} className={`p-4 rounded-2xl border-2 transition-all flex gap-3 items-start ${bgClass}`}>
+                        <span className="font-black mt-0.5">{key}.</span>
+                        <div className="flex-1">
+                          <p className="font-semibold">{value as string}</p>
+                          {q.options_hi?.[key] && <p className="text-sm opacity-80 mt-1">{q.options_hi[key]}</p>}
+                        </div>
+                        {isCorrect && <CheckCircle2 className="w-5 h-5 shrink-0" />}
+                        {isSelected && !isCorrect && <XCircle className="w-5 h-5 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {(q.explanation_en || q.explanation_hi) && (
+                  <div className="mt-6 p-6 bg-primary/5 rounded-2xl border border-primary/10">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-primary mb-3 flex items-center gap-2">
+                      <BrainCircuit className="w-4 h-4" />
+                      Detailed Explanation
+                    </h4>
+                    <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                      {q.explanation_en}
+                    </p>
+                    {q.explanation_hi && (
+                      <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400 mt-4 border-t border-primary/5 pt-4">
+                        {q.explanation_hi}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Timer className="w-3.5 h-3.5" />
+                    Time Spent: {q.time_taken_seconds}s
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Zap className="w-3.5 h-3.5" />
+                    Confidence: {q.confidence_level || "Not set"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 }

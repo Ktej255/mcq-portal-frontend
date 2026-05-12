@@ -76,17 +76,22 @@ export const examService = {
 
   saveAnswers: async (attemptId: string, answers: SaveAnswerPayload[]) => {
     // Backend expects a single answer per request — send the last answer
-    const last = answers[answers.length - 1];
-    if (!last) return;
-    const response = await apiClient.put(`attempts/${attemptId}/answers`, {
-      question_id: parseInt(last.questionId),
-      selected_option: last.selectedOptionId,
-      time_taken_seconds: last.timeSpentSeconds,
-      confidence_level: last.confidence,
-      is_skipped: last.status === 'UNANSWERED',
-      marked_for_review: last.status === 'MARKED_FOR_REVIEW',
-    });
-    return response.data?.data ?? response.data;
+    const saveableAnswers = answers.filter(answer => answer.status !== 'NOT_VISITED');
+    if (saveableAnswers.length === 0) return;
+
+    const responses = [];
+    for (const answer of saveableAnswers) {
+      const response = await apiClient.put(`attempts/${attemptId}/answers`, {
+        question_id: parseInt(answer.questionId),
+        selected_option: answer.selectedOptionId,
+        time_taken_seconds: answer.timeSpentSeconds,
+        confidence_level: answer.confidence,
+        is_skipped: answer.status === 'UNANSWERED',
+        marked_for_review: answer.status === 'MARKED_FOR_REVIEW' || answer.status === 'ANSWERED_AND_MARKED',
+      });
+      responses.push(response.data?.data ?? response.data);
+    }
+    return responses;
   },
 
   submitTest: async (attemptId: string) => {

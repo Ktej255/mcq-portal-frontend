@@ -22,6 +22,9 @@ const evidence = {
   observations: [],
 };
 
+let activeContext;
+let activePage;
+
 function apiPath(url) {
   try {
     const parsed = new URL(url);
@@ -53,9 +56,9 @@ async function getAuthSnapshot(page) {
       url: location.href,
       debug,
       localStorageKeys: Object.keys(localStorage),
-      bodyText: document.body.innerText.slice(0, 2000),
+      bodyText: (document.body?.innerText || "").slice(0, 2000),
     };
-  });
+  }).catch((err) => ({ url: page.url(), snapshotError: err.message }));
 }
 
 async function requireNoCriticalError(page, label) {
@@ -101,8 +104,10 @@ async function ensureAuthenticated(page, label) {
   }
 
   await page.waitForFunction(() => {
-    const text = document.body.innerText || "";
+    const text = document.body?.innerText || "";
+    const isFrontend = location.origin === "https://mcq-portal-frontend.vercel.app";
     return (
+      isFrontend &&
       !location.pathname.startsWith("/login") &&
       !/Continue with Google|Authorized access only|Initializing exam portal|Loading session/i.test(text)
     );
@@ -129,6 +134,7 @@ async function clickFirstVisible(page, selectors, label) {
     viewport: { width: 1440, height: 1000 },
     recordHar: { path: path.join(outDir, "network.har"), content: "embed" },
   });
+  activeContext = context;
 
   context.on("page", (p) => {
     p.on("console", (msg) => {
@@ -165,6 +171,7 @@ async function clickFirstVisible(page, selectors, label) {
   });
 
   const page = context.pages()[0] || await context.newPage();
+  activePage = page;
   page.on("console", (msg) => {
     if (["error", "warning"].includes(msg.type())) {
       evidence.consoleErrors.push({ page: page.url(), type: msg.type(), text: msg.text() });
@@ -259,6 +266,15 @@ async function clickFirstVisible(page, selectors, label) {
   console.log(`\nVALIDATION_ARTIFACTS=${outDir}\n`);
 })().catch(async (err) => {
   evidence.fatal = { message: err.message, stack: err.stack };
+  try {
+    if (activePage) {
+      await shot(activePage, "fatal-current-state");
+      evidence.observations.push({ label: "fatal-current-state", snapshot: await getAuthSnapshot(activePage) });
+    }
+    if (activeContext) {
+      await activeContext.close();
+    }
+  } catch {}
   writeEvidence();
   console.error(err);
   console.error(`\nVALIDATION_ARTIFACTS=${outDir}\n`);
