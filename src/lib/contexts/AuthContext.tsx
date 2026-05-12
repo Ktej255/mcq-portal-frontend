@@ -2,14 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "../firebase/config";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
 }
@@ -18,7 +16,6 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signInWithGoogle: async () => {},
-  signInWithEmail: async () => {},
   logout: async () => {},
   getToken: async () => null,
 });
@@ -77,20 +74,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signInWithEmail = async (email: string, pass: string) => {
-    if (!auth) {
-      console.error("Auth not initialized");
-      return;
-    }
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-      router.push("/dashboard");
-    } catch (error) {
-      console.error("Error signing in with email", error);
-      throw error;
-    }
-  };
-
   const logout = async () => {
     if (!auth) return;
     try {
@@ -112,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithEmail, logout, getToken }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, getToken }}>
       {children}
     </AuthContext.Provider>
   );
