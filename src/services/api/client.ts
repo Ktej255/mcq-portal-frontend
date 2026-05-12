@@ -96,6 +96,7 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         console.log(`[MCQ_DEBUG] Request Authorized: ${config.url}`);
+        console.log(`[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer ${token.substring(0, 10)}...[len:${token.length}]`);
       } else {
         console.error(`[MCQ_DEBUG] Request BLOCKED - No Token: ${config.url}`);
         // Optionally throw error to prevent request without token
