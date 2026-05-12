@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { dashboardService, HistoryItem } from "@/services/api/dashboardService";
 import { useRouter } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { DebugPanel } from "@/components/shared/DebugPanel";
 
 export default function HistoryPage() {
   const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
 
@@ -26,7 +27,7 @@ export default function HistoryPage() {
         setError(null);
       } catch (err) {
         console.error("Failed to fetch history:", err);
-        setError("Failed to load attempt history.");
+        setError(err); // Save full error object
       } finally {
         setLoading(false);
       }
@@ -43,9 +44,13 @@ export default function HistoryPage() {
   );
 
   if (error) return (
-    <div className="flex flex-col items-center justify-center h-64 text-center">
-      <p className="text-red-500 mb-4">{error}</p>
-      <Button onClick={() => window.location.reload()}>Retry</Button>
+    <div className="space-y-8">
+      <div className="flex flex-col items-center justify-center p-8 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800/50 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium mb-4">Critical Error: History fetch failed.</p>
+        <Button onClick={() => window.location.reload()}>Retry Request</Button>
+      </div>
+      
+      <DebugPanel error={error} context="History API (/attempts/history)" />
     </div>
   );
 

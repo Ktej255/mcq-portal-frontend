@@ -5,12 +5,13 @@ import { examService, TestMetadata } from "@/services/api/examService";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { DebugPanel } from "@/components/shared/DebugPanel";
 
 export default function TestsPage() {
   const router = useRouter();
   const [tests, setTests] = useState<TestMetadata[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
 
@@ -25,7 +26,7 @@ export default function TestsPage() {
         setError(null);
       } catch (err) {
         console.error("Failed to fetch tests:", err);
-        setError("Failed to load available tests.");
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -41,7 +42,7 @@ export default function TestsPage() {
       router.push(`/exam/${testId}?attemptId=${attempt.attemptId}`);
     } catch (err) {
       console.error("Failed to start attempt:", err);
-      alert("Failed to start the test. Please try again.");
+      setError(err); // Set error state to show debug panel
     }
   };
 
@@ -57,9 +58,13 @@ export default function TestsPage() {
   );
 
   if (error) return (
-    <div className="flex flex-col items-center justify-center h-64 text-center">
-      <p className="text-red-500 mb-4">{error}</p>
-      <Button onClick={() => window.location.reload()}>Retry</Button>
+    <div className="space-y-8">
+      <div className="flex flex-col items-center justify-center p-8 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800/50 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium mb-4">Critical Error: Tests fetch or start failed.</p>
+        <Button onClick={() => window.location.reload()}>Retry Request</Button>
+      </div>
+      
+      <DebugPanel error={error} context="Tests API (/exams/available)" />
     </div>
   );
 

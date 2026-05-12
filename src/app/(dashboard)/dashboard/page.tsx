@@ -5,11 +5,12 @@ import { dashboardService, DashboardSummary } from "@/services/api/dashboardServ
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, BookOpen, CheckCircle, Clock } from "lucide-react";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { DebugPanel } from "@/components/shared/DebugPanel";
 
 export default function DashboardHome() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
 
@@ -24,7 +25,7 @@ export default function DashboardHome() {
         setError(null);
       } catch (err) {
         console.error("Failed to fetch dashboard summary:", err);
-        setError("Failed to load dashboard data. Please try again later.");
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -47,14 +48,18 @@ export default function DashboardHome() {
   );
 
   if (error) return (
-    <div className="flex flex-col items-center justify-center h-64 text-center">
-      <p className="text-red-500 mb-4">{error}</p>
-      <button 
-        onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-md text-sm font-medium"
-      >
-        Retry
-      </button>
+    <div className="space-y-8">
+      <div className="flex flex-col items-center justify-center p-8 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800/50 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium mb-4">Critical Error: Dashboard data fetch failed.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-md text-sm font-medium"
+        >
+          Retry Request
+        </button>
+      </div>
+      
+      <DebugPanel error={error} context="Dashboard API (/dashboard/summary)" />
     </div>
   );
 
