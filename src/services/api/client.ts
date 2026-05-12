@@ -34,6 +34,36 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// Forensic Token Retrieval with Polling
+async function waitForToken(maxRetries = 50): Promise<string | null> {
+  console.log("[MCQ_DEBUG] Starting token retrieval polling...");
+  
+  for (let i = 0; i < maxRetries; i++) {
+    const user = auth?.currentUser;
+    
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        if (token) {
+          console.log(`[MCQ_DEBUG] Token acquired on attempt ${i + 1}. Length: ${token.length}`);
+          return token;
+        }
+      } catch (err) {
+        console.warn(`[MCQ_DEBUG] Token retrieval error on attempt ${i + 1}:`, err);
+      }
+    }
+    
+    if (i % 10 === 0 && i > 0) {
+      console.log(`[MCQ_DEBUG] Still waiting for token... (Attempt ${i}) User state: ${user ? 'exists' : 'null'}`);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  console.error("[MCQ_DEBUG] Token retrieval timed out after 5 seconds.");
+  return null;
+}
+
 // Add the interceptor immediately upon creation
 // Request interceptor: Attach tokens
 apiClient.interceptors.request.use(
@@ -46,46 +76,39 @@ apiClient.interceptors.request.use(
         headers: { ...config.headers },
         timestamp: new Date().toISOString()
       };
-      console.log(`[MCQ_DEBUG] Request: ${config.method?.toUpperCase()} ${config.url}`, config);
     }
 
     try {
       if (!auth) {
-        console.warn("[MCQ_DEBUG] Firebase Auth instance not found");
+        console.error("[MCQ_DEBUG] FATAL: Firebase Auth instance missing");
         return config;
       }
       
-      // Wait for auth to be ready
-      if (typeof auth.authStateReady === 'function') {
-        await auth.authStateReady();
-      }
+      // HARD GATE: Wait for token before any request
+      const token = await waitForToken();
       
-      const user = auth.currentUser;
       if (debug) {
-        debug.user = user ? { uid: user.uid, email: user.email } : null;
-        debug.authState = user ? 'SIGNED_IN' : 'SIGNED_OUT';
+        debug.user = auth.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null;
+        debug.authState = auth.currentUser ? 'SIGNED_IN' : 'SIGNED_OUT';
+        debug.tokenPresent = !!token;
       }
 
-      if (user) {
-        const token = await user.getIdToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-          if (debug) debug.tokenPresent = true;
-          console.log("[MCQ_DEBUG] Token attached successfully");
-        } else {
-          console.warn("[MCQ_DEBUG] User found but failed to get ID token");
-        }
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log(`[MCQ_DEBUG] Request Authorized: ${config.url}`);
       } else {
-        console.warn("[MCQ_DEBUG] No current user found in Firebase singleton");
+        console.error(`[MCQ_DEBUG] Request BLOCKED - No Token: ${config.url}`);
+        // Optionally throw error to prevent request without token
+        return Promise.reject(new Error("Authentication required: Token unavailable"));
       }
     } catch (error) {
-      console.error("[MCQ_DEBUG] Error in request interceptor:", error);
-      if (debug) debug.errors.push({ type: 'REQUEST_INTERCEPTOR', error });
+      console.error("[MCQ_DEBUG] Request interceptor failed:", error);
+      return Promise.reject(error);
     }
     return config;
   },
   (error) => {
-    console.error("[MCQ_DEBUG] Request error:", error);
+    console.error("[MCQ_DEBUG] Request configuration error:", error);
     return Promise.reject(error);
   }
 );
