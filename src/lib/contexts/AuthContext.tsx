@@ -39,17 +39,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const initAuth = async () => {
       try {
         // Wait for Firebase to definitively determine auth state (v10.3+)
-        if (typeof auth.authStateReady === 'function') {
+        if (auth && typeof auth.authStateReady === 'function') {
           await auth.authStateReady();
         }
       } catch (err) {
         console.error("Firebase authStateReady failed", err);
       }
 
-      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        setUser(currentUser);
+      if (auth) {
+        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+          setLoading(false);
+        });
+      } else {
         setLoading(false);
-      });
+      }
     };
 
     initAuth();
@@ -60,7 +64,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signInWithGoogle = async () => {
-    if (!auth) return;
+    if (!auth) {
+      console.error("Auth not initialized");
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
       router.push("/dashboard");
@@ -71,7 +78,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
-    if (!auth) return;
+    if (!auth) {
+      console.error("Auth not initialized");
+      return;
+    }
     try {
       await signInWithEmailAndPassword(auth, email, pass);
       router.push("/dashboard");

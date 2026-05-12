@@ -83,7 +83,7 @@ export const examService = {
       selected_option: last.selectedOptionId,
       time_taken_seconds: last.timeSpentSeconds,
       confidence_level: last.confidence,
-      is_skipped: last.status === 'SKIPPED',
+      is_skipped: last.status === 'UNANSWERED',
       marked_for_review: last.status === 'MARKED_FOR_REVIEW',
     });
     return response.data?.data ?? response.data;
