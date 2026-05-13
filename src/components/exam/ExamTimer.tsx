@@ -15,8 +15,8 @@ export function ExamTimer({ testId, initialTimeSeconds, onTimeUp }: ExamTimerPro
   const tickInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (storeTestId !== testId) {
-      // New test, reset timer
+    if (storeTestId !== testId || timeLeft > initialTimeSeconds) {
+      // New test or stale timer (e.g. reduced duration), reset timer
       resetTimer(initialTimeSeconds, testId);
     }
     // Always ensure it is running if we are mounted

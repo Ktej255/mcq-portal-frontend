@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
-import { examService, QuestionData } from '@/services/api/examService';
+import { examService, QuestionData, TestMetadata } from '@/services/api/examService';
 import { eventsService } from '@/services/api/eventsService';
 import { normalizeOptionId, normalizeConfidence } from '@/services/api/contracts';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ export default function ExamInterface() {
   const { warningsCount, isWarningVisible, lastViolation, dismissWarning, requestFullscreen } = useExamIntegrity();
 
   const [questions, setQuestions] = useState<QuestionData[]>([]);
+  const [testMetadata, setTestMetadata] = useState<TestMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
@@ -44,11 +45,21 @@ export default function ExamInterface() {
     const fetchExamData = async () => {
       try {
         setLoading(true);
-        const data = await examService.getQuestions(testId as string);
-        setQuestions(data);
+        // Fetch questions and test metadata in parallel
+        const [qData, tData] = await Promise.all([
+          examService.getQuestions(testId as string),
+          examService.getTestById(testId as string)
+        ]);
         
-        if (storeTestId !== testId) {
-          initializeTest(testId as string, data.map(q => q.id));
+        setQuestions(qData);
+        setTestMetadata(tData);
+        
+        const questionIds = qData.map(q => q.id);
+        const storeQuestionIds = Object.keys(answers);
+        const isStale = questionIds.some(id => !storeQuestionIds.includes(id));
+        
+        if (storeTestId !== testId || isStale) {
+          initializeTest(testId as string, questionIds);
         }
       } catch (err) {
         console.error("Failed to fetch exam data:", err);
@@ -184,10 +195,10 @@ export default function ExamInterface() {
 
         <ExamHeader 
           testId={testId as string}
-          testName="Exam in Progress" 
+          testName={testMetadata?.title || "Exam in Progress"} 
           totalQuestions={questions.length} 
-          durationSeconds={10800} 
-        onSubmit={() => setShowReview(true)}
+          durationSeconds={(testMetadata?.durationMinutes || 60) * 60} 
+          onSubmit={() => setShowReview(true)}
           onRequestFullscreen={requestFullscreen}
         />
       </div>

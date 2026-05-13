@@ -29,6 +29,8 @@ export interface PerformanceReport {
   strengths: string[];
   weaknesses: string[];
   narrative?: string;
+  behavioral_analysis?: any;
+  telemetry_summary?: any;
 }
 
 export interface HistoryItem {
@@ -109,6 +111,8 @@ export const dashboardService = {
       strengths,
       weaknesses,
       narrative: payload.narrative,
+      behavioral_analysis: payload.behavioral_analysis,
+      telemetry_summary: payload.telemetry_summary,
     };
   },
 
@@ -122,8 +126,13 @@ export const dashboardService = {
     return response.data?.data;
   },
 
-  getRecommendations: async () => {
-    const response = await apiClient.get('dashboard/recommendations');
+  getEvolution: async (): Promise<any> => {
+    const response = await apiClient.get('reports/evolution');
+    return response.data?.data;
+  },
+
+  getRecommendations: async (): Promise<any> => {
+    const response = await apiClient.get('reports/recommendations');
     return response.data?.data;
   }
 };

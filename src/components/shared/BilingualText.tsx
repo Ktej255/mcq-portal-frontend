@@ -21,16 +21,16 @@ export const BilingualText = React.memo(({
   if (!textEn && !textHi) return null;
 
   if (mode === 'ENGLISH') {
-    return <span className={className}>{textEn || textHi}</span>;
+    return <span className={`whitespace-pre-line ${className}`}>{textEn || textHi}</span>;
   }
 
   if (mode === 'HINDI') {
-    return <span className={className}>{textHi || textEn}</span>;
+    return <span className={`whitespace-pre-line ${className}`}>{textHi || textEn}</span>;
   }
 
   // HYBRID MODE
   return (
-    <div className={hybridContainerClassName}>
+    <div className={`${hybridContainerClassName} whitespace-pre-line`}>
       {textHi && (
         <span className={`text-lg font-medium ${className}`}>{textHi}</span>
       )}

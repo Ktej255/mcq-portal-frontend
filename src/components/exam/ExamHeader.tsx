@@ -27,47 +27,89 @@ export function ExamHeader({
 }: ExamHeaderProps) {
   const { answers } = useExamStore();
   
+  const visitedCount = Object.values(answers).filter(a => a.status !== 'NOT_VISITED').length;
   const answeredCount = Object.values(answers).filter(
     a => a.status === 'ANSWERED' || a.status === 'ANSWERED_AND_MARKED'
   ).length;
+  const markedCount = Object.values(answers).filter(
+    a => a.status === 'MARKED_FOR_REVIEW' || a.status === 'ANSWERED_AND_MARKED'
+  ).length;
 
   const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
+  const visitedPercentage = totalQuestions > 0 ? (visitedCount / totalQuestions) * 100 : 0;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-primary font-bold">
-            <ShieldAlert className="w-6 h-6" />
-            <span className="hidden md:inline-block text-xl tracking-tight">{testName}</span>
+    <header className="sticky top-0 z-50 w-full border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60">
+      <div className="flex h-20 items-center justify-between px-6 md:px-10">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+              <ShieldAlert className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-primary uppercase tracking-widest leading-none mb-1">Live Intelligence</span>
+              <span className="text-xl font-black tracking-tight leading-none text-zinc-900 dark:text-white truncate max-w-[200px] md:max-w-[400px]">{testName}</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 max-w-md mx-8 hidden lg:flex flex-col gap-1">
-          <div className="flex justify-between text-xs text-muted-foreground font-medium">
-            <span>Progress</span>
-            <span>{answeredCount} / {totalQuestions}</span>
+        <div className="flex-1 max-w-xl mx-12 hidden xl:flex flex-col gap-2">
+          <div className="flex justify-between items-end">
+            <div className="flex gap-4">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Solved</span>
+                <span className="text-sm font-black">{answeredCount} <span className="text-zinc-400 font-medium">/ {totalQuestions}</span></span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Marked</span>
+                <span className="text-sm font-black text-purple-600">{markedCount}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">Completion</span>
+              <p className="text-sm font-black">{Math.round(progressPercentage)}%</p>
+            </div>
           </div>
-          <Progress value={progressPercentage} className="h-2" />
+          <div className="relative h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+            <div 
+              className="absolute left-0 top-0 h-full bg-zinc-200 dark:bg-zinc-700 transition-all duration-500 ease-out"
+              style={{ width: `${visitedPercentage}%` }}
+            />
+            <div 
+              className="absolute left-0 top-0 h-full bg-primary transition-all duration-700 ease-out shadow-[0_0_10px_rgba(var(--primary),0.5)]"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {onRequestFullscreen && (
+        <div className="flex items-center gap-3 md:gap-6">
+          <div className="hidden sm:flex items-center gap-2">
+            {onRequestFullscreen && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRequestFullscreen}
+                className="h-10 px-4 rounded-xl gap-2 text-xs font-bold border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+              >
+                <Maximize2 className="w-4 h-4" />
+                SECURE
+              </Button>
+            )}
+            <LanguageSwitcher />
+          </div>
+          
+          <div className="h-12 w-[1px] bg-zinc-200 dark:border-zinc-800 hidden md:block" />
+          
+          <div className="flex items-center gap-4">
+            <ExamTimer testId={testId} initialTimeSeconds={durationSeconds} onTimeUp={onSubmit} />
             <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onRequestFullscreen}
-              className="hidden sm:flex gap-2 text-xs font-bold bg-primary/5 border-primary/20 hover:bg-primary/10"
+              variant="default" 
+              onClick={onSubmit} 
+              className="h-12 px-6 rounded-xl font-black text-sm uppercase tracking-wider bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all shadow-xl shadow-zinc-900/10 dark:shadow-white/10"
             >
-              <Maximize2 className="w-4 h-4" />
-              Secure Mode
+              Submit
             </Button>
-          )}
-          <LanguageSwitcher />
-          <ExamTimer testId={testId} initialTimeSeconds={durationSeconds} onTimeUp={onSubmit} />
-          <Button variant="default" onClick={onSubmit} className="font-semibold shadow-sm bg-green-600 hover:bg-green-700 text-white">
-            Review & Submit
-          </Button>
+          </div>
         </div>
       </div>
     </header>
