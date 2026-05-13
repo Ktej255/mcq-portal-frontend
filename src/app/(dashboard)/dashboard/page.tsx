@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { dashboardService, DashboardSummary } from "@/services/api/dashboardService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, BookOpen, CheckCircle, Clock, Sparkles } from "lucide-react";
+import { Activity, BookOpen, CheckCircle, Clock, Sparkles, TrendingUp, History as HistoryIcon, ChevronRight, Trophy, BrainCircuit, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApiConfig } from "@/lib/hooks/useApi";
@@ -118,7 +118,7 @@ export default function DashboardHome() {
           <div className="p-8 md:p-12 rounded-[3rem] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
             <div className="flex items-center justify-between mb-10">
               <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                <History className="w-8 h-8 text-primary" />
+                <HistoryIcon className="w-8 h-8 text-primary" />
                 Recent Attempts
               </h2>
               <Button variant="ghost" className="font-bold text-primary rounded-full px-6" onClick={() => window.location.href='/history'}>

@@ -75,5 +75,6 @@ export function normalizeReportPayload(payload: any, attemptId?: string) {
     correctCount: requireFiniteNumber(payload?.correctCount ?? payload?.correct_count ?? 0, 'correctCount'),
     incorrectCount: requireFiniteNumber(payload?.incorrectCount ?? payload?.incorrect_count ?? 0, 'incorrectCount'),
     unattemptedCount: requireFiniteNumber(payload?.unattemptedCount ?? payload?.unattempted_count ?? 0, 'unattemptedCount'),
+    totalQuestions: requireFiniteNumber(payload?.totalQuestions ?? payload?.total_questions ?? 0, 'totalQuestions'),
   };
 }

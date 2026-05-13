@@ -21,6 +21,8 @@ export interface PerformanceReport {
   correctCount: number;
   incorrectCount: number;
   unattemptedCount: number;
+  totalQuestions: number;
+  totalTime: number;
   subjectScores: { subject: string; score: number; total: number }[];
   confidenceAnalytics: { level: string; accuracy: number; count: number }[];
   topicWiseAnalysis: Record<string, { correct: number; incorrect: number; unattempted: number; total: number }>;
@@ -103,6 +105,8 @@ export const dashboardService = {
       correctCount: strictReport.correctCount,
       incorrectCount: strictReport.incorrectCount,
       unattemptedCount: strictReport.unattemptedCount,
+      totalQuestions: strictReport.totalQuestions,
+      totalTime: payload.totalTime ?? payload.total_time ?? 0,
       subjectScores,
       confidenceAnalytics,
       topicWiseAnalysis,

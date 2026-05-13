@@ -3,16 +3,17 @@
 import React from 'react';
 import { 
   Timer, Eye, CheckCircle, AlertTriangle, 
-  MousePointer2, Zap, Clock, Info
+  MousePointer2, Zap, Clock, Info, Activity
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface BehavioralTimelineProps {
   telemetry: any;
   questions: any[];
 }
 
-export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetry }) => {
+export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetry, questions }) => {
   if (!telemetry || !telemetry.question_sequence) {
     return (
       <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700">
@@ -53,7 +54,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
       <div className="relative pt-16 pb-12 px-6">
         {/* THE MAIN TIMELINE BAR */}
         <div className="h-4 bg-zinc-100 dark:bg-zinc-900 rounded-full relative shadow-inner overflow-visible border border-zinc-200 dark:border-zinc-800">
-          <TooltipProvider delayDuration={0}>
+          <TooltipProvider delay={0}>
             
             {/* FOCUS INTERRUPTION OVERLAYS */}
             {interruptions.map((inter: any, idx: number) => {
@@ -93,7 +94,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
                   style={{ left: `${position}%` }}
                 >
                   <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger>
                       <div className={`
                         w-6 h-6 rounded-full border-4 border-white dark:border-zinc-950 cursor-pointer transition-all hover:scale-150 relative z-20 shadow-sm
                         ${isChanged ? 'bg-amber-500 shadow-amber-500/30' : 'bg-blue-500 shadow-blue-500/30'}
@@ -146,14 +147,14 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Observation Points', value: sequence.length, icon: <Activity className="text-blue-500" />, desc: 'Linear sequence of question interactions' },
-          { label: 'Cognitive Friction', value: Object.values(evolutions).filter((e: any) => e.length > 1).length, icon: <Zap className="text-amber-500" />, desc: 'Frequency of answer uncertainty and revision' },
-          { label: 'Focus Anomalies', value: interruptions.length, icon: <AlertTriangle className="text-rose-500" />, desc: 'Detection of tab switching or window blur' },
+          { label: 'Observation Points', value: sequence.length, icon: Activity, color: 'text-blue-500', desc: 'Linear sequence of question interactions' },
+          { label: 'Cognitive Friction', value: Object.values(evolutions).filter((e: any) => e.length > 1).length, icon: Zap, color: 'text-amber-500', desc: 'Frequency of answer uncertainty and revision' },
+          { label: 'Focus Anomalies', value: interruptions.length, icon: AlertTriangle, color: 'text-rose-500', desc: 'Detection of tab switching or window blur' },
         ].map((metric, i) => (
           <div key={i} className="p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 hover:shadow-xl transition-all">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2.5 bg-white dark:bg-zinc-800 rounded-xl shadow-sm">
-                {cloneElement(metric.icon as ReactElement, { className: "w-5 h-5" })}
+                <metric.icon className={`w-5 h-5 ${metric.color}`} />
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{metric.label}</span>
             </div>

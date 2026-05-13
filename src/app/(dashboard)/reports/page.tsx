@@ -17,26 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useApiConfig } from "@/lib/hooks/useApi";
-import { dashboardService } from "@/services/api/dashboardService";
+import { dashboardService, PerformanceReport } from "@/services/api/dashboardService";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Cell } from 'recharts';
-
-interface PerformanceReport {
-  id: string;
-  total_score: number;
-  accuracy: number;
-  correct_count: number;
-  incorrect_count: number;
-  unattempted_count: number;
-  total_time: number;
-  average_time_per_question: number;
-  topicWiseAnalysis: any;
-  subjectScores: any[];
-  confidenceAnalytics: any[];
-  narrative: string;
-  strengths: string[];
-  forensic_data: any;
-  generatedAt: string;
-}
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6'];
 
@@ -232,15 +214,15 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
               <p className="opacity-40 mb-1">TOTAL_QUESTIONS</p>
-              <p className="text-xl font-black">{report.forensic_data?.total_questions || report.total_questions}</p>
+              <p className="text-xl font-black">{report.behavioral_analysis?.total_questions || report.totalQuestions}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">ATTEMPTED_COUNT</p>
-              <p className="text-xl font-black">{report.forensic_data?.attempted_count || (report.correct_count + report.incorrect_count)}</p>
+              <p className="text-xl font-black">{report.behavioral_analysis?.attempted_count || (report.correctCount + report.incorrectCount)}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">SKIPPED_COUNT</p>
-              <p className="text-xl font-black">{report.forensic_data?.skipped_count || report.unattempted_count}</p>
+              <p className="text-xl font-black">{report.behavioral_analysis?.skipped_count || report.unattemptedCount}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">ACCURACY_FORMULA</p>
@@ -248,7 +230,7 @@ export default function ReportsPage() {
             </div>
           </div>
           <div className="pt-4 border-t border-emerald-500/20">
-            <p>Verification Check: {report.total_questions === (report.correct_count + report.incorrect_count + report.unattempted_count) ? "SUCCESS: RECONCILED" : "FAILED: MISMATCH"}</p>
+            <p>Verification Check: {report.totalQuestions === (report.correctCount + report.incorrectCount + report.unattemptedCount) ? "SUCCESS: RECONCILED" : "FAILED: MISMATCH"}</p>
           </div>
         </div>
       )}
@@ -256,13 +238,13 @@ export default function ReportsPage() {
       {/* SECTION 1 — EXECUTIVE RESULT (Mathematically Verified) */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {[
-          { label: 'Final Score', value: report.total_score.toFixed(2), icon: Trophy, color: 'text-zinc-900 dark:text-white' },
-          { label: 'Correct', value: report.correct_count, icon: CheckCircle2, color: 'text-emerald-500' },
-          { label: 'Incorrect', value: report.incorrect_count, icon: XCircle, color: 'text-rose-500' },
-          { label: 'Skipped', value: report.unattempted_count, icon: HelpCircle, color: 'text-zinc-400' },
+          { label: 'Final Score', value: report.totalScore.toFixed(2), icon: Trophy, color: 'text-zinc-900 dark:text-white' },
+          { label: 'Correct', value: report.correctCount, icon: CheckCircle2, color: 'text-emerald-500' },
+          { label: 'Incorrect', value: report.incorrectCount, icon: XCircle, color: 'text-rose-500' },
+          { label: 'Skipped', value: report.unattemptedCount, icon: HelpCircle, color: 'text-zinc-400' },
           { label: 'Accuracy', value: `${report.accuracy.toFixed(1)}%`, icon: Target, color: 'text-blue-500' },
-          { label: 'Total Time', value: `${Math.floor(report.total_time / 60)}m`, icon: Timer, color: 'text-zinc-500' },
-          { label: 'Avg Pacing', value: `${report.average_time_per_question?.toFixed(0)}s`, icon: Zap, color: 'text-amber-500' },
+          { label: 'Total Time', value: `${Math.floor((report as any).totalTime / 60)}m`, icon: Timer, color: 'text-zinc-500' },
+          { label: 'Avg Pacing', value: `${report.averageTimePerQuestion?.toFixed(0)}s`, icon: Zap, color: 'text-amber-500' },
         ].map((stat, i) => (
           <div key={i} className="p-6 rounded-[2rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -365,7 +347,7 @@ export default function ReportsPage() {
             </div>
             <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800">
                <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic">
-                 "Our intelligence is derived from {telemetry.question_sequence?.length || 0} discrete behavioral markers observed during your {Math.floor((report.totalTimeTaken || 0) / 60)}m session."
+                 "Our intelligence is derived from {telemetry.question_sequence?.length || 0} discrete behavioral markers observed during your {Math.floor((report.totalTime || 0) / 60)}m session."
                </p>
             </div>
           </div>
@@ -420,7 +402,7 @@ export default function ReportsPage() {
              </div>
              {expandedSections.includes('timeline') && (
                <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                 <BehavioralTimeline telemetry={telemetry} />
+                 <BehavioralTimeline telemetry={telemetry} questions={reviewData} />
                </div>
              )}
           </div>
@@ -457,11 +439,11 @@ export default function ReportsPage() {
             <div className="grid md:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Avg Correct Time</p>
-                <p className="text-4xl font-black">{reviewData.filter(q => q.is_correct).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.correct_count || 1).toFixed(0)}s</p>
+                <p className="text-4xl font-black">{(reviewData.filter(q => q.is_correct).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.correctCount || 1)).toFixed(0)}s</p>
               </div>
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Avg Incorrect Time</p>
-                <p className="text-4xl font-black text-rose-400">{reviewData.filter(q => !q.is_correct && q.selected_option !== null).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.incorrect_count || 1).toFixed(0)}s</p>
+                <p className="text-4xl font-black text-rose-400">{(reviewData.filter(q => !q.is_correct && q.selected_option !== null).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.incorrectCount || 1)).toFixed(0)}s</p>
               </div>
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Guess Risk Zone</p>
@@ -615,10 +597,10 @@ export default function ReportsPage() {
                     <p className="text-sm opacity-70">Accuracy of {report.accuracy.toFixed(1)}% indicates widespread conceptual barriers. Focus on core NCERT revision before next attempt.</p>
                   </div>
                 )}
-                {report.average_time_per_question > 90 && (
+                {report.averageTimePerQuestion > 90 && (
                   <div className="p-6 bg-white/5 dark:bg-zinc-100 rounded-[2rem] border border-white/10 dark:border-zinc-200">
                     <p className="text-lg font-bold mb-2">Priority: Pacing Efficiency</p>
-                    <p className="text-sm opacity-70">Avg time of {report.average_time_per_question.toFixed(0)}s is 1.5x above the target. Practice 20-question speed drills.</p>
+                    <p className="text-sm opacity-70">Avg time of {report.averageTimePerQuestion.toFixed(0)}s is 1.5x above the target. Practice 20-question speed drills.</p>
                   </div>
                 )}
                 <div className="p-6 bg-white/5 dark:bg-zinc-100 rounded-[2rem] border border-white/10 dark:border-zinc-200">
