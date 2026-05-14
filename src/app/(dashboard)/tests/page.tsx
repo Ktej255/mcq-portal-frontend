@@ -53,7 +53,18 @@ export default function TestsPage() {
     return () => { cancelled = true; };
   }, [authLoading, user?.uid]);   // user.uid is stable; avoids repeated fires
 
-  const filteredTests = allTests.filter(t => t.subject === activeSubject);
+  const filteredTests = allTests
+    .filter(t => t.subject === activeSubject)
+    .sort((a, b) => {
+      const getBatchNum = (s: string) => {
+        const m = s.match(/Batch\s+(\d+)/i);
+        return m ? parseInt(m[1], 10) : 0;
+      };
+      const batchA = getBatchNum(a.title);
+      const batchB = getBatchNum(b.title);
+      if (batchA !== batchB) return batchA - batchB;
+      return a.title.localeCompare(b.title, undefined, { numeric: true });
+    });
 
   const handleStart = async (testId: string) => {
     try {

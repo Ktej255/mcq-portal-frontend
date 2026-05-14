@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useExamStore, ConfidenceLevel } from '@/lib/store/useExamStore';
 import { useTimerStore } from '@/lib/store/useTimerStore';
 import { useAutoSave } from '@/lib/hooks/useAutoSave';
+import { useSessionRecovery } from '@/lib/hooks/useSessionRecovery';
 import { ExamHeader } from '@/components/exam/ExamHeader';
 import { QuestionPalette } from '@/components/exam/QuestionPalette';
 import { ConfidenceSelector } from '@/components/exam/ConfidenceSelector';
@@ -13,13 +14,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu, RefreshCw, MessageSquare } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
 import { examService, QuestionData, TestMetadata } from '@/services/api/examService';
+import { revisionService } from '@/services/api/revisionService';
 import { eventsService } from '@/services/api/eventsService';
 import { normalizeOptionId, normalizeConfidence } from '@/services/api/contracts';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { FeedbackModal } from '@/components/exam/FeedbackModal';
 
 export default function ExamInterface() {
   const params = useParams();
@@ -31,8 +35,11 @@ export default function ExamInterface() {
   const { testId: storeTestId, initializeTest, currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
   const { timeLeft } = useTimerStore();
 
+  const attemptIdNum = attemptId ? parseInt(attemptId, 10) : null;
   const { isSaving, saveError } = useAutoSave(attemptId);
   const { warningsCount, isWarningVisible, lastViolation, dismissWarning, requestFullscreen } = useExamIntegrity();
+  const { detectRecovery, clearSnapshot, debouncedSave } = useSessionRecovery(attemptIdNum);
+  const [recoveryBannerShown, setRecoveryBannerShown] = useState(false);
 
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [testMetadata, setTestMetadata] = useState<TestMetadata | null>(null);
@@ -40,16 +47,43 @@ export default function ExamInterface() {
   const [error, setError] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchExamData = async () => {
       try {
         setLoading(true);
-        // Fetch questions and test metadata in parallel
-        const [qData, tData] = await Promise.all([
-          examService.getQuestions(testId as string),
-          examService.getTestById(testId as string)
-        ]);
+        
+        let qData: QuestionData[];
+        let tData: TestMetadata;
+
+        if (testId === 'revision') {
+          // Priority 2: Revision Drill Mode
+          qData = await revisionService.getRapidDrill() as any;
+          tData = {
+            id: 'revision',
+            title: 'Rapid Recovery Drill',
+            description: 'Focused reinforcement of recent mistakes.',
+            durationMinutes: 10,
+            subject_id: 0,
+            correct_marks: 1.0,
+            negative_marking_value: 0.33,
+            is_active: true,
+            created_at: new Date().toISOString()
+          };
+          
+          // If no attemptId, we might need to create a 'revision attempt' 
+          // or handle it differently in the backend. 
+          // For now, let's assume the backend handles submission via completion API.
+        } else {
+          // Standard Exam Mode
+          const [resQ, resT] = await Promise.all([
+            examService.getQuestions(testId as string),
+            examService.getTestById(testId as string)
+          ]);
+          qData = resQ;
+          tData = resT;
+        }
         
         setQuestions(qData);
         setTestMetadata(tData);
@@ -70,6 +104,18 @@ export default function ExamInterface() {
     };
 
     if (testId) fetchExamData();
+
+    // Priority 6: Detect session recovery on mount
+    if (attemptIdNum) {
+      const snapshot = detectRecovery();
+      if (snapshot && snapshot.attemptId === attemptIdNum && !recoveryBannerShown) {
+        setRecoveryBannerShown(true);
+        toast.info(
+          `Session recovered: ${Object.keys(snapshot.pendingAnswers).length} answers restored from local backup.`,
+          { duration: 6000, icon: <RefreshCw className="w-4 h-4" /> }
+        );
+      }
+    }
 
     if (attemptId) {
       eventsService.init(attemptId);
@@ -136,16 +182,41 @@ export default function ExamInterface() {
 
   const handleSubmit = async () => {
     try {
+      if (testId === 'revision') {
+        const payload = questions.map(q => {
+          const ans = answers[q.id];
+          const isCorrect = ans?.selectedOptionId === q.correct_option;
+          return {
+            question_id: parseInt(q.id, 10),
+            is_correct: isCorrect
+          };
+        });
+        
+        await revisionService.bulkComplete(payload);
+        toast.success("Recovery Drill Completed! Your mastery has been updated.");
+        router.push('/revision');
+        return;
+      }
+
       if (attemptId) {
         await examService.submitTest(attemptId);
+        // Priority 6: Clear recovery snapshot on successful submit
+        clearSnapshot();
         toast.success("Test submitted successfully!");
         router.push(`/reports?attemptId=${attemptId}`);
       } else {
         router.push('/dashboard');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Submission failed:", err);
-      toast.error("Failed to submit test. Please check your connection and try again.");
+      // Priority 2: Surface idempotent submit gracefully
+      if (err?.response?.status === 409) {
+        toast.info("Already submitted — redirecting to your report.");
+        clearSnapshot();
+        router.push(`/reports?attemptId=${attemptId}`);
+      } else {
+        toast.error("Failed to submit test. Please check your connection and try again.");
+      }
     }
   };
 
@@ -265,31 +336,54 @@ export default function ExamInterface() {
             <div className="max-w-4xl mx-auto space-y-8">
               
               {/* Question Meta */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4 mt-6">
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-sm font-bold bg-primary/10 text-primary hover:bg-primary/20">
-                    Q {currentQuestionIndex + 1}
-                  </Badge>
-                  <span className="text-sm font-medium text-muted-foreground">{question.subject}{question.topic ? ` • ${question.topic}` : ''}</span>
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-6 mt-8">
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-1">Current Question</span>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="h-8 px-3 text-sm font-black bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-lg">
+                        {currentQuestionIndex + 1}
+                      </Badge>
+                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{question.subject}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-xs">
-                    +{question.positiveMarks} / -{question.negativeMarks}
-                  </Badge>
-                  <Badge variant={question.difficulty === 'Hard' ? 'destructive' : question.difficulty === 'Medium' ? 'default' : 'secondary'}>
-                    {question.difficulty}
-                  </Badge>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-end mr-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-1">Marking</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] font-bold border-zinc-200 text-emerald-600 bg-emerald-50/50">
+                        +{question.positiveMarks}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] font-bold border-zinc-200 text-rose-600 bg-rose-50/50">
+                        -{question.negativeMarks}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-1">Difficulty</span>
+                    <Badge className={cn(
+                      "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full",
+                      question.difficulty === 'Hard' ? 'bg-rose-500 text-white' : 
+                      question.difficulty === 'Medium' ? 'bg-amber-500 text-white' : 
+                      'bg-emerald-500 text-white'
+                    )}>
+                      {question.difficulty}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
               {/* Question Body */}
-              <div className="text-lg md:text-xl font-medium leading-relaxed">
-                <BilingualText 
-                  textEn={question.textEn} 
-                  textHi={question.textHi} 
-                  hybridContainerClassName="space-y-4"
-                  className="block"
-                />
+              <div className="py-12">
+                <div className="text-xl md:text-2xl font-medium leading-[1.6] tracking-tight text-zinc-900 dark:text-zinc-100">
+                  <BilingualText 
+                    textEn={question.textEn} 
+                    textHi={question.textHi} 
+                    hybridContainerClassName="space-y-8"
+                    className="block"
+                  />
+                </div>
               </div>
 
               {/* Options */}
@@ -400,13 +494,13 @@ export default function ExamInterface() {
                 
                 {currentQuestionIndex === questions.length - 1 ? (
                   <Button 
-                    variant="default" 
+                    variant="default"
                     size="sm"
                     onClick={() => setShowReview(true)}
-                    className="h-11 px-5 sm:px-8 bg-green-600 hover:bg-green-700 text-white shadow-lg"
+                    className="h-11 px-5 sm:px-8 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg font-bold"
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Review & Submit
+                    SUBMIT ATTEMPT
                   </Button>
                 ) : (
                   <Button 
@@ -447,6 +541,13 @@ export default function ExamInterface() {
           onSubmit={handleSubmit}
         />
       )}
+
+      <FeedbackModal 
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        questionId={question.id}
+        testId={testId as string}
+      />
     </div>
   );
 }

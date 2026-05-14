@@ -33,6 +33,12 @@ export interface PerformanceReport {
   narrative?: string;
   behavioral_analysis?: any;
   telemetry_summary?: any;
+  truth_status?: 'VERIFIED' | 'FAILED' | 'UNVERIFIED'; // Phase 8: Forensic integrity gate
+  reliability_score?: number;
+  report_version?: string;
+  rendering_version?: string;
+  evaluation_version?: string;
+  telemetry_version?: string;
 }
 
 export interface HistoryItem {
@@ -117,6 +123,12 @@ export const dashboardService = {
       narrative: payload.narrative,
       behavioral_analysis: payload.behavioral_analysis,
       telemetry_summary: payload.telemetry_summary,
+      truth_status: payload.truth_status ?? 'UNVERIFIED',
+      reliability_score: payload.reliability_score ?? 0,
+      report_version: payload.report_version ?? '1.0.0',
+      rendering_version: payload.rendering_version ?? '1.0.0',
+      evaluation_version: payload.evaluation_version ?? '1.0.0',
+      telemetry_version: payload.telemetry_version ?? '1.0.0',
     };
   },
 
@@ -131,12 +143,18 @@ export const dashboardService = {
   },
 
   getEvolution: async (): Promise<any> => {
-    const response = await apiClient.get('reports/evolution');
+    const response = await apiClient.get('dashboard/evolution');
     return response.data?.data;
   },
 
   getRecommendations: async (): Promise<any> => {
-    const response = await apiClient.get('reports/recommendations');
+    const response = await apiClient.get('dashboard/recommendations');
+    return response.data?.data;
+  },
+
+  exportJourney: async (): Promise<any> => {
+    const response = await apiClient.get('dashboard/export-journey');
     return response.data?.data;
   }
 };
+

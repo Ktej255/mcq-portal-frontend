@@ -19,6 +19,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
+  devLogin: (email: string, uid: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   logout: async () => {},
   getToken: async () => null,
+  devLogin: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -34,8 +36,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const devLogin = (email: string, uid: string) => {
+    console.warn("FORENSIC | DEV LOGIN TRIGGERED | Email:", email);
+    const mockUser = {
+      email,
+      uid,
+      getIdToken: async () => "MOCK_TOKEN",
+    } as any;
+    if (typeof window !== 'undefined') {
+      (window as any).MOCK_TOKEN = "MOCK_TOKEN";
+      localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN");
+    }
+    setUser(mockUser);
+    setLoading(false);
+    router.replace("/dashboard");
+  };
+
   useEffect(() => {
     console.log("FORENSIC | AuthProvider Mount | Auth Initialized:", !!auth);
+    
+    // DEV BYPASS RESTORATION
+    if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem("MOCK_TOKEN");
+      if (savedToken && savedToken.startsWith("MOCK_TOKEN")) {
+        console.warn("FORENSIC | Restoring MOCK_TOKEN session:", savedToken);
+        (window as any).MOCK_TOKEN = savedToken;
+        
+        // Derive user identity from token if possible
+        let email = "validator@antigravity.os";
+        let uid = "dev-validator-id";
+        
+        if (savedToken.includes("_sim_")) {
+          const persona = savedToken.split("_sim_")[1];
+          email = `${persona.replace(/_/g, '')}@antigravity.dev`;
+          uid = `mock-uid-${persona}`;
+        }
+
+        setUser({
+          email: email,
+          uid: uid,
+          getIdToken: async () => savedToken,
+        } as any);
+        setLoading(false);
+        return;
+      }
+    }
+
     if (!auth) {
       console.error("FORENSIC | Auth Not Found during mount");
       setLoading(false);
@@ -126,7 +172,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, getToken }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, getToken, devLogin }}>
       {children}
     </AuthContext.Provider>
   );

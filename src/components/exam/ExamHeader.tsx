@@ -105,9 +105,9 @@ export function ExamHeader({
             <Button 
               variant="default" 
               onClick={onSubmit} 
-              className="h-12 px-6 rounded-xl font-black text-sm uppercase tracking-wider bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all shadow-xl shadow-zinc-900/10 dark:shadow-white/10"
+              className="h-12 px-6 rounded-xl font-black text-sm uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-900/10 transition-all"
             >
-              Submit
+              Submit Attempt
             </Button>
           </div>
         </div>

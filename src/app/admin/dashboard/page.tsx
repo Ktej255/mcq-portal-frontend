@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { adminService } from '@/services/api/adminService';
 import { 
   Users, FileText, CheckCircle2, TrendingUp, 
-  BarChart3, Target, Clock, AlertTriangle, ShieldAlert
+  BarChart3, Target, Clock, AlertTriangle, ShieldAlert, RotateCcw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell 
@@ -192,6 +194,31 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* MAINTENANCE & CALIBRATION */}
+          <div className="p-8 bg-zinc-900 text-white rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-1000">
+              <RotateCcw className="w-32 h-32" />
+            </div>
+            <div className="relative z-10 space-y-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-amber-500" />
+                System Maintenance
+              </h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Trigger institutional calibration to synchronize question difficulty with real student performance metrics.
+              </p>
+              <Button 
+                onClick={async () => {
+                  const res = await adminService.recalibrateBatches();
+                  toast.success("Calibration sequence initiated: " + res.job_id);
+                }}
+                className="w-full h-14 rounded-2xl bg-zinc-100 text-zinc-950 font-black text-sm uppercase tracking-widest hover:bg-white transition-all active:scale-95"
+              >
+                Recalibrate Intelligence
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

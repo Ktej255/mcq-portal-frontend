@@ -36,6 +36,15 @@ if (typeof window !== 'undefined') {
 
 // Forensic Token Retrieval with Polling
 async function waitForToken(maxRetries = 50): Promise<string | null> {
+  // DEV BYPASS
+  if (typeof window !== 'undefined') {
+    const mockToken = (window as any).MOCK_TOKEN || localStorage.getItem("MOCK_TOKEN");
+    if (mockToken) {
+      console.log("[MCQ_DEBUG] Using MOCK_TOKEN bypass from " + ((window as any).MOCK_TOKEN ? "window" : "localStorage"));
+      return mockToken;
+    }
+  }
+  
   console.log("[MCQ_DEBUG] Starting token retrieval polling...");
   
   for (let i = 0; i < maxRetries; i++) {
@@ -79,17 +88,17 @@ apiClient.interceptors.request.use(
     }
 
     try {
-      if (!auth) {
-        console.error("[MCQ_DEBUG] FATAL: Firebase Auth instance missing");
+      // HARD GATE: Wait for token before any request
+      const token = await waitForToken();
+
+      if (!token && !auth) {
+        console.error("[MCQ_DEBUG] FATAL: Auth instance missing and no MOCK_TOKEN available");
         return config;
       }
       
-      // HARD GATE: Wait for token before any request
-      const token = await waitForToken();
-      
       if (debug) {
-        debug.user = auth.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null;
-        debug.authState = auth.currentUser ? 'SIGNED_IN' : 'SIGNED_OUT';
+        debug.user = auth?.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null;
+        debug.authState = auth?.currentUser ? 'SIGNED_IN' : 'SIGNED_OUT';
         debug.tokenPresent = !!token;
       }
 

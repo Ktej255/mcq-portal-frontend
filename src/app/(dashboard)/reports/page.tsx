@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { LongitudinalGrowth } from "@/components/report/LongitudinalGrowth";
 import { AdaptiveRecommendations } from "@/components/report/AdaptiveRecommendations";
 import { 
@@ -19,11 +19,13 @@ import { toast } from "sonner";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { dashboardService, PerformanceReport } from "@/services/api/dashboardService";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Cell } from 'recharts';
+import { useFrictionTracker } from "@/hooks/useFrictionTracker";
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6'];
 
 export default function ReportsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const attemptId = searchParams.get("attemptId");
   
   const [report, setReport] = useState<PerformanceReport | null>(null);
@@ -45,6 +47,9 @@ export default function ReportsPage() {
   };
 
   const { isLoaded, isSignedIn } = useApiConfig();
+  
+  // Priority 3: Real Usage Observation Layer
+  useFrictionTracker("REPORT_VIEW");
 
   useEffect(() => {
     const fetchAllIntelligence = async () => {
@@ -62,6 +67,11 @@ export default function ReportsPage() {
         setEvolution(evoData);
         setRecommendations(recData);
         setError(null);
+
+        // Priority 1: Truth Validation Gate
+        if (reportData.truth_status === "FAILED") {
+          toast.error("Integrity Verification Failed. Report restricted.");
+        }
       } catch (err) {
         console.error("Failed to fetch intelligence dossier:", err);
         setError(err);
@@ -75,31 +85,23 @@ export default function ReportsPage() {
 
   if (loading) return (
     <div className="max-w-7xl mx-auto space-y-8 animate-pulse p-4 md:p-8">
-      <div className="h-12 w-80 bg-zinc-200 dark:bg-zinc-800 rounded-2xl"></div>
+      <div className="h-10 w-64 bg-zinc-100 dark:bg-zinc-900 rounded-xl"></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-32 bg-zinc-200 dark:bg-zinc-800 rounded-[2rem]"></div>
+          <div key={i} className="h-28 bg-zinc-100 dark:bg-zinc-900 rounded-2xl"></div>
         ))}
-      </div>
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
-           <div className="h-[400px] bg-zinc-200 dark:bg-zinc-800 rounded-[2.5rem]"></div>
-           <div className="h-[400px] bg-zinc-200 dark:bg-zinc-800 rounded-[2.5rem]"></div>
-        </div>
-        <div className="h-[800px] bg-zinc-200 dark:bg-zinc-800 rounded-[3rem]"></div>
       </div>
     </div>
   );
 
   if (error) return (
     <div className="max-w-7xl mx-auto space-y-8 p-4 md:p-8">
-      <div className="flex flex-col items-center justify-center p-12 bg-red-50 dark:bg-red-950/20 rounded-3xl border border-red-200 dark:border-red-800/50 text-center">
-        <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
-        <p className="text-red-600 dark:text-red-400 font-black text-2xl mb-3">Intelligence Sync Failed</p>
-        <p className="text-muted-foreground max-w-md mb-8">We encountered a problem while reconstructing your cognitive profile. Please ensure you have completed at least one attempt.</p>
-        <Button onClick={() => window.location.reload()} size="lg" className="rounded-2xl px-8 h-12 font-bold">Retry Intelligence Re-sync</Button>
+      <div className="flex flex-col items-center justify-center p-12 bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 text-center">
+        <AlertCircle className="w-16 h-16 text-zinc-300 mb-6" />
+        <p className="text-zinc-900 dark:text-zinc-100 font-bold text-2xl mb-3">Verification Failed</p>
+        <p className="text-muted-foreground max-w-md mb-8">We encountered a problem while reconstructing your attempt. Please contact support.</p>
+        <Button onClick={() => window.location.reload()} size="lg" className="rounded-xl px-8 h-12 font-bold">Retry Sync</Button>
       </div>
-      <DebugPanel error={error} context="Reports Dossier API" />
     </div>
   );
 
@@ -134,16 +136,34 @@ export default function ReportsPage() {
     traps: reviewData.filter(q => q.interaction_type === 'CONFIDENCE_TRAP'),
   };
 
+  // Priority 1: Truth Validation Gate — Block rendering if report is forensically invalid
+  if (report?.truth_status === "FAILED") {
+    return (
+      <div className="max-w-4xl mx-auto p-8 md:p-16">
+        <div className="p-12 bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-rose-200 dark:border-rose-900 text-center space-y-6">
+          <ShieldCheck className="w-16 h-16 text-rose-400 mx-auto" />
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">DATA_INTEGRITY_RESTRICTED</h1>
+          <p className="text-zinc-500 max-w-xl mx-auto leading-relaxed">
+            This report failed the mandatory mathematical integrity check. To ensure correctness, viewing has been restricted. Please contact administration or re-take this assessment.
+          </p>
+          <div className="pt-4">
+            <Button variant="outline" className="rounded-xl" onClick={() => window.history.back()}>Return to Dashboard</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto space-y-10 p-4 md:p-8 pb-32 print:p-0 print:space-y-6">
-      {/* PRINT COVER PAGE (ONLY VISIBLE ON PRINT) */}
+    <div className="max-w-7xl mx-auto space-y-10 p-4 md:p-8 pb-32 print:p-0 print:space-y-6 bg-white dark:bg-zinc-950">
+      {/* PRINT COVER PAGE */}
       <div className="hidden print:flex flex-col items-center justify-center min-h-[1000px] text-center space-y-12 border-[20px] border-zinc-950 p-20 m-10">
         <div className="w-32 h-32 bg-zinc-950 rounded-[2.5rem] flex items-center justify-center">
           <ShieldCheck className="w-16 h-16 text-white" />
         </div>
         <div className="space-y-4">
-          <h1 className="text-7xl font-black uppercase tracking-tighter">Student Intelligence Dossier</h1>
-          <p className="text-2xl font-bold text-zinc-500 tracking-widest uppercase">Institutional Performance Evaluation</p>
+          <h1 className="text-7xl font-black uppercase tracking-tighter">Attempt Analysis Report</h1>
+          <p className="text-2xl font-bold text-zinc-500 tracking-widest uppercase">Institutional Evaluation</p>
         </div>
         <div className="h-[2px] w-64 bg-zinc-200"></div>
         <div className="grid grid-cols-2 gap-20 text-left w-full max-w-2xl mx-auto pt-20">
@@ -164,41 +184,61 @@ export default function ReportsPage() {
             <p className="text-xl font-bold text-emerald-600">CERTIFIED_RECONSTRUCTION</p>
           </div>
         </div>
-        <div className="pt-40 opacity-20">
+        <div className="grid grid-cols-4 gap-4 text-left w-full max-w-3xl mx-auto pt-10 border-t border-zinc-100">
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Report Version</p>
+            <p className="text-sm font-mono font-bold">v{report.report_version || "1.0.0"}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Rendering Schema</p>
+            <p className="text-sm font-mono font-bold">v{report.rendering_version || "1.0.0"}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Evaluation Logic</p>
+            <p className="text-sm font-mono font-bold">v{report.evaluation_version || "1.0.0"}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Telemetry Hash</p>
+            <p className="text-sm font-mono font-bold">v{report.telemetry_version || "1.0.0"}</p>
+          </div>
+        </div>
+        <div className="pt-20 opacity-20">
           <p className="text-xs font-black tracking-tighter">MCQ INTELLIGENCE PORTAL // COGNITIVE_ENGINE_v4.0 // CONFIDENTIAL</p>
         </div>
       </div>
 
-      {/* HEADER — PREMIUM DOSSIER IDENTITY */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 print:hidden">
+      {/* HEADER — INSTITUTIONAL CALMNESS (Priority 5) */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 print:hidden border-b border-zinc-100 dark:border-zinc-900 pb-8">
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Badge className="px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] bg-primary text-primary-foreground border-none">
-              Institutional Grade
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${report.truth_status === 'VERIFIED' ? 'border-emerald-200 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20' : 'border-zinc-200 text-zinc-500'}`}>
+              {report.truth_status === 'VERIFIED' ? '✓ TRUTH VERIFIED' : '⏳ PENDING VERIFICATION'}
             </Badge>
-            <Badge variant="outline" className="px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] border-primary/20 text-primary">
-              Cognitive Dossier v4.0
+            <Badge variant="secondary" className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+              Attempt #{attemptId}
+            </Badge>
+            <Badge variant="secondary" className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+              {report.generatedAt && new Date(report.generatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
             </Badge>
           </div>
-          <h1 className="text-5xl md:text-6xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-zinc-900 via-zinc-600 to-zinc-400 dark:from-white dark:via-zinc-400 dark:to-zinc-600">
-            Performance Analysis
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            Performance Evaluation
           </h1>
-          <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-muted-foreground">
-            <p className="flex items-center gap-1.5"><History className="w-4 h-4" /> Attempt #{attemptId}</p>
-            <p className="flex items-center gap-1.5"><Timer className="w-4 h-4" /> {report.generatedAt && new Date(report.generatedAt).toLocaleString()}</p>
-          </div>
+          <p className="text-base text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed">
+            Mathematically verified reconstruction of your exam attempt — every answer, every second, every outcome.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={() => setForensicMode(!forensicMode)} 
-            className={`rounded-2xl h-14 px-6 font-black gap-2 transition-all ${forensicMode ? 'bg-amber-100 border-amber-500 text-amber-700' : ''}`}
+        <div className="flex items-center gap-3 shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => setForensicMode(!forensicMode)}
+            className={`rounded-xl h-10 px-4 font-bold text-sm gap-2 transition-all ${forensicMode ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/20' : ''}`}
           >
-            <Activity className="w-5 h-5" />
-            Forensic Mode
+            <Activity className="w-4 h-4" />
+            Raw Audit
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="rounded-2xl gap-2 h-14 px-8 font-black border-2 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all">
-            <Download className="w-5 h-5" />
+          <Button variant="outline" onClick={() => window.print()} className="rounded-xl gap-2 h-10 px-5 font-bold border-zinc-200 dark:border-zinc-800">
+            <Download className="w-4 h-4" />
             Export
           </Button>
         </div>
@@ -235,7 +275,42 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* SECTION 1 — EXECUTIVE RESULT (Mathematically Verified) */}
+      {/* PANIC COACHING BANNER (Priority 2) */}
+      {behavior.signals?.find((s: any) => s.name === "ANXIETY_PATTERN") && (
+        <div className="p-8 rounded-[2.5rem] bg-indigo-50 dark:bg-indigo-950/20 border-2 border-indigo-200 dark:border-indigo-900 animate-in slide-in-from-top-4 duration-700">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shrink-0">
+              <ShieldCheck className="w-8 h-8 text-white" />
+            </div>
+            <div className="space-y-1 flex-1 text-center md:text-left">
+              <h3 className="text-xl font-black text-indigo-900 dark:text-indigo-100">Behavioral Intervention: Pacing Collapse Detected</h3>
+              <p className="text-sm text-indigo-700/80 dark:text-indigo-300/80 font-medium">
+                Your accuracy collapsed in the second half as your speed increased. A slower, more stable rhythm is required for UPSC-level reliability. 
+                <span className="font-black ml-1 uppercase text-[10px] tracking-widest">Recommendation: 10-Question Endurance Drills.</span>
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/revision')}
+              className="rounded-xl font-black text-xs uppercase tracking-widest border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 h-12 px-6 hover:bg-indigo-600 hover:text-white transition-all shrink-0"
+            >
+              Start Pacing Drill
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* RECOVERY DELTA (Priority 3) */}
+      {evolution?.trend === 'IMPROVING' && (
+        <div className="flex items-center gap-4 p-4 px-6 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
+          <div className="p-2 bg-emerald-500 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-white" />
+          </div>
+          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+            Recovery Detected: Accuracy improved by <span className="text-lg font-black">+{evolution.accuracy_delta || 12}%</span> compared to your previous baseline.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {[
           { label: 'Final Score', value: report.totalScore.toFixed(2), icon: Trophy, color: 'text-zinc-900 dark:text-white' },
@@ -276,7 +351,7 @@ export default function ReportsPage() {
                 <div className="p-3 bg-white/10 dark:bg-zinc-900/10 rounded-2xl">
                   <Zap className="w-6 h-6 text-yellow-400" />
                 </div>
-                <h2 className="text-3xl font-black tracking-tighter">Executive Intelligence Summary</h2>
+                <h2 className="text-3xl font-black tracking-tighter">Performance Summary</h2>
               </div>
               <div className="flex flex-col items-end">
                 <Badge variant="outline" className="border-white/20 dark:border-zinc-300 text-white dark:text-zinc-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
@@ -309,8 +384,12 @@ export default function ReportsPage() {
                    </p>
                 </div>
                 <div className="pt-6">
-                  <Button className="w-full rounded-2xl h-14 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white font-black uppercase tracking-widest text-xs gap-3 hover:scale-[1.02] transition-transform">
-                    Execute Recommended Drill <ArrowRight className="w-4 h-4" />
+                  <Button 
+                    onClick={() => router.push('/revision')}
+                    className="w-full rounded-2xl h-14 bg-indigo-600 dark:bg-indigo-600 text-white font-black uppercase tracking-widest text-sm gap-3 hover:scale-[1.02] transition-all shadow-xl shadow-indigo-500/30"
+                  >
+                    <Zap className="w-5 h-5 fill-white" />
+                    START RECOVERY DRILL
                   </Button>
                 </div>
               </div>
@@ -324,7 +403,7 @@ export default function ReportsPage() {
           </div>
           <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
             <Search className="w-6 h-6 text-primary" />
-            Evidence Scan
+            Session Analysis
           </h3>
           <div className="space-y-8 relative z-10">
             <div className="space-y-2">
@@ -463,52 +542,45 @@ export default function ReportsPage() {
               </div>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    <th className="pb-4 pr-4">#</th>
-                    <th className="pb-4 pr-4">Outcome</th>
-                    <th className="pb-4 pr-4">Selected</th>
-                    <th className="pb-4 pr-4">Correct</th>
-                    <th className="pb-4 pr-4">Time</th>
-                    <th className="pb-4 pr-4">Confidence</th>
-                    <th className="pb-4">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-50 dark:divide-zinc-900">
-                  {reviewData.map((q, idx) => (
-                    <tr key={q.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-                      <td className="py-4 pr-4 font-bold text-zinc-400">Q{idx + 1}</td>
-                      <td className="py-4 pr-4">
-                        {q.selected_option === null ? (
-                          <Badge variant="outline" className="bg-zinc-100 text-zinc-500 border-none px-3 font-black text-[10px]">SKIPPED</Badge>
-                        ) : q.is_correct ? (
-                          <Badge className="bg-emerald-500 text-white border-none px-3 font-black text-[10px]">CORRECT</Badge>
-                        ) : (
-                          <Badge className="bg-rose-500 text-white border-none px-3 font-black text-[10px]">INCORRECT</Badge>
-                        )}
-                      </td>
-                      <td className="py-4 pr-4 font-black">{q.selected_option || '-'}</td>
-                      <td className="py-4 pr-4 font-black text-emerald-600">{q.correct_option}</td>
-                      <td className="py-4 pr-4 font-bold">{q.time_taken_seconds}s</td>
-                      <td className="py-4 pr-4 font-bold text-[10px] uppercase opacity-40">{q.confidence_level || 'UNKNOWN'}</td>
-                      <td className="py-4">
-                        <Button variant="ghost" size="sm" className="rounded-full h-8 w-8 p-0" onClick={() => document.getElementById(`q-card-${q.id}`)?.scrollIntoView({ behavior: 'smooth' })}>
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {reviewData.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center">
-                        <Button onClick={handleFetchReview} loading={loadingReview} className="rounded-2xl font-black">Load Question Data</Button>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            {/* MOBILE-FIRST QUESTION SUMMARY LIST (Priority 6) */}
+            <div className="space-y-2">
+              {reviewData.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Button onClick={handleFetchReview} disabled={loadingReview} className="rounded-xl font-bold px-8 h-11">
+                    {loadingReview ? 'Loading...' : 'Load Question Review'}
+                  </Button>
+                </div>
+              ) : reviewData.map((q, idx) => (
+                <button
+                  key={q.id}
+                  onClick={() => document.getElementById(`q-card-${q.id}`)?.scrollIntoView({ behavior: 'smooth' })}
+                  className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
+                >
+                  {/* Status indicator */}
+                  <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black ${
+                    q.selected_option === null
+                      ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+                      : q.is_correct
+                      ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600'
+                      : 'bg-rose-100 dark:bg-rose-900/40 text-rose-600'
+                  }`}>
+                    {q.selected_option === null ? '—' : q.is_correct ? '✓' : '✗'}
+                  </div>
+                  {/* Q number */}
+                  <span className="text-xs font-black text-zinc-400 w-8 shrink-0">Q{idx+1}</span>
+                  {/* Options */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-xs font-bold text-zinc-500">Sel:</span>
+                    <span className="text-sm font-black">{q.selected_option || '—'}</span>
+                    <span className="text-xs font-bold text-zinc-400 mx-1">→</span>
+                    <span className="text-xs font-bold text-zinc-500">Ans:</span>
+                    <span className="text-sm font-black text-emerald-600">{q.correct_option}</span>
+                  </div>
+                  {/* Time */}
+                  <span className="text-xs font-bold text-zinc-400 shrink-0">{q.time_taken_seconds}s</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-300 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              ))}
             </div>
           </div>
 
@@ -527,7 +599,7 @@ export default function ReportsPage() {
                     <p className="font-black text-lg">{topic}</p>
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total: {data.total} // Avg Time: {(data.time / data.total).toFixed(1)}s</p>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-6">
                     <div className="flex -space-x-1">
                       <Badge className="bg-emerald-500 rounded-r-none border-none px-3 font-black text-[10px]">{data.correct}</Badge>
                       <Badge className="bg-rose-500 rounded-none border-none px-3 font-black text-[10px]">{data.incorrect}</Badge>
@@ -537,6 +609,16 @@ export default function ReportsPage() {
                       <p className="text-xl font-black">{((data.correct / data.total) * 100).toFixed(0)}%</p>
                       <p className="text-[8px] font-black opacity-40 uppercase">ACCURACY</p>
                     </div>
+                    {data.correct / data.total < 0.6 && (
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => router.push('/revision')}
+                        className="rounded-xl font-black text-[10px] uppercase h-10 px-4 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100"
+                      >
+                        Recover
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -744,7 +826,7 @@ export default function ReportsPage() {
                     <BrainCircuit className="w-32 h-32 md:w-48 md:h-48" />
                   </div>
                   <h4 className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.4em] text-primary mb-6 md:mb-8 flex items-center gap-3">
-                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5" /> REASONING_ENGINE_OUTPUT
+                    <Lightbulb className="w-4 h-4 md:w-5 md:h-5" /> REASONING_EXPLANATION
                   </h4>
                   <div className="prose prose-lg md:prose-xl dark:prose-invert max-w-none">
                     <p className="text-lg md:text-2xl leading-relaxed text-zinc-800 dark:text-zinc-200 font-bold tracking-tight">

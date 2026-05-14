@@ -31,6 +31,16 @@ export interface Question {
   explanation_en?: string;
   explanation_hi?: string;
   difficulty: string;
+  status: string;
+  reviewer_id?: number;
+  explanation_quality_score?: number;
+  bilingual_alignment_score?: number;
+  is_current_affairs?: boolean;
+  content_date?: string;
+  is_outdated: boolean;
+  question_number?: number;
+  quality_notes?: any;
+  created_at: string;
 }
 
 export const adminService = {
@@ -65,13 +75,25 @@ export const adminService = {
   },
 
   // Questions
-  getQuestions: async (testId?: number) => {
-    const url = testId ? `admin/questions?test_id=${testId}` : 'admin/questions';
-    const response = await apiClient.get(url);
-    return response.data?.data || [];
+  getQuestions: async (testId?: number, skip = 0, limit = 100) => {
+    const params = new URLSearchParams();
+    if (testId) params.append('test_id', testId.toString());
+    params.append('skip', skip.toString());
+    params.append('limit', limit.toString());
+    
+    const response = await apiClient.get(`admin/questions?${params.toString()}`);
+    return response.data; // Return full PaginatedResponse
   },
   createQuestion: async (data: any) => {
     const response = await apiClient.post('admin/questions', data);
+    return response.data?.data;
+  },
+  updateQuestion: async (id: number, data: any) => {
+    const response = await apiClient.put(`admin/questions/${id}`, data);
+    return response.data?.data;
+  },
+  deleteQuestion: async (id: number) => {
+    const response = await apiClient.delete(`admin/questions/${id}`);
     return response.data?.data;
   },
   bulkCreateQuestions: async (questions: any[]) => {
@@ -81,5 +103,9 @@ export const adminService = {
   getPipelineObservability: async () => {
     const response = await apiClient.get('admin/observability/pipeline');
     return response.data?.data;
+  },
+  recalibrateBatches: async () => {
+    const response = await apiClient.post('admin/recalibrate-batches');
+    return response.data;
   }
 };
