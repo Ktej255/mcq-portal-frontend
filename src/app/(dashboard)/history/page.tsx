@@ -1,109 +1,87 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ArrowRight, BarChart3, CheckCircle2, Clock3, Route } from "lucide-react";
 
-import { dashboardService, HistoryItem } from "@/services/api/dashboardService";
-import { useRouter } from "next/navigation";
-import { useApiConfig } from "@/lib/hooks/useApi";
+const progressCards = [
+  {
+    label: "Current Path",
+    value: "Geography Day 1",
+    detail: "Earth as a System is the active class block.",
+    icon: Route,
+  },
+  {
+    label: "Practice Status",
+    value: "Not attempted yet",
+    detail: "The first score will appear after the fresh MCQ set.",
+    icon: CheckCircle2,
+  },
+  {
+    label: "Study Trend",
+    value: "Baseline forming",
+    detail: "Watch, explain, practice, revise. That loop will build your trend.",
+    icon: BarChart3,
+  },
+];
 
 export default function HistoryPage() {
-  const router = useRouter();
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const { isLoaded, isSignedIn } = useApiConfig();
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!isLoaded || !isSignedIn) return;
-      
-      try {
-        setLoading(true);
-        const data = await dashboardService.getHistory();
-        setHistory(data);
-      } catch (err) {
-        console.info("History is not available yet; showing the first-attempt state.", err);
-        setHistory([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [isLoaded, isSignedIn]);
-
-  if (loading) return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-10 w-48 bg-zinc-200 dark:bg-zinc-800 rounded"></div>
-      <div className="h-64 bg-zinc-200 dark:bg-zinc-800 rounded-xl"></div>
-    </div>
-  );
-
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Attempt History</h1>
-      {history.length === 0 ? (
-        <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-400">No attempt yet</p>
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
-            Your test history will appear after your first MCQ practice.
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm font-medium leading-6 text-zinc-500">
-            For now, start from Geography. It keeps the class day, MCQ room, tracking and revision connected.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button onClick={() => router.push("/upsc/geography")} className="rounded-xl bg-zinc-900 px-5 font-bold text-white">
-              Open Geography
-            </Button>
-            <Button onClick={() => router.push("/upsc/geography/mcq-readiness")} variant="outline" className="rounded-xl px-5 font-bold">
-              Open MCQ Room
-            </Button>
+    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Progress</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Your path is just starting</h1>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                Once you complete the first Geography practice, this page will show score trend, accuracy trend,
+                and whether your revision is actually improving weak topics.
+              </p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              Back to Today
+            </Link>
           </div>
-        </div>
-      ) : (
-      
-      <div className="bg-white dark:bg-zinc-900 border rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 dark:bg-zinc-950 border-b">
-            <tr>
-              <th className="px-6 py-4 font-medium">Test Name</th>
-              <th className="px-6 py-4 font-medium">Date</th>
-              <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium">Score</th>
-              <th className="px-6 py-4 font-medium">Accuracy</th>
-              <th className="px-6 py-4 font-medium text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {history.map((item) => (
-              <tr key={item.attemptId} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                <td className="px-6 py-4 font-medium">{item.title}</td>
-                <td className="px-6 py-4 text-muted-foreground">{item.date}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs ${item.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{item.score !== null ? `${item.score}/${item.maxScore}` : '-'}</td>
-                <td className="px-6 py-4">{item.accuracy}</td>
-                <td className="px-6 py-4 text-right">
-                  {item.status === 'COMPLETED' && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => router.push(`/reports?attemptId=${item.attemptId}`)}
-                    >
-                      View Report
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        </section>
+
+        <section className="mt-5 grid gap-4 md:grid-cols-3">
+          {progressCards.map((card) => (
+            <div key={card.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <card.icon className="h-5 w-5" />
+              </div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{card.label}</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight">{card.value}</h2>
+              <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">{card.detail}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff4df] text-[#6f4a12]">
+                <Clock3 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black tracking-tight">Next milestone</h2>
+                <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">
+                  Finish the Day 1 loop: learn the concept, explain it once, then attempt the fresh practice.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/upsc/geography/watch?day=1"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+            >
+              Continue <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
+        </section>
       </div>
-      )}
-    </div>
+    </main>
   );
 }

@@ -37,10 +37,12 @@ async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
   const checks = [];
-  checks.push(await verifyRoute(page, "/dashboard", "Your Daily Command"));
-  checks.push(await verifyRoute(page, "/tests", "Practice Batches"));
-  checks.push(await verifyRoute(page, "/history", "Your test history will appear"));
-  checks.push(await verifyRoute(page, "/reports", "Analytics will appear after your first practice"));
+  checks.push(await verifyRoute(page, "/dashboard", "Earth as a System"));
+  checks.push(await verifyRoute(page, "/upsc", "Earth as a System"));
+  checks.push(await verifyRoute(page, "/tests", "Start with today's MCQ only"));
+  checks.push(await verifyRoute(page, "/revision", "Your next revision is after practice"));
+  checks.push(await verifyRoute(page, "/history", "Your path is just starting"));
+  checks.push(await verifyRoute(page, "/reports", "No real gap yet"));
   await browser.close();
   console.log(JSON.stringify({ baseUrl, checks, passed: true }, null, 2));
 }

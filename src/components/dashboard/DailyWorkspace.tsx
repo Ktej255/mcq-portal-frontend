@@ -1,212 +1,150 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Play, 
-  Target, 
-  Zap, 
-  ChevronRight, 
-  BrainCircuit,
-  AlertCircle,
-  Download,
-  ArrowRight
-} from 'lucide-react';
+import Link from "next/link";
+import { ArrowRight, BarChart3, BookOpenCheck, CalendarClock, RefreshCcw, Target } from "lucide-react";
 
-import { Button } from '@/components/ui/button';
-import { revisionService, RevisionItem, HistoryItem, RecoveryPath } from '@/services/api/revisionService';
-import { RevisionHistory } from './RevisionHistory';
-import { ConceptRecoveryModal } from './ConceptRecoveryModal';
-import { dashboardService } from '@/services/api/dashboardService';
-import { useRouter } from 'next/navigation';
+import { Badge } from "@/components/ui/badge";
+import { geographySessions } from "@/lib/upsc/plan";
 
+const today = geographySessions[0];
+
+const quickCards = [
+  {
+    label: "Learning Gap",
+    title: "No weak area recorded yet",
+    detail: "Complete today's practice once. Your real weak topics will appear here.",
+    href: "/reports",
+    icon: Target,
+  },
+  {
+    label: "Next Revision",
+    title: "Revise after practice",
+    detail: "The first revision will focus on latitude, longitude, Earth movement, and time zones.",
+    href: "/revision",
+    icon: RefreshCcw,
+  },
+  {
+    label: "Progress",
+    title: "Geography sprint started",
+    detail: "Day 1 of 30 is active. The path will stay simple: learn, explain, practice, revise.",
+    href: "/history",
+    icon: BarChart3,
+  },
+];
+
+const pathSteps = [
+  { label: "Learn", href: "/upsc/geography/watch?day=1" },
+  { label: "Explain", href: "/upsc/geography/talk?day=1" },
+  { label: "Practice", href: "/upsc/geography/mcq-readiness?day=1" },
+  { label: "Revise", href: "/upsc/geography/revisit?day=1" },
+];
 
 export const DailyWorkspace = () => {
-  const router = useRouter();
-  const [queue, setQueue] = useState<RevisionItem[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [recoveryPath, setRecoveryPath] = useState<RecoveryPath | null>(null);
-  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [qData, hData] = await Promise.all([
-          revisionService.getQueue(),
-          revisionService.getHistory(5)
-        ]);
-        setQueue(qData);
-        setHistory(hData);
-      } catch (err) {
-        console.error("Failed to fetch workspace data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  const handleItemClick = async (item: RevisionItem) => {
-    if (item.priority > 0.8) {
-      try {
-        const path = await revisionService.getRecoveryPath(1); // Mock topic ID
-        setRecoveryPath(path);
-        setIsRecoveryOpen(true);
-      } catch (err) {
-        console.error("Failed to fetch recovery path:", err);
-      }
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      await dashboardService.exportJourney();
-      alert("Journey data compiled. Download starting...");
-    } catch (err) {
-      console.error("Export failed:", err);
-    }
-  };
-
   return (
-    <div className="max-w-5xl mx-auto space-y-10 py-10 px-4">
-      <header className="space-y-2">
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Institutional Dashboard</p>
-        <h1 className="text-4xl font-black tracking-tighter text-zinc-900">Your Daily Command.</h1>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* PRIMARY ACTIONS: REVISION QUEUE */}
-        <div className="lg:col-span-2 space-y-10">
-          <section className="space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-black tracking-tight">Active Revision Queue</h3>
-              <Badge variant="secondary" className="rounded-full px-3 font-bold">
-                {queue.length} TASKS
-              </Badge>
+    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-2">
+              <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-[#f7f4ee]">Today</Badge>
+              <h1 className="text-3xl font-black tracking-tight text-[#13251d] md:text-4xl">
+                {today.title}
+              </h1>
+              <p className="max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {today.anchor}
+              </p>
             </div>
+            <Link
+              href="/upsc/geography/watch?day=1"
+              className="inline-flex h-12 items-center justify-center rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              Start Today <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
 
-            {queue.length > 0 && (
-              <Button 
-                onClick={() => router.push('/revision')}
-                className="w-full rounded-[2rem] h-20 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xl uppercase tracking-widest gap-4 shadow-2xl shadow-indigo-500/40 hover:scale-[1.01] transition-all group"
+          <div className="mt-6 grid gap-3 md:grid-cols-4">
+            {pathSteps.map((step, index) => (
+              <Link
+                key={step.label}
+                href={step.href}
+                className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 transition hover:border-[#1d9e75]/60 hover:bg-[#eef8f2]"
               >
-                <div className="p-3 bg-white/20 rounded-2xl group-hover:rotate-12 transition-transform">
-                  <Zap className="w-8 h-8 fill-white" />
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-white text-sm font-black text-[#1a3a2a] shadow-sm">
+                  {index + 1}
                 </div>
-                START RECOVERY DRILL
-                <ArrowRight className="w-6 h-6 ml-2" />
-              </Button>
-            )}
+                <p className="text-base font-black text-[#13251d]">{step.label}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-            <div className="grid gap-3">
-              {queue.length === 0 && !loading ? (
-                <div className="p-8 rounded-3xl bg-zinc-50 border border-dashed border-zinc-200 text-center">
-                  <p className="text-zinc-400 font-medium italic">Queue is clear. You are educationally synchronized.</p>
+        <section className="grid gap-4 md:grid-cols-3">
+          {quickCards.map((card) => (
+            <Link
+              key={card.label}
+              href={card.href}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm transition hover:border-[#1d9e75]/60 hover:bg-[#fdfaf3]"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                  <card.icon className="h-5 w-5" />
                 </div>
-              ) : (
-                queue.slice(0, 3).map((item, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => handleItemClick(item)}
-                    className="group p-4 rounded-2xl bg-white border border-zinc-200 hover:border-blue-400 transition-all flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center">
-                        <BrainCircuit className="w-5 h-5 text-zinc-400 group-hover:text-blue-600 transition-colors" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-zinc-900">{item.topic}</p>
-                        <p className="text-xs text-muted-foreground">{item.reason}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className={item.priority > 0.8 ? 'text-rose-600 border-rose-100 bg-rose-50' : 'text-zinc-500'}>
-                        {item.priority > 0.8 ? 'Critical' : 'Scheduled'}
-                      </Badge>
-                      <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            <Button className="w-full h-14 rounded-2xl bg-zinc-900 text-white font-black text-lg hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/10">
-              <Play className="w-5 h-5 mr-2 fill-current" /> START MORNING DRILL
-            </Button>
-          </section>
-
-          {/* REVISION HISTORY TIMELINE */}
-          <RevisionHistory items={history} />
-        </div>
-
-        {/* SIDEBAR: CONTINUITY & STATUS */}
-        <div className="space-y-6">
-          <Card className="rounded-[2.5rem] border-none bg-zinc-50 shadow-none">
-            <CardContent className="p-8 space-y-6">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Current Streak</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black tracking-tighter text-zinc-900">14</span>
-                  <span className="text-sm font-bold text-zinc-500 uppercase">Days</span>
-                </div>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{card.label}</span>
               </div>
+              <h2 className="text-lg font-black tracking-tight text-[#13251d]">{card.title}</h2>
+              <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">{card.detail}</p>
+            </Link>
+          ))}
+        </section>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-500">
-                  <span>Weekly Goal</span>
-                  <span>5/7 Days</span>
-                </div>
-                <div className="flex gap-1.5">
-                  {[1, 1, 1, 1, 1, 0, 0].map((day, i) => (
-                    <div key={i} className={`flex-1 h-2 rounded-full ${day ? 'bg-zinc-900' : 'bg-zinc-200'}`} />
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-dashed border-zinc-200 space-y-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                  <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
-                    <span className="font-bold text-blue-600">Continuity Alert:</span> You have a current affairs gap in International Relations. Estimated 8m to resolve.
-                  </p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  onClick={handleExport}
-                  className="w-full justify-start h-10 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 px-2"
-                >
-                  <Download className="w-4 h-4 mr-2" /> Export Journey Data
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div 
-            onClick={() => window.location.href = '/simulation/lobby'}
-            className="p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-blue-700 text-white shadow-2xl relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-all"
-          >
-            <div className="relative z-10 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
+        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff4df] text-[#6f4a12]">
+                <BookOpenCheck className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-xl font-black tracking-tight">Prelims Simulation</h3>
-                <p className="text-xs opacity-70 font-medium">Locked environment • Fixed time • Serious scoring</p>
+                <h2 className="text-lg font-black tracking-tight">Today&apos;s Task</h2>
+                <p className="text-sm font-medium text-[#756f64]">{today.duration}</p>
               </div>
-              <ChevronRight className="w-5 h-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
             </div>
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
+            <p className="text-sm font-semibold leading-6 text-[#4f5e55]">
+              Watch the concept, explain it once in your own words, then solve the fresh practice set. Do not open the full portal map first.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/upsc/geography/lab?day=1"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+              >
+                Open Visual
+              </Link>
+              <Link
+                href="/upsc/geography"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+              >
+                Subject Plan
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <ConceptRecoveryModal 
-        isOpen={isRecoveryOpen} 
-        onClose={() => setIsRecoveryOpen(false)} 
-        path={recoveryPath} 
-      />
-    </div>
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black tracking-tight">Next Revision</h2>
+                <p className="text-sm font-medium text-[#756f64]">After today&apos;s practice</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm font-semibold text-[#4f5e55]">
+              <p>1. Redraw latitude and longitude.</p>
+              <p>2. Explain rotation and revolution.</p>
+              <p>3. Reattempt only wrong MCQs.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 };
