@@ -20,8 +20,11 @@ async function verifyRoute(page, path, expectedText) {
       throw new Error(`${path} exposed blocked failure text: ${blocked}`);
     }
   }
-  if (expectedText && !text.includes(expectedText)) {
-    throw new Error(`${path} did not contain expected text: ${expectedText}`);
+  const expectedItems = Array.isArray(expectedText) ? expectedText : expectedText ? [expectedText] : [];
+  for (const expected of expectedItems) {
+    if (!text.includes(expected)) {
+      throw new Error(`${path} did not contain expected text: ${expected}`);
+    }
   }
   const metrics = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
@@ -39,6 +42,7 @@ async function run() {
   const checks = [];
   checks.push(await verifyRoute(page, "/dashboard", "Earth as a System"));
   checks.push(await verifyRoute(page, "/upsc", "Earth as a System"));
+  checks.push(await verifyRoute(page, "/upsc/geography", ["TODAY'S FUNNEL", "Day 30", "Geography Command Day"]));
   checks.push(await verifyRoute(page, "/tests", "Start with today's MCQ only"));
   checks.push(await verifyRoute(page, "/revision", "Your next revision is after practice"));
   checks.push(await verifyRoute(page, "/history", "Your path is just starting"));
