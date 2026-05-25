@@ -1,5 +1,6 @@
 import { auth } from '@/lib/firebase/config';
-import { env } from '@/env';
+import { activeAuthProvider, env } from '@/env';
+import { supabase } from '@/lib/supabase/client';
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
@@ -15,6 +16,18 @@ export async function resolveToken(forceRefresh = false): Promise<string | null>
     if (mockToken) {
       if (authDebug) console.info("AUTH | TOKEN_STRATEGY | Using MOCK_TOKEN bypass");
       return mockToken;
+    }
+  }
+
+  // 2. Supabase Authentication
+  if (activeAuthProvider === 'supabase' && supabase) {
+    try {
+      const sessionResult = forceRefresh
+        ? await supabase.auth.refreshSession()
+        : await supabase.auth.getSession();
+      return sessionResult.data.session?.access_token ?? null;
+    } catch (err) {
+      console.error("FORENSIC | TOKEN_STRATEGY | Supabase token retrieval failed:", err);
     }
   }
 

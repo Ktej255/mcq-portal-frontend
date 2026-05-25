@@ -1,7 +1,10 @@
 export const env = {
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1',
   NEXT_PUBLIC_USE_MOCK_AUTH: process.env.NEXT_PUBLIC_USE_MOCK_AUTH || (process.env.NODE_ENV === 'development' ? 'true' : undefined),
+  NEXT_PUBLIC_AUTH_PROVIDER: process.env.NEXT_PUBLIC_AUTH_PROVIDER,
   NEXT_PUBLIC_DEBUG_API: process.env.NEXT_PUBLIC_DEBUG_API,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -11,6 +14,24 @@ export const env = {
 };
 
 const isMockAuth = env.NEXT_PUBLIC_USE_MOCK_AUTH === 'true';
+
+export type AuthProviderName = 'mock' | 'firebase' | 'supabase';
+
+export const activeAuthProvider: AuthProviderName = isMockAuth
+  ? 'mock'
+  : env.NEXT_PUBLIC_AUTH_PROVIDER === 'supabase'
+    ? 'supabase'
+    : 'firebase';
+
+export const missingSupabaseEnvVars = [
+  ['NEXT_PUBLIC_SUPABASE_URL', env.NEXT_PUBLIC_SUPABASE_URL],
+  ['NEXT_PUBLIC_SUPABASE_ANON_KEY', env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
+]
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+export const supabaseConfigReady = activeAuthProvider !== 'supabase' || missingSupabaseEnvVars.length === 0;
+
 export const missingFirebaseEnvVars = [
   ['NEXT_PUBLIC_FIREBASE_API_KEY', env.NEXT_PUBLIC_FIREBASE_API_KEY],
   ['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN],
