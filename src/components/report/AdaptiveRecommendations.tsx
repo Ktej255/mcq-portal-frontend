@@ -2,14 +2,28 @@
 
 import React from 'react';
 import { 
-  ArrowRight, CheckCircle2, AlertCircle, 
+  ArrowRight,
   BookOpen, Zap, Target, Timer, ShieldAlert
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+interface Recommendation {
+  type: string;
+  priority?: string;
+  topic?: string;
+  reason?: string;
+}
+
+interface AdaptivePlan {
+  strategy_name?: string;
+}
+
 interface AdaptiveRecommendationsProps {
-  data: any;
+  data: {
+    recommendations?: Recommendation[];
+    adaptivePlan?: AdaptivePlan;
+  } | null;
 }
 
 export const AdaptiveRecommendations: React.FC<AdaptiveRecommendationsProps> = ({ data }) => {
@@ -34,7 +48,7 @@ export const AdaptiveRecommendations: React.FC<AdaptiveRecommendationsProps> = (
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-5">
-        {data.recommendations.map((rec: any, idx: number) => (
+        {data.recommendations.map((rec: Recommendation, idx: number) => (
           <div 
             key={idx} 
             className="group relative p-8 rounded-[2.5rem] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 transition-all hover:shadow-2xl hover:-translate-y-1 overflow-hidden"

@@ -10,7 +10,9 @@ import {
   User,
 } from "firebase/auth";
 
-import { env } from "@/env";
+import { env, firebaseConfigReady } from "@/env";
+
+const isMockAuth = env.NEXT_PUBLIC_USE_MOCK_AUTH === "true";
 
 const firebaseConfig = {
   apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,7 +23,7 @@ const firebaseConfig = {
   appId: env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = !getApps().length && firebaseConfig.apiKey ? initializeApp(firebaseConfig) : (getApps().length ? getApp() : null);
+const app = !isMockAuth && firebaseConfigReady && !getApps().length ? initializeApp(firebaseConfig) : (getApps().length ? getApp() : null);
 const auth = app ? getAuth(app) : null;
 const googleProvider = new GoogleAuthProvider();
 

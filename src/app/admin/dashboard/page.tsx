@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '@/services/api/adminService';
 import { 
-  Users, FileText, CheckCircle2, TrendingUp, 
-  BarChart3, Target, Clock, AlertTriangle, ShieldAlert, RotateCcw
+  Users, FileText, TrendingUp, 
+  BarChart3, Clock, ShieldAlert, RotateCcw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -12,20 +12,47 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell 
+  Cell 
 } from 'recharts';
 
 const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6'];
+type StatColor = 'blue' | 'indigo' | 'emerald' | 'amber';
+
+interface PipelineHealth {
+  pipeline?: {
+    total_processed?: number;
+    failure_rate?: number;
+    pending_tasks?: number;
+  };
+  accuracy_drift?: {
+    quality_baseline_status?: string;
+    avg_hallucination_score?: number;
+  };
+}
+
+interface StatCardProps {
+  title: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+  trend: string;
+  color: StatColor;
+}
+
+interface IntegrityItemProps {
+  title: string;
+  count: number;
+  severity: 'high' | 'medium' | 'low';
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const stats = {
     totalStudents: 128,
     totalTests: 45,
     activeAttempts: 12,
     avgScore: 74.5,
     completionRate: 88,
-  });
-  const [pipelineHealth, setPipelineHealth] = useState<any>(null);
+  };
+  const [pipelineHealth, setPipelineHealth] = useState<PipelineHealth | null>(null);
 
   const chartData = [
     { name: 'Physics', value: 85 },
@@ -169,8 +196,8 @@ export default function AdminDashboard() {
                   </div>
                   <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Failures</p>
-                    <p className={`text-xl font-black ${pipelineHealth.pipeline?.failure_rate > 5 ? 'text-red-500' : ''}`}>
-                      {pipelineHealth.pipeline?.failure_rate.toFixed(1)}%
+                    <p className={`text-xl font-black ${(pipelineHealth.pipeline?.failure_rate ?? 0) > 5 ? 'text-red-500' : ''}`}>
+                      {(pipelineHealth.pipeline?.failure_rate ?? 0).toFixed(1)}%
                     </p>
                   </div>
                 </div>
@@ -178,14 +205,14 @@ export default function AdminDashboard() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Narrative Quality (Hallucination)</span>
-                    <Badge variant={pipelineHealth.accuracy_drift?.avg_hallucination_score > 0.2 ? 'destructive' : 'secondary'}>
-                      {pipelineHealth.accuracy_drift?.avg_hallucination_score.toFixed(2)}
+                    <Badge variant={(pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0) > 0.2 ? 'destructive' : 'secondary'}>
+                      {(pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0).toFixed(2)}
                     </Badge>
                   </div>
-                  <Progress value={(1 - pipelineHealth.accuracy_drift?.avg_hallucination_score) * 100} className="h-1.5" />
+                  <Progress value={(1 - (pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0)) * 100} className="h-1.5" />
                 </div>
 
-                {pipelineHealth.pipeline?.pending_tasks > 0 && (
+                {(pipelineHealth.pipeline?.pending_tasks ?? 0) > 0 && (
                   <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-800 text-xs font-medium">
                     <Clock className="w-4 h-4 animate-spin" />
                     {pipelineHealth.pipeline?.pending_tasks} analysis tasks in queue
@@ -225,8 +252,8 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ title, value, icon, trend, color }: any) {
-  const colorMap: any = {
+function StatCard({ title, value, icon, trend, color }: StatCardProps) {
+  const colorMap: Record<StatColor, string> = {
     blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600',
     indigo: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600',
     emerald: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600',
@@ -251,7 +278,7 @@ function StatCard({ title, value, icon, trend, color }: any) {
   );
 }
 
-function IntegrityItem({ title, count, severity }: any) {
+function IntegrityItem({ title, count, severity }: IntegrityItemProps) {
   const dotColor = severity === 'high' ? 'bg-red-500' : severity === 'medium' ? 'bg-amber-500' : 'bg-emerald-500';
   return (
     <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">

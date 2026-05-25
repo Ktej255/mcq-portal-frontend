@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { UpscProductEntry } from "@/components/marketing/UpscProductEntry";
 
 export default function Home() {
-  redirect("/dashboard");
+  return <UpscProductEntry />;
 }

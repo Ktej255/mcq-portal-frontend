@@ -50,7 +50,7 @@ export function FeedbackModal({ isOpen, onClose, questionId, testId }: FeedbackM
         setIsSuccess(false);
         setDescription('');
       }, 2000);
-    } catch (error) {
+    } catch {
       toast.error("Failed to submit feedback. Please try again later.");
     } finally {
       setIsSubmitting(false);

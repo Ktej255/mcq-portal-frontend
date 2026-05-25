@@ -5,7 +5,6 @@ import { useExamStore } from '@/lib/store/useExamStore';
 import { ExamTimer } from './ExamTimer';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { ShieldAlert, Maximize2 } from 'lucide-react';
 
 interface ExamHeaderProps {

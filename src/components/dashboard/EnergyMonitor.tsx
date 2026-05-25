@@ -3,12 +3,11 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Activity, Battery, BatteryLow, AlertTriangle, Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Activity, Battery, AlertTriangle, Info } from 'lucide-react';
 
 interface EnergyProps {
-  load: number; # 0.0 - 1.0
-  fatigue: number; # 0.0 - 1.0
+  load: number; // 0.0 - 1.0
+  fatigue: number; // 0.0 - 1.0
   risk: 'LOW' | 'MODERATE' | 'HIGH';
 }
 

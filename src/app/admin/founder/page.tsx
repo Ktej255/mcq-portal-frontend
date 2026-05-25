@@ -2,15 +2,12 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { 
   HeartPulse, 
-  RefreshCcw, 
   Users, 
   ShieldCheck, 
   AlertTriangle,
   Zap,
-  TrendingUp,
   CloudLightning
 } from 'lucide-react';
 
@@ -60,7 +57,7 @@ export default function FounderDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-5xl font-black tracking-tighter text-rose-600">4.2%</div>
-            <p className="text-xs mt-2 font-medium text-muted-foreground">Distribution of students in 'Detachment Recommended' state.</p>
+            <p className="text-xs mt-2 font-medium text-muted-foreground">Distribution of students in Detachment Recommended state.</p>
           </CardContent>
         </Card>
       </div>
@@ -102,7 +99,7 @@ export default function FounderDashboard() {
               </div>
               <div>
                 <p className="font-black text-rose-900">Current Affairs Stale-ness</p>
-                <p className="text-xs text-rose-800/70 mt-1 leading-relaxed">12 questions in 'Polity' have not been reviewed since the recent legislative updates. Immediate re-verification recommended.</p>
+                <p className="text-xs text-rose-800/70 mt-1 leading-relaxed">12 questions in Polity have not been reviewed since the recent legislative updates. Immediate re-verification recommended.</p>
               </div>
             </div>
 
@@ -112,7 +109,7 @@ export default function FounderDashboard() {
               </div>
               <div>
                 <p className="font-black text-amber-900">Revision Avoidance Cluster</p>
-                <p className="text-xs text-amber-800/70 mt-1 leading-relaxed">24% of students are consistently skipping 'Economics' revision tasks. System intervention triggered for morning drills.</p>
+                <p className="text-xs text-amber-800/70 mt-1 leading-relaxed">24% of students are consistently skipping Economics revision tasks. System intervention triggered for morning drills.</p>
               </div>
             </div>
           </div>

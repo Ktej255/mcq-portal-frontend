@@ -1,0 +1,2 @@
+subject,day,week,chapter,topic,batch_code,test_title,difficulty,question_text_en,option_a,option_b,option_c,option_d,correct_option,explanation_en,source,map_or_case_tag,pyq_linked,status
+Geography,3,1,Geomorphology,Plate Tectonics,GEO-D03,Geography Day 3: Plate Tectonics,MEDIUM,What is plate?,A,B,C,D,A,It moves.,FRESH_AUTHORING,,No,DRAFT

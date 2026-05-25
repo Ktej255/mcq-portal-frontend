@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
+import { QueryProvider } from "@/lib/contexts/QueryProvider";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MCQ Intelligence Portal",
-  description: "Cognitive performance tracking and exam analytics platform",
+  title: "UPSC Command",
+  description: "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
 };
 
 export default function RootLayout({
@@ -32,7 +33,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <QueryProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </QueryProvider>
           <Toaster position="bottom-right" theme="system" />
         </AuthProvider>
       </body>

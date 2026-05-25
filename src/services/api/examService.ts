@@ -7,11 +7,16 @@ export interface TestMetadata {
   title: string;
   description: string;
   durationMinutes: number;
-  totalQuestions: number;
+  totalQuestions?: number;
+  canStart?: boolean;
   subject: string;
-  attemptCount: number;
-  lastAttemptStatus: 'IN_PROGRESS' | 'SUBMITTED' | null;
-  lastAttemptDate: string | null;
+  attemptCount?: number;
+  lastAttemptStatus?: 'IN_PROGRESS' | 'SUBMITTED' | null;
+  lastAttemptDate?: string | null;
+  correct_marks?: number;
+  negative_marking_value?: number;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface QuestionData {
@@ -23,6 +28,7 @@ export interface QuestionData {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   positiveMarks: number;
   negativeMarks: number;
+  correct_option?: string;
   options: {
     id: string;
     textEn: string;
@@ -43,6 +49,7 @@ export interface SaveAnswerPayload {
   confidence: ConfidenceLevel | null;
   status: QuestionStatus;
   timeSpentSeconds: number;
+  lastAction?: 'VISITED' | 'ANSWER_SELECTED' | 'CLEARED' | 'MARKED_FOR_REVIEW';
 }
 
 export const examService = {
@@ -80,7 +87,11 @@ export const examService = {
 
   saveAnswers: async (attemptId: string, answers: SaveAnswerPayload[]) => {
     // Backend expects a single answer per request — send the last answer
-    const saveableAnswers = answers.filter(answer => answer.status !== 'NOT_VISITED');
+    const saveableAnswers = answers.filter(answer => {
+      if (answer.status === 'NOT_VISITED') return false;
+      if (answer.lastAction === 'VISITED') return false;
+      return Boolean(answer.selectedOptionId) || answer.lastAction === 'CLEARED' || answer.lastAction === 'MARKED_FOR_REVIEW';
+    });
     if (saveableAnswers.length === 0) return;
 
     const responses = [];
@@ -92,6 +103,7 @@ export const examService = {
         confidence_level: normalizeConfidence(answer.confidence),
         is_skipped: answer.status === 'UNANSWERED',
         marked_for_review: answer.status === 'MARKED_FOR_REVIEW' || answer.status === 'ANSWERED_AND_MARKED',
+        clear_response: answer.lastAction === 'CLEARED',
       });
       responses.push(response.data?.data ?? response.data);
     }

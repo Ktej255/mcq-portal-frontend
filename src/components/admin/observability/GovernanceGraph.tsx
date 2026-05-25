@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Zap, Database, Server, AlertTriangle, User } from 'lucide-react';
-import { DependencyGraph, GraphNode } from '@/services/api/observabilityService';
+import { Shield, Zap, Database, Server, User } from 'lucide-react';
+import { DependencyGraph } from '@/services/api/observabilityService';
 
 interface GovernanceGraphProps {
   graph: DependencyGraph;

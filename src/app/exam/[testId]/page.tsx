@@ -14,10 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu, RefreshCw, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu, RefreshCw } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
 import { examService, QuestionData, TestMetadata } from '@/services/api/examService';
+import { dashboardService, PerformanceReport } from '@/services/api/dashboardService';
 import { revisionService } from '@/services/api/revisionService';
 import { eventsService } from '@/services/api/eventsService';
 import { normalizeOptionId, normalizeConfidence } from '@/services/api/contracts';
@@ -32,14 +33,17 @@ export default function ExamInterface() {
   const { testId } = params;
   const attemptId = searchParams.get('attemptId');
 
-  const { testId: storeTestId, initializeTest, currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
+  const { testId: storeTestId, attemptId: storeAttemptId, initializeTest, currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
   const { timeLeft } = useTimerStore();
 
   const attemptIdNum = attemptId ? parseInt(attemptId, 10) : null;
-  const { isSaving, saveError } = useAutoSave(attemptId);
   const { warningsCount, isWarningVisible, lastViolation, dismissWarning, requestFullscreen } = useExamIntegrity();
-  const { detectRecovery, clearSnapshot, debouncedSave } = useSessionRecovery(attemptIdNum);
+  const { detectRecovery, clearSnapshot } = useSessionRecovery(attemptIdNum);
   const [recoveryBannerShown, setRecoveryBannerShown] = useState(false);
+  const [reportProcessingAttemptId, setReportProcessingAttemptId] = useState<string | null>(null);
+  const [reportProcessingStatus, setReportProcessingStatus] = useState('Scoring reconciliation queued');
+  const [reportProcessingError, setReportProcessingError] = useState<string | null>(null);
+  const { isSaving, saveError } = useAutoSave(attemptId, Boolean(reportProcessingAttemptId));
 
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [testMetadata, setTestMetadata] = useState<TestMetadata | null>(null);
@@ -59,13 +63,13 @@ export default function ExamInterface() {
 
         if (testId === 'revision') {
           // Priority 2: Revision Drill Mode
-          qData = await revisionService.getRapidDrill() as any;
+          qData = await revisionService.getRapidDrill() as unknown as QuestionData[];
           tData = {
             id: 'revision',
             title: 'Rapid Recovery Drill',
             description: 'Focused reinforcement of recent mistakes.',
             durationMinutes: 10,
-            subject_id: 0,
+            subject: 'General',
             correct_marks: 1.0,
             negative_marking_value: 0.33,
             is_active: true,
@@ -91,9 +95,10 @@ export default function ExamInterface() {
         const questionIds = qData.map(q => q.id);
         const storeQuestionIds = Object.keys(answers);
         const isStale = questionIds.some(id => !storeQuestionIds.includes(id));
+        const activeAttemptId = attemptId || null;
         
-        if (storeTestId !== testId || isStale) {
-          initializeTest(testId as string, questionIds);
+        if (storeTestId !== testId || storeAttemptId !== activeAttemptId || isStale) {
+          initializeTest(testId as string, questionIds, activeAttemptId);
         }
       } catch (err) {
         console.error("Failed to fetch exam data:", err);
@@ -109,11 +114,13 @@ export default function ExamInterface() {
     if (attemptIdNum) {
       const snapshot = detectRecovery();
       if (snapshot && snapshot.attemptId === attemptIdNum && !recoveryBannerShown) {
-        setRecoveryBannerShown(true);
-        toast.info(
-          `Session recovered: ${Object.keys(snapshot.pendingAnswers).length} answers restored from local backup.`,
-          { duration: 6000, icon: <RefreshCw className="w-4 h-4" /> }
-        );
+        window.setTimeout(() => {
+          setRecoveryBannerShown(true);
+          toast.info(
+            `Session recovered: ${Object.keys(snapshot.pendingAnswers).length} answers restored from local backup.`,
+            { duration: 6000, icon: <RefreshCw className="w-4 h-4" /> }
+          );
+        }, 0);
       }
     }
 
@@ -121,7 +128,7 @@ export default function ExamInterface() {
       eventsService.init(attemptId);
       return () => eventsService.stop(attemptId);
     }
-  }, [testId, storeTestId, initializeTest, attemptId]);
+  }, [testId, storeTestId, storeAttemptId, initializeTest, attemptId, attemptIdNum, detectRecovery, recoveryBannerShown, answers]);
 
   // Record QUESTION_VIEWED when currentQuestionIndex changes
   useEffect(() => {
@@ -199,29 +206,53 @@ export default function ExamInterface() {
       }
 
       if (attemptId) {
+        setShowReview(false);
+        setReportProcessingAttemptId(attemptId);
+        setReportProcessingStatus('Final answer sync in progress');
+        setReportProcessingError(null);
+        await examService.saveAnswers(attemptId, Object.values(answers));
         await examService.submitTest(attemptId);
+        setReportProcessingStatus('Forensic pipeline running');
+        await dashboardService.waitForReportReady(attemptId, {
+          onStatus: (report: PerformanceReport) => {
+            const processingStatus = report.processingStatus ?? report.processing_status ?? 'PENDING';
+            setReportProcessingStatus(
+              processingStatus === 'PENDING'
+                ? 'Telemetry verification and cognitive analysis running'
+                : 'Truth verification complete'
+            );
+          }
+        });
         // Priority 6: Clear recovery snapshot on successful submit
         clearSnapshot();
-        toast.success("Test submitted successfully!");
+        toast.success("Forensic report generated.");
         router.push(`/reports?attemptId=${attemptId}`);
       } else {
         router.push('/dashboard');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Submission failed:", err);
+      const responseStatus = typeof err === 'object' && err !== null && 'response' in err
+        ? (err as { response?: { status?: number } }).response?.status
+        : undefined;
       // Priority 2: Surface idempotent submit gracefully
-      if (err?.response?.status === 409) {
+      if (responseStatus === 409) {
+        if (attemptId) {
+          setReportProcessingAttemptId(attemptId);
+          setReportProcessingStatus('Checking finalized report state');
+          await dashboardService.waitForReportReady(attemptId);
+        }
         toast.info("Already submitted — redirecting to your report.");
         clearSnapshot();
         router.push(`/reports?attemptId=${attemptId}`);
       } else {
+        setReportProcessingError("Report generation did not complete. Please retry from this screen.");
         toast.error("Failed to submit test. Please check your connection and try again.");
       }
     }
   };
 
   const handleOptionChange = (optionId: string) => {
-    const isChange = !!currentAnswer?.selectedOptionId && currentAnswer.selectedOptionId !== optionId;
     const conf = currentAnswer?.confidence || 'EDUCATED_GUESS';
     setAnswer(question.id, optionId, conf);
     
@@ -244,6 +275,20 @@ export default function ExamInterface() {
       }, attemptId);
     }
   };
+
+  if (reportProcessingAttemptId) {
+    return (
+      <ReportProcessingScreen
+        attemptId={reportProcessingAttemptId}
+        status={reportProcessingStatus}
+        error={reportProcessingError}
+        onRetry={() => {
+          setReportProcessingError(null);
+          handleSubmit();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -552,6 +597,58 @@ export default function ExamInterface() {
   );
 }
 
+function ReportProcessingScreen({
+  attemptId,
+  status,
+  error,
+  onRetry,
+}: {
+  attemptId: string;
+  status: string;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  const steps = [
+    'scoring reconciliation',
+    'telemetry verification',
+    'cognitive analysis',
+    'recommendation generation',
+  ];
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
+      <div className="w-full max-w-2xl space-y-8 rounded-2xl border bg-white p-8 shadow-sm dark:bg-zinc-950">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40">
+          <RefreshCw className="h-8 w-8 animate-spin" />
+        </div>
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-zinc-400">Attempt #{attemptId}</p>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            Generating Forensic Intelligence Report
+          </h1>
+          <p className="text-sm font-semibold text-muted-foreground">{status}</p>
+        </div>
+        <div className="grid gap-3 text-left sm:grid-cols-2">
+          {steps.map(step => (
+            <div key={step} className="flex items-center gap-3 rounded-xl border bg-zinc-50 p-4 dark:bg-zinc-900">
+              <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+              <span className="text-sm font-bold capitalize text-zinc-700 dark:text-zinc-200">{step}</span>
+            </div>
+          ))}
+        </div>
+        {error && (
+          <div className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900 dark:bg-rose-950/20">
+            <p className="text-sm font-bold">{error}</p>
+            <Button onClick={onRetry} variant="outline" className="rounded-xl font-bold">
+              Retry Report Generation
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ExamReviewOverlay({ 
   questions, 
   answers, 
@@ -561,7 +658,7 @@ function ExamReviewOverlay({
   onSubmit 
 }: { 
   questions: QuestionData[], 
-  answers: Record<string, any>, 
+  answers: ReturnType<typeof useExamStore.getState>['answers'], 
   onBack: () => void, 
   timeLeft: number,
   onNavigate: (idx: number) => void, 

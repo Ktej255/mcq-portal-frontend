@@ -13,9 +13,7 @@ import { Button } from '@/components/ui/button';
 import { 
   BrainCircuit, 
   ArrowRight, 
-  AlertCircle,
-  CheckCircle2,
-  Lock
+  AlertCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -45,7 +43,7 @@ export const ConceptRecoveryModal = ({
           </div>
           <DialogTitle className="text-4xl font-black tracking-tighter">Structural Weakness.</DialogTitle>
           <DialogDescription className="text-zinc-500 font-medium text-lg leading-relaxed">
-            We've detected a repeated failure pattern in <span className="text-zinc-900 font-bold">{path.primary_topic}</span>. 
+            We&apos;ve detected a repeated failure pattern in <span className="text-zinc-900 font-bold">{path.primary_topic}</span>. 
             Continuing to drill this topic without foundational recovery may cause prepare-burnout.
           </DialogDescription>
         </DialogHeader>

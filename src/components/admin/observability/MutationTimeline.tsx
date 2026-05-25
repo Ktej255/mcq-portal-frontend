@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { History, Shield, AlertTriangle, CheckCircle2, User, FileText, Clock } from 'lucide-react';
+import { History, Shield, CheckCircle2, User, FileText, Clock } from 'lucide-react';
 import { MutationRecord } from '@/services/api/observabilityService';
 
 interface MutationTimelineProps {
@@ -77,7 +77,7 @@ export const MutationTimeline: React.FC<MutationTimelineProps> = ({ mutations })
 
               <div className="p-4 rounded-xl bg-black/40 border border-white/5">
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Forensic Justification</h4>
-                <p className="text-sm text-white italic">"{mutation.justification}"</p>
+                <p className="text-sm text-white italic">&quot;{mutation.justification}&quot;</p>
               </div>
 
               <div className="mt-4 flex items-center justify-between text-[10px]">

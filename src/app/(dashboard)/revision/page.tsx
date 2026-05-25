@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Brain, 
-  Calendar, 
   ChevronRight, 
   CheckCircle2, 
   AlertCircle, 
@@ -85,7 +84,7 @@ export default function RevisionPage() {
               <Badge className="bg-white/20 text-white border-none px-3 font-black text-[10px] uppercase tracking-widest">Single-Click Recovery</Badge>
               <h2 className="text-4xl md:text-5xl font-black tracking-tighter">Ready for Recovery?</h2>
               <p className="text-lg opacity-80 font-bold leading-relaxed">
-                We've selected 5 high-priority questions from your recent mistakes in **Environment Core** and **Polity**.
+                We&apos;ve selected 5 high-priority questions from your recent mistakes in Environment Core and Polity.
               </p>
             </div>
             <div className="flex flex-col gap-4">

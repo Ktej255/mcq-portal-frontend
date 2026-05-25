@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService, Question } from '@/services/api/adminService';
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,14 @@ import {
   AlertCircle, 
   Clock, 
   FileText, 
+  Database,
   MoreVertical,
   ChevronLeft,
   ChevronRight,
   Eye,
-  ShieldCheck
+  ShieldCheck,
+  Trash2,
+  UploadCloud
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -28,12 +32,74 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import {
+  readLocalBulkQuestionDrafts,
+  writeLocalBulkQuestionDrafts,
+  type LocalBulkQuestionDraft,
+} from '@/lib/upsc/mcqDraftBank';
+
+function getQualityNotes(question?: LocalBulkQuestionDraft["questions"][number]) {
+  const notes = question?.quality_notes;
+  return notes && typeof notes === "object" && !Array.isArray(notes) ? (notes as Record<string, unknown>) : {};
+}
+
+function asText(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+const subjectSlugByName: Record<string, string> = {
+  geography: "geography",
+  environment: "environment",
+  "disaster management": "disaster-management",
+  economy: "economy",
+  "science and tech": "science-tech",
+  "science & tech": "science-tech",
+  "polity and governance": "polity-governance",
+  "internal security and indian society": "internal-security-society",
+  history: "history",
+};
+
+const subjectSlugByPrefix: Record<string, string> = {
+  GEO: "geography",
+  ENV: "environment",
+  DIS: "disaster-management",
+  ECO: "economy",
+  SCI: "science-tech",
+  POL: "polity-governance",
+  INT: "internal-security-society",
+  HIS: "history",
+};
+
+function getDraftRoute(draft: LocalBulkQuestionDraft) {
+  const firstQuestion = draft.questions[0];
+  const notes = getQualityNotes(firstQuestion);
+  const subject = asText(notes.subject)?.toLowerCase();
+  const batchCode = asText(notes.batch_code);
+  const prefix = batchCode?.split("-")[0] ?? "";
+  const slug = (subject && subjectSlugByName[subject]) || subjectSlugByPrefix[prefix] || "geography";
+  const day = asText(notes.day) ?? "1";
+  return `/upsc/${slug}/mcq-readiness?day=${day}`;
+}
+
+function getDraftSummary(draft: LocalBulkQuestionDraft) {
+  const firstQuestion = draft.questions[0];
+  const notes = getQualityNotes(firstQuestion);
+  return {
+    batchCode: asText(notes.batch_code) || "UNMAPPED",
+    subject: asText(notes.subject) || "UPSC",
+    topic: asText(notes.topic) || asText(notes.test_title) || "Local MCQ batch",
+    day: asText(notes.day) || "1",
+    difficulty: firstQuestion?.difficulty || "MEDIUM",
+  };
+}
 
 export default function QuestionsControlRoom() {
   const [page, setPage] = useState(0);
   const [limit] = useState(20);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [localDrafts, setLocalDrafts] = useState<LocalBulkQuestionDraft[]>([]);
   const queryClient = useQueryClient();
 
   const { data: response, isLoading } = useQuery({
@@ -54,6 +120,18 @@ export default function QuestionsControlRoom() {
   const questions = response?.data || [];
   const total = response?.total || 0;
   const totalPages = Math.ceil(total / limit);
+  const localDraftQuestionCount = localDrafts.reduce((sum, draft) => sum + draft.questions.length, 0);
+
+  useEffect(() => {
+    setLocalDrafts(readLocalBulkQuestionDrafts());
+  }, []);
+
+  const removeLocalDraft = (draftId: string) => {
+    const nextDrafts = localDrafts.filter((draft) => draft.id !== draftId);
+    setLocalDrafts(nextDrafts);
+    writeLocalBulkQuestionDrafts(nextDrafts);
+    toast.success("Local draft removed.");
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -82,6 +160,86 @@ export default function QuestionsControlRoom() {
           </Button>
         </div>
       </div>
+
+      <section className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+        <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-emerald-700 p-3 text-white">
+              <Database className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+                Local Draft Bank
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-emerald-950 dark:text-emerald-50">
+                Offline UPSC imports ready for review
+              </h2>
+              <p className="mt-2 text-sm font-medium text-emerald-900/70 dark:text-emerald-100/70">
+                These are MCQs saved locally while the backend is offline. They stay attached to subject, day, topic, and batch code.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge className="bg-emerald-700 text-white">{localDraftQuestionCount} local questions</Badge>
+            <Link href="/admin/questions/bulk">
+              <Button variant="outline" className="gap-2 bg-white/80">
+                <UploadCloud className="h-4 w-4" />
+                Upload more
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {localDrafts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-emerald-200 bg-white/70 p-6 text-sm font-semibold text-emerald-900/70 dark:border-emerald-900/60 dark:bg-zinc-950/30 dark:text-emerald-100/70">
+            No local drafts yet. Use Bulk Upload with the UPSC template to create the first local batch.
+          </div>
+        ) : (
+          <div className="grid gap-3 xl:grid-cols-2">
+            {localDrafts.slice().reverse().map((draft) => {
+              const summary = getDraftSummary(draft);
+              return (
+                <article key={draft.id} className="rounded-lg border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900/50 dark:bg-zinc-950/50">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="border-emerald-300 font-black text-emerald-800 dark:text-emerald-200">
+                          {summary.batchCode}
+                        </Badge>
+                        <Badge variant="secondary" className="font-bold">
+                          {draft.importMode}
+                        </Badge>
+                        <Badge variant="outline" className="font-bold">
+                          {draft.questions.length} questions
+                        </Badge>
+                      </div>
+                      <h3 className="truncate text-lg font-black text-zinc-950 dark:text-zinc-50">{summary.topic}</h3>
+                      <p className="mt-1 text-sm font-medium text-muted-foreground">
+                        {summary.subject} Day {summary.day} · {summary.difficulty} · {new Date(draft.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Link href={getDraftRoute(draft)}>
+                        <Button size="sm" className="gap-2 bg-emerald-800 hover:bg-emerald-900">
+                          <Eye className="h-4 w-4" />
+                          Day room
+                        </Button>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => removeLocalDraft(draft.id)}
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-rose-200 bg-white px-3 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-rose-900/50 dark:bg-zinc-950 dark:hover:bg-rose-950/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <div className="bg-white dark:bg-zinc-900 rounded-xl border shadow-sm overflow-hidden">
         <div className="p-4 border-b bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between gap-4">
@@ -117,12 +275,12 @@ export default function QuestionsControlRoom() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Loading questions...</td>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">Loading questions...</td>
                   </tr>
                 ))
               ) : questions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
                     <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
                     No questions found.
                   </td>
@@ -178,10 +336,8 @@ export default function QuestionsControlRoom() {
                     </td>
                     <td className="p-4 align-top text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
+                        <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-md border border-transparent opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-100 dark:hover:bg-zinc-800 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
+                          <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
                           <DropdownMenuLabel>Workflow Actions</DropdownMenuLabel>

@@ -1,5 +1,7 @@
 import { apiClient } from './client';
 
+type JsonRecord = Record<string, unknown>;
+
 export interface TraceBase {
   trace_id: string;
   parent_trace_id: string | null;
@@ -13,10 +15,10 @@ export interface TraceBase {
 export interface TraceDetail extends TraceBase {
   user_id: number | null;
   attempt_id: number | null;
-  input_payload: any | null;
-  output_payload: any | null;
+  input_payload: JsonRecord | null;
+  output_payload: JsonRecord | null;
   error_message: string | null;
-  provider_metadata: any | null;
+  provider_metadata: JsonRecord | null;
 }
 
 export interface TraceTreeNode extends TraceDetail {
@@ -33,15 +35,15 @@ export interface JobExecution {
   completed_at: string | null;
   duration_ms: number | null;
   retries: number;
-  error_payload: any | null;
-  metadata_payload: any | null;
+  error_payload: JsonRecord | null;
+  metadata_payload: JsonRecord | null;
 }
 
 export interface OperationalMetric {
   id: number;
   metric_type: string;
   value: number;
-  metadata_json: any | null;
+  metadata_json: JsonRecord | null;
   timestamp: string;
 }
 

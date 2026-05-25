@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Legacy CJS validation runner; package scripts execute this file directly with Node. */
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("@playwright/test");

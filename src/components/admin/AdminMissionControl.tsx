@@ -1,6 +1,6 @@
 import React from 'react';
 import { OperationalHealthPanel } from './OperationalHealthPanel';
-import { Activity, ShieldAlert, Users, TrendingUp } from 'lucide-react';
+import { ShieldAlert, TrendingUp } from 'lucide-react';
 
 /**
  * Focus Area 2: Founder Operations Center (Mission Control)

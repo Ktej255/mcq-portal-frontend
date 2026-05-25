@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useExamStore } from '../store/useExamStore';
-import { examService } from '@/services/api/examService';
+import { examService, SaveAnswerPayload } from '@/services/api/examService';
 import { toast } from 'sonner';
 
-export const useAutoSave = (attemptId: string | null) => {
+export const useAutoSave = (attemptId: string | null, disabled = false) => {
   const { answers } = useExamStore();
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -19,11 +19,15 @@ export const useAutoSave = (attemptId: string | null) => {
   const syncToBackendRef = useRef<(isRetry?: boolean) => Promise<void>>(() => Promise.resolve());
 
   const syncToBackend = useCallback(async (isRetry = false) => {
-    if (!attemptId) return;
+    if (!attemptId || disabled) return;
 
-    const payload = Object.values(answers).filter(answer => answer.status !== 'NOT_VISITED');
+    const payload = Object.values(answers).filter(answer => {
+      if (answer.status === 'NOT_VISITED') return false;
+      if (answer.lastAction === 'VISITED') return false;
+      return Boolean(answer.selectedOptionId) || answer.lastAction === 'CLEARED' || answer.lastAction === 'MARKED_FOR_REVIEW';
+    });
     if (payload.length === 0) return;
-    const changedPayload = payload.filter((answer: any) => {
+    const changedPayload = payload.filter((answer: SaveAnswerPayload) => {
       const key = String(answer.questionId);
       return JSON.stringify(answer) !== lastSavedByQuestion.current[key];
     });
@@ -44,7 +48,7 @@ export const useAutoSave = (attemptId: string | null) => {
     try {
       await examService.saveAnswers(attemptId, payloadToSave);
       setLastSaved(new Date());
-      payloadToSave.forEach((answer: any) => {
+      payloadToSave.forEach((answer: SaveAnswerPayload) => {
         lastSavedByQuestion.current[String(answer.questionId)] = JSON.stringify(answer);
       });
       retryCount.current = 0; // Reset on success
@@ -76,13 +80,19 @@ export const useAutoSave = (attemptId: string | null) => {
         syncToBackendRef.current(false);
       }
     }
-  }, [answers, attemptId]);
+  }, [answers, attemptId, disabled]);
 
   useEffect(() => {
     syncToBackendRef.current = syncToBackend;
   }, [syncToBackend]);
 
   useEffect(() => {
+    if (disabled) {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+      }
+      return;
+    }
     if (!attemptId || Object.keys(answers).length === 0) return;
 
     if (saveTimeout.current) {
@@ -95,7 +105,7 @@ export const useAutoSave = (attemptId: string | null) => {
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [answers, attemptId, syncToBackend]);
+  }, [answers, attemptId, disabled, syncToBackend]);
 
   return { isSaving, lastSaved, saveError };
 };

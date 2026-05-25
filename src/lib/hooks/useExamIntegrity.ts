@@ -10,8 +10,6 @@ export const useExamIntegrity = () => {
       setWarningsCount(prev => prev + 1);
       setLastViolation(reason);
       setIsWarningVisible(true);
-      // In a real system, we'd log this to the backend here
-      console.warn(`Integrity Violation: ${reason}`);
     };
 
     const handleVisibilityChange = () => {

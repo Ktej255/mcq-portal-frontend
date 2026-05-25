@@ -3,17 +3,22 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { 
-  Zap, ShieldCheck, RefreshCcw, AlertOctagon, 
+  ShieldCheck, RefreshCcw, AlertOctagon, 
   Flame, HelpCircle 
 } from 'lucide-react';
 
-interface MasteryMapProps {
-  topicAnalysis: Record<string, any>;
-  behavioralSignals?: any[];
+interface TopicMetrics {
+  correct: number;
+  incorrect: number;
+  total: number;
 }
 
-export const MasteryMap: React.FC<MasteryMapProps> = ({ topicAnalysis, behavioralSignals = [] }) => {
-  const getTopicState = (topic: string, data: any) => {
+interface MasteryMapProps {
+  topicAnalysis: Record<string, TopicMetrics>;
+}
+
+export const MasteryMap: React.FC<MasteryMapProps> = ({ topicAnalysis }) => {
+  const getTopicState = (data: TopicMetrics) => {
     const accuracy = (data.correct / (data.correct + data.incorrect)) * 100 || 0;
     
     // Logic for states
@@ -31,7 +36,7 @@ export const MasteryMap: React.FC<MasteryMapProps> = ({ topicAnalysis, behaviora
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {Object.entries(topicAnalysis).map(([topic, data]) => {
-        const state = getTopicState(topic, data);
+        const state = getTopicState(data);
         const accuracy = (data.correct / (data.correct + data.incorrect)) * 100 || 0;
 
         return (

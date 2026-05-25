@@ -18,7 +18,7 @@ export default function DashboardLayout({
     <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
       <div className="flex flex-col items-center gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground animate-pulse">Initializing exam portal...</p>
+        <p className="text-muted-foreground animate-pulse">Initializing UPSC Command...</p>
       </div>
     </div>
   );

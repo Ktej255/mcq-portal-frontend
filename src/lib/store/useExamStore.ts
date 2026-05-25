@@ -11,14 +11,16 @@ export interface AnswerRecord {
   confidence: ConfidenceLevel | null;
   status: QuestionStatus;
   timeSpentSeconds: number;
+  lastAction?: 'VISITED' | 'ANSWER_SELECTED' | 'CLEARED' | 'MARKED_FOR_REVIEW';
 }
 
 interface ExamState {
   testId: string | null;
+  attemptId: string | null;
   currentQuestionIndex: number;
   answers: Record<string, AnswerRecord>;
   
-  initializeTest: (testId: string, questionIds: string[]) => void;
+  initializeTest: (testId: string, questionIds: string[], attemptId?: string | null) => void;
   setCurrentQuestion: (index: number) => void;
   visitQuestion: (questionId: string) => void;
   setAnswer: (questionId: string, optionId: string | null, confidence: ConfidenceLevel | null) => void;
@@ -31,10 +33,11 @@ export const useExamStore = create<ExamState>()(
   persist(
     (set) => ({
       testId: null,
+      attemptId: null,
       currentQuestionIndex: 0,
       answers: {},
 
-  initializeTest: (testId, questionIds) => {
+  initializeTest: (testId, questionIds, attemptId = null) => {
     const initialAnswers: Record<string, AnswerRecord> = {};
     questionIds.forEach(id => {
       const stringId = String(id);
@@ -46,7 +49,7 @@ export const useExamStore = create<ExamState>()(
         timeSpentSeconds: 0,
       };
     });
-    set({ testId, currentQuestionIndex: 0, answers: initialAnswers });
+    set({ testId, attemptId: attemptId ? String(attemptId) : null, currentQuestionIndex: 0, answers: initialAnswers });
   },
 
   setCurrentQuestion: (index) => set({ currentQuestionIndex: index }),
@@ -62,6 +65,7 @@ export const useExamStore = create<ExamState>()(
         [stringId]: {
           ...existing,
           status: 'UNANSWERED',
+          lastAction: 'VISITED',
         }
       }
     };
@@ -85,6 +89,7 @@ export const useExamStore = create<ExamState>()(
           selectedOptionId: optionId,
           confidence,
           status: newStatus,
+          lastAction: optionId ? 'ANSWER_SELECTED' : 'CLEARED',
         }
       }
     };
@@ -104,6 +109,7 @@ export const useExamStore = create<ExamState>()(
         [stringId]: {
           ...existing,
           status: newStatus,
+          lastAction: 'MARKED_FOR_REVIEW',
         }
       }
     };
@@ -127,6 +133,7 @@ export const useExamStore = create<ExamState>()(
           selectedOptionId: null,
           confidence: null,
           status: newStatus,
+          lastAction: 'CLEARED',
         }
       }
     };

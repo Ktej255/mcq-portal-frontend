@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/validation-artifacts/
+scratch/*.log
+scratch/*.png
+scratch/*.json
 
 # next.js
 /.next/

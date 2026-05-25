@@ -1,17 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   Play, 
-  RotateCcw, 
   Target, 
   Zap, 
-  Clock, 
   ChevronRight, 
   BrainCircuit,
-  History,
   AlertCircle,
   Download,
   ArrowRight
@@ -172,7 +169,7 @@ export const DailyWorkspace = () => {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
                   <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
-                    <span className="font-bold text-blue-600">Continuity Alert:</span> You have a current affairs gap in 'International Relations'. Estimated 8m to resolve.
+                    <span className="font-bold text-blue-600">Continuity Alert:</span> You have a current affairs gap in International Relations. Estimated 8m to resolve.
                   </p>
                 </div>
                 <Button 
@@ -213,5 +210,3 @@ export const DailyWorkspace = () => {
     </div>
   );
 };
-
-

@@ -15,13 +15,19 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const pathname = usePathname();
 
   // Mock role for now - in production this comes from user metadata or backend
-  const isAdmin = user?.email?.endsWith('@admin.com') || user?.email === 'sarit.kumar.dev@gmail.com';
+  const isLocalMockAdmin =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+    localStorage.getItem("MOCK_TOKEN")?.startsWith("MOCK_TOKEN");
+  const isAdmin = user?.email?.endsWith('@admin.com') || user?.email === 'sarit.kumar.dev@gmail.com' || isLocalMockAdmin;
   const userRole = isAdmin ? 'ADMIN' : 'STUDENT';
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push(`/login?redirect=${pathname}`);
+        const search = window.location.search;
+        const redirectTarget = `${pathname}${search}`;
+        router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
       } else if (requiredRole && userRole !== requiredRole) {
         router.push('/dashboard'); // Unauthorized
       }

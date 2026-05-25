@@ -1,14 +1,58 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, AreaChart, Area 
+  XAxis, YAxis, CartesianGrid, 
+  Tooltip, AreaChart, Area 
 } from 'recharts';
 import { TrendingUp, Activity, Target, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
+interface TrajectoryPoint {
+  accuracy: number;
+  score: number;
+  average_time_per_question: number;
+}
+
+interface LongitudinalProfile {
+  trajectory_points?: TrajectoryPoint[];
+  learning_velocity?: {
+    accuracy_slope?: number;
+    recovery_velocity?: number;
+  };
+  behavioral_stability?: {
+    consistency_score?: number;
+  };
+}
+
 interface LongitudinalGrowthProps {
-  profile: any;
+  profile: LongitudinalProfile | null;
+}
+
+function StableChartFrame({ children }: { children: (size: { width: number; height: number }) => React.ReactNode }) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  const height = 256;
+
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element) return;
+
+    const updateReady = () => {
+      const rect = element.getBoundingClientRect();
+      setWidth(Math.floor(rect.width));
+    };
+
+    updateReady();
+    const observer = new ResizeObserver(updateReady);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={frameRef} className="h-64 w-full min-w-0">
+      {width > 0 ? children({ width, height }) : null}
+    </div>
+  );
 }
 
 export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile }) => {
@@ -20,7 +64,7 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
     );
   }
 
-  const data = profile.trajectory_points.map((p: any, idx: number) => ({
+  const data = profile.trajectory_points.map((p: TrajectoryPoint, idx: number) => ({
     name: `Attempt ${idx + 1}`,
     accuracy: p.accuracy,
     score: p.score,
@@ -29,6 +73,9 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
 
   const velocity = profile.learning_velocity || {};
   const stability = profile.behavioral_stability || {};
+  const accuracySlope = velocity.accuracy_slope ?? 0;
+  const recoveryVelocity = velocity.recovery_velocity ?? 0;
+  const consistencyScore = stability.consistency_score ?? 0;
 
   return (
     <div className="space-y-8">
@@ -39,17 +86,17 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
             <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Learning Velocity</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-black">{velocity.accuracy_slope > 0 ? '+' : ''}{velocity.accuracy_slope?.toFixed(2)}</p>
+            <p className="text-3xl font-black">{accuracySlope > 0 ? '+' : ''}{accuracySlope.toFixed(2)}</p>
             <span className="text-[10px] font-bold text-muted-foreground">pts / attempt</span>
           </div>
           <div className="mt-2 flex items-center gap-1.5">
-            {velocity.accuracy_slope > 0 ? (
+            {accuracySlope > 0 ? (
               <ArrowUpRight className="w-4 h-4 text-emerald-500" />
             ) : (
               <ArrowDownRight className="w-4 h-4 text-rose-500" />
             )}
-            <span className={`text-[10px] font-black uppercase ${velocity.accuracy_slope > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {velocity.accuracy_slope > 0 ? 'Accelerating' : 'Stagnating'}
+            <span className={`text-[10px] font-black uppercase ${accuracySlope > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {accuracySlope > 0 ? 'Accelerating' : 'Stagnating'}
             </span>
           </div>
         </div>
@@ -60,13 +107,13 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
             <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Behavioral Consistency</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-black">{(stability.consistency_score * 100)?.toFixed(0)}%</p>
+            <p className="text-3xl font-black">{(consistencyScore * 100).toFixed(0)}%</p>
             <span className="text-[10px] font-bold text-muted-foreground">Stability Index</span>
           </div>
           <div className="mt-2 h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
             <div 
               className="h-full bg-blue-500 transition-all duration-1000" 
-              style={{ width: `${stability.consistency_score * 100}%` }}
+              style={{ width: `${consistencyScore * 100}%` }}
             ></div>
           </div>
         </div>
@@ -77,7 +124,7 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
             <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recovery Velocity</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <p className="text-3xl font-black">{velocity.recovery_velocity > 0 ? '+' : ''}{velocity.recovery_velocity?.toFixed(1)}%</p>
+            <p className="text-3xl font-black">{recoveryVelocity > 0 ? '+' : ''}{recoveryVelocity.toFixed(1)}%</p>
             <span className="text-[10px] font-bold text-muted-foreground">Recent Gain</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 font-medium">Comparison of last 3 attempts vs earlier history.</p>
@@ -90,9 +137,9 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
             <TrendingUp className="w-4 h-4" />
             Accuracy Trajectory
           </h4>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+          <StableChartFrame>
+            {({ width, height }) => (
+              <AreaChart data={data} width={width} height={height}>
                 <defs>
                   <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
@@ -116,8 +163,8 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
                 />
                 <Area type="monotone" dataKey="accuracy" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorAcc)" />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+            )}
+          </StableChartFrame>
         </div>
 
         <div className="space-y-4">
@@ -125,9 +172,9 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
             <Zap className="w-4 h-4 text-amber-500" />
             Score Momentum
           </h4>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+          <StableChartFrame>
+            {({ width, height }) => (
+              <AreaChart data={data} width={width} height={height}>
                 <defs>
                   <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
@@ -142,8 +189,8 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
                 />
                 <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorScore)" />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+            )}
+          </StableChartFrame>
         </div>
       </div>
 
@@ -155,8 +202,8 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
                <TrendingUp className="w-4 h-4" /> Trajectory Insight
              </h5>
              <p className="text-sm font-bold text-muted-foreground leading-relaxed">
-               Your accuracy has shown a **{velocity.accuracy_slope > 0 ? 'positive' : 'downward'} trend** of {Math.abs(velocity.accuracy_slope || 0).toFixed(1)}% per attempt. 
-               This suggests that your current revision cycle is {velocity.accuracy_slope > 0 ? 'highly effective' : 'requiring a pivot'}.
+               Your accuracy has shown a {accuracySlope > 0 ? 'positive' : 'downward'} trend of {Math.abs(accuracySlope).toFixed(1)}% per attempt. 
+               This suggests that your current revision cycle is {accuracySlope > 0 ? 'highly effective' : 'requiring a pivot'}.
              </p>
           </div>
           <div className="flex-1 space-y-3">
@@ -164,7 +211,7 @@ export const LongitudinalGrowth: React.FC<LongitudinalGrowthProps> = ({ profile 
                <Activity className="w-4 h-4" /> Stability Note
              </h5>
              <p className="text-sm font-bold text-muted-foreground leading-relaxed">
-               With a stability index of {(stability.consistency_score * 100).toFixed(0)}%, your behavioral patterns (pacing/confidence) are **{stability.consistency_score > 0.7 ? 'highly predictable' : 'fluctuating'}**. Predictable patterns lead to more reliable AI coaching.
+               With a stability index of {(consistencyScore * 100).toFixed(0)}%, your behavioral patterns (pacing/confidence) are {consistencyScore > 0.7 ? 'highly predictable' : 'fluctuating'}. Predictable patterns lead to more reliable AI coaching.
              </p>
           </div>
         </div>

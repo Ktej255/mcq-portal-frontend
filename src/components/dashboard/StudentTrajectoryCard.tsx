@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Zap, Target, BarChart3, ChevronRight } from 'lucide-react';
+import { TrendingUp, Zap, Target, ChevronRight } from 'lucide-react';
 
 interface TrajectoryProps {
   mastery: number;

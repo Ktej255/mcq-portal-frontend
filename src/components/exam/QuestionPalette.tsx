@@ -1,8 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useExamStore, QuestionStatus } from '@/lib/store/useExamStore';
-import { Button } from '@/components/ui/button';
+import { useExamStore } from '@/lib/store/useExamStore';
 
 interface QuestionPaletteProps {
   questionIds: string[];
@@ -11,22 +10,6 @@ interface QuestionPaletteProps {
 
 export function QuestionPalette({ questionIds, onQuestionSelect }: QuestionPaletteProps) {
   const { answers, currentQuestionIndex, setCurrentQuestion } = useExamStore();
-
-  const getStatusColor = (status: QuestionStatus) => {
-    switch (status) {
-      case 'ANSWERED':
-        return 'bg-green-500 text-white hover:bg-green-600 border-transparent';
-      case 'MARKED_FOR_REVIEW':
-        return 'bg-purple-500 text-white hover:bg-purple-600 border-transparent';
-      case 'ANSWERED_AND_MARKED':
-        return 'bg-purple-600 text-white hover:bg-purple-700 border-transparent relative overflow-hidden before:absolute before:bottom-0 before:right-0 before:w-0 before:h-0 before:border-b-[12px] before:border-l-[12px] before:border-b-green-400 before:border-l-transparent';
-      case 'UNANSWERED':
-        return 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200';
-      case 'NOT_VISITED':
-      default:
-        return 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700';
-    }
-  };
 
   return (
     <div className="flex flex-col h-full bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm border-l border-zinc-200/50 dark:border-zinc-800/50">

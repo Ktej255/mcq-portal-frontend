@@ -4,8 +4,6 @@ import React from 'react';
 import { 
   CheckCircle2, 
   History, 
-  ChevronRight,
-  BrainCircuit,
   Calendar
 } from 'lucide-react';
 

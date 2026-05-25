@@ -15,7 +15,7 @@ export type ExamEventType =
 export interface ExamEvent {
   event_type: ExamEventType;
   question_id?: number;
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   timestamp?: string;
 }
 

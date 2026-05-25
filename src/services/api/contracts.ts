@@ -54,17 +54,23 @@ export function requireFiniteNumber(value: unknown, fieldName: string): number {
   return parsed;
 }
 
-export function normalizeReportPayload(payload: any, attemptId?: string) {
-  const inferredScore = Array.isArray(payload?.subjectScores)
-    ? payload.subjectScores.reduce((sum: number, item: any) => sum + (Number(item.score) || 0), 0)
+type ReportPayload = Record<string, unknown>;
+
+export function normalizeReportPayload(rawPayload: unknown, attemptId?: string) {
+  const payload = rawPayload && typeof rawPayload === 'object' ? rawPayload as ReportPayload : {};
+  const inferredScore = Array.isArray(payload.subjectScores)
+    ? payload.subjectScores.reduce((sum: number, rawItem: unknown) => {
+        const item = rawItem && typeof rawItem === 'object' ? rawItem as ReportPayload : {};
+        return sum + (Number(item.score) || 0);
+      }, 0)
     : undefined;
 
-  const scoreSource = payload?.totalScore ?? payload?.total_score ?? inferredScore;
+  const scoreSource = payload.totalScore ?? payload.total_score ?? inferredScore;
   if (attemptId && scoreSource === undefined) {
     throw new Error('Invalid report payload: attempt report missing totalScore');
   }
 
-  const accuracy = requireFiniteNumber(payload?.accuracy ?? 0, 'accuracy');
+  const accuracy = requireFiniteNumber(payload.accuracy ?? 0, 'accuracy');
   if (accuracy < 0 || accuracy > 100) {
     throw new Error('Invalid report payload: accuracy must be between 0 and 100');
   }
@@ -72,9 +78,9 @@ export function normalizeReportPayload(payload: any, attemptId?: string) {
   return {
     totalScore: requireFiniteNumber(scoreSource ?? 0, 'totalScore'),
     accuracy,
-    correctCount: requireFiniteNumber(payload?.correctCount ?? payload?.correct_count ?? 0, 'correctCount'),
-    incorrectCount: requireFiniteNumber(payload?.incorrectCount ?? payload?.incorrect_count ?? 0, 'incorrectCount'),
-    unattemptedCount: requireFiniteNumber(payload?.unattemptedCount ?? payload?.unattempted_count ?? 0, 'unattemptedCount'),
-    totalQuestions: requireFiniteNumber(payload?.totalQuestions ?? payload?.total_questions ?? 0, 'totalQuestions'),
+    correctCount: requireFiniteNumber(payload.correctCount ?? payload.correct_count ?? 0, 'correctCount'),
+    incorrectCount: requireFiniteNumber(payload.incorrectCount ?? payload.incorrect_count ?? 0, 'incorrectCount'),
+    unattemptedCount: requireFiniteNumber(payload.unattemptedCount ?? payload.unattempted_count ?? 0, 'unattemptedCount'),
+    totalQuestions: requireFiniteNumber(payload.totalQuestions ?? payload.total_questions ?? 0, 'totalQuestions'),
   };
 }

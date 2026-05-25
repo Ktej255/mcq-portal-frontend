@@ -1,34 +1,60 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Shield, Lock, Globe, Zap, ArrowRight, CheckCircle2 } from "lucide-react";
+import { env } from "@/env";
+
+const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 
 export default function LoginPage() {
   const { signInWithGoogle, devLogin, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect") || "/dashboard";
+  const [isLocalTestingHost, setIsLocalTestingHost] = useState(false);
+
+  useEffect(() => {
+    setIsLocalTestingHost(["localhost", "127.0.0.1"].includes(window.location.hostname));
+  }, []);
+
+  useEffect(() => {
+    if (isLocalTestingHost && !authLoading && !user) {
+      devLogin("validator@upsc.local", "local-dev-validator", redirectPath);
+    }
+  }, [isLocalTestingHost, authLoading, user, devLogin, redirectPath]);
 
   useEffect(() => {
     const token = searchParams.get("token");
     if (token && token.startsWith("MOCK_TOKEN") && !authLoading && !user) {
-      console.warn("FORENSIC | AUTO_LOGIN | TOKEN DETECTED:", token);
+      if (authDebug) console.info("AUTH | AUTO_LOGIN | MOCK_TOKEN detected");
       
-      let email = "validator@antigravity.os";
+      let email = "validator@upsc.local";
       let uid = "dev-validator-id";
       
       if (token.includes("_sim_")) {
         const persona = token.split("_sim_")[1];
-        email = `${persona.replace(/_/g, '')}@antigravity.dev`;
+        email = `${persona.replace(/_/g, '')}@upsc.local`;
         uid = `mock-uid-${persona}`;
       }
       
       // Update localStorage so AuthContext can restore it
       localStorage.setItem("MOCK_TOKEN", token);
-      devLogin(email, uid);
+      devLogin(email, uid, redirectPath);
     }
-  }, [searchParams, devLogin, authLoading, user]);
+  }, [searchParams, devLogin, authLoading, user, redirectPath]);
+
+  if (isLocalTestingHost) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 px-6 py-5 text-center shadow-2xl">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-500">Local Testing Mode</p>
+          <p className="mt-3 text-lg font-black">Bypassing Firebase login...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-zinc-950 text-white overflow-hidden selection:bg-zinc-100 selection:text-zinc-900">
@@ -36,7 +62,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20 brightness-100 contrast-150 pointer-events-none" />
       </div>
 
       <div className="relative z-10 w-full grid lg:grid-cols-2">
@@ -44,9 +70,9 @@ export default function LoginPage() {
         <div className="hidden lg:flex flex-col justify-between p-16 xl:p-24 bg-zinc-900/40 backdrop-blur-3xl border-r border-zinc-800/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-zinc-950 font-black text-xl">A</span>
+              <span className="text-zinc-950 font-black text-xl">U</span>
             </div>
-            <span className="text-xl font-black tracking-tighter uppercase italic">Antigravity OS</span>
+            <span className="text-xl font-black tracking-tighter uppercase italic">UPSC Command</span>
           </div>
 
           <div className="space-y-12">
@@ -89,9 +115,9 @@ export default function LoginPage() {
           <div className="max-w-md w-full space-y-10">
             <div className="lg:hidden flex flex-col items-center mb-12">
                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-2xl shadow-white/10">
-                <span className="text-zinc-950 font-black text-3xl">A</span>
+                <span className="text-zinc-950 font-black text-3xl">U</span>
               </div>
-              <h1 className="text-3xl font-black tracking-tighter">Antigravity</h1>
+              <h1 className="text-3xl font-black tracking-tighter">UPSC Command</h1>
             </div>
 
             <div className="space-y-2 text-center lg:text-left">
@@ -139,7 +165,7 @@ export default function LoginPage() {
                 </p>
                 {process.env.NODE_ENV === 'development' && (
                   <Button 
-                    onClick={() => devLogin("validator@antigravity.os", "dev-validator-id")}
+                    onClick={() => devLogin("validator@upsc.local", "dev-validator-id", redirectPath)}
                     variant="ghost"
                     className="w-full text-[10px] text-zinc-700 hover:text-zinc-500 font-bold uppercase tracking-widest mt-4"
                   >

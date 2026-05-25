@@ -1,27 +1,124 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { LongitudinalGrowth } from "@/components/report/LongitudinalGrowth";
 import { AdaptiveRecommendations } from "@/components/report/AdaptiveRecommendations";
 import { 
   Trophy, Target, Timer, Zap, 
   BrainCircuit, BarChart3, TrendingUp, AlertCircle,
-  CheckCircle2, XCircle, HelpCircle, ArrowRight,
+  CheckCircle2, XCircle, HelpCircle,
   ShieldCheck, Activity, Search, Download,
-  History, Lightbulb, ChevronRight, Clock
+  Lightbulb, ChevronRight, Clock, RefreshCw
 } from 'lucide-react';
 import { BehavioralTimeline } from "@/components/report/BehavioralTimeline";
-import { DebugPanel } from "@/components/shared/DebugPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { dashboardService, PerformanceReport } from "@/services/api/dashboardService";
-import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Cell } from 'recharts';
+import { BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Cell } from 'recharts';
 import { useFrictionTracker } from "@/hooks/useFrictionTracker";
 
 const COLORS = ['#10b981', '#ef4444', '#6366f1', '#f59e0b', '#8b5cf6'];
+type ReportRecord = Record<string, unknown>;
+type ReviewQuestion = ReportRecord & {
+  id?: string | number;
+  interaction_type?: string;
+  selected_option?: string | null;
+  correct_option?: string;
+  time_taken_seconds?: number;
+  is_correct?: boolean;
+  topic?: string;
+  difficulty?: string;
+  text_en?: string;
+  text_hi?: string;
+  explanation_en?: string;
+  explanation_hi?: string;
+  confidence_level?: string;
+  options_en: Record<string, string>;
+  options_hi?: Record<string, string>;
+  forensic_evidence?: { first_view?: string; dwell_time?: number; revisions?: number };
+};
+
+const asReportRecord = (value: unknown): ReportRecord => {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as ReportRecord
+    : {};
+};
+
+const asNumber = (value: unknown, fallback = 0): number => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+};
+
+function ReportProcessingState({ attemptId, status }: { attemptId: string | null; status: string }) {
+  const steps = [
+    'scoring reconciliation',
+    'telemetry verification',
+    'cognitive analysis',
+    'recommendation generation',
+  ];
+
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-2xl space-y-8 rounded-2xl border bg-white p-8 text-center shadow-sm dark:bg-zinc-950">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40">
+          <RefreshCw className="h-8 w-8 animate-spin" />
+        </div>
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-zinc-400">
+            {attemptId ? `Attempt #${attemptId}` : 'Aggregate report'}
+          </p>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            Generating Forensic Intelligence Report
+          </h1>
+          <p className="text-sm font-semibold text-muted-foreground">{status}</p>
+        </div>
+        <div className="grid gap-3 text-left sm:grid-cols-2">
+          {steps.map(step => (
+            <div key={step} className="flex items-center gap-3 rounded-xl border bg-zinc-50 p-4 dark:bg-zinc-900">
+              <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+              <span className="text-sm font-bold capitalize text-zinc-700 dark:text-zinc-200">{step}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StableChartFrame({
+  children,
+  height = 256,
+}: {
+  children: (size: { width: number; height: number }) => React.ReactNode;
+  height?: number;
+}) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element) return;
+
+    const updateReady = () => {
+      const rect = element.getBoundingClientRect();
+      setWidth(Math.floor(rect.width));
+    };
+
+    updateReady();
+    const observer = new ResizeObserver(updateReady);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={frameRef} className="min-w-0" style={{ height }}>
+      {width > 0 ? children({ width, height }) : null}
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const searchParams = useSearchParams();
@@ -31,14 +128,15 @@ export default function ReportsPage() {
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingReview, setLoadingReview] = useState(false);
-  const [evolution, setEvolution] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<any>(null);
-  const [reviewData, setReviewData] = useState<any[]>([]);
+  const [evolution, setEvolution] = useState<ReportRecord | null>(null);
+  const [recommendations, setRecommendations] = useState<ReportRecord | null>(null);
+  const [reviewData, setReviewData] = useState<ReviewQuestion[]>([]);
   const [showReview, setShowReview] = useState(true); // Default to true for Forensic Phase
-  const [error, setError] = useState<any | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
   const [showHindi, setShowHindi] = useState(true);
   const [forensicMode, setForensicMode] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(['summary', 'questions', 'topics']);
+  const [processingStatus, setProcessingStatus] = useState('Scoring reconciliation queued');
 
   const toggleSection = (id: string) => {
     setExpandedSections(prev => 
@@ -57,8 +155,22 @@ export default function ReportsPage() {
       
       try {
         setLoading(true);
-        const [reportData, evoData, recData] = await Promise.all([
-          dashboardService.getReport(attemptId || undefined),
+        setReport(null);
+
+        const reportData = attemptId
+          ? await dashboardService.waitForReportReady(attemptId, {
+              onStatus: reportStatus => {
+                const status = reportStatus.processingStatus ?? reportStatus.processing_status ?? 'PENDING';
+                setProcessingStatus(
+                  status === 'PENDING'
+                    ? 'Telemetry verification and cognitive analysis running'
+                    : 'Truth verification complete'
+                );
+              }
+            })
+          : await dashboardService.getReport(undefined);
+
+        const [evoData, recData] = await Promise.all([
           dashboardService.getEvolution(),
           dashboardService.getRecommendations()
         ]);
@@ -84,14 +196,7 @@ export default function ReportsPage() {
   }, [attemptId, isLoaded, isSignedIn]);
 
   if (loading) return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-pulse p-4 md:p-8">
-      <div className="h-10 w-64 bg-zinc-100 dark:bg-zinc-900 rounded-xl"></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-28 bg-zinc-100 dark:bg-zinc-900 rounded-2xl"></div>
-        ))}
-      </div>
-    </div>
+    <ReportProcessingState attemptId={attemptId} status={processingStatus} />
   );
 
   if (error) return (
@@ -118,15 +223,64 @@ export default function ReportsPage() {
       setTimeout(() => {
         document.getElementById('solution-review')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load detailed review.");
     } finally {
       setLoadingReview(false);
     }
   };
 
-  const behavior = report.behavioral_analysis || {};
-  const telemetry = report.telemetry_summary || {};
+  const handleExportReport = () => {
+    const lines = [
+      'UPSC Command - Forensic Attempt Report',
+      `Attempt: ${attemptId ?? report.attemptId ?? 'unknown'}`,
+      `Truth Status: ${report.truth_status ?? 'UNKNOWN'}`,
+      `Processing Status: ${report.processingStatus ?? report.processing_status ?? 'UNKNOWN'}`,
+      `Reliability: ${report.reliability_score ?? 0}`,
+      `Final Score: ${report.totalScore.toFixed(2)}`,
+      `Accuracy: ${report.accuracy.toFixed(2)}%`,
+      `Correct: ${report.correctCount}`,
+      `Incorrect: ${report.incorrectCount}`,
+      `Skipped: ${report.unattemptedCount}`,
+      `Total Questions: ${report.totalQuestions}`,
+      `Generated At: ${report.generatedAt ?? new Date().toISOString()}`,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mcq-report-attempt-${attemptId ?? report.attemptId ?? 'unknown'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const behavior = asReportRecord(report.behavioral_analysis);
+  const telemetry = asReportRecord(report.telemetry_summary);
+  const behavioralDataQuality = asReportRecord(behavior.behavioral_data_quality);
+  const focusInterruptions = Array.isArray(telemetry.focus_interruptions)
+    ? telemetry.focus_interruptions
+    : [];
+  const questionSequence = Array.isArray(telemetry.question_sequence)
+    ? telemetry.question_sequence
+    : [];
+  const behavioralSignals = Array.isArray(behavior.signals)
+    ? behavior.signals as Array<{ name?: string }>
+    : [];
+  const behavioralTotalQuestions = asNumber(behavior.total_questions, report.totalQuestions);
+  const behavioralAttemptedCount = asNumber(behavior.attempted_count, report.correctCount + report.incorrectCount);
+  const behavioralSkippedCount = asNumber(behavior.skipped_count, report.unattemptedCount);
+  const overconfidenceRate = asNumber(behavior.overconfidence_rate);
+  const calibrationScore = asNumber(behavior.calibration_score);
+  const evolutionAccuracyDelta = asNumber(evolution?.accuracy_delta, 12);
+  const behavioralReliability = Number(behavioralDataQuality.score);
+  const reportReliability = Number(report.reliability_score);
+  const reliabilityPercent = Number.isFinite(behavioralReliability)
+    ? Math.round(behavioralReliability * 100)
+    : Number.isFinite(reportReliability)
+      ? Math.round(reportReliability)
+      : 0;
 
   // Forensic Segmentation (Phase 5)
   const segments = {
@@ -203,7 +357,7 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="pt-20 opacity-20">
-          <p className="text-xs font-black tracking-tighter">MCQ INTELLIGENCE PORTAL // COGNITIVE_ENGINE_v4.0 // CONFIDENTIAL</p>
+          <p className="text-xs font-black tracking-tighter">UPSC COMMAND // COGNITIVE_ENGINE_v4.0 // CONFIDENTIAL</p>
         </div>
       </div>
 
@@ -237,7 +391,7 @@ export default function ReportsPage() {
             <Activity className="w-4 h-4" />
             Raw Audit
           </Button>
-          <Button variant="outline" onClick={() => window.print()} className="rounded-xl gap-2 h-10 px-5 font-bold border-zinc-200 dark:border-zinc-800">
+          <Button variant="outline" onClick={handleExportReport} className="rounded-xl gap-2 h-10 px-5 font-bold border-zinc-200 dark:border-zinc-800">
             <Download className="w-4 h-4" />
             Export
           </Button>
@@ -254,15 +408,15 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
               <p className="opacity-40 mb-1">TOTAL_QUESTIONS</p>
-              <p className="text-xl font-black">{report.behavioral_analysis?.total_questions || report.totalQuestions}</p>
+              <p className="text-xl font-black">{behavioralTotalQuestions}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">ATTEMPTED_COUNT</p>
-              <p className="text-xl font-black">{report.behavioral_analysis?.attempted_count || (report.correctCount + report.incorrectCount)}</p>
+              <p className="text-xl font-black">{behavioralAttemptedCount}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">SKIPPED_COUNT</p>
-              <p className="text-xl font-black">{report.behavioral_analysis?.skipped_count || report.unattemptedCount}</p>
+              <p className="text-xl font-black">{behavioralSkippedCount}</p>
             </div>
             <div>
               <p className="opacity-40 mb-1">ACCURACY_FORMULA</p>
@@ -276,7 +430,7 @@ export default function ReportsPage() {
       )}
 
       {/* PANIC COACHING BANNER (Priority 2) */}
-      {behavior.signals?.find((s: any) => s.name === "ANXIETY_PATTERN") && (
+          {behavioralSignals.find((signal) => signal.name === "ANXIETY_PATTERN") && (
         <div className="p-8 rounded-[2.5rem] bg-indigo-50 dark:bg-indigo-950/20 border-2 border-indigo-200 dark:border-indigo-900 animate-in slide-in-from-top-4 duration-700">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shrink-0">
@@ -307,7 +461,7 @@ export default function ReportsPage() {
             <TrendingUp className="w-4 h-4 text-white" />
           </div>
           <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
-            Recovery Detected: Accuracy improved by <span className="text-lg font-black">+{evolution.accuracy_delta || 12}%</span> compared to your previous baseline.
+            Recovery Detected: Accuracy improved by <span className="text-lg font-black">+{evolutionAccuracyDelta}%</span> compared to your previous baseline.
           </p>
         </div>
       )}
@@ -318,7 +472,7 @@ export default function ReportsPage() {
           { label: 'Incorrect', value: report.incorrectCount, icon: XCircle, color: 'text-rose-500' },
           { label: 'Skipped', value: report.unattemptedCount, icon: HelpCircle, color: 'text-zinc-400' },
           { label: 'Accuracy', value: `${report.accuracy.toFixed(1)}%`, icon: Target, color: 'text-blue-500' },
-          { label: 'Total Time', value: `${Math.floor((report as any).totalTime / 60)}m`, icon: Timer, color: 'text-zinc-500' },
+          { label: 'Total Time', value: `${Math.floor(report.totalTime / 60)}m`, icon: Timer, color: 'text-zinc-500' },
           { label: 'Avg Pacing', value: `${report.averageTimePerQuestion?.toFixed(0)}s`, icon: Zap, color: 'text-amber-500' },
         ].map((stat, i) => (
           <div key={i} className="p-6 rounded-[2rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3">
@@ -355,7 +509,7 @@ export default function ReportsPage() {
               </div>
               <div className="flex flex-col items-end">
                 <Badge variant="outline" className="border-white/20 dark:border-zinc-300 text-white dark:text-zinc-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {(behavior.behavioral_data_quality?.score * 100).toFixed(0)}% Reliability
+                  {reliabilityPercent}% Reliability
                 </Badge>
                 <p className="text-[8px] font-bold opacity-40 mt-1 uppercase tracking-tighter">Inference_Engine_v4.0</p>
               </div>
@@ -380,7 +534,7 @@ export default function ReportsPage() {
                 <div className="space-y-1">
                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 text-rose-400">03 / Strategic Risk</p>
                    <p className="text-xl font-bold leading-relaxed text-rose-200 dark:text-rose-600">
-                     {behavior.overconfidence_rate > 15 ? "Calibration Gap detected in complex topics." : "Strategic volatility remains low."}
+                     {overconfidenceRate > 15 ? "Calibration Gap detected in complex topics." : "Strategic volatility remains low."}
                    </p>
                 </div>
                 <div className="pt-6">
@@ -409,24 +563,24 @@ export default function ReportsPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Calibration Stability</span>
-                <span className="text-sm font-black">{(behavior.calibration_score || 0 * 100).toFixed(0)}%</span>
+                <span className="text-sm font-black">{(calibrationScore * 100).toFixed(0)}%</span>
               </div>
               <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${behavior.calibration_score * 100}%` }}></div>
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${calibrationScore * 100}%` }}></div>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Focus Integrity</span>
-                <span className="text-sm font-black">{(100 - (telemetry.focus_interruptions?.length || 0) * 10)}%</span>
+                <span className="text-sm font-black">{(100 - focusInterruptions.length * 10)}%</span>
               </div>
               <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${100 - (telemetry.focus_interruptions?.length || 0) * 10}%` }}></div>
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${100 - focusInterruptions.length * 10}%` }}></div>
               </div>
             </div>
             <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800">
                <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic">
-                 "Our intelligence is derived from {telemetry.question_sequence?.length || 0} discrete behavioral markers observed during your {Math.floor((report.totalTime || 0) / 60)}m session."
+                 Our intelligence is derived from {questionSequence.length} discrete behavioral markers observed during your {Math.floor((report.totalTime || 0) / 60)}m session.
                </p>
             </div>
           </div>
@@ -481,7 +635,7 @@ export default function ReportsPage() {
              </div>
              {expandedSections.includes('timeline') && (
                <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                 <BehavioralTimeline telemetry={telemetry} questions={reviewData} />
+                <BehavioralTimeline telemetry={telemetry} />
                </div>
              )}
           </div>
@@ -518,15 +672,15 @@ export default function ReportsPage() {
             <div className="grid md:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Avg Correct Time</p>
-                <p className="text-4xl font-black">{(reviewData.filter(q => q.is_correct).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.correctCount || 1)).toFixed(0)}s</p>
+                <p className="text-4xl font-black">{(reviewData.filter(q => q.is_correct).reduce((acc, curr) => acc + asNumber(curr.time_taken_seconds), 0) / (report.correctCount || 1)).toFixed(0)}s</p>
               </div>
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Avg Incorrect Time</p>
-                <p className="text-4xl font-black text-rose-400">{(reviewData.filter(q => !q.is_correct && q.selected_option !== null).reduce((acc, curr) => acc + curr.time_taken_seconds, 0) / (report.incorrectCount || 1)).toFixed(0)}s</p>
+                <p className="text-4xl font-black text-rose-400">{(reviewData.filter(q => !q.is_correct && q.selected_option !== null).reduce((acc, curr) => acc + asNumber(curr.time_taken_seconds), 0) / (report.incorrectCount || 1)).toFixed(0)}s</p>
               </div>
               <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Guess Risk Zone</p>
-                <p className="text-4xl font-black text-amber-400">{reviewData.filter(q => q.time_taken_seconds < 15 && !q.is_correct).length} Qs</p>
+                <p className="text-4xl font-black text-amber-400">{reviewData.filter(q => asNumber(q.time_taken_seconds) < 15 && !q.is_correct).length} Qs</p>
               </div>
             </div>
           </div>
@@ -593,11 +747,11 @@ export default function ReportsPage() {
               </h2>
             </div>
             <div className="space-y-6">
-              {Object.entries(report.topicWiseAnalysis || {}).map(([topic, data]: [string, any]) => (
+              {Object.entries(report.topicWiseAnalysis || {}).map(([topic, data]) => (
                 <div key={topic} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] gap-4">
                   <div className="space-y-1">
                     <p className="font-black text-lg">{topic}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total: {data.total} // Avg Time: {(data.time / data.total).toFixed(1)}s</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total: {data.total} / Avg Time: {(((data.time ?? 0) / data.total) || 0).toFixed(1)}s</p>
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="flex -space-x-1">
@@ -633,9 +787,9 @@ export default function ReportsPage() {
                 Subject Distribution
               </h2>
             </div>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={report.subjectScores}>
+            <StableChartFrame height={320}>
+              {({ width, height }) => (
+                <BarChart data={report.subjectScores} width={width} height={height}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{fill: '#71717a', fontSize: 10, fontWeight: 'bold'}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#71717a', fontSize: 10, fontWeight: 'bold'}} />
@@ -649,8 +803,8 @@ export default function ReportsPage() {
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+              )}
+            </StableChartFrame>
           </div>
         </div>
 
@@ -710,16 +864,16 @@ export default function ReportsPage() {
               <Zap className="w-6 h-6 text-yellow-500" />
               Calibration Matrix
             </h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={report.confidenceAnalytics} layout="vertical">
+            <StableChartFrame height={256}>
+              {({ width, height }) => (
+                <BarChart data={report.confidenceAnalytics} layout="vertical" width={width} height={height}>
                   <XAxis type="number" hide />
                   <YAxis dataKey="level" type="category" width={110} axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 'black', fill: '#71717a'}} />
                   <Tooltip cursor={{fill: '#f4f4f5'}} />
                   <Bar dataKey="accuracy" fill="#10b981" radius={[0, 12, 12, 0]} barSize={28} name="Accuracy %" />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+              )}
+            </StableChartFrame>
             <div className="mt-8 p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] border border-dashed border-zinc-200 dark:border-zinc-800">
               <p className="text-[10px] leading-relaxed text-muted-foreground font-bold text-center">
                 CALIBRATION_LOGIC: High accuracy at **100% SURE** indicates concept stability. Low accuracy at high confidence reveals **Cognitive Blind Spots**.

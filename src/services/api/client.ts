@@ -21,10 +21,12 @@ export const apiClient = axios.create({
 });
 
 import { auth } from '@/lib/firebase/config';
+const apiDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
 // Initialize debug object
 if (typeof window !== 'undefined') {
-  (window as any).MCQ_DEBUG = {
+  const debugWindow = window as Window & { MCQ_DEBUG?: Record<string, unknown> };
+  debugWindow.MCQ_DEBUG = {
     lastRequest: null,
     lastResponse: null,
     authState: 'INITIALIZING',
@@ -34,50 +36,13 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// Forensic Token Retrieval with Polling
-async function waitForToken(maxRetries = 50): Promise<string | null> {
-  // DEV BYPASS
-  if (typeof window !== 'undefined') {
-    const mockToken = (window as any).MOCK_TOKEN || localStorage.getItem("MOCK_TOKEN");
-    if (mockToken) {
-      console.log("[MCQ_DEBUG] Using MOCK_TOKEN bypass from " + ((window as any).MOCK_TOKEN ? "window" : "localStorage"));
-      return mockToken;
-    }
-  }
-  
-  console.log("[MCQ_DEBUG] Starting token retrieval polling...");
-  
-  for (let i = 0; i < maxRetries; i++) {
-    const user = auth?.currentUser;
-    
-    if (user) {
-      try {
-        const token = await user.getIdToken();
-        if (token) {
-          console.log(`[MCQ_DEBUG] Token acquired on attempt ${i + 1}. Length: ${token.length}`);
-          return token;
-        }
-      } catch (err) {
-        console.warn(`[MCQ_DEBUG] Token retrieval error on attempt ${i + 1}:`, err);
-      }
-    }
-    
-    if (i % 10 === 0 && i > 0) {
-      console.log(`[MCQ_DEBUG] Still waiting for token... (Attempt ${i}) User state: ${user ? 'exists' : 'null'}`);
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  console.error("[MCQ_DEBUG] Token retrieval timed out after 5 seconds.");
-  return null;
-}
+import { waitForToken, resolveToken } from '@/lib/auth/token-strategy';
 
 // Add the interceptor immediately upon creation
 // Request interceptor: Attach tokens
 apiClient.interceptors.request.use(
   async (config) => {
-    const debug = (window as any).MCQ_DEBUG;
+    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
     if (debug) {
       debug.lastRequest = {
         url: config.url,
@@ -104,8 +69,10 @@ apiClient.interceptors.request.use(
 
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log(`[MCQ_DEBUG] Request Authorized: ${config.url}`);
-        console.log(`[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer ${token.substring(0, 10)}...[len:${token.length}]`);
+        if (apiDebug) {
+          console.info(`[MCQ_DEBUG] Request Authorized: ${config.url}`);
+          console.info(`[MCQ_DEBUG] HEADER VERIFICATION | Authorization: Bearer ${token.substring(0, 10)}...[len:${token.length}]`);
+        }
       } else {
         console.error(`[MCQ_DEBUG] Request BLOCKED - No Token: ${config.url}`);
         // Optionally throw error to prevent request without token
@@ -126,19 +93,19 @@ apiClient.interceptors.request.use(
 // Response interceptor: Log and Retry
 apiClient.interceptors.response.use(
   (response) => {
-    const debug = (window as any).MCQ_DEBUG;
+    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
     if (debug) {
       debug.lastResponse = {
         status: response.status,
         data: response.data,
         headers: response.headers
       };
-      console.log(`[MCQ_DEBUG] Response 200: ${response.config.url}`, response.data);
+      if (apiDebug) console.info(`[MCQ_DEBUG] Response 200: ${response.config.url}`, response.data);
     }
     return response;
   },
   async (error) => {
-    const debug = (window as any).MCQ_DEBUG;
+    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
     const originalRequest = error.config;
 
     if (debug) {
@@ -148,22 +115,24 @@ apiClient.interceptors.response.use(
         message: error.message,
         stack: error.stack
       };
-      console.error(`[MCQ_DEBUG] API Error: ${originalRequest?.url}`, {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
+      if (apiDebug) {
+        console.error(`[MCQ_DEBUG] API Error: ${originalRequest?.url}`, {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+      }
     }
 
     if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
-      console.warn(`[MCQ_DEBUG] Triggering 401/403 retry for ${originalRequest.url}`);
+      if (apiDebug) console.warn(`[MCQ_DEBUG] Triggering 401/403 retry for ${originalRequest.url}`);
       originalRequest._retry = true;
       await new Promise(resolve => setTimeout(resolve, 800));
       try {
-        if (auth?.currentUser) {
-          const token = await auth.currentUser.getIdToken(true);
+        const token = await resolveToken(true);
+        if (token) {
           originalRequest.headers.Authorization = `Bearer ${token}`;
-          console.log("[MCQ_DEBUG] Retrying with fresh token...");
+          if (apiDebug) console.info("[MCQ_DEBUG] Retrying with fresh token...");
           return apiClient(originalRequest);
         }
       } catch (retryError) {

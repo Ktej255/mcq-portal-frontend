@@ -3,9 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, History, BarChart3, Settings, BookOpen, Database, ShieldAlert, UploadCloud } from 'lucide-react';
+import { LayoutDashboard, FileText, History, BarChart3, Settings, Database, ShieldAlert, UploadCloud, GraduationCap, CalendarCheck } from 'lucide-react';
 
 const studentNavItems = [
+  { name: 'UPSC Portal', href: '/upsc', icon: GraduationCap },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Available Tests', href: '/tests', icon: FileText },
   { name: 'Revision Engine', href: '/revision', icon: RotateCcw },
@@ -15,6 +16,7 @@ const studentNavItems = [
 
 const adminNavItems = [
   { name: 'Admin Console', href: '/admin/dashboard', icon: LayoutDashboard },
+  { name: 'Launch Plan', href: '/admin/launch-plan', icon: CalendarCheck },
   { name: 'Institutional Health', href: '/admin/founder', icon: Activity },
   { name: 'Question Bank', href: '/admin/questions', icon: Database },
   { name: 'Bulk Upload', href: '/admin/questions/bulk', icon: UploadCloud },
@@ -53,9 +55,9 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
         <div className="h-24 flex items-center justify-between px-8">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-zinc-900 dark:bg-zinc-100 rounded-lg flex items-center justify-center">
-              <span className="text-white dark:text-zinc-900 font-black text-sm">A</span>
+              <span className="text-white dark:text-zinc-900 font-black text-sm">U</span>
             </div>
-            <h2 className="text-xl font-black tracking-tighter uppercase italic">Antigravity</h2>
+            <h2 className="text-xl font-black tracking-tighter uppercase italic">UPSC Command</h2>
           </div>
           <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={onClose}>
             <X className="w-5 h-5" />
@@ -67,7 +69,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
             <p className="px-4 mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">Navigation</p>
             <nav className="space-y-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link 
                     key={item.name} 
@@ -93,7 +95,15 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
           <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-[1.5rem] border border-zinc-100 dark:border-zinc-800">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
-                {user?.photoURL ? <img src={user.photoURL} alt="" /> : <span className="font-bold text-xs">{user?.displayName?.[0] || 'U'}</span>}
+                {user?.photoURL ? (
+                  <span
+                    aria-label="User avatar"
+                    className="h-full w-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${user.photoURL})` }}
+                  />
+                ) : (
+                  <span className="font-bold text-xs">{user?.displayName?.[0] || 'U'}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black truncate">{user?.displayName || 'Student'}</p>

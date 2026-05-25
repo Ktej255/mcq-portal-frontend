@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { observabilityService } from '@/services/api/observabilityService';
-import { Activity, RefreshCw, Filter, Search, Clock, Zap, Database, Server, AlertTriangle, CheckCircle2, Camera, Shield, User, FileText, Lock } from 'lucide-react';
+import { Activity, RefreshCw, Search, Clock, Zap, Database, Server, Camera, Shield, User, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TraceNode } from '@/components/admin/observability/TraceNode';
 import { GovernanceGraph } from '@/components/admin/observability/GovernanceGraph';

@@ -39,9 +39,15 @@ export interface Question {
   content_date?: string;
   is_outdated: boolean;
   question_number?: number;
-  quality_notes?: any;
+  quality_notes?: Record<string, unknown> | string | null;
   created_at: string;
 }
+
+export type CreateTestPayload = Omit<Test, 'id'>;
+export type QuestionPayload = Pick<Question, 'test_id' | 'topic_id' | 'text_en' | 'options_en' | 'correct_option' | 'difficulty'> &
+  Partial<Pick<Question, 'text_hi' | 'options_hi' | 'explanation_en' | 'explanation_hi' | 'status' | 'reviewer_id' | 'explanation_quality_score' | 'bilingual_alignment_score' | 'is_current_affairs' | 'content_date' | 'question_number' | 'quality_notes'>> & {
+  source?: string;
+};
 
 export const adminService = {
   // Subjects
@@ -69,7 +75,7 @@ export const adminService = {
     const response = await apiClient.get('admin/tests');
     return response.data?.data || [];
   },
-  createTest: async (data: any) => {
+  createTest: async (data: CreateTestPayload) => {
     const response = await apiClient.post('admin/tests', data);
     return response.data?.data;
   },
@@ -84,11 +90,11 @@ export const adminService = {
     const response = await apiClient.get(`admin/questions?${params.toString()}`);
     return response.data; // Return full PaginatedResponse
   },
-  createQuestion: async (data: any) => {
+  createQuestion: async (data: QuestionPayload) => {
     const response = await apiClient.post('admin/questions', data);
     return response.data?.data;
   },
-  updateQuestion: async (id: number, data: any) => {
+  updateQuestion: async (id: number, data: Partial<QuestionPayload>) => {
     const response = await apiClient.put(`admin/questions/${id}`, data);
     return response.data?.data;
   },
@@ -96,7 +102,7 @@ export const adminService = {
     const response = await apiClient.delete(`admin/questions/${id}`);
     return response.data?.data;
   },
-  bulkCreateQuestions: async (questions: any[]) => {
+  bulkCreateQuestions: async (questions: QuestionPayload[]) => {
     const response = await apiClient.post('admin/questions/bulk', { questions });
     return response.data?.data;
   },

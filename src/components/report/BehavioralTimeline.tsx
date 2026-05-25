@@ -2,18 +2,33 @@
 
 import React from 'react';
 import { 
-  Timer, Eye, CheckCircle, AlertTriangle, 
-  MousePointer2, Zap, Clock, Info, Activity
+  Eye, AlertTriangle, 
+  MousePointer2, Zap, Clock, Activity
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
-interface BehavioralTimelineProps {
-  telemetry: any;
-  questions: any[];
+interface TimelineEvent {
+  question_id: string | number;
+  timestamp: string;
 }
 
-export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetry, questions }) => {
+interface FocusInterruption {
+  type?: string;
+  timestamp: string;
+}
+
+interface BehavioralTelemetry {
+  question_sequence?: TimelineEvent[];
+  answer_evolution?: Record<string, unknown[]>;
+  focus_interruptions?: FocusInterruption[];
+}
+
+interface BehavioralTimelineProps {
+  telemetry: BehavioralTelemetry | null;
+}
+
+export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetry }) => {
   if (!telemetry || !telemetry.question_sequence) {
     return (
       <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-700">
@@ -25,7 +40,6 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
   const sequence = telemetry.question_sequence;
   const evolutions = telemetry.answer_evolution || {};
   const interruptions = telemetry.focus_interruptions || [];
-  const pacing = telemetry.pacing_shifts || [];
 
   return (
     <div className="space-y-10">
@@ -57,7 +71,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
           <TooltipProvider delay={0}>
             
             {/* FOCUS INTERRUPTION OVERLAYS */}
-            {interruptions.map((inter: any, idx: number) => {
+            {interruptions.map((inter: FocusInterruption, idx: number) => {
               return (
                 <div 
                   key={`inter-${idx}`}
@@ -73,7 +87,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
                     <TooltipContent className="bg-rose-600 text-white border-none rounded-2xl p-4 shadow-3xl min-w-[200px]">
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 border-b border-white/20 pb-1">Anomaly_Detected</h4>
                       <p className="font-bold text-lg">{inter.type === 'TAB_SWITCH' ? 'Tab Escape' : 'Window Blur'}</p>
-                      <p className="text-[10px] opacity-80 mt-1">"Focus integrity was interrupted at {new Date(inter.timestamp).toLocaleTimeString()}."</p>
+                      <p className="text-[10px] opacity-80 mt-1">Focus integrity was interrupted at {new Date(inter.timestamp).toLocaleTimeString()}.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -81,7 +95,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
             })}
 
             {/* QUESTION EVENTS */}
-            {sequence.map((event: any, idx: number) => {
+            {sequence.map((event: TimelineEvent, idx: number) => {
               const position = (idx / (sequence.length - 1)) * 100;
               const evos = evolutions[event.question_id] || [];
               const isChanged = evos.length > 1;
@@ -126,7 +140,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
                           )}
                         </div>
                         <p className="text-[9px] font-bold text-muted-foreground italic leading-relaxed pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                          "Telemetry confirms active cognitive engagement during this window."
+                          Telemetry confirms active cognitive engagement during this window.
                         </p>
                       </div>
                     </TooltipContent>
@@ -148,7 +162,7 @@ export const BehavioralTimeline: React.FC<BehavioralTimelineProps> = ({ telemetr
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Observation Points', value: sequence.length, icon: Activity, color: 'text-blue-500', desc: 'Linear sequence of question interactions' },
-          { label: 'Cognitive Friction', value: Object.values(evolutions).filter((e: any) => e.length > 1).length, icon: Zap, color: 'text-amber-500', desc: 'Frequency of answer uncertainty and revision' },
+          { label: 'Cognitive Friction', value: Object.values(evolutions).filter((e) => Array.isArray(e) && e.length > 1).length, icon: Zap, color: 'text-amber-500', desc: 'Frequency of answer uncertainty and revision' },
           { label: 'Focus Anomalies', value: interruptions.length, icon: AlertTriangle, color: 'text-rose-500', desc: 'Detection of tab switching or window blur' },
         ].map((metric, i) => (
           <div key={i} className="p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 hover:shadow-xl transition-all">

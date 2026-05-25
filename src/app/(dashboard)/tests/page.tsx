@@ -36,8 +36,12 @@ export default function TestsPage() {
     if (authLoading) return;
 
     let cancelled = false;
-    setBatchLoading(true);
-    setFetchError(null);
+    window.setTimeout(() => {
+      if (!cancelled) {
+        setBatchLoading(true);
+        setFetchError(null);
+      }
+    }, 0);
 
     examService.getAvailableTests()
       .then((data) => {
@@ -70,8 +74,9 @@ export default function TestsPage() {
     try {
       const attempt = await examService.startAttempt(testId);
       router.push(`/exam/${testId}?attemptId=${attempt.attemptId}`);
-    } catch (err: any) {
-      setFetchError(err?.message ?? "Could not start test.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not start test.";
+      setFetchError(message);
     }
   };
 
@@ -147,7 +152,7 @@ export default function TestsPage() {
               filteredTests.map((test, i) => {
                 const done    = test.lastAttemptStatus === "SUBMITTED";
                 const inprog  = test.lastAttemptStatus === "IN_PROGRESS";
-                const empty   = test.totalQuestions === 0;
+                const empty   = test.canStart === false || (test.totalQuestions ?? 0) === 0;
 
                 return (
                   <motion.div
@@ -174,7 +179,7 @@ export default function TestsPage() {
                           : inprog ? <Clock className="w-5 h-5" />
                           : <Circle className={cn("w-5 h-5", empty && "opacity-25")} />}
                       </div>
-                      {!empty && test.attemptCount > 0 && (
+                      {!empty && (test.attemptCount ?? 0) > 0 && (
                         <div className="text-right">
                           <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 block">Attempts</span>
                           <span className="text-lg font-black text-zinc-900 dark:text-white">{test.attemptCount}</span>

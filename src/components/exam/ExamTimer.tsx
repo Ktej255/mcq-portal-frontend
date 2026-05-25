@@ -21,7 +21,7 @@ export function ExamTimer({ testId, initialTimeSeconds, onTimeUp }: ExamTimerPro
     }
     // Always ensure it is running if we are mounted
     startTimer();
-  }, [testId, initialTimeSeconds, storeTestId, resetTimer, startTimer]);
+  }, [testId, initialTimeSeconds, storeTestId, timeLeft, resetTimer, startTimer]);
 
   useEffect(() => {
     if (isRunning && timeLeft > 0) {

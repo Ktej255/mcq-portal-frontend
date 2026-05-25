@@ -3,7 +3,6 @@
 import React from 'react';
 import { useLanguageStore, LanguageMode } from '@/lib/store/useLanguageStore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 
 export function LanguageSwitcher() {

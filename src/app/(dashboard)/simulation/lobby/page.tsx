@@ -8,7 +8,6 @@ import {
   Timer, 
   ZapOff, 
   AlertTriangle,
-  ChevronRight,
   Target
 } from 'lucide-react';
 
@@ -60,7 +59,7 @@ export default function SimulationLobby() {
               <Target className="w-5 h-5 text-indigo-400" />
             </div>
             <p className="text-sm text-zinc-300 font-medium italic">
-              "Temperament is the silent differentiator in the final 10 minutes of the exam."
+              &quot;Temperament is the silent differentiator in the final 10 minutes of the exam.&quot;
             </p>
           </div>
 

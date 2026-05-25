@@ -26,16 +26,18 @@ export const ReportIntegrityGuard: React.FC<ReportIntegrityGuardProps> = ({
         const lastLoaded = localStorage.getItem(`report_sync_${reportId}`);
         if (lastLoaded && lastLoaded !== serverTimestamp) {
             const msg = "STALE_REPORT_DETECTED: Local cache mismatch with server truth.";
-            setError(msg);
-            onIntegrityFailure?.(msg);
+            window.setTimeout(() => {
+                setError(msg);
+                onIntegrityFailure?.(msg);
+            }, 0);
             return;
         }
 
         // 2. Hydration Verification
         // If the report rendering takes too long or displays inconsistent values, we flag it.
         localStorage.setItem(`report_sync_${reportId}`, serverTimestamp);
-        setIsVerified(true);
-    }, [reportId, serverTimestamp]);
+        window.setTimeout(() => setIsVerified(true), 0);
+    }, [reportId, serverTimestamp, onIntegrityFailure]);
 
     if (error) {
         return (
@@ -60,7 +62,7 @@ export const ReportIntegrityGuard: React.FC<ReportIntegrityGuardProps> = ({
     return (
         <div className="relative">
             <div className="absolute -top-3 -right-3">
-                <ShieldCheck className="text-emerald-500 w-6 h-6" title="Forensically Verified" />
+                <ShieldCheck className="text-emerald-500 w-6 h-6" />
             </div>
             {children}
         </div>

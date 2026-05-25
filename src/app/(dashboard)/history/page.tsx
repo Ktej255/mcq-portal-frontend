@@ -12,7 +12,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<any | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
 
