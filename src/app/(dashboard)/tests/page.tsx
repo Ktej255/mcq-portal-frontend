@@ -7,26 +7,62 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import {
   CheckCircle2, Circle, Clock, PlayCircle, RotateCcw,
-  Leaf, Scale, Library, Beaker, TrendingUp, Globe, RefreshCw
+  Leaf, Scale, Library, Beaker, TrendingUp, Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ── Static subject list — always visible immediately ──────────
 const SUBJECTS = [
+  { name: "Geography",   icon: Globe },
   { name: "Environment", icon: Leaf },
   { name: "Polity",      icon: Scale },
   { name: "History",     icon: Library },
   { name: "Science",     icon: Beaker },
   { name: "Economy",     icon: TrendingUp },
-  { name: "Geography",   icon: Globe },
 ];
+
+const fallbackTests: TestMetadata[] = [
+  {
+    id: "local-geography-mcq",
+    title: "Geography Fresh Practice",
+    description: "Start from the Geography MCQ readiness room for the current class day.",
+    durationMinutes: 30,
+    totalQuestions: 25,
+    canStart: true,
+    subject: "Geography",
+  },
+  {
+    id: "local-geography-review",
+    title: "Geography Revision Practice",
+    description: "Recover weak concepts before the next class.",
+    durationMinutes: 20,
+    totalQuestions: 12,
+    canStart: true,
+    subject: "Geography",
+  },
+  {
+    id: "local-environment-mcq",
+    title: "Environment Practice Setup",
+    description: "Environment is structured and ready for fresh MCQ batches.",
+    durationMinutes: 30,
+    totalQuestions: 25,
+    canStart: true,
+    subject: "Environment",
+  },
+];
+
+const fallbackRoutes: Record<string, string> = {
+  "local-geography-mcq": "/upsc/geography/mcq-readiness",
+  "local-geography-review": "/upsc/geography/revisit",
+  "local-environment-mcq": "/upsc/environment/mcq-readiness",
+};
 
 export default function TestsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
-  const [activeSubject, setActiveSubject] = useState("Environment");
+  const [activeSubject, setActiveSubject] = useState("Geography");
   const [allTests, setAllTests] = useState<TestMetadata[]>([]);
   const [batchLoading, setBatchLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -45,10 +81,13 @@ export default function TestsPage() {
 
     examService.getAvailableTests()
       .then((data) => {
-        if (!cancelled) setAllTests(Array.isArray(data) ? data : []);
+        if (!cancelled) setAllTests(Array.isArray(data) && data.length ? data : fallbackTests);
       })
-      .catch((err) => {
-        if (!cancelled) setFetchError(err?.message ?? "Failed to load batches.");
+      .catch(() => {
+        if (!cancelled) {
+          setAllTests(fallbackTests);
+          setFetchError(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setBatchLoading(false);
@@ -71,6 +110,12 @@ export default function TestsPage() {
     });
 
   const handleStart = async (testId: string) => {
+    const fallbackRoute = fallbackRoutes[testId];
+    if (fallbackRoute) {
+      router.push(fallbackRoute);
+      return;
+    }
+
     try {
       const attempt = await examService.startAttempt(testId);
       router.push(`/exam/${testId}?attemptId=${attempt.attemptId}`);
@@ -124,10 +169,10 @@ export default function TestsPage() {
 
       {/* ── Error banner ── */}
       {fetchError && (
-        <div className="mb-6 flex items-center justify-between gap-4 px-4 py-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-2xl">
-          <p className="text-sm text-red-600 dark:text-red-400">{fetchError}</p>
-          <Button size="sm" variant="outline" onClick={() => window.location.reload()} className="shrink-0 rounded-xl">
-            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-medium text-amber-800">Practice data is being refreshed. You can continue from the subject rooms.</p>
+          <Button size="sm" variant="outline" onClick={() => router.push("/upsc")} className="shrink-0 rounded-xl">
+            Open UPSC
           </Button>
         </div>
       )}

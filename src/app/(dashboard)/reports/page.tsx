@@ -6,7 +6,7 @@ import { LongitudinalGrowth } from "@/components/report/LongitudinalGrowth";
 import { AdaptiveRecommendations } from "@/components/report/AdaptiveRecommendations";
 import { 
   Trophy, Target, Timer, Zap, 
-  BrainCircuit, BarChart3, TrendingUp, AlertCircle,
+  BrainCircuit, BarChart3, TrendingUp,
   CheckCircle2, XCircle, HelpCircle,
   ShieldCheck, Activity, Search, Download,
   Lightbulb, ChevronRight, Clock, RefreshCw
@@ -150,6 +150,13 @@ export default function ReportsPage() {
   useFrictionTracker("REPORT_VIEW");
 
   useEffect(() => {
+    if (!attemptId) {
+      setReport(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     const fetchAllIntelligence = async () => {
       if (!isLoaded || !isSignedIn) return;
       
@@ -199,18 +206,25 @@ export default function ReportsPage() {
     <ReportProcessingState attemptId={attemptId} status={processingStatus} />
   );
 
-  if (error) return (
+  if (error || !report) return (
     <div className="max-w-7xl mx-auto space-y-8 p-4 md:p-8">
-      <div className="flex flex-col items-center justify-center p-12 bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 text-center">
-        <AlertCircle className="w-16 h-16 text-zinc-300 mb-6" />
-        <p className="text-zinc-900 dark:text-zinc-100 font-bold text-2xl mb-3">Verification Failed</p>
-        <p className="text-muted-foreground max-w-md mb-8">We encountered a problem while reconstructing your attempt. Please contact support.</p>
-        <Button onClick={() => window.location.reload()} size="lg" className="rounded-xl px-8 h-12 font-bold">Retry Sync</Button>
+      <div className="flex flex-col items-center justify-center rounded-3xl border border-zinc-200 bg-white p-12 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <BarChart3 className="mb-6 h-16 w-16 text-zinc-300" />
+        <p className="mb-3 text-2xl font-bold text-zinc-900 dark:text-zinc-100">Analytics will appear after your first practice.</p>
+        <p className="mb-8 max-w-md text-muted-foreground">
+          Complete one Geography MCQ session first. Your score, weak topics, and revision plan will show here automatically.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button onClick={() => router.push("/upsc/geography/mcq-readiness")} size="lg" className="h-12 rounded-xl px-8 font-bold">
+            Open MCQ Room
+          </Button>
+          <Button onClick={() => router.push("/upsc/geography")} size="lg" variant="outline" className="h-12 rounded-xl px-8 font-bold">
+            Open Geography
+          </Button>
+        </div>
       </div>
     </div>
   );
-
-  if (!report) return null;
 
   const handleFetchReview = async () => {
     if (!attemptId) return;

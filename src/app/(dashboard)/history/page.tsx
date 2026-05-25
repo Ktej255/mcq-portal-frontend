@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { dashboardService, HistoryItem } from "@/services/api/dashboardService";
 import { useRouter } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
-import { DebugPanel } from "@/components/shared/DebugPanel";
 
 export default function HistoryPage() {
   const router = useRouter();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown | null>(null);
 
   const { isLoaded, isSignedIn } = useApiConfig();
 
@@ -24,10 +22,9 @@ export default function HistoryPage() {
         setLoading(true);
         const data = await dashboardService.getHistory();
         setHistory(data);
-        setError(null);
       } catch (err) {
-        console.error("Failed to fetch history:", err);
-        setError(err); // Save full error object
+        console.info("History is not available yet; showing the first-attempt state.", err);
+        setHistory([]);
       } finally {
         setLoading(false);
       }
@@ -43,20 +40,28 @@ export default function HistoryPage() {
     </div>
   );
 
-  if (error) return (
-    <div className="space-y-8">
-      <div className="flex flex-col items-center justify-center p-8 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800/50 text-center">
-        <p className="text-red-600 dark:text-red-400 font-medium mb-4">Critical Error: History fetch failed.</p>
-        <Button onClick={() => window.location.reload()}>Retry Request</Button>
-      </div>
-      
-      <DebugPanel error={error} context="History API (/attempts/history)" />
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Attempt History</h1>
+      {history.length === 0 ? (
+        <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-zinc-400">No attempt yet</p>
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            Your test history will appear after your first MCQ practice.
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm font-medium leading-6 text-zinc-500">
+            For now, start from Geography. It keeps the class day, MCQ room, tracking and revision connected.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button onClick={() => router.push("/upsc/geography")} className="rounded-xl bg-zinc-900 px-5 font-bold text-white">
+              Open Geography
+            </Button>
+            <Button onClick={() => router.push("/upsc/geography/mcq-readiness")} variant="outline" className="rounded-xl px-5 font-bold">
+              Open MCQ Room
+            </Button>
+          </div>
+        </div>
+      ) : (
       
       <div className="bg-white dark:bg-zinc-900 border rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-left text-sm">
@@ -98,6 +103,7 @@ export default function HistoryPage() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
