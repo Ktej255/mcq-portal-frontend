@@ -13,7 +13,7 @@ const blockedText = [
 
 async function verifyRoute(page, path, expectedText) {
   await page.goto(`${baseUrl}${path}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(2500);
   const text = await page.locator("body").innerText();
   for (const blocked of blockedText) {
     if (text.includes(blocked)) {
