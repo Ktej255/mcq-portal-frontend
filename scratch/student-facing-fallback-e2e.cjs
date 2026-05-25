@@ -36,6 +36,21 @@ async function verifyRoute(page, path, expectedText) {
   return { path, ok: true };
 }
 
+async function verifyWatchToTalkFlow(page) {
+  await page.goto(`${baseUrl}/upsc/geography/watch?day=1`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.waitForTimeout(2500);
+  await page.getByTestId("watch-complete-and-discuss").click();
+  await page.waitForURL(/\/upsc\/geography\/talk\?day=1/, { timeout: 45000 });
+  await page.waitForTimeout(1500);
+  const text = await page.locator("body").innerText();
+  for (const expected of ["AI teacher", "STUDENT ANSWER"]) {
+    if (!text.includes(expected)) {
+      throw new Error(`/upsc/geography/watch -> talk flow did not contain expected text: ${expected}`);
+    }
+  }
+  return { path: "/upsc/geography/watch-to-talk", ok: true };
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -43,6 +58,8 @@ async function run() {
   checks.push(await verifyRoute(page, "/dashboard", "Earth as a System"));
   checks.push(await verifyRoute(page, "/upsc", "Earth as a System"));
   checks.push(await verifyRoute(page, "/upsc/geography", ["TODAY'S FUNNEL", "Day 30", "Geography Command Day"]));
+  checks.push(await verifyRoute(page, "/upsc/geography/watch?day=1", ["CLASS PLAYER", "Watch the lesson"]));
+  checks.push(await verifyWatchToTalkFlow(page));
   checks.push(await verifyRoute(page, "/tests", "Start with today's MCQ only"));
   checks.push(await verifyRoute(page, "/revision", "Your next revision is after practice"));
   checks.push(await verifyRoute(page, "/history", "Your path is just starting"));
