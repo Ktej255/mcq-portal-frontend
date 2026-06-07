@@ -34,6 +34,9 @@ export type StudentSubjectReport = {
   recoveryItems: number;
   commandDays: number;
   meTimeChecks: number;
+  teacherDoubtCount: number;
+  latestTeacherDoubtCategory: string | null;
+  latestTeacherDoubtAction: string | null;
   latestMeTimeMood: SubjectMeTimeMood | null;
   latestMeTimeResetPlan: string | null;
   readinessSignal: string;
@@ -51,6 +54,7 @@ export type UpscStudentReportSnapshot = {
     watchedDays: number;
     commandDays: number;
     recoveryItems: number;
+    teacherDoubtCount: number;
     meTimeChecks: number;
     currentAffairsUnlocked: number;
     weeklyWindowsGenerated: number;
@@ -117,6 +121,15 @@ function needsRecovery(progress?: StudentReportProgress) {
   );
 }
 
+function hasTeacherDoubt(progress?: StudentReportProgress) {
+  return Boolean(
+    progress?.teacherDoubtCategory &&
+      progress?.teacherDoubtReason &&
+      progress?.teacherDoubtRepairAction &&
+      progress?.teacherDoubtMasteryCheck
+  );
+}
+
 function hasCommand(progress?: StudentReportProgress) {
   return Boolean(
     !needsRecovery(progress) &&
@@ -124,6 +137,23 @@ function hasCommand(progress?: StudentReportProgress) {
         progress?.mcqOutcome === "Command" ||
         (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75))
   );
+}
+
+function latestTeacherDoubtSignal(states: Array<StudentReportProgress | undefined>) {
+  const completed = states
+    .filter((state): state is StudentReportProgress => hasTeacherDoubt(state) && !hasCommand(state))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.updatedAt ?? left.teacherDoubtMasteryCheck ?? "");
+      const rightTime = Date.parse(right.updatedAt ?? right.teacherDoubtMasteryCheck ?? "");
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    });
+  const latest = completed[0];
+
+  return {
+    teacherDoubtCount: completed.length,
+    latestTeacherDoubtCategory: latest?.teacherDoubtCategory ?? null,
+    latestTeacherDoubtAction: latest?.teacherDoubtRepairAction ?? null,
+  };
 }
 
 const meTimeMoodLabels: Record<SubjectMeTimeMood, string> = {
@@ -191,6 +221,7 @@ export function buildStudentSubjectReport(
   const commandDays = states.filter(hasCommand).length;
   const mcqSets = states.filter((state) => state?.mcqCompleted).length;
   const meTimeChecks = states.filter((state) => state?.meTimeCompletedAt).length;
+  const teacherDoubtSignal = latestTeacherDoubtSignal(states);
   const meTimeSignal = latestMeTimeSignal(states);
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
@@ -204,7 +235,9 @@ export function buildStudentSubjectReport(
           ? "Command forming"
           : "Evidence forming";
   const nextAction =
-    recoveryItems > 0
+    teacherDoubtSignal.teacherDoubtCount > 0 && teacherDoubtSignal.latestTeacherDoubtAction
+      ? teacherDoubtSignal.latestTeacherDoubtAction
+      : recoveryItems > 0
       ? "Clear the first recovery item before adding new load."
       : startedDays === 0
         ? "Start Day 1 to create the baseline report."
@@ -229,6 +262,7 @@ export function buildStudentSubjectReport(
     recoveryItems,
     commandDays,
     meTimeChecks,
+    ...teacherDoubtSignal,
     ...meTimeSignal,
     currentAffairsUnlocked: currentAffairsUnlocked(subject, progress),
     weeklyWindowsGenerated: weeklyWindowCount(subject),
@@ -252,6 +286,7 @@ export function buildUpscStudentReportSnapshot(
   const totalDays = subjects.reduce((sum, subject) => sum + subject.totalDays, 0);
   const startedDays = subjects.reduce((sum, subject) => sum + subject.startedDays, 0);
   const recoveryItems = subjects.reduce((sum, subject) => sum + subject.recoveryItems, 0);
+  const teacherDoubtCount = subjects.reduce((sum, subject) => sum + subject.teacherDoubtCount, 0);
   const startedSubjects = subjects.filter((subject) => subject.startedDays > 0);
   const strongestSubject =
     [...startedSubjects].sort(
@@ -274,6 +309,7 @@ export function buildUpscStudentReportSnapshot(
       watchedDays: subjects.reduce((sum, subject) => sum + subject.watchedDays, 0),
       commandDays: subjects.reduce((sum, subject) => sum + subject.commandDays, 0),
       recoveryItems,
+      teacherDoubtCount,
       meTimeChecks: subjects.reduce((sum, subject) => sum + subject.meTimeChecks, 0),
       currentAffairsUnlocked: subjects.reduce((sum, subject) => sum + subject.currentAffairsUnlocked, 0),
       weeklyWindowsGenerated: subjects.reduce((sum, subject) => sum + subject.weeklyWindowsGenerated, 0),
@@ -286,7 +322,9 @@ export function buildUpscStudentReportSnapshot(
         ? `${startedSubjects[0].title}: ${startedSubjects[0].startedDays}/${startedSubjects[0].totalDays} days started`
         : "No subject baseline yet",
       currentPosition:
-        recoveryItems > 0
+        teacherDoubtCount > 0
+          ? `${teacherDoubtCount} AI teacher gap${teacherDoubtCount === 1 ? "" : "s"} active`
+          : recoveryItems > 0
           ? `${recoveryItems} recovery item${recoveryItems === 1 ? "" : "s"} across subjects`
           : startedDays > 0
             ? `${startedDays}/${totalDays} planned days have evidence`

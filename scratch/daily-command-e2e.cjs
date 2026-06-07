@@ -82,6 +82,13 @@ async function seedMissionState(page) {
           confidence: "Shaky",
           reflection: "Monsoon logic needs one more map explanation.",
           revisitQueued: true,
+          talkScore: 72,
+          talkBand: "Practice",
+          talkNextRoute: "/upsc/geography/watch?day=3",
+          teacherDoubtCategory: "Applied proof",
+          teacherDoubtReason: "The answer knows monsoon words but does not prove the idea on the India map.",
+          teacherDoubtRepairAction: "Attach one monsoon map proof: Western Ghats windward side, rain shadow, or Bay branch path.",
+          teacherDoubtMasteryCheck: "Can the learner explain why one region receives rainfall while another stays dry?",
           updatedAt: new Date().toISOString(),
         },
       })
@@ -109,10 +116,12 @@ async function run() {
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Revisit queued", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
-  await page.getByTestId("daily-learning-gap").getByText("Repair Day 3 before moving ahead", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("daily-revision-signal").getByText("Due now", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("daily-today-task").getByText("Repair Day 3", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("daily-growth-signal").getByText("Growth begins", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-learning-gap").getByText("AI found Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-revision-signal").getByText("AI gap", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-today-task").getByText("Solve Day 3 Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-teacher-doubt-plan").getByText("Attach one monsoon map proof", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-teacher-doubt-plan").getByText("Can the learner explain why one region receives rainfall", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-growth-signal").getByText("Average recall 72", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-me-time-checkin").waitFor({ timeout: 15000 });
   await page.getByTestId("daily-me-time-tired").click();
   await page

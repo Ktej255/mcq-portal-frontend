@@ -201,6 +201,14 @@ function gapTone(tone: "good" | "repair" | "neutral") {
   return "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]";
 }
 
+function labelForDailyDoubt(href: string) {
+  if (href.includes("/watch")) return "Open repair class";
+  if (href.includes("/revisit")) return "Open revisit";
+  if (href.includes("/mcq-readiness")) return "Open MCQs";
+  if (href.includes("/lab")) return "Use visual support";
+  return "Repeat talk";
+}
+
 export function UpscDailyMissionControl() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [dailyState, setDailyState] = useState<DailyState>({ subjectSlug: "geography", day: 1, note: "" });
@@ -480,6 +488,41 @@ export function UpscDailyMissionControl() {
             </p>
           </article>
         </section>
+
+        {dailyPlanner.teacherDoubt ? (
+          <section
+            data-testid="daily-teacher-doubt-plan"
+            className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-5 text-[#5d3a05] shadow-sm md:p-6"
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9a6a16]">
+                  AI teacher gap
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                  Day {dailyPlanner.teacherDoubt.day}: {dailyPlanner.teacherDoubt.category}
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6">{dailyPlanner.teacherDoubt.reason}</p>
+              </div>
+              <Link
+                href={dailyPlanner.teacherDoubt.href}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                {labelForDailyDoubt(dailyPlanner.teacherDoubt.href)} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Repair action</p>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.repairAction}</p>
+              </div>
+              <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Mastery check</p>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.masteryCheck}</p>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section
           data-testid="daily-me-time-checkin"

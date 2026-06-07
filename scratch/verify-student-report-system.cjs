@@ -52,6 +52,10 @@ async function seedProfileAndProgress(page) {
             talkScore: 62,
             talkBand: "Revisit",
             revisitQueued: true,
+            teacherDoubtCategory: "Mechanism",
+            teacherDoubtReason: "The answer names location but misses the cause-effect chain.",
+            teacherDoubtRepairAction: "Build one because-chain for location, relief, rainfall, and consequence.",
+            teacherDoubtMasteryCheck: "Can the learner explain the sequence without skipping the middle cause?",
             meTimeCompletedAt: new Date().toISOString(),
             meTimeMood: "focused",
             updatedAt: new Date().toISOString(),
@@ -133,6 +137,9 @@ async function run() {
   const environmentCardText = await page
     .locator('[data-testid="upsc-subject-report-card"][data-subject-slug="environment"]')
     .innerText();
+  const geographyCardText = await page
+    .locator('[data-testid="upsc-subject-report-card"][data-subject-slug="geography"]')
+    .innerText();
 
   checks.push({
     label: "report-system-content",
@@ -140,6 +147,7 @@ async function run() {
     subjectCardCount,
     weeklyCount,
     allSubjectText,
+    geographyCardText,
     environmentCardText,
     evidenceText,
     monthlyText,
@@ -157,8 +165,11 @@ async function run() {
     throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
   }
   const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
-  if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText)) {
+  if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText) || !/ai gaps\s+1/i.test(compactAllSubjectText)) {
     throw new Error(`All-subject report should count Geography and Environment evidence: ${allSubjectText}`);
+  }
+  if (!/latest ai gap:\s*mechanism/i.test(geographyCardText) || !/because-chain/i.test(geographyCardText)) {
+    throw new Error(`Geography report card missing AI teacher gap evidence: ${geographyCardText}`);
   }
   if (!/exam stress: grounding needed/i.test(environmentCardText) || !/covered news\s+1 hook/i.test(environmentCardText.replace(/\s+/g, " "))) {
     throw new Error(`Environment report card missing readiness or covered-news evidence: ${environmentCardText}`);

@@ -85,6 +85,7 @@ export default function ReportsPage() {
                 ["Started", `${allSubjectReport.totals.startedDays}/${allSubjectReport.totals.totalDays}`],
                 ["Weekly reports", allSubjectReport.totals.weeklyWindowsGenerated],
                 ["Recovery", allSubjectReport.totals.recoveryItems],
+                ["AI gaps", allSubjectReport.totals.teacherDoubtCount],
                 ["Recall", allSubjectReport.totals.averageRecall === null ? "Not measured" : `${allSubjectReport.totals.averageRecall}/100`],
                 ["MCQ", allSubjectReport.totals.averageMcq === null ? "No score" : `${allSubjectReport.totals.averageMcq}%`],
                 ["Me-time", allSubjectReport.totals.meTimeChecks],
@@ -115,11 +116,12 @@ export default function ReportsPage() {
                     {subject.monthlyVerdict}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {[
                     ["Start", `${subject.startedDays}/${subject.totalDays}`],
                     ["Cmd", subject.commandDays],
                     ["Fix", subject.recoveryItems],
+                    ["AI", subject.teacherDoubtCount],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md bg-[#f7f4ee] p-2">
                       <p className="text-sm font-black text-[#13251d]">{value}</p>
@@ -137,6 +139,14 @@ export default function ReportsPage() {
                     <p className="mt-1 text-xs font-black leading-4 text-[#13251d]">{subject.currentAffairsUnlocked} hook{subject.currentAffairsUnlocked === 1 ? "" : "s"}</p>
                   </div>
                 </div>
+                {subject.latestTeacherDoubtCategory && subject.latestTeacherDoubtAction ? (
+                  <div className="mt-3 rounded-md border border-[#ef9f27]/35 bg-[#fff8e8] p-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9a6a16]">
+                      Latest AI gap: {subject.latestTeacherDoubtCategory}
+                    </p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-[#5d3a05]">{subject.latestTeacherDoubtAction}</p>
+                  </div>
+                ) : null}
                 <p className="mt-3 text-xs font-semibold leading-5 text-[#49675e]">{subject.nextAction}</p>
               </Link>
             ))}

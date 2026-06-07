@@ -8,6 +8,14 @@ export type DailyPlannerProgress = SubjectDayProgress & {
 };
 
 export type DailyPlannerDecision = {
+  teacherDoubt: {
+    day: number;
+    category: string;
+    reason: string;
+    repairAction: string;
+    masteryCheck: string;
+    href: string;
+  } | null;
   learningGap: {
     title: string;
     detail: string;
@@ -107,7 +115,78 @@ function findRevisionDue(input: PlannerInput) {
     })[0];
 }
 
-function buildGap(input: PlannerInput, revisionDue: ReturnType<typeof findRevisionDue>): DailyPlannerDecision["learningGap"] {
+function hasTeacherDoubt(progress?: DailyPlannerProgress) {
+  return Boolean(
+    progress?.teacherDoubtCategory &&
+      progress?.teacherDoubtReason &&
+      progress?.teacherDoubtRepairAction &&
+      progress?.teacherDoubtMasteryCheck
+  );
+}
+
+function findTeacherDoubtDue(input: PlannerInput): DailyPlannerDecision["teacherDoubt"] {
+  const candidate = input.sessions
+    .map((session) => {
+      const progress = input.progress[String(session.day)];
+      if (!progress || !hasTeacherDoubt(progress) || hasCommand(progress)) return null;
+      if (session.day > input.selectedDay) return null;
+      const href =
+        progress.talkNextRoute ??
+        (progress.talkUnlockStage === "mcq"
+          ? routeFor(input.subjectSlug, "mcq-readiness", session.day)
+          : routeFor(input.subjectSlug, "talk", session.day));
+
+      return {
+        day: session.day,
+        progress,
+        category: progress.teacherDoubtCategory!,
+        reason: progress.teacherDoubtReason!,
+        repairAction: progress.teacherDoubtRepairAction!,
+        masteryCheck: progress.teacherDoubtMasteryCheck!,
+        href,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => {
+      const leftUrgent = needsRecovery(left.progress) || left.day === input.selectedDay ? 0 : 1;
+      const rightUrgent = needsRecovery(right.progress) || right.day === input.selectedDay ? 0 : 1;
+      return leftUrgent - rightUrgent || right.day - left.day;
+    })[0];
+
+  return candidate
+    ? {
+        day: candidate.day,
+        category: candidate.category,
+        reason: candidate.reason,
+        repairAction: candidate.repairAction,
+        masteryCheck: candidate.masteryCheck,
+        href: candidate.href,
+      }
+    : null;
+}
+
+function labelForDoubtHref(href: string) {
+  if (href.includes("/watch")) return "Open repair class";
+  if (href.includes("/revisit")) return "Open revisit";
+  if (href.includes("/mcq-readiness")) return "Open MCQs";
+  if (href.includes("/lab")) return "Use visual support";
+  return "Repeat talk";
+}
+
+function buildGap(
+  input: PlannerInput,
+  revisionDue: ReturnType<typeof findRevisionDue>,
+  teacherDoubt: DailyPlannerDecision["teacherDoubt"]
+): DailyPlannerDecision["learningGap"] {
+  if (teacherDoubt) {
+    return {
+      title: `AI found ${teacherDoubt.category} gap`,
+      detail: `Day ${teacherDoubt.day}: ${teacherDoubt.repairAction}`,
+      scoreLabel: "Teacher gap",
+      tone: "repair",
+    };
+  }
+
   const active = input.progress[String(input.selectedDay)];
   const previous = input.progress[String(input.selectedDay - 1)];
   const reference = revisionDue?.progress ?? previous ?? active;
@@ -162,8 +241,21 @@ function buildGap(input: PlannerInput, revisionDue: ReturnType<typeof findRevisi
   };
 }
 
-function buildTodayTask(input: PlannerInput, revisionDue: ReturnType<typeof findRevisionDue>): DailyPlannerDecision["todayTask"] {
+function buildTodayTask(
+  input: PlannerInput,
+  revisionDue: ReturnType<typeof findRevisionDue>,
+  teacherDoubt: DailyPlannerDecision["teacherDoubt"]
+): DailyPlannerDecision["todayTask"] {
   const active = input.progress[String(input.selectedDay)];
+
+  if (teacherDoubt) {
+    return {
+      title: `Solve Day ${teacherDoubt.day} ${teacherDoubt.category} gap`,
+      detail: teacherDoubt.masteryCheck,
+      href: teacherDoubt.href,
+      actionLabel: labelForDoubtHref(teacherDoubt.href),
+    };
+  }
 
   if (revisionDue && needsRecovery(revisionDue.progress)) {
     return {
@@ -257,27 +349,29 @@ function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
 
 export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDecision {
   const revisionDue = findRevisionDue(input);
+  const teacherDoubt = findTeacherDoubtDue(input);
   const fallbackRevisionDay = Math.min(input.selectedDay + 2, input.sessions.length);
   const fallbackRevision = findSession(input.sessions, fallbackRevisionDay);
 
   return {
-    learningGap: buildGap(input, revisionDue),
+    teacherDoubt,
+    learningGap: buildGap(input, revisionDue, teacherDoubt),
     revision: revisionDue
       ? {
-          title: `Revise Day ${revisionDue.source.day}`,
-          detail: `${revisionDue.source.title} is due before ${revisionDue.due.title}.`,
-          href: routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
-          dueLabel: needsRecovery(revisionDue.progress) ? "Due now" : `Day ${revisionDue.dueDay}`,
-          urgent: needsRecovery(revisionDue.progress),
+          title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Revise Day ${revisionDue.source.day}`,
+          detail: teacherDoubt ? teacherDoubt.masteryCheck : `${revisionDue.source.title} is due before ${revisionDue.due.title}.`,
+          href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
+          dueLabel: teacherDoubt ? "AI gap" : needsRecovery(revisionDue.progress) ? "Due now" : `Day ${revisionDue.dueDay}`,
+          urgent: Boolean(teacherDoubt) || needsRecovery(revisionDue.progress),
         }
       : {
-          title: `Next revision Day ${fallbackRevision.day}`,
-          detail: fallbackRevision.title,
-          href: routeFor(input.subjectSlug, "revisit", fallbackRevision.day),
-          dueLabel: `Day ${fallbackRevisionDay}`,
-          urgent: false,
+          title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Next revision Day ${fallbackRevision.day}`,
+          detail: teacherDoubt?.masteryCheck ?? fallbackRevision.title,
+          href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", fallbackRevision.day),
+          dueLabel: teacherDoubt ? "AI gap" : `Day ${fallbackRevisionDay}`,
+          urgent: Boolean(teacherDoubt),
         },
-    todayTask: buildTodayTask(input, revisionDue),
+    todayTask: buildTodayTask(input, revisionDue, teacherDoubt),
     growth: buildGrowth(input),
   };
 }
