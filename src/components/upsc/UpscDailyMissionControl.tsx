@@ -374,6 +374,79 @@ export function UpscDailyMissionControl() {
   return (
     <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f4ee] text-[#1b2f27]">
       <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        <section
+          data-testid="daily-command-student-focus"
+          data-visible-mode="single-action-planner-proof"
+          data-active-subject={activeSubject.slug}
+          data-active-day={activeSession.day}
+          data-next-action-href={dailyPlanner.sessionReadiness.href}
+          data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
+          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+          data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
+          data-learning-gap={dailyPlanner.learningGap.title}
+          data-revision-href={dailyPlanner.revision.href}
+          data-after-this-decision={dailyPlanner.nextSessionProof.decision}
+          data-after-this-route={dailyPlanner.tomorrowAdjustment.href}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Daily command</Badge>
+                <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                  {activeSubject.title} / Day {activeSession.day}
+                </span>
+                <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                  {dailyPlanner.sessionReadiness.scorePercent}% ready
+                </span>
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Do this now</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
+                {dailyPlanner.sessionReadiness.title}
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
+                {dailyPlanner.sessionReadiness.detail}
+              </p>
+              <div className="mt-4 grid gap-2 md:grid-cols-3">
+                {[
+                  ["Gap", dailyPlanner.learningGap.title],
+                  ["Revision", dailyPlanner.revision.dueLabel],
+                  ["After this", dailyPlanner.tomorrowAdjustment.statusLabel],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-xs font-black leading-5 text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <details
+                data-testid="daily-command-focus-proof"
+                className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3"
+              >
+                <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+                  Why this action?
+                </summary>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                  {dailyPlanner.nextSessionProof.evidenceSummary}
+                </p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                  After this: {dailyPlanner.tomorrowAdjustment.title}
+                </p>
+              </details>
+            </div>
+            <Link
+              href={dailyPlanner.sessionReadiness.href}
+              data-testid="daily-command-primary-action"
+              data-next-action-href={dailyPlanner.sessionReadiness.href}
+              data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
+              data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
+            >
+              {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+
         <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
             <Link href="/upsc" className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">

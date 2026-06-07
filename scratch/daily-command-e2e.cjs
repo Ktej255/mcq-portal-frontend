@@ -96,6 +96,59 @@ async function seedMissionState(page) {
   });
 }
 
+async function assertStudentFocus(page, expected, checks, label) {
+  await page.getByTestId("daily-command-student-focus").waitFor({ timeout: 15000 });
+  const focus = await page.getByTestId("daily-command-student-focus").evaluate((node) => ({
+    mode: node.getAttribute("data-visible-mode"),
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    nextActionHref: node.getAttribute("data-next-action-href"),
+    nextActionLabel: node.getAttribute("data-next-action-label"),
+    readinessStatus: node.getAttribute("data-readiness-status"),
+    readinessScore: node.getAttribute("data-readiness-score"),
+    learningGap: node.getAttribute("data-learning-gap"),
+    revisionHref: node.getAttribute("data-revision-href"),
+    afterThisDecision: node.getAttribute("data-after-this-decision"),
+    afterThisRoute: node.getAttribute("data-after-this-route"),
+    text: node.textContent || "",
+  }));
+  const primaryAction = await page.getByTestId("daily-command-primary-action").evaluate((node) => ({
+    href: node.getAttribute("href"),
+    nextActionHref: node.getAttribute("data-next-action-href"),
+    nextActionLabel: node.getAttribute("data-next-action-label"),
+    readiness: node.getAttribute("data-session-readiness"),
+    text: node.textContent || "",
+  }));
+  const focusProofOpen = await page.getByTestId("daily-command-focus-proof").evaluate((node) =>
+    node instanceof HTMLDetailsElement ? node.open : false
+  );
+  checks.push({ label, focus, primaryAction, focusProofOpen });
+
+  if (
+    focus.mode !== "single-action-planner-proof" ||
+    focus.subject !== expected.subject ||
+    focus.day !== expected.day ||
+    focus.nextActionHref !== expected.nextActionHref ||
+    focus.nextActionLabel !== expected.nextActionLabel ||
+    focus.readinessStatus !== expected.readinessStatus ||
+    focus.readinessScore !== expected.readinessScore ||
+    focus.afterThisDecision !== expected.afterThisDecision ||
+    focus.afterThisRoute !== expected.afterThisRoute ||
+    !focus.learningGap ||
+    !focus.revisionHref ||
+    !focus.text.includes("Do this now") ||
+    !focus.text.includes(expected.visibleText) ||
+    primaryAction.href !== expected.nextActionHref ||
+    primaryAction.nextActionHref !== expected.nextActionHref ||
+    primaryAction.nextActionLabel !== expected.nextActionLabel ||
+    primaryAction.readiness !== expected.readinessStatus ||
+    !primaryAction.text.includes(expected.nextActionLabel) ||
+    focusProofOpen
+  ) {
+    throw new Error(`${label}: student focus contract failed: ${JSON.stringify({ focus, primaryAction, focusProofOpen }, null, 2)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -126,6 +179,22 @@ async function run() {
     );
   }
   await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
+  await assertStudentFocus(
+    page,
+    {
+      subject: "geography",
+      day: "3",
+      nextActionHref: "/upsc/geography/watch?day=3",
+      nextActionLabel: "Open repair class",
+      readinessStatus: "Repair lock",
+      readinessScore: "40",
+      afterThisDecision: "Repair first",
+      afterThisRoute: "/upsc/geography/watch?day=3",
+      visibleText: "Repair Day 3 before new load",
+    },
+    checks,
+    "daily-command-focus-repair-lock"
+  );
   await page.getByText("Geography: Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Revisit queued", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -194,6 +263,22 @@ async function run() {
   if (repairReadinessAfterMeTime.status !== "Repair lock" || repairReadinessAfterMeTime.score !== "60") {
     throw new Error(`Unexpected repair readiness after me-time: ${JSON.stringify(repairReadinessAfterMeTime)}`);
   }
+  await assertStudentFocus(
+    page,
+    {
+      subject: "geography",
+      day: "3",
+      nextActionHref: "/upsc/geography/watch?day=3",
+      nextActionLabel: "Open repair class",
+      readinessStatus: "Repair lock",
+      readinessScore: "60",
+      afterThisDecision: "Repair first",
+      afterThisRoute: "/upsc/geography/watch?day=3",
+      visibleText: "Repair Day 3 before new load",
+    },
+    checks,
+    "daily-command-focus-after-me-time"
+  );
   const repairProofAfterMeTime = await page.getByTestId("daily-next-session-proof").evaluate((node) => ({
     decision: node.getAttribute("data-decision"),
     text: node.textContent || "",
@@ -237,6 +322,22 @@ async function run() {
   if (freshReadiness.status !== "Mind-state first" || freshReadiness.score !== "0" || freshReadiness.href !== "#daily-me-time-checkin") {
     throw new Error(`Unexpected fresh readiness: ${JSON.stringify(freshReadiness)}`);
   }
+  await assertStudentFocus(
+    page,
+    {
+      subject: "history",
+      day: "4",
+      nextActionHref: "#daily-me-time-checkin",
+      nextActionLabel: "Choose me-time",
+      readinessStatus: "Mind-state first",
+      readinessScore: "0",
+      afterThisDecision: "Same topic",
+      afterThisRoute: "/upsc/history/watch?day=4",
+      visibleText: "Save mind-state before starting",
+    },
+    checks,
+    "daily-command-focus-fresh-history"
+  );
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Keep Day 4 as the next start", { exact: false }).waitFor({ timeout: 15000 });
   const freshAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
     status: node.getAttribute("data-adjustment-status"),
