@@ -1,0 +1,153 @@
+export type CurrentAffairsBridgeItem = {
+  id: string;
+  subjectSlug: "geography";
+  linkedDay: number;
+  linkedTopic: string;
+  issueHook: string;
+  staticBridge: string;
+  prelimsUse: string;
+  mainsUse: string;
+  revisionPrompt: string;
+  sourceStatus: "daily-source-pending" | "ready-for-class";
+};
+
+export const geographyCurrentAffairsBridge: CurrentAffairsBridgeItem[] = [
+  {
+    id: "geo-day-02-space-earth-observation",
+    subjectSlug: "geography",
+    linkedDay: 2,
+    linkedTopic: "Earth, Universe, and Location",
+    issueHook: "Earth-observation satellites, mapping data, and disaster-monitoring updates.",
+    staticBridge: "Connect latitude, longitude, orbit, sensor coverage, and spatial resolution before reading the news item.",
+    prelimsUse: "Location, instrument, and application traps around remote sensing and GIS.",
+    mainsUse: "Use as evidence for governance, disaster preparedness, agriculture, and climate monitoring answers.",
+    revisionPrompt: "Explain why satellite imagery is useful only when location, scale, and time-series logic are understood.",
+    sourceStatus: "daily-source-pending",
+  },
+  {
+    id: "geo-day-05-monsoon-forecast",
+    subjectSlug: "geography",
+    linkedDay: 5,
+    linkedTopic: "Climatology",
+    issueHook: "Monsoon variability, heat waves, western disturbances, El Nino/La Nina, and seasonal forecasts.",
+    staticBridge: "Attach every update to pressure belts, jet streams, ITCZ movement, and local relief controls.",
+    prelimsUse: "Terminology traps around monsoon onset, withdrawal, rainfall distribution, and climate drivers.",
+    mainsUse: "Use for agriculture, water stress, urban heat, food inflation, and disaster-management answers.",
+    revisionPrompt: "State the static climate mechanism first, then add the current update as a consequence.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-06-ocean-warming",
+    subjectSlug: "geography",
+    linkedDay: 6,
+    linkedTopic: "Oceanography",
+    issueHook: "Marine heatwaves, cyclones, sea-level rise, coral bleaching, and coastal erosion updates.",
+    staticBridge: "Link the issue to currents, temperature, salinity, pressure, and coastal morphology.",
+    prelimsUse: "Map-based traps around seas, currents, coral locations, and cyclone basins.",
+    mainsUse: "Use for coastal governance, blue economy, climate adaptation, and disaster risk reduction.",
+    revisionPrompt: "Explain one ocean process and one human consequence without using notes.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-08-himalayan-risk",
+    subjectSlug: "geography",
+    linkedDay: 8,
+    linkedTopic: "India Relief and Physiography",
+    issueHook: "Himalayan infrastructure, landslides, subsidence, glacial hazards, and seismic vulnerability.",
+    staticBridge: "Read the update through young fold mountains, slope instability, drainage, and tectonic activity.",
+    prelimsUse: "Himalayan ranges, passes, river origins, and state-wise hazard-location traps.",
+    mainsUse: "Use for sustainable mountain development, carrying capacity, and disaster-management case studies.",
+    revisionPrompt: "Give one physical cause and one planning failure behind a Himalayan risk story.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-09-river-basin",
+    subjectSlug: "geography",
+    linkedDay: 9,
+    linkedTopic: "Drainage and River Systems",
+    issueHook: "Floods, river pollution, groundwater stress, dam operations, and inter-basin transfer debates.",
+    staticBridge: "Connect basin shape, slope, tributaries, rainfall regime, sediment, and human intervention.",
+    prelimsUse: "River-origin, tributary, state, wetland, and project-location traps.",
+    mainsUse: "Use for water governance, federalism, agriculture, urban flooding, and ecological flow arguments.",
+    revisionPrompt: "Describe how one river-basin feature changes flood or drought risk.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-12-soil-degradation",
+    subjectSlug: "geography",
+    linkedDay: 12,
+    linkedTopic: "Soils and Vegetation",
+    issueHook: "Soil degradation, desertification, forest-fire alerts, invasive species, and restoration programs.",
+    staticBridge: "Tie the update to soil type, rainfall, temperature, vegetation cover, slope, and land use.",
+    prelimsUse: "Soil-distribution, vegetation-zone, protected-area, and convention traps.",
+    mainsUse: "Use for agriculture productivity, ecosystem services, climate resilience, and land restoration.",
+    revisionPrompt: "Name the soil or vegetation base first, then explain the current pressure.",
+    sourceStatus: "daily-source-pending",
+  },
+  {
+    id: "geo-day-13-resource-location",
+    subjectSlug: "geography",
+    linkedDay: 13,
+    linkedTopic: "Resources and Agriculture",
+    issueHook: "Critical minerals, renewable-energy siting, crop-pattern shifts, irrigation stress, and food security.",
+    staticBridge: "Read every update through resource distribution, climate suitability, soil, market, and transport logic.",
+    prelimsUse: "Mineral belts, crop regions, scheme-location, and resource-map traps.",
+    mainsUse: "Use for agriculture reforms, energy transition, regional development, and climate adaptation.",
+    revisionPrompt: "Explain why a crop or mineral is concentrated in one region before adding the news angle.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-14-map-governance",
+    subjectSlug: "geography",
+    linkedDay: 14,
+    linkedTopic: "India Map Drill",
+    issueHook: "Places in news, border regions, strategic corridors, geospatial policy, and map-based governance.",
+    staticBridge: "Do not read the update without placing the site on the India map first.",
+    prelimsUse: "State, district, river, pass, coastline, island, and neighboring-country traps.",
+    mainsUse: "Use for security, infrastructure, regional planning, and disaster-response location proof.",
+    revisionPrompt: "Point to the location, name the neighboring physical feature, and then explain why it matters.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-18-transport-corridor",
+    subjectSlug: "geography",
+    linkedDay: 18,
+    linkedTopic: "Transport and Trade",
+    issueHook: "Ports, freight corridors, logistics parks, inland waterways, and regional trade routes.",
+    staticBridge: "Connect the update to hinterland, terrain, resource base, market access, and network effects.",
+    prelimsUse: "Port, corridor, waterway, state, and route-location traps.",
+    mainsUse: "Use for regional development, logistics efficiency, export competitiveness, and environment trade-offs.",
+    revisionPrompt: "Explain how terrain and market decide whether a corridor succeeds.",
+    sourceStatus: "daily-source-pending",
+  },
+  {
+    id: "geo-day-24-disaster-geography",
+    subjectSlug: "geography",
+    linkedDay: 24,
+    linkedTopic: "Disaster Geography Bridge",
+    issueHook: "Cyclones, floods, landslides, earthquakes, GLOFs, droughts, and early-warning updates.",
+    staticBridge: "Begin with hazard location, physical trigger, exposure, vulnerability, and capacity.",
+    prelimsUse: "Hazard-prone state, river, mountain, coastline, and warning-agency traps.",
+    mainsUse: "Use for risk reduction, preparedness, governance coordination, and climate adaptation.",
+    revisionPrompt: "Convert one disaster event into hazard, exposure, vulnerability, and response points.",
+    sourceStatus: "ready-for-class",
+  },
+  {
+    id: "geo-day-25-environment-bridge",
+    subjectSlug: "geography",
+    linkedDay: 25,
+    linkedTopic: "Environment Geography Bridge",
+    issueHook: "Protected areas, biodiversity hotspots, EIA debates, climate agreements, and conservation corridors.",
+    staticBridge: "Attach the update to ecosystem location, climate, relief, human pressure, and governance instrument.",
+    prelimsUse: "National park, sanctuary, convention, species, biome, and location traps.",
+    mainsUse: "Use for conservation, livelihood, ecological security, and sustainable-development answers.",
+    revisionPrompt: "Name the ecosystem first, then the governance instrument, then the current issue.",
+    sourceStatus: "ready-for-class",
+  },
+];
+
+export const currentAffairsBridgeSummary = {
+  subjectCount: 1,
+  geographyItems: geographyCurrentAffairsBridge.length,
+  readyForClass: geographyCurrentAffairsBridge.filter((item) => item.sourceStatus === "ready-for-class").length,
+};

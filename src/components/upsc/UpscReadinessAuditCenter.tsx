@@ -95,6 +95,7 @@ const globalModules = [
   { title: "Pricing Command", href: "/upsc/pricing", status: "Ready" },
   { title: "Optional Subject Command", href: "/upsc/optional-subjects", status: "Ready" },
   { title: "Syllabus and PYQ Library", href: "/upsc/source-library", status: "Ready" },
+  { title: "Covered-Topic Current Affairs", href: "/upsc/current-affairs", status: "Ready" },
   { title: "Content Command Center", href: "/upsc/content-command", status: "Ready" },
   { title: "MCQ Command Center", href: "/upsc/mcq-command", status: "Ready" },
   { title: "Revision Command Center", href: "/upsc/revision-command", status: "Ready" },

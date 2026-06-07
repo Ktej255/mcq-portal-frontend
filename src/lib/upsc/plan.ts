@@ -111,6 +111,13 @@ export const upscCalendar = [
     href: "/upsc/source-library",
   },
   {
+    window: "Current Affairs",
+    title: "Covered-Topic Current Affairs",
+    detail: "Subject news hooks unlock only after the linked static topic is covered by the student.",
+    status: "Structure ready",
+    href: "/upsc/current-affairs",
+  },
+  {
     window: "June",
     title: "Geography",
     detail: "First complete subject sprint with map-first learning.",

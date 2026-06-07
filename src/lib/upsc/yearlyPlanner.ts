@@ -212,8 +212,8 @@ export const productEngineFeatures: ProductEngineFeature[] = [
   },
   {
     title: "Covered-topic current affairs",
-    status: "planned",
-    ownerSurface: "Subject current affairs bridge",
+    status: "ready",
+    ownerSurface: "/upsc/current-affairs",
     studentOutcome: "Only current affairs attached to already-covered topics appear, reducing noise for beginners.",
   },
   {
