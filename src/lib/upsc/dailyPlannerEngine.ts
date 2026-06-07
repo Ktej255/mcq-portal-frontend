@@ -41,6 +41,20 @@ export type DailyPlannerDecision = {
     metricLabel: string;
     meTimeLabel: string;
   };
+  sessionReadiness: {
+    title: string;
+    detail: string;
+    href: string;
+    actionLabel: string;
+    statusLabel: string;
+    scorePercent: number;
+    tone: "good" | "repair" | "neutral";
+    checklist: Array<{
+      label: string;
+      detail: string;
+      status: "done" | "pending" | "repair";
+    }>;
+  };
   tomorrowAdjustment: {
     title: string;
     detail: string;
@@ -353,6 +367,159 @@ function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
   };
 }
 
+function hasRecallBaseline(progress?: DailyPlannerProgress) {
+  return Boolean(
+    progress?.baselineSavedAt ||
+      progress?.baselineKnowledge?.trim() ||
+      progress?.reflection?.trim() ||
+      typeof progress?.talkScore === "number"
+  );
+}
+
+function buildSessionReadiness(
+  input: PlannerInput,
+  teacherDoubt: DailyPlannerDecision["teacherDoubt"]
+): DailyPlannerDecision["sessionReadiness"] {
+  const active = input.progress[String(input.selectedDay)];
+  const meTimeReady = Boolean(active?.meTimeCompletedAt);
+  const recallReady = hasRecallBaseline(active);
+  const watchReady = Boolean(active?.watched);
+  const talkReady = typeof active?.talkScore === "number" && active.talkScore >= recallTarget;
+  const mcqReady = Boolean(active?.mcqCompleted && active.mcqOutcome !== "Pending");
+  const checklist: DailyPlannerDecision["sessionReadiness"]["checklist"] = [
+    {
+      label: "Mind-state",
+      detail: meTimeReady ? `Saved as ${active?.meTimeMood ?? "ready"}` : "Save me-time before opening the next action.",
+      status: meTimeReady ? "done" : "pending",
+    },
+    {
+      label: "Known points",
+      detail: recallReady ? "Recall baseline is attached to this day." : "Start by explaining what is already known.",
+      status: recallReady ? "done" : "pending",
+    },
+    {
+      label: "Class proof",
+      detail: watchReady ? "Focused class evidence is saved." : "Watch only after the readiness step is clear.",
+      status: watchReady ? "done" : "pending",
+    },
+    {
+      label: "AI discussion",
+      detail: talkReady ? `${active?.talkScore}/100 recall is command-ready.` : "Explain to the AI teacher before MCQs.",
+      status: talkReady ? "done" : active?.talkScore || active?.teacherDoubtCategory ? "repair" : "pending",
+    },
+    {
+      label: "Practice evidence",
+      detail: mcqReady ? `${active?.mcqScorePercent ?? 0}% MCQ evidence saved.` : "Fresh MCQ evidence is still pending.",
+      status: mcqReady ? "done" : active?.mcqOutcome === "Revisit" ? "repair" : "pending",
+    },
+  ];
+  const scorePercent = Math.round(
+    (checklist.filter((item) => item.status === "done").length / checklist.length) * 100
+  );
+
+  if (teacherDoubt) {
+    return {
+      title: `Repair Day ${teacherDoubt.day} before new load`,
+      detail: teacherDoubt.repairAction,
+      href: teacherDoubt.href,
+      actionLabel: labelForDoubtHref(teacherDoubt.href),
+      statusLabel: "Repair lock",
+      scorePercent,
+      tone: "repair",
+      checklist,
+    };
+  }
+
+  if (needsRecovery(active)) {
+    return {
+      title: `Recovery is active for Day ${input.selectedDay}`,
+      detail: "The next session should stay inside revisit until the weak signal is resolved.",
+      href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
+      actionLabel: "Open revisit",
+      statusLabel: "Recovery lock",
+      scorePercent,
+      tone: "repair",
+      checklist,
+    };
+  }
+
+  if (!meTimeReady) {
+    return {
+      title: "Save mind-state before starting",
+      detail: "One small check-in tells the system whether to run normal class, small-win mode, or a reduced-load loop.",
+      href: "#daily-me-time-checkin",
+      actionLabel: "Choose me-time",
+      statusLabel: "Mind-state first",
+      scorePercent,
+      tone: "neutral",
+      checklist,
+    };
+  }
+
+  if (!recallReady) {
+    return {
+      title: "Recall baseline is pending",
+      detail: "The student should first explain what is already known so the gap is measured before content opens.",
+      href: routeFor(input.subjectSlug, "talk", input.selectedDay),
+      actionLabel: "Start recall",
+      statusLabel: "Recall first",
+      scorePercent,
+      tone: "neutral",
+      checklist,
+    };
+  }
+
+  if (!watchReady) {
+    return {
+      title: "Class can start now",
+      detail: "Mind-state and known-points evidence exist. Open the focused lesson or repair class for this day.",
+      href: routeFor(input.subjectSlug, "watch", input.selectedDay),
+      actionLabel: "Open class",
+      statusLabel: "Class ready",
+      scorePercent,
+      tone: "good",
+      checklist,
+    };
+  }
+
+  if (!talkReady) {
+    return {
+      title: "Discussion is the next gate",
+      detail: "Class evidence exists. The next proof is a 95 percent recall explanation with the AI teacher.",
+      href: routeFor(input.subjectSlug, "talk", input.selectedDay),
+      actionLabel: "Open talk",
+      statusLabel: "Talk gate",
+      scorePercent,
+      tone: "neutral",
+      checklist,
+    };
+  }
+
+  if (!mcqReady) {
+    return {
+      title: "Fresh MCQ evidence is next",
+      detail: "Recall is strong enough. Complete the day-specific MCQ set before advancing.",
+      href: routeFor(input.subjectSlug, "mcq-readiness", input.selectedDay),
+      actionLabel: "Open MCQs",
+      statusLabel: "Practice ready",
+      scorePercent,
+      tone: "good",
+      checklist,
+    };
+  }
+
+  return {
+    title: "Session is command-ready",
+    detail: "Mind-state, recall, class proof, discussion, and practice evidence are all saved for this day.",
+    href: routeFor(input.subjectSlug, "track", input.selectedDay),
+    actionLabel: "Open track",
+    statusLabel: "Cleared",
+    scorePercent,
+    tone: "good",
+    checklist,
+  };
+}
+
 function buildTomorrowAdjustment(
   input: PlannerInput,
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
@@ -459,6 +626,7 @@ export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDeci
         },
     todayTask: buildTodayTask(input, revisionDue, teacherDoubt),
     growth: buildGrowth(input),
+    sessionReadiness: buildSessionReadiness(input, teacherDoubt),
     tomorrowAdjustment: buildTomorrowAdjustment(input, teacherDoubt),
   };
 }

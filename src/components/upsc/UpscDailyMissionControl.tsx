@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   CalendarDays,
   CheckCircle2,
+  Clock,
   ClipboardCheck,
   FileText,
   Gauge,
@@ -199,6 +200,18 @@ function gapTone(tone: "good" | "repair" | "neutral") {
   if (tone === "good") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
   if (tone === "repair") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
   return "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]";
+}
+
+function readinessTone(tone: "good" | "repair" | "neutral") {
+  if (tone === "good") return "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]";
+  if (tone === "repair") return "border-[#ef9f27]/60 bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]";
+}
+
+function checklistTone(status: "done" | "pending" | "repair") {
+  if (status === "done") return "border-[#b9d9cd] bg-white text-[#085041]";
+  if (status === "repair") return "border-[#ef9f27]/50 bg-white text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-white text-[#5d675f]";
 }
 
 function labelForDailyDoubt(href: string) {
@@ -489,6 +502,59 @@ export function UpscDailyMissionControl() {
           </article>
         </section>
 
+        <section
+          data-testid="daily-session-readiness"
+          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+          data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
+          className={cn("rounded-lg border p-5 shadow-sm md:p-6", readinessTone(dailyPlanner.sessionReadiness.tone))}
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-white/80">
+                  <ClipboardCheck className="h-5 w-5" />
+                </div>
+                <span className="rounded-md bg-white/80 px-2.5 py-1.5 text-xs font-black uppercase tracking-[0.12em]">
+                  {dailyPlanner.sessionReadiness.scorePercent}%
+                </span>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">
+                Before session readiness
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                {dailyPlanner.sessionReadiness.title}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">
+                {dailyPlanner.sessionReadiness.detail}
+              </p>
+              <Link
+                href={dailyPlanner.sessionReadiness.href}
+                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {dailyPlanner.sessionReadiness.checklist.map((item) => (
+                <div key={item.label} className={cn("min-h-28 rounded-md border p-3", checklistTone(item.status))}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                    {item.status === "done" ? (
+                      <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" />
+                    ) : item.status === "repair" ? (
+                      <RefreshCcw className="h-4 w-4 text-[#ef9f27]" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-[#8a8174]" />
+                    )}
+                  </div>
+                  <h3 className="text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                  <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <Link
           data-testid="daily-tomorrow-adjustment"
           data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
@@ -550,6 +616,7 @@ export function UpscDailyMissionControl() {
         ) : null}
 
         <section
+          id="daily-me-time-checkin"
           data-testid="daily-me-time-checkin"
           data-active-mood={activeProgress?.meTimeMood ?? "pending"}
           data-completed={activeProgress?.meTimeCompletedAt ? "true" : "false"}

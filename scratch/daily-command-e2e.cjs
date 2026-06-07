@@ -133,6 +133,17 @@ async function run() {
   await page.getByTestId("daily-learning-gap").getByText("AI found Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-revision-signal").getByText("AI gap", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-today-task").getByText("Solve Day 3 Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-session-readiness").getByText("Repair Day 3 before new load", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-session-readiness").getByText("Attach one monsoon map proof", { exact: false }).waitFor({ timeout: 15000 });
+  const repairReadiness = await page.getByTestId("daily-session-readiness").evaluate((node) => ({
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label: "daily-session-readiness-repair-lock", repairReadiness });
+  if (repairReadiness.status !== "Repair lock" || repairReadiness.score !== "40") {
+    throw new Error(`Unexpected repair readiness: ${JSON.stringify(repairReadiness)}`);
+  }
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Hold Day 3 for repair", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Tomorrow starts with the AI teacher's Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
   const repairAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
@@ -154,6 +165,15 @@ async function run() {
     .getByText("Me-time saved for Geography Day 3", { exact: false })
     .waitFor({ timeout: 15000 });
   await page.getByTestId("daily-growth-signal").getByText("Reset before class", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-session-readiness").getByText("Saved as tired", { exact: false }).waitFor({ timeout: 15000 });
+  const repairReadinessAfterMeTime = await page.getByTestId("daily-session-readiness").evaluate((node) => ({
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+  }));
+  checks.push({ label: "daily-session-readiness-after-me-time", repairReadinessAfterMeTime });
+  if (repairReadinessAfterMeTime.status !== "Repair lock" || repairReadinessAfterMeTime.score !== "60") {
+    throw new Error(`Unexpected repair readiness after me-time: ${JSON.stringify(repairReadinessAfterMeTime)}`);
+  }
   await page.getByRole("link", { name: /Watch/i }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "daily-command-desktop-geography", checks);
 
@@ -172,6 +192,19 @@ async function run() {
   await page.getByRole("button", { name: /December-January\s+History/i }).click();
   await page.getByRole("button", { name: /HIS-D04/i }).click();
   await page.getByText("History: Day 4", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-session-readiness").getByText("Save mind-state before starting", { exact: false }).waitFor({ timeout: 15000 });
+  const freshReadiness = await page.getByTestId("daily-session-readiness").evaluate((node) => {
+    const link = node.querySelector("a");
+    return {
+      status: node.getAttribute("data-readiness-status"),
+      score: node.getAttribute("data-readiness-score"),
+      href: link?.getAttribute("href"),
+    };
+  });
+  checks.push({ label: "daily-session-readiness-fresh-day", freshReadiness });
+  if (freshReadiness.status !== "Mind-state first" || freshReadiness.score !== "0" || freshReadiness.href !== "#daily-me-time-checkin") {
+    throw new Error(`Unexpected fresh readiness: ${JSON.stringify(freshReadiness)}`);
+  }
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Keep Day 4 as the next start", { exact: false }).waitFor({ timeout: 15000 });
   const freshAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
     status: node.getAttribute("data-adjustment-status"),
