@@ -489,6 +489,31 @@ export function UpscDailyMissionControl() {
           </article>
         </section>
 
+        <Link
+          data-testid="daily-tomorrow-adjustment"
+          data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
+          href={dailyPlanner.tomorrowAdjustment.href}
+          className="grid gap-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 text-[#085041] shadow-sm transition hover:-translate-y-0.5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-5"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
+            <CalendarDays className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+              Tomorrow auto-adjusts from today&apos;s evidence
+            </span>
+            <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#13251d]">
+              {dailyPlanner.tomorrowAdjustment.title}
+            </span>
+            <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#49675e]">
+              {dailyPlanner.tomorrowAdjustment.detail}
+            </span>
+          </span>
+          <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
+            {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
+
         {dailyPlanner.teacherDoubt ? (
           <section
             data-testid="daily-teacher-doubt-plan"

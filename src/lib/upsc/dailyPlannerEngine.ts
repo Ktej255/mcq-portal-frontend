@@ -41,6 +41,12 @@ export type DailyPlannerDecision = {
     metricLabel: string;
     meTimeLabel: string;
   };
+  tomorrowAdjustment: {
+    title: string;
+    detail: string;
+    href: string;
+    statusLabel: string;
+  };
 };
 
 type PlannerInput = {
@@ -347,6 +353,86 @@ function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
   };
 }
 
+function buildTomorrowAdjustment(
+  input: PlannerInput,
+  teacherDoubt: DailyPlannerDecision["teacherDoubt"]
+): DailyPlannerDecision["tomorrowAdjustment"] {
+  const active = input.progress[String(input.selectedDay)];
+  const currentSession = findSession(input.sessions, input.selectedDay);
+  const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
+  const nextSession = findSession(input.sessions, nextDay);
+
+  if (teacherDoubt) {
+    return {
+      title: `Hold Day ${teacherDoubt.day} for repair`,
+      detail: `Tomorrow starts with the AI teacher's ${teacherDoubt.category} gap before any new topic opens.`,
+      href: teacherDoubt.href,
+      statusLabel: "Repair first",
+    };
+  }
+
+  if (needsRecovery(active)) {
+    return {
+      title: `Repeat Day ${currentSession.day} before moving ahead`,
+      detail: `${currentSession.title} stays active because the latest evidence is still in recovery.`,
+      href: routeFor(input.subjectSlug, "revisit", currentSession.day),
+      statusLabel: "Recovery lock",
+    };
+  }
+
+  if (!active || !hasStarted(active) || !active.watched) {
+    return {
+      title: `Keep Day ${currentSession.day} as the next start`,
+      detail: "No completed class evidence is saved yet, so tomorrow should not jump to a new topic.",
+      href: routeFor(input.subjectSlug, "watch", currentSession.day),
+      statusLabel: "Same topic",
+    };
+  }
+
+  if (!active.reflection?.trim() || (typeof active.talkScore === "number" && active.talkScore < recallTarget)) {
+    return {
+      title: `Keep Day ${currentSession.day} in Talk`,
+      detail: "Recall evidence is incomplete or below 95 percent, so the next plan remains discussion-first.",
+      href: routeFor(input.subjectSlug, "talk", currentSession.day),
+      statusLabel: "Recall gap",
+    };
+  }
+
+  if (!active.mcqCompleted || active.mcqOutcome === "Pending") {
+    return {
+      title: `Attach Day ${currentSession.day} MCQs`,
+      detail: "Class and recall evidence exist, but practice evidence is still missing.",
+      href: routeFor(input.subjectSlug, "mcq-readiness", currentSession.day),
+      statusLabel: "Practice pending",
+    };
+  }
+
+  if (active.mcqOutcome === "Revisit") {
+    return {
+      title: `Repair Day ${currentSession.day} MCQ traps`,
+      detail: "Practice result needs a short recovery loop before the next topic can safely open.",
+      href: routeFor(input.subjectSlug, "revisit", currentSession.day),
+      statusLabel: "MCQ repair",
+    };
+  }
+
+  if (currentSession.day >= input.sessions.length) {
+    return {
+      title: "Move into final tracking",
+      detail: "The last planned day has command evidence, so tomorrow should consolidate the full subject.",
+      href: routeFor(input.subjectSlug, "track", currentSession.day),
+      statusLabel: "Subject closeout",
+    };
+  }
+
+  return {
+    title: `Advance to Day ${nextSession.day}`,
+    detail: `${nextSession.title} opens because today's watch, recall, and MCQ evidence are clear.`,
+    href: routeFor(input.subjectSlug, "watch", nextSession.day),
+    statusLabel: "Advance",
+  };
+}
+
 export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDecision {
   const revisionDue = findRevisionDue(input);
   const teacherDoubt = findTeacherDoubtDue(input);
@@ -373,5 +459,6 @@ export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDeci
         },
     todayTask: buildTodayTask(input, revisionDue, teacherDoubt),
     growth: buildGrowth(input),
+    tomorrowAdjustment: buildTomorrowAdjustment(input, teacherDoubt),
   };
 }

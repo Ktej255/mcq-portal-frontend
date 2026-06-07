@@ -2,6 +2,7 @@ const { chromium } = require("playwright");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "upsc-student-profile-v1";
+const modernProfileKey = "sarit-upsc-student-profile-v1";
 const studentToken = "MOCK_TOKEN_student_route_gate";
 const masterToken = "MOCK_TOKEN_MASTER_route_gate";
 const profile = {
@@ -13,11 +14,22 @@ const profile = {
   weakestSubject: "GEOGRAPHY",
   completedAt: new Date().toISOString(),
 };
+const modernProfile = {
+  level: "beginner",
+  preparationStage: "not-started",
+  studyWindow: "90",
+  learningStyle: "mixed",
+  weakSignal: "retention",
+  studyTime: "morning",
+  attemptHistory: "no-attempt",
+  learningPattern: "deep-work",
+  mindState: "calm",
+  updatedAt: new Date().toISOString(),
+};
 
 const operatorRoutes = [
   "/upsc/prelims-2026-audit",
   "/upsc/prelims-2026-audit-v2",
-  "/upsc/daily-command",
   "/upsc/content-command",
   "/upsc/mcq-command",
   "/upsc/readiness-audit",
@@ -32,12 +44,13 @@ const auditApiRoutes = ["/api/admin/prelims-audit-v1", "/api/admin/prelims-audit
 async function seed(page, token) {
   await page.goto(`${baseUrl}/login`);
   await page.evaluate(
-    ({ profileKey, profile, token }) => {
+    ({ profileKey, modernProfileKey, profile, modernProfile, token }) => {
       localStorage.clear();
       localStorage.setItem("MOCK_TOKEN", token);
       localStorage.setItem(profileKey, JSON.stringify(profile));
+      localStorage.setItem(modernProfileKey, JSON.stringify(modernProfile));
     },
-    { profileKey, profile, token },
+    { profileKey, modernProfileKey, profile, modernProfile, token },
   );
 }
 
@@ -91,6 +104,7 @@ async function expectApiStatus(page, route, token, expectedStatus) {
   for (const route of operatorRoutes) {
     await expectPath(page, route, "/dashboard");
   }
+  await expectAccessible(page, "/upsc/daily-command");
   await expectAccessible(page, "/upsc/geography/talk?day=1");
 
   await seed(page, masterToken);

@@ -10,7 +10,6 @@ const operatorRoutes = new Set([
   "/upsc/prelims-2026-audit",
   "/upsc/prelims-2026-audit-v2",
   "/upsc/readiness-audit",
-  "/upsc/daily-command",
   "/upsc/mcq-command",
   "/upsc/content-command",
   "/upsc/revision-command",
@@ -61,8 +60,8 @@ function classify(route) {
     return {
       access: "public",
       area: "Public entry",
-      expectedPath: route === "/login" ? "/dashboard" : route,
-      note: route === "/" ? "Marketing entry" : "Local preview host redirects to the student dashboard",
+      expectedPath: route,
+      note: route === "/" ? "Marketing entry" : "Local preview sign-in and student preview entry",
     };
   }
 
@@ -132,6 +131,7 @@ function classify(route) {
 const routes = walk(appRoot)
   .filter((filePath) => filePath.endsWith(`${path.sep}page.tsx`) || filePath.endsWith("/page.tsx"))
   .map(pageFileToRoute)
+  .map((route) => (route === "/upsc/optional-subjects/sample" ? "/upsc/optional-subjects/agriculture" : route))
   .sort((left, right) => left.localeCompare(right))
   .map((route) => ({ route, ...classify(route) }));
 

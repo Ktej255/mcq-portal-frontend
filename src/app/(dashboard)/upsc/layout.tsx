@@ -9,7 +9,6 @@ const operatorRoutes = new Set([
   "/upsc/prelims-2026-audit",
   "/upsc/prelims-2026-audit-v2",
   "/upsc/readiness-audit",
-  "/upsc/daily-command",
   "/upsc/mcq-command",
   "/upsc/content-command",
   "/upsc/revision-command",

@@ -112,6 +112,20 @@ async function run() {
   await seedMissionState(page);
 
   await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
+  const seededHeaderText = await page.locator("body").innerText({ timeout: 15000 });
+  checks.push({
+    label: "daily-command-student-route",
+    url: page.url(),
+    textSample: seededHeaderText.slice(0, 500),
+    storedDailyMission: await page.evaluate(() => window.localStorage.getItem("sarit-upsc-daily-command-v1")),
+  });
+  const dailyDashboardVisible = await page.getByTestId("daily-learning-dashboard").isVisible().catch(() => false);
+  if (!dailyDashboardVisible) {
+    throw new Error(
+      `Daily command dashboard did not render after seed: ${JSON.stringify(checks[checks.length - 1], null, 2)}`
+    );
+  }
+  await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
   await page.getByText("Geography: Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Revisit queued", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -119,6 +133,17 @@ async function run() {
   await page.getByTestId("daily-learning-gap").getByText("AI found Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-revision-signal").getByText("AI gap", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-today-task").getByText("Solve Day 3 Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-tomorrow-adjustment").getByText("Hold Day 3 for repair", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-tomorrow-adjustment").getByText("Tomorrow starts with the AI teacher's Applied proof gap", { exact: false }).waitFor({ timeout: 15000 });
+  const repairAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
+    status: node.getAttribute("data-adjustment-status"),
+    href: node.getAttribute("href"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label: "daily-tomorrow-repair-adjustment", repairAdjustment });
+  if (repairAdjustment.status !== "Repair first" || repairAdjustment.href !== "/upsc/geography/watch?day=3") {
+    throw new Error(`Unexpected repair adjustment: ${JSON.stringify(repairAdjustment)}`);
+  }
   await page.getByTestId("daily-teacher-doubt-plan").getByText("Attach one monsoon map proof", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-teacher-doubt-plan").getByText("Can the learner explain why one region receives rainfall", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-growth-signal").getByText("Average recall 72", { exact: false }).waitFor({ timeout: 15000 });
@@ -147,6 +172,15 @@ async function run() {
   await page.getByRole("button", { name: /December-January\s+History/i }).click();
   await page.getByRole("button", { name: /HIS-D04/i }).click();
   await page.getByText("History: Day 4", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-tomorrow-adjustment").getByText("Keep Day 4 as the next start", { exact: false }).waitFor({ timeout: 15000 });
+  const freshAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
+    status: node.getAttribute("data-adjustment-status"),
+    href: node.getAttribute("href"),
+  }));
+  checks.push({ label: "daily-tomorrow-fresh-adjustment", freshAdjustment });
+  if (freshAdjustment.status !== "Same topic" || freshAdjustment.href !== "/upsc/history/watch?day=4") {
+    throw new Error(`Unexpected fresh adjustment: ${JSON.stringify(freshAdjustment)}`);
+  }
   await page.getByPlaceholder("Write today's target, doubt, or class instruction here.").fill(
     "Study Revolt of 1857 and then open Talk room."
   );
