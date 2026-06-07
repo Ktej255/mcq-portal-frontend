@@ -90,6 +90,30 @@ export type QuestionBankSelection = {
   questions: PracticeQuestion[];
 };
 
+export type QuestionBankCoverageRow = {
+  subjectSlug: string;
+  subjectTitle: string;
+  totalDays: number;
+  expectedDifficultySlots: number;
+  coveredDifficultySlots: number;
+  totalQuestions: number;
+  curatedQuestions: number;
+  generatedQuestions: number;
+  fullCoverage: boolean;
+  availableByDifficulty: Record<QuestionDifficulty, number>;
+};
+
+export type QuestionBankCoverageSummary = {
+  subjectCount: number;
+  totalDays: number;
+  expectedDifficultySlots: number;
+  coveredDifficultySlots: number;
+  totalQuestions: number;
+  curatedQuestions: number;
+  generatedQuestions: number;
+  fullCoverageSubjects: number;
+};
+
 export type QuestionBankProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
 };
@@ -572,17 +596,90 @@ function buildGeneratedSubjectQuestion(
   };
 }
 
+function subjectQuestionSlot(question: Pick<PracticeQuestion, "linkedDay" | "difficulty">) {
+  return `${question.linkedDay}:${question.difficulty}`;
+}
+
 function buildGeneratedSubjectBank(subject: QuestionBankSubject) {
-  if (subject.slug === "geography") return [];
+  const existingSlots = new Set(
+    geographyQuestionBank
+      .filter((question) => question.subjectSlug === subject.slug)
+      .map(subjectQuestionSlot)
+  );
+
   return subject.sessions
-    .slice(0, Math.min(8, subject.sessions.length))
-    .flatMap((session) => questionDifficulties.map((difficulty) => buildGeneratedSubjectQuestion(subject, session, difficulty)));
+    .flatMap((session) =>
+      questionDifficulties
+        .filter((difficulty) => !existingSlots.has(subjectQuestionSlot({ linkedDay: session.day, difficulty })))
+        .map((difficulty) => buildGeneratedSubjectQuestion(subject, session, difficulty))
+    );
 }
 
 export const allPracticeQuestionBank: PracticeQuestion[] = [
   ...geographyQuestionBank.map((question) => ({ ...question, subjectTitle: "Geography" })),
   ...questionBankSubjects.flatMap(buildGeneratedSubjectBank),
 ];
+
+function countByDifficulty(questions: PracticeQuestion[]) {
+  return questionDifficulties.reduce(
+    (counts, difficulty) => ({
+      ...counts,
+      [difficulty]: questions.filter((question) => question.difficulty === difficulty).length,
+    }),
+    {} as Record<QuestionDifficulty, number>
+  );
+}
+
+export const questionBankCoverageRows: QuestionBankCoverageRow[] = questionBankSubjects.map((subject) => {
+  const subjectQuestions = allPracticeQuestionBank.filter((question) => question.subjectSlug === subject.slug);
+  const coveredSlots = new Set(subjectQuestions.map(subjectQuestionSlot));
+  const expectedDifficultySlots = subject.sessions.length * questionDifficulties.length;
+  const curatedQuestions = geographyQuestionBank.filter((question) => question.subjectSlug === subject.slug).length;
+  const coveredDifficultySlots = subject.sessions.reduce(
+    (sum, session) =>
+      sum +
+      questionDifficulties.filter((difficulty) =>
+        coveredSlots.has(subjectQuestionSlot({ linkedDay: session.day, difficulty }))
+      ).length,
+    0
+  );
+
+  return {
+    subjectSlug: subject.slug,
+    subjectTitle: subject.title,
+    totalDays: subject.sessions.length,
+    expectedDifficultySlots,
+    coveredDifficultySlots,
+    totalQuestions: subjectQuestions.length,
+    curatedQuestions,
+    generatedQuestions: subjectQuestions.length - curatedQuestions,
+    fullCoverage: coveredDifficultySlots === expectedDifficultySlots,
+    availableByDifficulty: countByDifficulty(subjectQuestions),
+  };
+});
+
+export const questionBankCoverageSummary: QuestionBankCoverageSummary = questionBankCoverageRows.reduce(
+  (summary, row) => ({
+    subjectCount: summary.subjectCount + 1,
+    totalDays: summary.totalDays + row.totalDays,
+    expectedDifficultySlots: summary.expectedDifficultySlots + row.expectedDifficultySlots,
+    coveredDifficultySlots: summary.coveredDifficultySlots + row.coveredDifficultySlots,
+    totalQuestions: summary.totalQuestions + row.totalQuestions,
+    curatedQuestions: summary.curatedQuestions + row.curatedQuestions,
+    generatedQuestions: summary.generatedQuestions + row.generatedQuestions,
+    fullCoverageSubjects: summary.fullCoverageSubjects + (row.fullCoverage ? 1 : 0),
+  }),
+  {
+    subjectCount: 0,
+    totalDays: 0,
+    expectedDifficultySlots: 0,
+    coveredDifficultySlots: 0,
+    totalQuestions: 0,
+    curatedQuestions: 0,
+    generatedQuestions: 0,
+    fullCoverageSubjects: 0,
+  }
+);
 
 export function getQuestionBankSubject(slug: string) {
   return questionBankSubjects.find((subject) => subject.slug === slug) ?? questionBankSubjects[0];

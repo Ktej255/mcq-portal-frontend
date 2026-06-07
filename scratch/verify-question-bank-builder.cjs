@@ -66,6 +66,7 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
     const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
     const recommendation = document.querySelector('[data-testid="upsc-question-bank-recommendation"]');
     const selectionProof = document.querySelector('[data-testid="upsc-question-bank-selection-proof"]');
+    const coverageProof = document.querySelector('[data-testid="upsc-question-bank-coverage-proof"]');
     const aiGap = document.querySelector('[data-testid="upsc-question-bank-ai-gap"]');
     const questions = [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) => ({
       subjectSlug: node.getAttribute("data-subject-slug"),
@@ -96,6 +97,23 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       ledgerPoints: recommendation?.getAttribute("data-ledger-points"),
       commandBonus: recommendation?.getAttribute("data-command-bonus"),
       recoveryPenalty: recommendation?.getAttribute("data-recovery-penalty"),
+      coverage: {
+        subjectCount: coverageProof?.getAttribute("data-subject-count"),
+        totalDays: coverageProof?.getAttribute("data-total-days"),
+        totalQuestionRows: coverageProof?.getAttribute("data-total-question-rows"),
+        curatedQuestionRows: coverageProof?.getAttribute("data-curated-question-rows"),
+        generatedQuestionRows: coverageProof?.getAttribute("data-generated-question-rows"),
+        coveredDifficultySlots: coverageProof?.getAttribute("data-covered-difficulty-slots"),
+        expectedDifficultySlots: coverageProof?.getAttribute("data-expected-difficulty-slots"),
+        fullCoverageSubjects: coverageProof?.getAttribute("data-full-coverage-subjects"),
+        activeSubject: coverageProof?.getAttribute("data-active-subject"),
+        activeSubjectDays: coverageProof?.getAttribute("data-active-subject-days"),
+        activeSubjectQuestions: coverageProof?.getAttribute("data-active-subject-questions"),
+        activeSubjectSlots: coverageProof?.getAttribute("data-active-subject-slots"),
+        activeSubjectExpectedSlots: coverageProof?.getAttribute("data-active-subject-expected-slots"),
+        activeSubjectFullCoverage: coverageProof?.getAttribute("data-active-subject-full-coverage"),
+        text: coverageProof?.textContent || "",
+      },
       adaptiveLevelText:
         document.querySelector('[data-testid="upsc-question-bank-adaptive-level"]')?.textContent || "",
       selectionProof: {
@@ -187,6 +205,21 @@ async function run() {
     !recoveryState.selectionProof.rows.some((row) => row.id === "recovery" && row.points === "-12")
   ) {
     throw new Error(`recovery adaptive level failed: ${JSON.stringify(recoveryState)}`);
+  }
+  if (
+    recoveryState.coverage.subjectCount !== "8" ||
+    recoveryState.coverage.totalDays !== "201" ||
+    recoveryState.coverage.coveredDifficultySlots !== recoveryState.coverage.expectedDifficultySlots ||
+    recoveryState.coverage.fullCoverageSubjects !== "8" ||
+    recoveryState.coverage.activeSubject !== "geography" ||
+    recoveryState.coverage.activeSubjectDays !== "30" ||
+    recoveryState.coverage.activeSubjectSlots !== recoveryState.coverage.activeSubjectExpectedSlots ||
+    recoveryState.coverage.activeSubjectFullCoverage !== "true" ||
+    Number(recoveryState.coverage.totalQuestionRows) < 804 ||
+    Number(recoveryState.coverage.generatedQuestionRows) < 780 ||
+    !recoveryState.coverage.text.includes("Full subjects")
+  ) {
+    throw new Error(`question bank full coverage proof failed: ${JSON.stringify(recoveryState.coverage)}`);
   }
   await assertNoOverflow(page, "question-bank-recovery-desktop", checks);
 
@@ -347,6 +380,14 @@ async function run() {
   });
   const environmentState = await readQuestionBankState(page, "environment-command-recommends-hard", checks, "environment");
   expectDifficultySet(environmentState, "HARD", 5, "environment-command-recommends-hard", "environment");
+  if (
+    environmentState.coverage.activeSubject !== "environment" ||
+    environmentState.coverage.activeSubjectFullCoverage !== "true" ||
+    Number(environmentState.coverage.activeSubjectDays) < 20 ||
+    Number(environmentState.coverage.activeSubjectQuestions) < Number(environmentState.coverage.activeSubjectExpectedSlots)
+  ) {
+    throw new Error(`environment question bank coverage failed: ${JSON.stringify(environmentState.coverage)}`);
+  }
   const firstEnvironmentQuestionId = environmentState.questions[0]?.id;
   if (!firstEnvironmentQuestionId) {
     throw new Error(`Missing first environment question id: ${JSON.stringify(environmentState)}`);

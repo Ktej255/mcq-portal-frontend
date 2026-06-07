@@ -17,7 +17,10 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import {
+  allPracticeQuestionBank,
   getQuestionBankSubject,
+  questionBankCoverageRows,
+  questionBankCoverageSummary,
   questionDifficulties,
   questionBankSubjects,
   readLocalQuestionBankAttempts,
@@ -54,6 +57,7 @@ export function UpscQuestionBankBuilder() {
   const [attempts, setAttempts] = useState<QuestionBankAttempt[]>([]);
   const [difficulty, setDifficulty] = useState<QuestionDifficulty | null>(null);
   const [count, setCount] = useState<number | null>(null);
+  const [displayQuestionIds, setDisplayQuestionIds] = useState<string[]>([]);
 
   useEffect(() => {
     const nextSubjectSlug = getQuestionBankSubject(requestedSubject).slug;
@@ -90,8 +94,32 @@ export function UpscQuestionBankBuilder() {
       }),
     [activeCount, activeDifficulty, attempts, profile, progress, selectedSubject.slug]
   );
-
   const recommendation = selection.recommendation;
+  const selectedCoverage = useMemo(
+    () => questionBankCoverageRows.find((row) => row.subjectSlug === selectedSubject.slug),
+    [selectedSubject.slug]
+  );
+  const targetDayKey = recommendation.targetDays.join(",");
+
+  useEffect(() => {
+    setDisplayQuestionIds(selection.questions.map((question) => question.id));
+  }, [activeCount, activeDifficulty, selectedSubject.slug, targetDayKey]);
+
+  const displayedQuestions = useMemo(() => {
+    if (!displayQuestionIds.length) return selection.questions;
+
+    const subjectQuestionMap = new Map(
+      allPracticeQuestionBank
+        .filter((question) => question.subjectSlug === selectedSubject.slug)
+        .map((question) => [question.id, question])
+    );
+    const lockedQuestions = displayQuestionIds
+      .map((questionId) => subjectQuestionMap.get(questionId))
+      .filter((question): question is PracticeQuestion => Boolean(question));
+
+    return lockedQuestions.length ? lockedQuestions : selection.questions;
+  }, [displayQuestionIds, selectedSubject.slug, selection.questions]);
+
   const attemptByQuestionId = useMemo(
     () => new Map(attempts.map((attempt) => [attempt.questionId, attempt])),
     [attempts]
@@ -167,6 +195,10 @@ export function UpscQuestionBankBuilder() {
           data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
           data-adaptive-level={recommendation.adaptiveLevel}
           data-adaptive-score={recommendation.adaptiveReadinessScore}
+          data-total-question-rows={questionBankCoverageSummary.totalQuestions}
+          data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
+          data-expected-difficulty-slots={questionBankCoverageSummary.expectedDifficultySlots}
+          data-full-coverage-subjects={questionBankCoverageSummary.fullCoverageSubjects}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
@@ -193,6 +225,7 @@ export function UpscQuestionBankBuilder() {
                 ["Evidence level", `${recommendation.adaptiveLevel} / ${recommendation.adaptiveReadinessScore}`],
                 ["Solved", recommendation.solvedCount],
                 ["Accuracy", solvedAccuracy],
+                ["Coverage", selectedCoverage?.fullCoverage ? "Full path" : "Partial"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -200,6 +233,39 @@ export function UpscQuestionBankBuilder() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-question-bank-coverage-proof"
+          data-subject-count={questionBankCoverageSummary.subjectCount}
+          data-total-days={questionBankCoverageSummary.totalDays}
+          data-total-question-rows={questionBankCoverageSummary.totalQuestions}
+          data-curated-question-rows={questionBankCoverageSummary.curatedQuestions}
+          data-generated-question-rows={questionBankCoverageSummary.generatedQuestions}
+          data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
+          data-expected-difficulty-slots={questionBankCoverageSummary.expectedDifficultySlots}
+          data-full-coverage-subjects={questionBankCoverageSummary.fullCoverageSubjects}
+          data-active-subject={selectedCoverage?.subjectSlug}
+          data-active-subject-days={selectedCoverage?.totalDays}
+          data-active-subject-questions={selectedCoverage?.totalQuestions}
+          data-active-subject-slots={selectedCoverage?.coveredDifficultySlots}
+          data-active-subject-expected-slots={selectedCoverage?.expectedDifficultySlots}
+          data-active-subject-full-coverage={selectedCoverage?.fullCoverage ? "true" : "false"}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+        >
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              ["Full subjects", `${questionBankCoverageSummary.fullCoverageSubjects}/${questionBankCoverageSummary.subjectCount}`],
+              ["Day slots", `${questionBankCoverageSummary.coveredDifficultySlots}/${questionBankCoverageSummary.expectedDifficultySlots}`],
+              ["Question rows", questionBankCoverageSummary.totalQuestions],
+              ["Active subject", selectedCoverage ? `${selectedCoverage.totalQuestions} rows` : "Pending"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
+                <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -444,8 +510,8 @@ export function UpscQuestionBankBuilder() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Selected set</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight" data-question-count={selection.questions.length}>
-                {selection.questions.length} questions generated
+              <h2 className="mt-1 text-2xl font-black tracking-tight" data-question-count={displayedQuestions.length}>
+                {displayedQuestions.length} questions generated
               </h2>
             </div>
             <Link
@@ -457,8 +523,8 @@ export function UpscQuestionBankBuilder() {
           </div>
 
           <div className="grid gap-3">
-            {selection.questions.length ? (
-              selection.questions.map((question, index) => {
+            {displayedQuestions.length ? (
+              displayedQuestions.map((question, index) => {
                 const attempt = attemptByQuestionId.get(question.id);
 
                 return (
