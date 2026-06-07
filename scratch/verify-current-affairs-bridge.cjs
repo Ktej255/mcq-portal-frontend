@@ -4,8 +4,11 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
-const progressKey = "sarit-upsc-geography-progress-v1";
 const evidencePath = path.join(__dirname, "verify-current-affairs-bridge-evidence.json");
+
+function progressKey(subjectSlug) {
+  return `sarit-upsc-${subjectSlug}-progress-v1`;
+}
 
 async function assertNoOverflow(page, label, checks) {
   const metrics = await page.evaluate(() => ({
@@ -23,7 +26,7 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
-async function seedProgress(page, progress) {
+async function seedProgress(page, progress, subjectSlug = "geography") {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
     ({ profileStorageKey, progressStorageKey, seededProgress }) => {
@@ -47,7 +50,7 @@ async function seedProgress(page, progress) {
         window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
       }
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey, seededProgress: progress }
+    { profileStorageKey: profileKey, progressStorageKey: progressKey(subjectSlug), seededProgress: progress }
   );
 }
 
@@ -66,11 +69,12 @@ async function run() {
   await seedProgress(page, null);
   await page.goto(`${baseUrl}/upsc/current-affairs`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-current-affairs-hero").waitFor({ timeout: 15000 });
+  const activeSubject = await page.getByTestId("upsc-current-affairs-hero").getAttribute("data-active-subject");
   const initialUnlockedCards = await page.getByTestId("upsc-current-affairs-card").count();
   const initialNextUnlockText = await page.getByTestId("upsc-current-affairs-next-unlock").innerText();
-  checks.push({ label: "initial-locked-state", initialUnlockedCards, initialNextUnlockText });
-  if (initialUnlockedCards !== 0 || !initialNextUnlockText.includes("Day 2")) {
-    throw new Error(`initial-locked-state failed: ${JSON.stringify({ initialUnlockedCards, initialNextUnlockText })}`);
+  checks.push({ label: "initial-locked-state", activeSubject, initialUnlockedCards, initialNextUnlockText });
+  if (activeSubject !== "geography" || initialUnlockedCards !== 0 || !initialNextUnlockText.includes("Day 2")) {
+    throw new Error(`initial-locked-state failed: ${JSON.stringify({ activeSubject, initialUnlockedCards, initialNextUnlockText })}`);
   }
   await assertNoOverflow(page, "current-affairs-initial-desktop", checks);
 
@@ -104,6 +108,41 @@ async function run() {
     throw new Error(`covered-topic-unlocks-only-linked-hooks failed: ${JSON.stringify(unlockedCards)}`);
   }
   await assertNoOverflow(page, "current-affairs-unlocked-desktop", checks);
+
+  await seedProgress(page, {
+    1: {
+      day: 1,
+      watched: true,
+      talkScore: 76,
+      updatedAt: new Date().toISOString(),
+    },
+  }, "environment");
+  await page.goto(`${baseUrl}/upsc/current-affairs?subject=environment`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("upsc-current-affairs-hero").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-current-affairs-card").first().waitFor({ timeout: 15000 });
+  const environmentState = await page.evaluate(() => {
+    const hero = document.querySelector('[data-testid="upsc-current-affairs-hero"]');
+    const cards = [...document.querySelectorAll('[data-testid="upsc-current-affairs-card"]')].map((card) => ({
+      subjectSlug: card.getAttribute("data-subject-slug"),
+      linkedDay: card.getAttribute("data-linked-day"),
+      unlocked: card.getAttribute("data-unlocked"),
+      text: card.textContent || "",
+    }));
+
+    return {
+      activeSubject: hero?.getAttribute("data-active-subject"),
+      cards,
+    };
+  });
+  checks.push({ label: "environment-covered-topic-unlocks-only-environment-hook", environmentState });
+  if (
+    environmentState.activeSubject !== "environment" ||
+    environmentState.cards.length !== 1 ||
+    environmentState.cards.some((card) => card.subjectSlug !== "environment" || card.linkedDay !== "1" || card.unlocked !== "true")
+  ) {
+    throw new Error(`environment-covered-topic-unlocks-only-environment-hook failed: ${JSON.stringify(environmentState)}`);
+  }
+  await assertNoOverflow(page, "current-affairs-environment-desktop", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/current-affairs`, { waitUntil: "networkidle", timeout: 45000 });

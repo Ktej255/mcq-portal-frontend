@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Newspaper, RefreshCcw, Route } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
   currentAffairsBridgeSummary,
-  geographyCurrentAffairsBridge,
+  currentAffairsSubjects,
+  getCurrentAffairsForSubject,
+  getCurrentAffairsSubject,
   type CurrentAffairsBridgeItem,
 } from "@/lib/upsc/currentAffairsBridge";
-import { geographySessions } from "@/lib/upsc/plan";
-import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import { useSubjectProgress, type SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
+import { cn } from "@/lib/utils";
 
-function hasCoveredStaticTopic(progress?: GeographyDayProgress) {
+function hasCoveredStaticTopic(progress?: SubjectDayProgress) {
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
@@ -25,16 +29,26 @@ function hasCoveredStaticTopic(progress?: GeographyDayProgress) {
 }
 
 function sourceLabel(status: CurrentAffairsBridgeItem["sourceStatus"]) {
-  return status === "ready-for-class" ? "Ready for class" : "Daily source pending";
+  return status === "ready-for-class" ? "Topic bridge ready" : "Daily source pending";
 }
 
 export function UpscCurrentAffairsBridge() {
-  const { getDayProgress, isLoaded } = useGeographyProgress();
-  const unlockedItems = geographyCurrentAffairsBridge.filter((item) => hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
-  const lockedItems = geographyCurrentAffairsBridge.filter((item) => !hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
+  const searchParams = useSearchParams();
+  const requestedSubject = searchParams.get("subject") ?? "geography";
+  const [subjectSlug, setSubjectSlug] = useState(() => getCurrentAffairsSubject(requestedSubject).slug);
+
+  useEffect(() => {
+    setSubjectSlug(getCurrentAffairsSubject(requestedSubject).slug);
+  }, [requestedSubject]);
+
+  const selectedSubject = useMemo(() => getCurrentAffairsSubject(subjectSlug), [subjectSlug]);
+  const { getDayProgress, isLoaded } = useSubjectProgress(selectedSubject.slug, selectedSubject.sessions);
+  const subjectItems = useMemo(() => getCurrentAffairsForSubject(selectedSubject.slug), [selectedSubject.slug]);
+  const unlockedItems = subjectItems.filter((item) => hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
+  const lockedItems = subjectItems.filter((item) => !hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
   const nextLocked = lockedItems[0];
   const nextLockedSession = nextLocked
-    ? geographySessions.find((session) => session.day === nextLocked.linkedDay)
+    ? selectedSubject.sessions.find((session) => session.day === nextLocked.linkedDay)
     : null;
 
   return (
@@ -42,6 +56,7 @@ export function UpscCurrentAffairsBridge() {
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
         <section
           data-testid="upsc-current-affairs-hero"
+          data-active-subject={selectedSubject.slug}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
@@ -50,18 +65,19 @@ export function UpscCurrentAffairsBridge() {
                 Covered-topic current affairs
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">
-                News appears only after the static topic is covered.
+                {selectedSubject.title} news appears only after the topic is covered.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                The page links current-affairs hooks to Geography class days. A beginner sees only items connected
-                to topics they have watched, explained, practiced, or otherwise opened in the learning loop.
+                The page links current-affairs hooks to class days. A beginner sees only items connected to topics
+                they have watched, explained, practiced, or otherwise opened in the learning loop.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
                 ["Unlocked", isLoaded ? unlockedItems.length : 0],
-                ["Locked", isLoaded ? lockedItems.length : geographyCurrentAffairsBridge.length],
-                ["Ready hooks", currentAffairsBridgeSummary.readyForClass],
+                ["Locked", isLoaded ? lockedItems.length : subjectItems.length],
+                ["Subject hooks", subjectItems.length],
+                ["Subjects", currentAffairsBridgeSummary.subjectCount],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -69,6 +85,33 @@ export function UpscCurrentAffairsBridge() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-current-affairs-subjects"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {currentAffairsSubjects.map((subject) => {
+              const isActive = selectedSubject.slug === subject.slug;
+              return (
+                <button
+                  key={subject.slug}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setSubjectSlug(subject.slug)}
+                  className={cn(
+                    "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                    isActive
+                      ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                      : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                  )}
+                >
+                  {subject.title}
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -90,7 +133,7 @@ export function UpscCurrentAffairsBridge() {
                 </p>
               </div>
               <Link
-                href={`/upsc/geography?day=${nextLocked.linkedDay}`}
+                href={`/upsc/${selectedSubject.slug}?day=${nextLocked.linkedDay}`}
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
               >
                 Open topic <ArrowRight className="ml-2 h-4 w-4" />
@@ -118,14 +161,14 @@ export function UpscCurrentAffairsBridge() {
             <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5">
               <p className="text-lg font-black tracking-tight">No current-affairs hook is visible yet.</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                Start Geography Day 1 and complete the first Watch or Talk evidence. The portal will then reveal
+                Start {selectedSubject.title} Day 1 and complete the first Watch or Talk evidence. The portal will then reveal
                 only the linked issue hooks instead of showing a full news feed.
               </p>
               <Link
-                href="/dashboard"
+                href={`/upsc/${selectedSubject.slug}?day=1`}
                 className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
               >
-                Go to today&apos;s task
+                Open Day 1
               </Link>
             </div>
           )}
@@ -143,7 +186,7 @@ export function UpscCurrentAffairsBridge() {
             {lockedItems.map((item) => (
               <Link
                 key={item.id}
-                href={`/upsc/geography?day=${item.linkedDay}`}
+                href={`/upsc/${selectedSubject.slug}?day=${item.linkedDay}`}
                 className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 transition hover:border-[#1d9e75]"
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -167,6 +210,7 @@ function CurrentAffairsCard({ item, unlocked }: { item: CurrentAffairsBridgeItem
   return (
     <article
       data-testid="upsc-current-affairs-card"
+      data-subject-slug={item.subjectSlug}
       data-linked-day={item.linkedDay}
       data-unlocked={unlocked ? "true" : "false"}
       className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 shadow-sm"
