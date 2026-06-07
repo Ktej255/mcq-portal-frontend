@@ -65,6 +65,7 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
   const state = await page.evaluate(() => {
     const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
     const recommendation = document.querySelector('[data-testid="upsc-question-bank-recommendation"]');
+    const selectionProof = document.querySelector('[data-testid="upsc-question-bank-selection-proof"]');
     const aiGap = document.querySelector('[data-testid="upsc-question-bank-ai-gap"]');
     const questions = [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) => ({
       subjectSlug: node.getAttribute("data-subject-slug"),
@@ -97,6 +98,21 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       recoveryPenalty: recommendation?.getAttribute("data-recovery-penalty"),
       adaptiveLevelText:
         document.querySelector('[data-testid="upsc-question-bank-adaptive-level"]')?.textContent || "",
+      selectionProof: {
+        evidenceRule: selectionProof?.getAttribute("data-evidence-rule"),
+        activeDifficulty: selectionProof?.getAttribute("data-active-difficulty"),
+        recommendedDifficulty: selectionProof?.getAttribute("data-recommended-difficulty"),
+        manualOverride: selectionProof?.getAttribute("data-manual-override"),
+        adaptiveScore: selectionProof?.getAttribute("data-adaptive-score"),
+        adaptiveLevel: selectionProof?.getAttribute("data-adaptive-level"),
+        text: selectionProof?.textContent || "",
+        rows: [...document.querySelectorAll('[data-testid="upsc-question-bank-proof-row"]')].map((row) => ({
+          id: row.getAttribute("data-proof-id"),
+          value: row.getAttribute("data-proof-value"),
+          points: row.getAttribute("data-proof-points"),
+          text: row.textContent || "",
+        })),
+      },
       ledgerText: ledger?.textContent || "",
       aiGapText: aiGap?.textContent || "",
       questions,
@@ -160,7 +176,15 @@ async function run() {
     recoveryState.recallPoints !== "6" ||
     recoveryState.mcqPoints !== "4" ||
     recoveryState.recoveryPenalty !== "12" ||
-    !recoveryState.adaptiveLevelText.includes("Evidence-derived MCQ level")
+    !recoveryState.adaptiveLevelText.includes("Evidence-derived MCQ level") ||
+    recoveryState.selectionProof.evidenceRule !== "recall-consistency-marks-ledger-command-recovery" ||
+    recoveryState.selectionProof.activeDifficulty !== "EASY" ||
+    recoveryState.selectionProof.recommendedDifficulty !== "EASY" ||
+    recoveryState.selectionProof.manualOverride !== "false" ||
+    recoveryState.selectionProof.rows.length !== 6 ||
+    !recoveryState.selectionProof.rows.some((row) => row.id === "recall" && row.points === "6" && row.value === "62/100") ||
+    !recoveryState.selectionProof.rows.some((row) => row.id === "mcq-marks" && row.points === "4" && row.value === "40%") ||
+    !recoveryState.selectionProof.rows.some((row) => row.id === "recovery" && row.points === "-12")
   ) {
     throw new Error(`recovery adaptive level failed: ${JSON.stringify(recoveryState)}`);
   }
@@ -175,6 +199,17 @@ async function run() {
     activeDifficulty: document
       .querySelector('[data-testid="upsc-question-bank-hero"]')
       ?.getAttribute("data-active-difficulty"),
+    selectionProof: {
+      activeDifficulty: document
+        .querySelector('[data-testid="upsc-question-bank-selection-proof"]')
+        ?.getAttribute("data-active-difficulty"),
+      recommendedDifficulty: document
+        .querySelector('[data-testid="upsc-question-bank-selection-proof"]')
+        ?.getAttribute("data-recommended-difficulty"),
+      manualOverride: document
+        .querySelector('[data-testid="upsc-question-bank-selection-proof"]')
+        ?.getAttribute("data-manual-override"),
+    },
     questionDifficulties: [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) =>
       node.getAttribute("data-question-difficulty")
     ),
@@ -182,6 +217,9 @@ async function run() {
   checks.push({ label: "manual-medium-override", manualMediumState });
   if (
     manualMediumState.activeDifficulty !== "MEDIUM" ||
+    manualMediumState.selectionProof.activeDifficulty !== "MEDIUM" ||
+    manualMediumState.selectionProof.recommendedDifficulty !== "EASY" ||
+    manualMediumState.selectionProof.manualOverride !== "true" ||
     manualMediumState.questionDifficulties.some((difficulty) => difficulty !== "MEDIUM")
   ) {
     throw new Error(`manual-medium-override failed: ${JSON.stringify(manualMediumState)}`);
@@ -211,6 +249,8 @@ async function run() {
   if (
     aiGapState.aiGapCount !== "1" ||
     aiGapState.targetDays !== "5" ||
+    aiGapState.selectionProof.rows.length !== 6 ||
+    !aiGapState.selectionProof.rows.some((row) => row.id === "recovery" && row.points === "-27") ||
     !aiGapState.aiGapText.includes("Map proof") ||
     !aiGapState.aiGapText.includes("India map anchor") ||
     aiGapState.questions[0]?.linkedDay !== "5"
@@ -260,7 +300,11 @@ async function run() {
     commandState.adaptiveScore !== "80" ||
     commandState.recallPoints !== "35" ||
     commandState.mcqPoints !== "30" ||
-    commandState.commandBonus !== "9"
+    commandState.commandBonus !== "9" ||
+    commandState.selectionProof.activeDifficulty !== "HARD" ||
+    commandState.selectionProof.adaptiveLevel !== "advanced" ||
+    !commandState.selectionProof.rows.some((row) => row.id === "command" && row.points === "9") ||
+    !commandState.selectionProof.rows.some((row) => row.id === "recovery" && row.points === "0")
   ) {
     throw new Error(`command adaptive level failed: ${JSON.stringify(commandState)}`);
   }

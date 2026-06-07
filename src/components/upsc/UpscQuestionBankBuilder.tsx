@@ -107,6 +107,50 @@ export function UpscQuestionBankBuilder() {
     { label: "Profile", value: recommendation.learnerLevel, Icon: ClipboardCheck },
     { label: "Evidence level", value: recommendation.adaptiveLevel, Icon: BrainCircuit },
   ];
+  const selectionProofRows = [
+    {
+      id: "recall",
+      label: "Recall",
+      value: scoreText(recommendation.averageRecall, "/100"),
+      points: recommendation.adaptiveSignals.recallPoints,
+      rule: "Talk recall moves the learner from basics toward PYQ traps.",
+    },
+    {
+      id: "consistency",
+      label: "Consistency",
+      value: `${recommendation.consistencyPercent}%`,
+      points: recommendation.adaptiveSignals.consistencyPoints,
+      rule: "Recent started days decide how much load the next set can carry.",
+    },
+    {
+      id: "mcq-marks",
+      label: "MCQ marks",
+      value: scoreText(recommendation.averageMcq, "%"),
+      points: recommendation.adaptiveSignals.mcqPoints,
+      rule: "Practice marks decide whether to repair basics or raise difficulty.",
+    },
+    {
+      id: "solved-ledger",
+      label: "Solved ledger",
+      value: recommendation.solvedAccuracyPercent === null ? "No attempts" : `${recommendation.solvedAccuracyPercent}%`,
+      points: recommendation.adaptiveSignals.ledgerPoints,
+      rule: "Wrong answers stay in the repair queue and reduce difficulty.",
+    },
+    {
+      id: "command",
+      label: "Command days",
+      value: recommendation.commandCount,
+      points: recommendation.adaptiveSignals.commandBonus,
+      rule: "Command evidence adds controlled permission for harder questions.",
+    },
+    {
+      id: "recovery",
+      label: "Recovery load",
+      value: recommendation.recoveryCount + recommendation.teacherDoubtCount + recommendation.unresolvedIncorrectCount,
+      points: -recommendation.adaptiveSignals.recoveryPenalty,
+      rule: "Active recovery, AI teacher gaps, and incorrect answers block difficulty jumps.",
+    },
+  ];
   const markQuestionSolved = (question: PracticeQuestion, selectedOption: QuestionOption) => {
     setAttempts(saveLocalQuestionBankAttempt(question, selectedOption));
   };
@@ -242,6 +286,58 @@ export function UpscQuestionBankBuilder() {
                   <Icon className="mb-3 h-4 w-4 text-[#085041]" />
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
                   <p className="mt-1 text-lg font-black capitalize">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            data-testid="upsc-question-bank-selection-proof"
+            data-evidence-rule="recall-consistency-marks-ledger-command-recovery"
+            data-active-difficulty={activeDifficulty}
+            data-recommended-difficulty={recommendation.recommendedDifficulty}
+            data-manual-override={difficulty ? "true" : "false"}
+            data-adaptive-score={recommendation.adaptiveReadinessScore}
+            data-adaptive-level={recommendation.adaptiveLevel}
+            className="mt-5 rounded-lg border border-[#b9d9cd] bg-white/75 p-4"
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#085041]">
+                  Selection proof
+                </p>
+                <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">
+                  Why this MCQ set opened
+                </h3>
+              </div>
+              <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+                {activeDifficulty.replace("_", " ")}
+              </Badge>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {selectionProofRows.map((row) => (
+                <div
+                  key={row.id}
+                  data-testid="upsc-question-bank-proof-row"
+                  data-proof-id={row.id}
+                  data-proof-value={row.value}
+                  data-proof-points={row.points}
+                  className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      {row.label}
+                    </p>
+                    <span
+                      className={cn(
+                        "rounded px-2 py-1 text-[10px] font-black",
+                        row.points < 0 ? "bg-[#fff4df] text-[#6f4a12]" : "bg-white text-[#085041]"
+                      )}
+                    >
+                      {row.points > 0 ? `+${row.points}` : row.points}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-base font-black text-[#13251d]">{row.value}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.rule}</p>
                 </div>
               ))}
             </div>
