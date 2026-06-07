@@ -2,6 +2,8 @@ import { coreSubjectBlueprints, optionalSubjects } from "@/lib/upsc/yearlyPlanne
 
 export type SourceStage = "Prelims" | "Mains" | "Optional";
 export type ImportStatus = "source-indexed" | "topic-mapped" | "text-import-pending";
+export type TrendWeight = "High" | "Medium" | "Selective";
+export type TrendEvidenceLevel = "official-source-indexed" | "topic-pattern-model" | "full-text-pending";
 
 export type OfficialSourceAnchor = {
   id: string;
@@ -31,6 +33,28 @@ export type PyqImportRow = {
   nextAction: string;
 };
 
+export type PyqTrendInsight = {
+  id: string;
+  label: string;
+  syllabusArea: string;
+  prelimsWeight: TrendWeight;
+  mainsWeight: TrendWeight;
+  trendWindow: string;
+  pyqSignal: string;
+  nextYearWatch: string;
+  contentDesign: string;
+  dailyPlannerUse: string;
+  evidenceLevel: TrendEvidenceLevel;
+};
+
+export type SubjectSystematicPath = {
+  basicsStart: string;
+  advancedBridge: string;
+  currentAffairsRule: string;
+  gapRule: string;
+  revisionRule: string;
+};
+
 export type SubjectSourcePack = {
   slug: string;
   title: string;
@@ -38,6 +62,8 @@ export type SubjectSourcePack = {
   syllabusSource: string;
   syllabusNodes: SyllabusNode[];
   pyqRows: PyqImportRow[];
+  trendInsights: PyqTrendInsight[];
+  systematicPath: SubjectSystematicPath;
   readinessScore: number;
 };
 
@@ -262,6 +288,289 @@ function gsPaperForSubject(slug: string) {
   return "General Studies mixed";
 }
 
+function subjectSystematicPath(slug: string): SubjectSystematicPath {
+  const paths: Record<string, SubjectSystematicPath> = {
+    geography: {
+      basicsStart: "NCERT map, landform, climate, water, India physical environment, and human geography foundations.",
+      advancedBridge: "Reference-book process depth, atlas drills, location theory, resources, agriculture, and regional development.",
+      currentAffairsRule: "Unlock only after linked static topic: monsoon, disasters, rivers, minerals, crops, places in news, and climate events.",
+      gapRule: "Student recall must expose missing mechanism, missing map anchor, or one-factor explanation before watch room opens.",
+      revisionRule: "Revise weak map/process topics on Day +2, then retest with PYQ-style elimination.",
+    },
+    environment: {
+      basicsStart: "NCERT ecology, biodiversity, pollution, biology, and basic climate vocabulary.",
+      advancedBridge: "Conventions, protected-area logic, environment laws, reports, species, pollution standards, and policy instruments.",
+      currentAffairsRule: "Unlock only where ecology, convention, species, or policy topic is already covered.",
+      gapRule: "Student recall must separate term-definition memory from cause-impact-control reasoning.",
+      revisionRule: "Revisit species, conventions, and pollution indicators through spaced mixed drills.",
+    },
+    "polity-governance": {
+      basicsStart: "NCERT Constitution, rights, Parliament, federalism, local government, and basic governance language.",
+      advancedBridge: "Laxmikanth provisions, landmark cases, committees, ARC, governance schemes, and mains frameworks.",
+      currentAffairsRule: "Unlock bills, judgments, appointments, federal disputes, and governance reforms after matching static chapter.",
+      gapRule: "Student recall must cite provision, institution, accountability tool, or case principle.",
+      revisionRule: "Revision alternates articles/institutions with application-based mains prompts.",
+    },
+    economy: {
+      basicsStart: "NCERT macro, money, banking, budget, inflation, external sector, and development basics.",
+      advancedBridge: "Budget, Economic Survey, RBI, fiscal policy, sector constraints, data interpretation, and reform logic.",
+      currentAffairsRule: "Unlock fiscal, monetary, trade, jobs, agriculture, welfare, and infrastructure updates after static base.",
+      gapRule: "Student recall must connect concept, data, institution, and policy consequence.",
+      revisionRule: "Revise weak economy areas with data cards plus applied MCQs.",
+    },
+    "science-tech": {
+      basicsStart: "NCERT physics, chemistry, biology, space, energy, health, and everyday science fundamentals.",
+      advancedBridge: "Applications, mission objectives, mechanisms, risk, ethics, governance, and emerging-technology examples.",
+      currentAffairsRule: "Unlock only technology-in-news items that match completed science mechanisms.",
+      gapRule: "Student recall must explain mechanism, application, and risk in simple language.",
+      revisionRule: "Revision uses mechanism diagrams, application traps, and current affairs bridges.",
+    },
+    "disaster-management": {
+      basicsStart: "Hazard, exposure, vulnerability, capacity, early warning, and geography-linked disaster basics.",
+      advancedBridge: "DM Act, NDMA guidelines, Sendai Framework, institutional flow, case studies, and response frameworks.",
+      currentAffairsRule: "Unlock disaster events after the relevant hazard and institution chain is covered.",
+      gapRule: "Student recall must separate hazard from disaster risk and response from mitigation.",
+      revisionRule: "Revision converts each disaster into risk-cause-impact-response-prevention grids.",
+    },
+    "internal-security-society": {
+      basicsStart: "NCERT society, social change, diversity, state, borders, security vocabulary, and cyber basics.",
+      advancedBridge: "Internal security doctrines, border management, cyber, extremism, society frameworks, and vulnerable-section themes.",
+      currentAffairsRule: "Unlock cases only after the social/security concept is covered.",
+      gapRule: "Student recall must identify cause, stakeholder, institution, and policy response.",
+      revisionRule: "Revision uses issue-maps and answer frameworks rather than isolated facts.",
+    },
+    history: {
+      basicsStart: "NCERT ancient, medieval, modern, and art-culture chronology, personalities, sources, and institutions.",
+      advancedBridge: "Old NCERT/Bipan Chandra/Nitin Singhania-style source, culture, movement, and theme depth.",
+      currentAffairsRule: "Unlock culture/news links only after matching monument, movement, personality, or theme is covered.",
+      gapRule: "Student recall must place event/source/art form in timeline, region, and theme.",
+      revisionRule: "Revision rotates chronology, source-based traps, art-culture images, and movement themes.",
+    },
+  };
+
+  return (
+    paths[slug] ?? {
+      basicsStart: "NCERT foundation layer before reference-book depth.",
+      advancedBridge: "Reference material, PYQ traps, reports, and answer frameworks.",
+      currentAffairsRule: "Unlock only after the static topic has been completed.",
+      gapRule: "Student recall must expose concept, fact, application, or source gaps.",
+      revisionRule: "Revision follows weak-topic evidence from recall and MCQ score.",
+    }
+  );
+}
+
+function subjectTrendInsights(slug: string): PyqTrendInsight[] {
+  const trendWindow = "2015-2025";
+  const evidenceLevel: TrendEvidenceLevel = "topic-pattern-model";
+  const commonDailyUse = "Use this signal to choose recall prompts, watch-room examples, MCQ difficulty, and revision spacing.";
+
+  const insights: Record<string, PyqTrendInsight[]> = {
+    geography: [
+      {
+        id: "geo-map-process",
+        label: "Map plus process explanation",
+        syllabusArea: "Physical and Indian geography",
+        prelimsWeight: "High",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Questions repeatedly reward location, mechanism, and elimination rather than isolated place memory.",
+        nextYearWatch: "Monsoon variability, rivers, minerals, disasters, crops, corridors, and places in news.",
+        contentDesign: "Start with NCERT map logic, then add atlas proof, process animation, and PYQ-style traps.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "geo-human-economic",
+        label: "Human and economic geography application",
+        syllabusArea: "Population, settlement, industry, transport, regional development",
+        prelimsWeight: "Medium",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains demand often asks why a pattern occurs and how geography shapes policy or development.",
+        nextYearWatch: "Urbanisation, migration, logistics, regional inequality, resource security, and climate adaptation.",
+        contentDesign: "Convert each topic into cause-factor-map-example-answer chain.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    environment: [
+      {
+        id: "env-convention-species",
+        label: "Species, protected areas, and conventions",
+        syllabusArea: "Ecology, biodiversity, conservation governance",
+        prelimsWeight: "High",
+        mainsWeight: "Medium",
+        trendWindow,
+        pyqSignal: "Prelims repeatedly tests category, habitat, treaty, institution, and location traps.",
+        nextYearWatch: "Ramsar, CITES, CMS, COP decisions, invasive species, protected-area changes, and species in news.",
+        contentDesign: "Build species-habitat-map-institution cards after ecology basics.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "env-climate-policy",
+        label: "Climate and pollution governance",
+        syllabusArea: "Climate science, pollution, EIA, environmental institutions",
+        prelimsWeight: "High",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Questions blend science terms with policy instruments and institutional mandates.",
+        nextYearWatch: "Carbon markets, climate finance, air quality, waste rules, EIA, and green transition debates.",
+        contentDesign: "Teach mechanism first, then convention/policy, then current-affairs hook.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    "polity-governance": [
+      {
+        id: "polity-institution-provision",
+        label: "Institution and constitutional provision",
+        syllabusArea: "Constitution, Parliament, judiciary, federalism, bodies",
+        prelimsWeight: "High",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Prelims tests provisions and bodies; mains asks institutional balance, reform, and accountability.",
+        nextYearWatch: "Judgments, bills, federal disputes, constitutional bodies, elections, and governance reforms.",
+        contentDesign: "Pair every article/body with role, limitation, current trigger, and mains angle.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "governance-delivery",
+        label: "Governance delivery and accountability",
+        syllabusArea: "Transparency, welfare, e-governance, social justice",
+        prelimsWeight: "Medium",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains demand rewards examples, committees, case studies, and implementation logic.",
+        nextYearWatch: "DBT, social audit, digital governance, public service delivery, and welfare outcomes.",
+        contentDesign: "Convert schemes and governance tools into problem-tool-limitation-reform frameworks.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    economy: [
+      {
+        id: "eco-macro-policy",
+        label: "Macro policy and data interpretation",
+        syllabusArea: "Growth, inflation, banking, fiscal policy, external sector",
+        prelimsWeight: "High",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Questions reward concept plus institution plus consequence, especially around Budget, RBI, and Survey themes.",
+        nextYearWatch: "Inflation, fiscal consolidation, trade, employment, banking, debt, and growth composition.",
+        contentDesign: "Teach concept, then data, then policy implication, then MCQ trap.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "eco-sectoral-inclusive",
+        label: "Sectoral and inclusive growth",
+        syllabusArea: "Agriculture, industry, infrastructure, poverty, employment, welfare",
+        prelimsWeight: "Medium",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains asks constraints, reforms, outcomes, and inclusive-development tradeoffs.",
+        nextYearWatch: "MSP, PLI, logistics, rural incomes, jobs, welfare delivery, and climate-economy linkages.",
+        contentDesign: "Use sector dashboards: issue, data, scheme, bottleneck, reform.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    "science-tech": [
+      {
+        id: "snt-application-risk",
+        label: "Application, risk, and governance",
+        syllabusArea: "Space, biotech, health, IT, AI, defence, energy",
+        prelimsWeight: "Medium",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Questions usually test mechanism, application, benefit, risk, and ethical or regulatory angle.",
+        nextYearWatch: "AI governance, space missions, biotech, vaccines, cyber, semiconductors, nuclear and clean energy.",
+        contentDesign: "Explain mechanism visually, then ask application and risk questions.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    "disaster-management": [
+      {
+        id: "dm-risk-governance",
+        label: "Risk reduction and institutional response",
+        syllabusArea: "Hazard, exposure, vulnerability, mitigation, response, recovery",
+        prelimsWeight: "Selective",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains rewards risk-chain thinking and examples more than event narration.",
+        nextYearWatch: "Heatwaves, floods, landslides, urban risk, earthquakes, industrial accidents, and early warning.",
+        contentDesign: "Use hazard-risk-institution-case-study-answer grids.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    "internal-security-society": [
+      {
+        id: "security-society-issue-map",
+        label: "Issue-map and institutional response",
+        syllabusArea: "Internal security, cyber, border management, Indian society",
+        prelimsWeight: "Selective",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains asks causes, stakeholders, institutions, legal tools, and reforms.",
+        nextYearWatch: "Cyber security, border management, social cohesion, migration, vulnerable groups, and extremism.",
+        contentDesign: "Build every topic as cause-impact-stakeholder-response-reform.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+    history: [
+      {
+        id: "history-source-culture",
+        label: "Source, culture, and chronology traps",
+        syllabusArea: "Ancient, medieval, art and culture",
+        prelimsWeight: "High",
+        mainsWeight: "Medium",
+        trendWindow,
+        pyqSignal: "Prelims frequently rewards source-location-period matching and art-culture elimination.",
+        nextYearWatch: "UNESCO, excavations, inscriptions, monuments, schools of art, GI/culture themes, and personalities.",
+        contentDesign: "Pair timeline with map, source, image cue, and elimination trap.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "history-modern-movement",
+        label: "Modern movement themes",
+        syllabusArea: "Freedom movement, reform, nationalism, post-1857 developments",
+        prelimsWeight: "Medium",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains rewards thematic explanation: causes, phases, methods, debates, and contributions.",
+        nextYearWatch: "Personalities, constitutional development, social reform, peasant/tribal movements, and press/education themes.",
+        contentDesign: "Move from chronology to theme to answer framework.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ],
+  };
+
+  return (
+    insights[slug] ?? [
+      {
+        id: `${slug}-trend`,
+        label: "Syllabus-PYQ-current affairs bridge",
+        syllabusArea: "Integrated subject demand",
+        prelimsWeight: "Medium",
+        mainsWeight: "Medium",
+        trendWindow,
+        pyqSignal: "Use official papers to tag repeated concepts, traps, and answer demands.",
+        nextYearWatch: "Track current-affairs hooks only after static coverage.",
+        contentDesign: "Build basics, advanced layer, PYQ pattern, and revision rule together.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+    ]
+  );
+}
+
 function buildSubjectPyqRows(slug: string): PyqImportRow[] {
   const gsPaper = gsPaperForSubject(slug);
   const prelimsRows = sourceYears.map((year) => ({
@@ -299,6 +608,8 @@ export const subjectSourcePacks: SubjectSourcePack[] = coreSubjectBlueprints.map
     syllabusSource: officialSourceAnchors.find((source) => source.id === "cse-2025-notification")!.href,
     syllabusNodes: subjectNodes(subject.slug),
     pyqRows: rows,
+    trendInsights: subjectTrendInsights(subject.slug),
+    systematicPath: subjectSystematicPath(subject.slug),
     readinessScore: Math.round((indexedRows / rows.length) * 100),
   };
 });
@@ -351,6 +662,7 @@ export const syllabusPyqRegistrySummary = {
   optionalSubjectCount: optionalSourcePacks.length,
   gsPyqRows: subjectSourcePacks.reduce((sum, subject) => sum + subject.pyqRows.length, 0),
   optionalPyqRows: optionalSourcePacks.reduce((sum, subject) => sum + subject.paperRows.length, 0),
+  trendInsightCount: subjectSourcePacks.reduce((sum, subject) => sum + subject.trendInsights.length, 0),
   sourceIndexedRows:
     subjectSourcePacks.reduce((sum, subject) => sum + subject.pyqRows.filter((row) => row.status !== "text-import-pending").length, 0) +
     optionalSourcePacks.reduce((sum, subject) => sum + subject.paperRows.filter((row) => row.status !== "text-import-pending").length, 0),

@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { ArrowRight, BookMarked, CheckCircle2, Database, FileSearch, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  BookMarked,
+  CheckCircle2,
+  Database,
+  FileSearch,
+  Route,
+  ShieldCheck,
+} from "lucide-react";
 
 import {
   officialSourceAnchors,
@@ -43,7 +51,7 @@ export function UpscSyllabusPyqLibrary() {
                 ["GS subjects", syllabusPyqRegistrySummary.coreSubjectCount],
                 ["Optional subjects", syllabusPyqRegistrySummary.optionalSubjectCount],
                 ["GS source rows", syllabusPyqRegistrySummary.gsPyqRows],
-                ["Optional rows", syllabusPyqRegistrySummary.optionalPyqRows],
+                ["Trend boards", syllabusPyqRegistrySummary.trendInsightCount],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -78,7 +86,12 @@ export function UpscSyllabusPyqLibrary() {
             const pendingRows = subject.pyqRows.length - indexedRows;
 
             return (
-              <article key={subject.slug} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+              <article
+                key={subject.slug}
+                data-testid="upsc-subject-source-pack"
+                data-subject-slug={subject.slug}
+                className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">GS source pack</p>
@@ -92,6 +105,50 @@ export function UpscSyllabusPyqLibrary() {
                   <Metric label="Nodes" value={subject.syllabusNodes.length} />
                   <Metric label="Indexed" value={indexedRows} />
                   <Metric label="Pending" value={pendingRows} />
+                </div>
+                <div className="mt-3 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-3" data-testid="upsc-systematic-path">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Route className="h-4 w-4 text-[#085041]" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">Systematic path rule</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <PathRow label="Basics" value={subject.systematicPath.basicsStart} />
+                    <PathRow label="Advanced" value={subject.systematicPath.advancedBridge} />
+                    <PathRow label="Current affairs" value={subject.systematicPath.currentAffairsRule} />
+                    <PathRow label="Gap" value={subject.systematicPath.gapRule} />
+                    <PathRow label="Revision" value={subject.systematicPath.revisionRule} />
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2" data-testid="upsc-pyq-trend-board">
+                  {subject.trendInsights.map((trend) => (
+                    <details
+                      key={trend.id}
+                      data-testid="upsc-pyq-trend-insight"
+                      data-evidence-level={trend.evidenceLevel}
+                      className="rounded-md border border-[#cfe5dc] bg-white p-3"
+                    >
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                              {trend.trendWindow} / {trend.syllabusArea}
+                            </p>
+                            <h3 className="mt-1 text-sm font-black">{trend.label}</h3>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <TrendBadge label="Prelims" value={trend.prelimsWeight} />
+                            <TrendBadge label="Mains" value={trend.mainsWeight} />
+                          </div>
+                        </div>
+                      </summary>
+                      <div className="mt-3 grid gap-2 text-xs font-semibold leading-5 text-[#4f5e55]">
+                        <p>{trend.pyqSignal}</p>
+                        <p className="rounded-md bg-[#f7f4ee] p-2 font-bold text-[#31443a]">Next watch: {trend.nextYearWatch}</p>
+                        <p className="rounded-md bg-[#e7f5ee] p-2 font-bold text-[#085041]">{trend.contentDesign}</p>
+                        <p className="rounded-md bg-[#fff4df] p-2 font-bold text-[#6f4a12]">{trend.dailyPlannerUse}</p>
+                      </div>
+                    </details>
+                  ))}
                 </div>
                 <div className="mt-3 grid gap-2">
                   {subject.syllabusNodes.map((node) => (
@@ -188,8 +245,31 @@ function ImportPreview({
       </div>
       <p className="mt-3 flex items-center gap-2 text-xs font-bold leading-5 text-[#5d675f]">
         <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" />
-        Source rows exist; full PDF text extraction and topic mapping continue next.
+        Source rows exist; trend boards are operational; full PDF text extraction and exact topic tagging continue next.
       </p>
     </article>
+  );
+}
+
+function PathRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="rounded-md bg-white/80 p-2 text-xs font-semibold leading-5 text-[#31443a]">
+      <span className="font-black text-[#085041]">{label}:</span> {value}
+    </p>
+  );
+}
+
+function TrendBadge({ label, value }: { label: string; value: string }) {
+  const tone =
+    value === "High"
+      ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
+      : value === "Medium"
+        ? "border-[#8ab6ff] bg-[#eef5ff] text-[#12366c]"
+        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b]";
+
+  return (
+    <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${tone}`}>
+      {label}: {value}
+    </span>
   );
 }
