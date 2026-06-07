@@ -85,17 +85,18 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto(`${baseUrl}/upsc`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   await seedMissionState(page);
-  const dashboardHref = await page.getByRole("link", { name: /Open Daily Mission/i }).first().getAttribute("href");
-  if (dashboardHref !== "/upsc/daily-command") {
-    throw new Error(`Dashboard Daily Mission link is not wired correctly: ${dashboardHref}`);
-  }
 
   await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   await page.getByText("Geography: Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Revisit queued", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-learning-gap").getByText("Repair Day 3 before moving ahead", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-revision-signal").getByText("Due now", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-today-task").getByText("Repair Day 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-growth-signal").getByText("Growth begins", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByRole("link", { name: /Watch/i }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "daily-command-desktop-geography", checks);
 

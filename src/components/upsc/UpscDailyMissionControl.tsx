@@ -21,8 +21,13 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  buildDailyPlannerDecision,
+  type DailyPlannerProgress,
+} from "@/lib/upsc/dailyPlannerEngine";
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
 import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
+import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
@@ -146,6 +151,12 @@ function getInitialDailyState(): DailyState {
   });
 }
 
+function gapTone(tone: "good" | "repair" | "neutral") {
+  if (tone === "good") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
+  if (tone === "repair") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]";
+}
+
 export function UpscDailyMissionControl() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [dailyState, setDailyState] = useState<DailyState>({ subjectSlug: "geography", day: 1, note: "" });
@@ -207,6 +218,25 @@ export function UpscDailyMissionControl() {
     );
   }, [isLoaded, dailyState]);
   const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(8) : []), [isLoaded, dailyState, saved]);
+  const studentProfile = useMemo(() => (isLoaded ? readStudentProfile() : null), [isLoaded, dailyState, saved]);
+  const activeProgressMap = useMemo<Record<string, DailyPlannerProgress | undefined>>(() => {
+    if (!isLoaded) return {};
+    return activeSubject.sessions.reduce<Record<string, DailyPlannerProgress | undefined>>((map, session) => {
+      map[String(session.day)] = getProgress(activeSubject, session) as DailyPlannerProgress | undefined;
+      return map;
+    }, {});
+  }, [activeSubject, dailyState, isLoaded, saved]);
+  const dailyPlanner = useMemo(
+    () =>
+      buildDailyPlannerDecision({
+        subjectSlug: activeSubject.slug,
+        sessions: activeSubject.sessions,
+        selectedDay: activeSession.day,
+        progress: activeProgressMap,
+        profile: studentProfile,
+      }),
+    [activeProgressMap, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
+  );
 
   const saveDailyState = (patch: Partial<DailyState>) => {
     const next = {
@@ -294,6 +324,89 @@ export function UpscDailyMissionControl() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section
+          data-testid="daily-learning-dashboard"
+          className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
+          <article
+            data-testid="daily-learning-gap"
+            className={cn("rounded-lg border p-5 shadow-sm", gapTone(dailyPlanner.learningGap.tone))}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
+                <BrainCircuit className="h-5 w-5" />
+              </div>
+              <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                {dailyPlanner.learningGap.scoreLabel}
+              </span>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Learning gap</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.learningGap.title}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.learningGap.detail}</p>
+          </article>
+
+          <Link
+            data-testid="daily-revision-signal"
+            href={dailyPlanner.revision.href}
+            className={cn(
+              "rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5",
+              dailyPlanner.revision.urgent
+                ? "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
+                : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]"
+            )}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
+                <RefreshCcw className="h-5 w-5" />
+              </div>
+              <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                {dailyPlanner.revision.dueLabel}
+              </span>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.revision.title}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.revision.detail}</p>
+          </Link>
+
+          <Link
+            data-testid="daily-today-task"
+            href={dailyPlanner.todayTask.href}
+            className="rounded-lg border border-[#1a3a2a] bg-[#1a3a2a] p-5 text-white shadow-sm transition hover:-translate-y-0.5"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/15">
+                <Target className="h-5 w-5" />
+              </div>
+              <span className="rounded-md bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                {dailyPlanner.todayTask.actionLabel}
+              </span>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">Today&apos;s task</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.todayTask.title}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-white/80">{dailyPlanner.todayTask.detail}</p>
+          </Link>
+
+          <article
+            data-testid="daily-growth-signal"
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 text-[#34453b] shadow-sm"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <LineChart className="h-5 w-5" />
+              </div>
+              <span className="rounded-md bg-[#f7f4ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                {dailyPlanner.growth.meTimeLabel}
+              </span>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Growth trend</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">{dailyPlanner.growth.title}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{dailyPlanner.growth.detail}</p>
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+              {dailyPlanner.growth.metricLabel}
+            </p>
+          </article>
         </section>
 
         <section
