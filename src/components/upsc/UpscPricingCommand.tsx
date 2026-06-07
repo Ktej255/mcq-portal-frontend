@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   coreSubjectBlueprints,
   optionalSubjects,
+  productMonthlyBasePrice,
   pricingCheckoutPath,
   productPricingPlans,
   recommendedProductPlanId,
@@ -60,12 +61,17 @@ const inclusionBlocks = [
 export function UpscPricingCommand() {
   const monthly = productPricingPlans.find((plan) => plan.id === "monthly") ?? productPricingPlans[0];
   const recommendedPlanId = recommendedProductPlanId;
+  const pricingProofRows = productPricingPlans.map((plan) => ({
+    ...plan,
+    savings: plan.listPrice - plan.launchPrice,
+  }));
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
         <section
           data-testid="upsc-pricing-hero"
+          data-monthly-base={productMonthlyBasePrice}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
@@ -109,6 +115,7 @@ export function UpscPricingCommand() {
                 data-months={plan.months}
                 data-list-price={plan.listPrice}
                 data-launch-price={plan.launchPrice}
+                data-savings={savings}
                 data-discount-percent={plan.discountPercent}
                 data-effective-monthly={plan.effectiveMonthly}
                 className={`rounded-lg border p-4 shadow-sm ${
@@ -161,6 +168,50 @@ export function UpscPricingCommand() {
               </article>
             );
           })}
+        </section>
+
+        <section
+          data-testid="upsc-pricing-discount-proof"
+          data-monthly-base={productMonthlyBasePrice}
+          data-plan-count={pricingProofRows.length}
+          data-proof-rule="monthly-base-times-duration-minus-launch-price"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Discount proof</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Every package is calculated from Rs 399 monthly</h2>
+            </div>
+            <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">Transparent ladder</Badge>
+          </div>
+          <div className="grid gap-2">
+            {pricingProofRows.map((plan) => (
+              <div
+                key={plan.id}
+                data-testid="upsc-pricing-proof-row"
+                data-plan-id={plan.id}
+                data-duration-months={plan.months}
+                data-monthly-base={productMonthlyBasePrice}
+                data-list-price={plan.listPrice}
+                data-launch-price={plan.launchPrice}
+                data-savings={plan.savings}
+                data-discount-percent={plan.discountPercent}
+                data-effective-monthly={plan.effectiveMonthly}
+                className="grid gap-2 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-bold text-[#31443a] md:grid-cols-[0.7fr_1fr_0.9fr_0.9fr] md:items-center"
+              >
+                <span className="font-black text-[#13251d]">{plan.title}</span>
+                <span>
+                  {money(productMonthlyBasePrice)} x {plan.months} = {money(plan.listPrice)}
+                </span>
+                <span>
+                  Pay {money(plan.launchPrice)} / save {money(plan.savings)}
+                </span>
+                <span>
+                  {plan.discountPercent}% off, {money(plan.effectiveMonthly)} monthly
+                </span>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section data-testid="upsc-pricing-inclusions" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">

@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "verify-pricing-planner-evidence.json");
 const profileKey = "sarit-upsc-student-profile-v1";
+const expectedMonthlyBase = 399;
 
 const expectedPlans = {
   monthly: { months: 1, launchPrice: 399 },
@@ -14,13 +15,18 @@ const expectedPlans = {
 };
 
 function expectedPlanMath(plan) {
-  const listPrice = 399 * plan.months;
+  const listPrice = expectedMonthlyBase * plan.months;
   return {
     ...plan,
     listPrice,
+    savings: listPrice - plan.launchPrice,
     discountPercent: Math.round(((listPrice - plan.launchPrice) / listPrice) * 100),
     effectiveMonthly: Math.round(plan.launchPrice / plan.months),
   };
+}
+
+function money(value) {
+  return `Rs ${value.toLocaleString("en-IN")}`;
 }
 
 async function assertNoOverflow(page, label, checks) {
@@ -84,19 +90,39 @@ async function run() {
   await page.getByTestId("upsc-pricing-hero").waitFor({ timeout: 15000 });
 
   const pricingState = await page.evaluate(() => {
+    const discountProof = document.querySelector('[data-testid="upsc-pricing-discount-proof"]');
     const plans = [...document.querySelectorAll('[data-testid="upsc-pricing-plan"]')].map((card) => ({
       id: card.getAttribute("data-plan-id"),
       months: card.getAttribute("data-months"),
       listPrice: card.getAttribute("data-list-price"),
       launchPrice: card.getAttribute("data-launch-price"),
+      savings: card.getAttribute("data-savings"),
       discountPercent: card.getAttribute("data-discount-percent"),
       effectiveMonthly: card.getAttribute("data-effective-monthly"),
       selectHref: card.querySelector('[data-testid="upsc-pricing-plan-select"]')?.getAttribute("href"),
       text: card.textContent || "",
     }));
+    const proofRows = [...document.querySelectorAll('[data-testid="upsc-pricing-proof-row"]')].map((row) => ({
+      id: row.getAttribute("data-plan-id"),
+      months: row.getAttribute("data-duration-months"),
+      monthlyBase: row.getAttribute("data-monthly-base"),
+      listPrice: row.getAttribute("data-list-price"),
+      launchPrice: row.getAttribute("data-launch-price"),
+      savings: row.getAttribute("data-savings"),
+      discountPercent: row.getAttribute("data-discount-percent"),
+      effectiveMonthly: row.getAttribute("data-effective-monthly"),
+      text: row.textContent || "",
+    }));
 
     return {
       plans,
+      discountProof: {
+        monthlyBase: discountProof?.getAttribute("data-monthly-base"),
+        planCount: discountProof?.getAttribute("data-plan-count"),
+        proofRule: discountProof?.getAttribute("data-proof-rule"),
+        proofRows,
+        text: discountProof?.textContent || "",
+      },
       inclusionText: document.querySelector('[data-testid="upsc-pricing-inclusions"]')?.textContent || "",
       readinessText: document.querySelector('[data-testid="upsc-pricing-operating-rules"]')?.textContent || "",
     };
@@ -106,30 +132,66 @@ async function run() {
   if (pricingState.plans.length !== 4) {
     throw new Error(`Expected 4 pricing plans, got ${pricingState.plans.length}`);
   }
+  if (
+    readNumber(pricingState.discountProof.monthlyBase) !== expectedMonthlyBase ||
+    readNumber(pricingState.discountProof.planCount) !== 4 ||
+    pricingState.discountProof.proofRule !== "monthly-base-times-duration-minus-launch-price" ||
+    pricingState.discountProof.proofRows.length !== 4
+  ) {
+    throw new Error(`Pricing discount proof shell failed: ${JSON.stringify(pricingState.discountProof)}`);
+  }
 
   for (const [planId, expectedBase] of Object.entries(expectedPlans)) {
     const actual = pricingState.plans.find((plan) => plan.id === planId);
+    const proof = pricingState.discountProof.proofRows.find((plan) => plan.id === planId);
     const expected = expectedPlanMath(expectedBase);
     if (!actual) throw new Error(`Missing pricing plan ${planId}`);
+    if (!proof) throw new Error(`Missing pricing proof row ${planId}`);
     const actualMath = {
       months: readNumber(actual.months),
       listPrice: readNumber(actual.listPrice),
       launchPrice: readNumber(actual.launchPrice),
+      savings: readNumber(actual.savings),
       discountPercent: readNumber(actual.discountPercent),
       effectiveMonthly: readNumber(actual.effectiveMonthly),
+    };
+    const proofMath = {
+      months: readNumber(proof.months),
+      monthlyBase: readNumber(proof.monthlyBase),
+      listPrice: readNumber(proof.listPrice),
+      launchPrice: readNumber(proof.launchPrice),
+      savings: readNumber(proof.savings),
+      discountPercent: readNumber(proof.discountPercent),
+      effectiveMonthly: readNumber(proof.effectiveMonthly),
     };
     const expectedMath = {
       months: expected.months,
       listPrice: expected.listPrice,
       launchPrice: expected.launchPrice,
+      savings: expected.savings,
+      discountPercent: expected.discountPercent,
+      effectiveMonthly: expected.effectiveMonthly,
+    };
+    const expectedProofMath = {
+      months: expected.months,
+      monthlyBase: expectedMonthlyBase,
+      listPrice: expected.listPrice,
+      launchPrice: expected.launchPrice,
+      savings: expected.savings,
       discountPercent: expected.discountPercent,
       effectiveMonthly: expected.effectiveMonthly,
     };
     if (JSON.stringify(actualMath) !== JSON.stringify(expectedMath)) {
       throw new Error(`${planId} pricing math mismatch: ${JSON.stringify({ actualMath, expectedMath })}`);
     }
+    if (JSON.stringify(proofMath) !== JSON.stringify(expectedProofMath)) {
+      throw new Error(`${planId} pricing proof mismatch: ${JSON.stringify({ proofMath, expectedProofMath })}`);
+    }
     if (actual.selectHref !== `/upsc/pricing/checkout?plan=${encodeURIComponent(planId)}`) {
       throw new Error(`${planId} select href mismatch: ${actual.selectHref}`);
+    }
+    if (!proof.text.includes(money(expectedMonthlyBase)) || !proof.text.includes(money(expected.launchPrice))) {
+      throw new Error(`${planId} proof row missing visible source math: ${proof.text}`);
     }
   }
 
@@ -146,12 +208,18 @@ async function run() {
   const checkoutState = await page.evaluate(() => {
     const intent = document.querySelector('[data-testid="upsc-pricing-checkout-intent"]');
     const math = document.querySelector('[data-testid="upsc-pricing-checkout-math"]');
+    const proof = document.querySelector('[data-testid="upsc-pricing-checkout-proof"]');
     return {
       planId: intent?.getAttribute("data-plan-id"),
       months: intent?.getAttribute("data-months"),
+      monthlyBase: intent?.getAttribute("data-monthly-base"),
+      listPrice: intent?.getAttribute("data-list-price"),
       launchPrice: intent?.getAttribute("data-launch-price"),
+      savings: intent?.getAttribute("data-savings"),
       discountPercent: intent?.getAttribute("data-discount-percent"),
       effectiveMonthly: intent?.getAttribute("data-effective-monthly"),
+      proofRule: proof?.getAttribute("data-proof-rule"),
+      proofText: proof?.textContent || "",
       mathText: math?.textContent || "",
       text: document.body.textContent || "",
     };
@@ -161,9 +229,15 @@ async function run() {
   if (
     checkoutState.planId !== "three-year" ||
     readNumber(checkoutState.months) !== threeYearMath.months ||
+    readNumber(checkoutState.monthlyBase) !== expectedMonthlyBase ||
+    readNumber(checkoutState.listPrice) !== threeYearMath.listPrice ||
     readNumber(checkoutState.launchPrice) !== threeYearMath.launchPrice ||
+    readNumber(checkoutState.savings) !== threeYearMath.savings ||
     readNumber(checkoutState.discountPercent) !== threeYearMath.discountPercent ||
     readNumber(checkoutState.effectiveMonthly) !== threeYearMath.effectiveMonthly ||
+    checkoutState.proofRule !== "monthly-base-times-duration-minus-launch-price" ||
+    !checkoutState.proofText.includes(money(expectedMonthlyBase)) ||
+    !checkoutState.proofText.includes(money(threeYearMath.savings)) ||
     !checkoutState.text.includes("Local checkout handoff")
   ) {
     throw new Error(`Checkout intent failed: ${JSON.stringify(checkoutState)}`);

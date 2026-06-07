@@ -68,10 +68,10 @@ export type ThreeDayLaunchItem = {
   proof: string;
 };
 
-const monthlyRate = 399;
+export const productMonthlyBasePrice = 399;
 
 function pricingPlan(id: string, title: string, months: number, launchPrice: number, audience: string, promise: string): ProductPlan {
-  const listPrice = monthlyRate * months;
+  const listPrice = productMonthlyBasePrice * months;
   return {
     id,
     title,

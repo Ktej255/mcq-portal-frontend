@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, BadgeIndianRupee, CheckCircle2, ShieldCheck } fr
 import { Badge } from "@/components/ui/badge";
 import {
   getProductPricingPlan,
+  productMonthlyBasePrice,
   pricingCheckoutPath,
   productPricingPlans,
   recommendedProductPlanId,
@@ -29,8 +30,10 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           data-testid="upsc-pricing-checkout-intent"
           data-plan-id={selectedPlan.id}
           data-months={selectedPlan.months}
+          data-monthly-base={productMonthlyBasePrice}
           data-list-price={selectedPlan.listPrice}
           data-launch-price={selectedPlan.launchPrice}
+          data-savings={savings}
           data-discount-percent={selectedPlan.discountPercent}
           data-effective-monthly={selectedPlan.effectiveMonthly}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
@@ -72,6 +75,25 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
               <p className="mt-1 text-xl font-black">{value}</p>
             </div>
           ))}
+        </section>
+
+        <section
+          data-testid="upsc-pricing-checkout-proof"
+          data-plan-id={selectedPlan.id}
+          data-monthly-base={productMonthlyBasePrice}
+          data-duration-months={selectedPlan.months}
+          data-list-price={selectedPlan.listPrice}
+          data-launch-price={selectedPlan.launchPrice}
+          data-savings={savings}
+          data-proof-rule="monthly-base-times-duration-minus-launch-price"
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm"
+        >
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Checkout proof</p>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#31443a]">
+            {money(productMonthlyBasePrice)} x {selectedPlan.months} month
+            {selectedPlan.months === 1 ? "" : "s"} = {money(selectedPlan.listPrice)} list price. Final plan price is{" "}
+            {money(selectedPlan.launchPrice)}, so the student saves {money(savings)}.
+          </p>
         </section>
 
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
