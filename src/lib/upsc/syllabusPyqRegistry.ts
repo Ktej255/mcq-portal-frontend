@@ -903,7 +903,21 @@ export const syllabusPyqRegistrySummary = {
   gsPyqRows: subjectSourcePacks.reduce((sum, subject) => sum + subject.pyqRows.length, 0),
   optionalPyqRows: optionalSourcePacks.reduce((sum, subject) => sum + subject.paperRows.length, 0),
   trendInsightCount: subjectSourcePacks.reduce((sum, subject) => sum + subject.trendInsights.length, 0),
+  officialAnchorCount: officialSourceAnchors.length,
+  yearWindow: `${sourceYears[sourceYears.length - 1]}-${sourceYears[0]}`,
   sourceIndexedRows:
     subjectSourcePacks.reduce((sum, subject) => sum + subject.pyqRows.filter((row) => row.status !== "text-import-pending").length, 0) +
     optionalSourcePacks.reduce((sum, subject) => sum + subject.paperRows.filter((row) => row.status !== "text-import-pending").length, 0),
+};
+
+export const syllabusPyqPreloadAudit = {
+  ...syllabusPyqRegistrySummary,
+  totalPyqRows: syllabusPyqRegistrySummary.gsPyqRows + syllabusPyqRegistrySummary.optionalPyqRows,
+  textImportPendingRows:
+    syllabusPyqRegistrySummary.gsPyqRows +
+    syllabusPyqRegistrySummary.optionalPyqRows -
+    syllabusPyqRegistrySummary.sourceIndexedRows,
+  proofRule: "core-and-optional-official-source-row-preload",
+  statusRule:
+    "Source-indexed rows point to official UPSC paper pages; text-import-pending rows still require PDF text extraction and topic mapping.",
 };

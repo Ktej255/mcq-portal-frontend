@@ -61,18 +61,48 @@ async function run() {
   await page.getByText("Trend boards", { exact: true }).waitFor({ timeout: 15000 });
 
   const libraryState = await page.evaluate(() => {
+    const preloadProof = document.querySelector('[data-testid="upsc-syllabus-pyq-preload-proof"]');
     const packs = [...document.querySelectorAll('[data-testid="upsc-subject-source-pack"]')];
     const geographyPack = document.querySelector('[data-testid="upsc-subject-source-pack"][data-subject-slug="geography"]');
     const trendInsights = [...document.querySelectorAll('[data-testid="upsc-pyq-trend-insight"]')];
     const officialAnchors = [...document.querySelectorAll('[data-testid="upsc-official-source-anchors"] a')];
-    const optionalCards = [...document.querySelectorAll('[data-testid="upsc-optional-source-packs"] a')];
+    const optionalCards = [...document.querySelectorAll('[data-testid="upsc-optional-source-pack-link"]')];
 
     return {
       subjectPackCount: packs.length,
+      preloadProof: {
+        proofRule: preloadProof?.getAttribute("data-proof-rule"),
+        yearWindow: preloadProof?.getAttribute("data-year-window"),
+        coreSubjectCount: preloadProof?.getAttribute("data-core-subject-count"),
+        optionalSubjectCount: preloadProof?.getAttribute("data-optional-subject-count"),
+        gsPyqRows: preloadProof?.getAttribute("data-gs-pyq-rows"),
+        optionalPyqRows: preloadProof?.getAttribute("data-optional-pyq-rows"),
+        totalPyqRows: preloadProof?.getAttribute("data-total-pyq-rows"),
+        sourceIndexedRows: preloadProof?.getAttribute("data-source-indexed-rows"),
+        textImportPendingRows: preloadProof?.getAttribute("data-text-import-pending-rows"),
+        officialAnchorCount: preloadProof?.getAttribute("data-official-anchor-count"),
+        trendInsightCount: preloadProof?.getAttribute("data-trend-insight-count"),
+        text: preloadProof?.textContent || "",
+      },
       officialAnchorCount: officialAnchors.length,
       optionalCardCount: optionalCards.length,
       trendInsightCount: trendInsights.length,
       trendEvidenceLevels: trendInsights.map((node) => node.getAttribute("data-evidence-level")),
+      subjectPackRows: packs.map((pack) => ({
+        slug: pack.getAttribute("data-subject-slug"),
+        syllabusNodeCount: pack.getAttribute("data-syllabus-node-count"),
+        pyqRowCount: pack.getAttribute("data-pyq-row-count"),
+        indexedRowCount: pack.getAttribute("data-indexed-row-count"),
+        pendingRowCount: pack.getAttribute("data-pending-row-count"),
+        trendInsightCount: pack.getAttribute("data-trend-insight-count"),
+        readinessScore: pack.getAttribute("data-readiness-score"),
+      })),
+      optionalPackRows: optionalCards.map((card) => ({
+        slug: card.getAttribute("data-optional-slug"),
+        paperRowCount: card.getAttribute("data-paper-row-count"),
+        yearCount: card.getAttribute("data-year-count"),
+        readinessScore: card.getAttribute("data-readiness-score"),
+      })),
       geographyText: geographyPack?.textContent || "",
       bodyText: document.body.textContent || "",
     };
@@ -80,22 +110,66 @@ async function run() {
 
   checks.push({ label: "source-library-trend-state", libraryState });
 
-  if (libraryState.subjectPackCount < 8) {
-    throw new Error(`Expected at least 8 GS source packs, got ${libraryState.subjectPackCount}`);
+  const expectedPreloadProof = {
+    proofRule: "core-and-optional-official-source-row-preload",
+    yearWindow: "2015-2025",
+    coreSubjectCount: "8",
+    optionalSubjectCount: "48",
+    gsPyqRows: "176",
+    optionalPyqRows: "1056",
+    totalPyqRows: "1232",
+    sourceIndexedRows: "216",
+    textImportPendingRows: "1016",
+    officialAnchorCount: "5",
+    trendInsightCount: "13",
+  };
+
+  if (libraryState.subjectPackCount !== 8) {
+    throw new Error(`Expected 8 GS source packs, got ${libraryState.subjectPackCount}`);
   }
-  if (libraryState.officialAnchorCount < 5) {
-    throw new Error(`Expected official source anchors, got ${libraryState.officialAnchorCount}`);
+  if (libraryState.officialAnchorCount !== 5) {
+    throw new Error(`Expected 5 official source anchors, got ${libraryState.officialAnchorCount}`);
   }
-  if (libraryState.optionalCardCount < 45) {
+  if (libraryState.optionalCardCount !== 48) {
     throw new Error(`Expected optional source cards, got ${libraryState.optionalCardCount}`);
   }
-  if (libraryState.trendInsightCount < 12) {
+  if (libraryState.trendInsightCount !== 13) {
     throw new Error(`Expected subject trend insights, got ${libraryState.trendInsightCount}`);
+  }
+  for (const [key, expected] of Object.entries(expectedPreloadProof)) {
+    if (libraryState.preloadProof[key] !== expected) {
+      throw new Error(`Preload proof ${key} mismatch: ${JSON.stringify({ expected, actual: libraryState.preloadProof[key], preloadProof: libraryState.preloadProof })}`);
+    }
+  }
+  if (
+    !libraryState.preloadProof.text.includes("GS and optional source rows are counted from one registry") ||
+    !libraryState.preloadProof.text.includes("PDF text extraction and topic mapping")
+  ) {
+    throw new Error(`Preload proof missing visible audit language: ${libraryState.preloadProof.text}`);
+  }
+  if (
+    libraryState.subjectPackRows.some(
+      (pack) =>
+        pack.pyqRowCount !== "22" ||
+        Number(pack.indexedRowCount) + Number(pack.pendingRowCount) !== 22 ||
+        Number(pack.trendInsightCount) < 1 ||
+        Number(pack.syllabusNodeCount) < 1
+    )
+  ) {
+    throw new Error(`Subject source-pack row contract failed: ${JSON.stringify(libraryState.subjectPackRows)}`);
+  }
+  if (
+    libraryState.optionalPackRows.some(
+      (pack) => pack.paperRowCount !== "22" || pack.yearCount !== "11" || pack.readinessScore !== "18"
+    )
+  ) {
+    throw new Error(`Optional source-pack row contract failed: ${JSON.stringify(libraryState.optionalPackRows)}`);
   }
   if (libraryState.trendEvidenceLevels.some((level) => level !== "topic-pattern-model")) {
     throw new Error(`Unexpected trend evidence levels: ${JSON.stringify(libraryState.trendEvidenceLevels)}`);
   }
   for (const required of [
+    "Preload audit proof",
     "Map plus process explanation",
     "Systematic path rule",
     "Basics:",

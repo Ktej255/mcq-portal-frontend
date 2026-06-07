@@ -13,6 +13,7 @@ import {
   officialSourceAnchors,
   optionalSourcePacks,
   subjectSourcePacks,
+  syllabusPyqPreloadAudit,
   syllabusPyqRegistrySummary,
   type ImportStatus,
 } from "@/lib/upsc/syllabusPyqRegistry";
@@ -63,6 +64,47 @@ export function UpscSyllabusPyqLibrary() {
           </div>
         </section>
 
+        <section
+          data-testid="upsc-syllabus-pyq-preload-proof"
+          data-proof-rule={syllabusPyqPreloadAudit.proofRule}
+          data-year-window={syllabusPyqPreloadAudit.yearWindow}
+          data-core-subject-count={syllabusPyqPreloadAudit.coreSubjectCount}
+          data-optional-subject-count={syllabusPyqPreloadAudit.optionalSubjectCount}
+          data-gs-pyq-rows={syllabusPyqPreloadAudit.gsPyqRows}
+          data-optional-pyq-rows={syllabusPyqPreloadAudit.optionalPyqRows}
+          data-total-pyq-rows={syllabusPyqPreloadAudit.totalPyqRows}
+          data-source-indexed-rows={syllabusPyqPreloadAudit.sourceIndexedRows}
+          data-text-import-pending-rows={syllabusPyqPreloadAudit.textImportPendingRows}
+          data-official-anchor-count={syllabusPyqPreloadAudit.officialAnchorCount}
+          data-trend-insight-count={syllabusPyqPreloadAudit.trendInsightCount}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                Preload audit proof
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                GS and optional source rows are counted from one registry.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
+                {syllabusPyqPreloadAudit.statusRule}
+              </p>
+            </div>
+            <Database className="h-6 w-6 text-[#085041]" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <AuditMetric label="Year window" value={syllabusPyqPreloadAudit.yearWindow} />
+            <AuditMetric label="GS PYQ rows" value={syllabusPyqPreloadAudit.gsPyqRows} />
+            <AuditMetric label="Optional rows" value={syllabusPyqPreloadAudit.optionalPyqRows} />
+            <AuditMetric label="Total rows" value={syllabusPyqPreloadAudit.totalPyqRows} />
+            <AuditMetric label="Source indexed" value={syllabusPyqPreloadAudit.sourceIndexedRows} />
+            <AuditMetric label="Text pending" value={syllabusPyqPreloadAudit.textImportPendingRows} />
+            <AuditMetric label="Official anchors" value={syllabusPyqPreloadAudit.officialAnchorCount} />
+            <AuditMetric label="Trend insights" value={syllabusPyqPreloadAudit.trendInsightCount} />
+          </div>
+        </section>
+
         <section data-testid="upsc-official-source-anchors" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-4 flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-[#1a3a2a]" />
@@ -91,6 +133,12 @@ export function UpscSyllabusPyqLibrary() {
                 key={subject.slug}
                 data-testid="upsc-subject-source-pack"
                 data-subject-slug={subject.slug}
+                data-syllabus-node-count={subject.syllabusNodes.length}
+                data-pyq-row-count={subject.pyqRows.length}
+                data-indexed-row-count={indexedRows}
+                data-pending-row-count={pendingRows}
+                data-trend-insight-count={subject.trendInsights.length}
+                data-readiness-score={subject.readinessScore}
                 className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -192,7 +240,16 @@ export function UpscSyllabusPyqLibrary() {
           </div>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {optionalSourcePacks.map((subject) => (
-              <Link key={subject.slug} href={subject.route} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]">
+              <Link
+                key={subject.slug}
+                href={subject.route}
+                data-testid="upsc-optional-source-pack-link"
+                data-optional-slug={subject.slug}
+                data-paper-row-count={subject.paperRows.length}
+                data-year-count={subject.yearRows.length}
+                data-readiness-score={subject.readinessScore}
+                className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+              >
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{subject.group}</p>
                 <h3 className="mt-1 text-sm font-black">{subject.title}</h3>
                 <p className="mt-1 text-xs font-semibold text-[#5d675f]">
@@ -212,6 +269,15 @@ function Metric({ label, value }: { label: string; value: number }) {
     <div className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
       <p className="mt-1 text-xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function AuditMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-md border border-[#b9d9cd] bg-white/75 p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+      <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
     </div>
   );
 }
