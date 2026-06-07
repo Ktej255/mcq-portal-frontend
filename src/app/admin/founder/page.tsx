@@ -1,120 +1,131 @@
-"use client";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  CircleDashed,
+  ClipboardCheck,
+  ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { geographyDay1Recommendation } from "@/lib/upsc/geographyDay1ContentIntake";
+import { geographyFounderReviewItems } from "@/lib/upsc/geographyPilotRelease";
+import { releaseGates } from "@/lib/upsc/featureInventory";
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  HeartPulse, 
-  Users, 
-  ShieldCheck, 
-  AlertTriangle,
-  Zap,
-  CloudLightning
-} from 'lucide-react';
+export default function FounderReviewPage() {
+  const completedGates = releaseGates.filter((gate) => gate.complete).length;
 
-export default function FounderDashboard() {
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6" data-testid="admin-founder-review-page">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 pb-6">
+        <div className="max-w-3xl">
+          <Badge variant="outline" className="mb-3 h-7 rounded-md border-emerald-200 bg-emerald-50 px-2 font-bold text-emerald-800">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Founder Review
+          </Badge>
+          <h1 className="text-3xl font-black text-zinc-950">Geography Pilot Review Center</h1>
+          <p className="mt-3 text-base leading-7 text-zinc-600">
+            Human review checklist for the first learner path. This screen intentionally shows review work and open
+            gates, not fabricated institutional-health percentages.
+          </p>
+        </div>
+        <Link
+          href="/admin/launch-plan"
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-bold text-white transition hover:bg-zinc-800"
+        >
+          Open Launch Plan <ArrowRight className="h-4 w-4" />
+        </Link>
+      </header>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">Founder surfaces</p>
+          <p className="mt-3 text-3xl font-black text-emerald-950">{geographyFounderReviewItems.length}</p>
+          <p className="mt-2 text-sm leading-6 text-emerald-800">
+            Landing, Watch, Talk, Visual Lab, MCQ intake, Track/Revisit, and mobile fit.
+          </p>
+        </div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Release gate</p>
+          <p className="mt-3 text-3xl font-black text-amber-950">
+            {completedGates}/{releaseGates.length}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-amber-800">
+            Live Supabase, Google OAuth continuity, real Day 1 assets, and the first tester wave remain open.
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" data-testid="admin-founder-surface-checklist">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-zinc-900">Institutional Health</h1>
-          <p className="text-muted-foreground mt-1 text-lg font-medium">Founder-level educational signals and system integrity.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200 text-xs font-bold">
-            <ShieldCheck className="w-4 h-4" />
-            OPERATIONAL STABILITY: 100%
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-2 border-zinc-900 bg-zinc-900 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <HeartPulse className="w-24 h-24" />
-          </div>
-          <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase tracking-widest opacity-60">Global Recovery Success</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-black tracking-tighter">78.4%</div>
-            <p className="text-xs mt-2 font-medium opacity-70">Students successfully recovering from weak topics within 3 revision cycles.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-zinc-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Content Freshness Index</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-black tracking-tighter text-zinc-900">94.2%</div>
-            <p className="text-xs mt-2 font-medium text-emerald-600">+2.1% from last audit</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-zinc-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Student Burnout Risk</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-black tracking-tighter text-rose-600">4.2%</div>
-            <p className="text-xs mt-2 font-medium text-muted-foreground">Distribution of students in Detachment Recommended state.</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500" />
-            Educational Momentum
+          <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950">
+            <ClipboardCheck className="h-5 w-5 text-emerald-700" />
+            Seven-Point Founder Checklist
           </h2>
-          <div className="space-y-4">
-            {[
-              { label: 'Daily Consistency (Active Users)', value: '89%', change: '+5%', color: 'bg-emerald-500' },
-              { label: 'Revision Queue Clearance Rate', value: '62%', change: '-3%', color: 'bg-amber-500' },
-              { label: 'Explanation Quality Score (Avg)', value: '0.88', change: '+0.04', color: 'bg-blue-500' },
-            ].map((item, i) => (
-              <div key={i} className="p-5 rounded-2xl bg-white border border-zinc-100 shadow-sm">
-                <div className="flex justify-between items-end mb-2">
-                  <span className="text-xs font-bold text-zinc-500 uppercase">{item.label}</span>
-                  <span className="text-sm font-black">{item.value}</span>
-                </div>
-                <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${item.color}`} style={{ width: item.value }} />
+          <p className="mt-1 text-sm text-zinc-500">
+            Use the Launch Plan to save the actual review completion state before sharing.
+          </p>
+        </div>
+        <div className="mt-4 divide-y divide-zinc-100">
+          {geographyFounderReviewItems.map((item, index) => (
+            <div key={item.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-zinc-950">
+                  {index + 1}. {item.label}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">{item.detail}</p>
+              </div>
+              <Link
+                href={item.href}
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-900 transition hover:bg-zinc-50"
+              >
+                Open Surface <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm" data-testid="admin-founder-day1-decision">
+        <h2 className="flex items-center gap-2 text-xl font-black text-emerald-950">
+          <BookOpenCheck className="h-5 w-5 text-emerald-700" />
+          Day 1 Content Decision
+        </h2>
+        <p className="mt-3 text-sm font-black leading-6 text-emerald-950">
+          Day 1: {geographyDay1Recommendation.proposedDay1}
+        </p>
+        <p className="mt-1 text-sm font-black leading-6 text-emerald-950">
+          Day 2: {geographyDay1Recommendation.proposedDay2}
+        </p>
+        <p className="mt-3 text-sm leading-6 text-emerald-800">{geographyDay1Recommendation.decision}</p>
+        <Link
+          href="/admin/feature-inventory"
+          className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100"
+        >
+          Inspect Founder Sources <ArrowRight className="h-4 w-4" />
+        </Link>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" data-testid="admin-founder-release-gates">
+        <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950">
+          <ShieldCheck className="h-5 w-5 text-emerald-700" />
+          Open Release Boundary
+        </h2>
+        <div className="mt-4 divide-y divide-zinc-100">
+          {releaseGates.map((gate) => {
+            const Icon = gate.complete ? CheckCircle2 : CircleDashed;
+            return (
+              <div key={gate.title} className="flex gap-3 py-3">
+                <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${gate.complete ? "text-emerald-600" : "text-amber-600"}`} />
+                <div>
+                  <p className="text-sm font-black text-zinc-950">{gate.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-zinc-600">{gate.detail}</p>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-
-        <div className="space-y-6">
-          <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-            <CloudLightning className="w-5 h-5 text-blue-500" />
-            Institutional Bottlenecks
-          </h2>
-          <div className="grid gap-4">
-            <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 flex gap-4">
-              <div className="p-3 bg-rose-500/10 rounded-xl">
-                <AlertTriangle className="w-6 h-6 text-rose-600" />
-              </div>
-              <div>
-                <p className="font-black text-rose-900">Current Affairs Stale-ness</p>
-                <p className="text-xs text-rose-800/70 mt-1 leading-relaxed">12 questions in Polity have not been reviewed since the recent legislative updates. Immediate re-verification recommended.</p>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-100 flex gap-4">
-              <div className="p-3 bg-amber-500/10 rounded-xl">
-                <Users className="w-6 h-6 text-amber-600" />
-              </div>
-              <div>
-                <p className="font-black text-amber-900">Revision Avoidance Cluster</p>
-                <p className="text-xs text-amber-800/70 mt-1 leading-relaxed">24% of students are consistently skipping Economics revision tasks. System intervention triggered for morning drills.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -8,10 +8,20 @@ import {
   Timer, 
   ZapOff, 
   AlertTriangle,
+  LockKeyhole,
   Target
 } from 'lucide-react';
+import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 
 export default function SimulationLobby() {
+  return (
+    <ProtectedRoute requiredRole="ADMIN">
+      <SimulationLobbyContent />
+    </ProtectedRoute>
+  );
+}
+
+function SimulationLobbyContent() {
   return (
     <div className="max-w-4xl mx-auto py-20 px-6 space-y-12">
       <div className="text-center space-y-4">
@@ -22,6 +32,10 @@ export default function SimulationLobby() {
         <p className="text-zinc-500 font-medium max-w-lg mx-auto">
           This is a high-fidelity exam environment designed to build temperament. All educational safety nets are removed.
         </p>
+        <div className="mx-auto flex max-w-lg items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
+          <LockKeyhole className="h-4 w-4 shrink-0" />
+          Internal prototype. Launch stays disabled until the legacy exam API is connected and verified.
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -64,9 +78,10 @@ export default function SimulationLobby() {
           </div>
 
           <Button 
-            className="w-full h-18 rounded-2xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-xl shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]"
+            disabled
+            className="w-full h-18 rounded-lg bg-indigo-500 text-white font-black text-xl shadow-xl shadow-indigo-500/20"
           >
-            I AM READY. START SIMULATION.
+            SIMULATION API REQUIRED
           </Button>
           
           <p className="text-[10px] text-center text-zinc-500 font-bold uppercase tracking-widest">

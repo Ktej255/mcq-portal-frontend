@@ -35,6 +35,19 @@ async function seedEvidence(page) {
   await page.evaluate((key) => {
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_track_evidence_ledger");
     window.localStorage.setItem(
+      "sarit-upsc-student-profile-v1",
+      JSON.stringify({
+        level: "advanced",
+        preparationStage: "multiple-attempts",
+        attemptHistory: "two-plus-attempts",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    window.localStorage.setItem(
       key,
       JSON.stringify({
         "13": {
@@ -42,7 +55,7 @@ async function seedEvidence(page) {
           watched: true,
           watchState: "Watched",
           watchSceneCompletedIds: ["13-briefing", "13-mechanism", "13-map", "13-trap", "13-recap"],
-          talkScore: 88,
+          talkScore: 96,
           talkBand: "Command",
           talkUnlockStage: "mcq",
           talkClassroomStage: "examiner-verdict",
@@ -97,6 +110,17 @@ async function expectEvidence(page, id, statusText, detailText) {
   return row.getAttribute("href");
 }
 
+async function openAdvancedDiagnostics(page, checks, label) {
+  await page.getByTestId("geography-track-simple-dashboard").waitFor({ timeout: 15000 });
+  const advancedOpenBefore = await page.getByTestId("geography-track-advanced-tools").evaluate((element) => Boolean(element.open));
+  checks.push({ label, advancedOpenBefore });
+  if (advancedOpenBefore) {
+    throw new Error("Track diagnostics should stay folded on first load.");
+  }
+  await page.getByTestId("geography-track-advanced-tools").locator("summary").click();
+  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -113,15 +137,15 @@ async function run() {
   await seedEvidence(page);
 
   await page.goto(`${baseUrl}/upsc/geography/track?day=13`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
+  await openAdvancedDiagnostics(page, checks, "evidence-ledger-folded-command-day");
   await page.getByTestId("geography-focused-evidence-ledger").getByText("Tick status for this day", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-focused-evidence-ledger").getByText("100% ready", { exact: false }).waitFor({ timeout: 15000 });
 
-  const watchHref = await expectEvidence(page, "geography-evidence-watch-proof", "Done", "5/5 scene proofs saved");
-  const talkHref = await expectEvidence(page, "geography-evidence-talk-verdict", "Done", "88/100 Command verdict");
-  const revisitHref = await expectEvidence(page, "geography-evidence-revisit-state", "Done", "No active recovery blocker");
-  const labHref = await expectEvidence(page, "geography-evidence-lab-proof", "Done", "Wildlife Sanctuaries: Wayanad WLS");
-  const mcqHref = await expectEvidence(page, "geography-evidence-mcq-outcome", "Done", "22/25 correct");
+  const watchHref = await expectEvidence(page, "geography-evidence-lesson", "Done", "5/5 lesson checkpoints saved");
+  const talkHref = await expectEvidence(page, "geography-evidence-discussion", "Done", "96/100 Command verdict");
+  const revisitHref = await expectEvidence(page, "geography-evidence-short-revision", "Done", "No active recovery blocker");
+  const labHref = await expectEvidence(page, "geography-evidence-optional-visual", "Done", "Wildlife Sanctuaries: Wayanad WLS");
+  const mcqHref = await expectEvidence(page, "geography-evidence-practice-result", "Done", "22/25 correct");
 
   const expectedHrefs = {
     watchHref: "/upsc/geography/watch?day=13",
@@ -139,16 +163,16 @@ async function run() {
   await assertNoOverflow(page, "evidence-ledger-command-day", checks);
 
   await page.goto(`${baseUrl}/upsc/geography/track?day=15`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-evidence-watch-proof").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-evidence-talk-verdict").getByText("Active", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-evidence-lab-proof").getByText("Blocked", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-evidence-mcq-outcome").getByText("Blocked", { exact: false }).waitFor({ timeout: 15000 });
+  await openAdvancedDiagnostics(page, checks, "evidence-ledger-folded-talk-pending-day");
+  await page.getByTestId("geography-evidence-lesson").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-evidence-discussion").getByText("Active", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-evidence-optional-visual").getByText("Pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-evidence-practice-result").getByText("Pending", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "evidence-ledger-talk-pending-day", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/geography/track?day=13`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
+  await openAdvancedDiagnostics(page, checks, "evidence-ledger-folded-mobile");
   await assertNoOverflow(page, "evidence-ledger-mobile", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

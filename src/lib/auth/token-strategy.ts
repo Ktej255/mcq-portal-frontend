@@ -1,6 +1,7 @@
 import { auth } from '@/lib/firebase/config';
 import { activeAuthProvider, env } from '@/env';
 import { supabase } from '@/lib/supabase/client';
+import { readLocalMockToken } from '@/lib/auth/local-testing';
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
@@ -10,13 +11,10 @@ const authDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
  */
 export async function resolveToken(forceRefresh = false): Promise<string | null> {
   // 1. Check for MOCK_TOKEN bypass (Priority for dev/validator scenarios)
-  if (typeof window !== 'undefined') {
-    const mockWindow = window as Window & { MOCK_TOKEN?: string };
-    const mockToken = mockWindow.MOCK_TOKEN || localStorage.getItem("MOCK_TOKEN");
-    if (mockToken) {
-      if (authDebug) console.info("AUTH | TOKEN_STRATEGY | Using MOCK_TOKEN bypass");
-      return mockToken;
-    }
+  const mockToken = readLocalMockToken();
+  if (mockToken) {
+    if (authDebug) console.info("AUTH | TOKEN_STRATEGY | Using local MOCK_TOKEN bypass");
+    return mockToken;
   }
 
   // 2. Supabase Authentication

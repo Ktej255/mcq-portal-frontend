@@ -20,11 +20,12 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { GeographyLoopActions } from "@/components/upsc/GeographyLoopActions";
 import { getGeographyLoopState, hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
+import { getCurrentGeographyTopic, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
 import { labSlugForGeographySession } from "@/lib/upsc/geographyLearning";
 import { buildGeographyReadinessSnapshot } from "@/lib/upsc/geographyReadiness";
 import { geographySessions } from "@/lib/upsc/plan";
+import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
 
@@ -69,14 +70,15 @@ const evidenceStatusIcon: Record<EvidenceStatus, LucideIcon> = {
 
 export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
   const { getDayProgress, isLoaded, progress, stats } = useGeographyProgress();
+  const learnerLevel = readStudentProfile()?.level ?? "beginner";
   const focusedDay =
     initialDay && Number.isFinite(initialDay) ? Math.min(Math.max(initialDay, 1), geographySessions.length) : undefined;
-  const readinessSnapshot = buildGeographyReadinessSnapshot(progress, { isLoaded });
+  const readinessSnapshot = buildGeographyReadinessSnapshot(progress, { isLoaded, learnerLevel });
 
   const loopStates = geographySessions.map((session) => ({
     session,
     progress: getDayProgress(session.day),
-    state: getGeographyLoopState(session, getDayProgress(session.day)),
+    state: getGeographyLoopState(session, getDayProgress(session.day), { learnerLevel }),
   }));
   const focusedLoopState =
     loopStates.find(({ session }) => session.day === focusedDay) ??
@@ -87,8 +89,10 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
   const talkPassedCount = loopStates.filter(({ progress }) => hasGeographyTalkClearance(progress)).length;
   const labCompleteCount = loopStates.filter(({ progress }) => progress?.labCompleted).length;
   const mcqCommandCount = readinessSnapshot.stageCounts.mcq;
+  const generatedCurrentDay = getCurrentGeographyTopic(progress).day;
+  const canOpenTrackDay = (day: number) => day <= generatedCurrentDay || Boolean(getDayProgress(day));
   const blockedCount = loopStates.filter(({ state }) =>
-    ["Watch pending", "Talk pending", "Lab pending", "Revisit required"].includes(state.label)
+    ["Lesson pending", "Watch pending", "Talk pending", "Revisit required"].includes(state.label)
   ).length;
 
   const groupedSessions = weekLabels.map((label, index) => ({
@@ -107,10 +111,19 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
     readinessSnapshot.days.find((day) => day.session.day === nextFocusSession.day) ?? readinessSnapshot.days[0];
   const focusedProgress = focusedLoopState?.progress;
   const focusedDayComplete = Boolean(focusedReadiness?.mcqCommand);
+  const nextFocusNextDay = nextFocusSession.day < geographySessions.length ? nextFocusSession.day + 1 : "";
+  const nextStudyHref =
+    nextFocusSession.day < geographySessions.length
+      ? getGuidedStudyEntryRoute(learnerLevel, nextFocusSession.day + 1)
+      : "/upsc/geography/track";
   const focusedCloseoutHref = focusedDayComplete
-    ? "/upsc/geography/pilot"
-    : focusedReadiness?.nextState.href ?? focusedLoopState?.state.href ?? `/upsc/geography/watch?day=${nextFocusSession.day}`;
-  const focusedCloseoutLabel = focusedDayComplete ? "Return to pilot feedback" : "Finish current gate";
+    ? nextStudyHref
+    : focusedReadiness?.nextState.href ?? focusedLoopState?.state.href ?? `/upsc/geography/talk?day=${nextFocusSession.day}`;
+  const focusedCloseoutLabel = focusedDayComplete
+    ? nextFocusSession.day < geographySessions.length
+      ? `Start Day ${nextFocusSession.day + 1}`
+      : "Review Geography progress"
+    : focusedLoopState?.state.cta ?? "Continue";
   const focusedWatchProofCount = Math.min(
     focusedProgress?.watchSceneCompletedIds?.length ?? (focusedProgress?.watched ? 5 : 0),
     5
@@ -122,30 +135,28 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
   const focusedEvidenceItems: FocusedEvidenceItem[] = focusedReadiness
     ? [
         {
-          label: "Watch proof",
-          detail: `${focusedWatchProofCount}/5 scene proofs saved`,
+          label: "Lesson",
+          detail: `${focusedWatchProofCount}/5 lesson checkpoints saved`,
           status: focusedReadiness.watchComplete ? "Done" : focusedLoopState?.state.room === "watch" ? "Active" : "Pending",
           href: `/upsc/geography/watch?day=${nextFocusSession.day}`,
           icon: PlayCircle,
         },
         {
-          label: "Talk verdict",
+          label: "Discussion",
           detail:
             typeof focusedProgress?.talkScore === "number"
               ? `${focusedProgress.talkScore}/100 ${focusedProgress.talkBand ?? "Talk"} verdict`
               : "AI teacher verdict missing",
           status: focusedReadiness.talkClear
             ? "Done"
-            : focusedReadiness.watchComplete
-              ? focusedLoopState?.state.room === "talk"
-                ? "Active"
-                : "Pending"
-              : "Blocked",
+            : focusedLoopState?.state.room === "talk"
+              ? "Active"
+              : "Pending",
           href: `/upsc/geography/talk?day=${nextFocusSession.day}`,
           icon: BrainCircuit,
         },
         {
-          label: "Revisit state",
+          label: "Short revision",
           detail: focusedReadiness.revisitNeeded
             ? focusedProgress?.recoveryDiagnosisSummary ?? "Recovery is queued"
             : focusedReadiness.recoveryComplete
@@ -156,38 +167,85 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
           icon: RefreshCcw,
         },
         {
-          label: "Lab proof",
+          label: "Optional visual",
           detail:
             focusedProgress?.labEvidenceAnchor
               ? `${focusedLabProofCount}/5 proofs at ${focusedProgress.labEvidenceAnchor}`
               : `${focusedLabProofCount}/5 visual proofs saved`,
           status: focusedReadiness.labComplete
             ? "Done"
-            : focusedReadiness.talkClear
-              ? focusedLoopState?.state.room === "lab"
-                ? "Active"
-                : "Pending"
-              : "Blocked",
+            : "Pending",
           href: `/upsc/geography/lab?mode=${focusedProgress?.labMode ?? nextFocusLabSlug}&day=${nextFocusSession.day}`,
           icon: Layers3,
         },
         {
-          label: "MCQ outcome",
+          label: "Practice result",
           detail: focusedProgress?.mcqCompleted
             ? `${focusedProgress.mcqCorrectCount ?? 0}/${focusedProgress.mcqTotal ?? focusedReadiness.mcqPlanned} correct`
-            : `${focusedReadiness.mcqDrafted}/${focusedReadiness.mcqPlanned} fresh drafted`,
+            : "Reviewed practice result is not available yet",
           status: focusedReadiness.mcqCommand
             ? "Done"
-            : focusedReadiness.labComplete
-              ? focusedLoopState?.state.room === "mcq"
-                ? "Active"
-                : "Pending"
-              : "Blocked",
+            : focusedLoopState?.state.room === "mcq"
+              ? "Active"
+              : "Pending",
           href: `/upsc/geography/mcq-readiness?day=${nextFocusSession.day}`,
           icon: ClipboardCheck,
         },
       ]
     : [];
+  const focusedDayNumber = focusedLoopState?.session.day ?? nextFocusSession.day;
+  const spacedRevisionDayNumber = Math.min(focusedDayNumber + 2, geographySessions.length);
+  const spacedRevisionItem = stats.revisitDays[0]
+    ? {
+        source: stats.revisitDays[0],
+        due:
+          geographySessions.find((session) => session.day === Math.min(stats.revisitDays[0].day + 2, geographySessions.length)) ??
+          stats.revisitDays[0],
+      }
+    : stats.spacedRevisionItems[0];
+  const spacedRevisionSession =
+    spacedRevisionItem?.source ??
+    geographySessions.find((session) => session.day === spacedRevisionDayNumber) ??
+    nextFocusSession;
+  const spacedRevisionDueSession = spacedRevisionItem?.due ?? spacedRevisionSession;
+  const spacedRevisionCopy =
+    stats.revisitDays[0]
+      ? `Day ${spacedRevisionSession.day} is already in revisit. Repair it before new work.`
+      : stats.spacedRevisionItems.length > 0
+        ? `Day ${spacedRevisionSession.day} is due on study Day ${spacedRevisionDueSession.day}. Re-explain it before new content.`
+        : `Revise Day ${spacedRevisionSession.day} on the Feynman + Day 3 recall cycle.`;
+  const simpleTrendLabel =
+    readinessSnapshot.score >= 75
+      ? "Stable"
+      : readinessSnapshot.score >= 45
+        ? "Building"
+        : "Needs support";
+  const simpleTrackSignals = [
+    {
+      id: "gap",
+      label: "Learning gap",
+      value: focusedLoopState?.state.label ?? "Start recall",
+      detail: focusedLoopState?.state.detail ?? "Begin with the first Talk room.",
+      icon: Gauge,
+      testId: "geography-track-learning-gap",
+    },
+    {
+      id: "revision",
+      label: "Next revision",
+      value: stats.revisitDays[0] || stats.spacedRevisionItems.length > 0 ? `Day ${spacedRevisionSession.day}` : `Day ${spacedRevisionDueSession.day}`,
+      detail: spacedRevisionCopy,
+      icon: TimerReset,
+      testId: "geography-track-next-revision",
+    },
+    {
+      id: "trend",
+      label: "Trend",
+      value: simpleTrendLabel,
+      detail: `${readinessSnapshot.score}% Geography readiness, ${readinessSnapshot.commandCount}/30 command days.`,
+      icon: BarChart3,
+      testId: "geography-track-trend",
+    },
+  ];
 
   if (!isLoaded) {
     return (
@@ -202,6 +260,158 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1b2f27]">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        <section
+          data-testid="geography-track-simple-dashboard"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
+        >
+          <div data-testid="geography-track-four-signal-surface" className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            <div
+              data-testid="geography-track-focused-day"
+              data-signal-priority="primary"
+              data-learner-level={learnerLevel}
+              data-focused-day={focusedDayNumber}
+              data-day-complete={focusedDayComplete ? "true" : "false"}
+              data-next-topic-day={nextFocusNextDay}
+              data-next-action-href={focusedCloseoutHref}
+              data-next-action-label={focusedCloseoutLabel}
+              className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5"
+            >
+              <Link href={`/upsc/geography?day=${nextFocusSession.day}`} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
+                <ArrowLeft className="h-4 w-4" /> Geography
+              </Link>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1d9e75]">
+                Today&apos;s task
+              </p>
+              <h1 className="mt-2 text-2xl font-black leading-tight text-[#13251d] md:text-4xl">
+                Day {focusedDayNumber}: {focusedLoopState?.session.title ?? nextFocusSession.title}
+              </h1>
+              <p className="mt-3 text-sm font-bold leading-6 text-[#5d675f]">
+                {focusedLoopState?.state.label ?? "Start recall"}: {focusedLoopState?.state.detail ?? "Open the first Talk room and continue from there."}
+              </p>
+              <Link
+                data-testid="geography-track-focused-route"
+                data-learner-level={learnerLevel}
+                data-focused-day={focusedDayNumber}
+                data-day-complete={focusedDayComplete ? "true" : "false"}
+                data-next-topic-day={nextFocusNextDay}
+                data-next-action-href={focusedCloseoutHref}
+                data-next-action-label={focusedCloseoutLabel}
+                href={focusedCloseoutHref}
+                className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] sm:w-auto"
+              >
+                {focusedCloseoutLabel} <ArrowLeft className="h-4 w-4 rotate-180" />
+              </Link>
+              <p
+                data-testid="geography-track-one-action-rule"
+                className="mt-3 text-xs font-bold leading-5 text-[#49675e]"
+              >
+                Use this button first. The rest of Track is only context.
+              </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {simpleTrackSignals.map((signal) => (
+                <article
+                  key={signal.id}
+                  data-testid={signal.testId}
+                  className="rounded-lg border border-[#dcd5c7] bg-white/75 p-4"
+                >
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                    <signal.icon className="h-4 w-4" />
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    {signal.label}
+                  </p>
+                  <p className="mt-2 text-xl font-black leading-6 text-[#13251d]">{signal.value}</p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#657066]">{signal.detail}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <details
+            data-testid="geography-track-path-map"
+            className="group mt-5 overflow-hidden rounded-lg border border-[#dcd5c7] bg-white/70"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">30-day path</p>
+                <h2 className="text-base font-black text-[#13251d]">Open only when you want to change day</h2>
+              </div>
+              <span className="rounded-md border border-[#cfc6b6] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] transition group-open:bg-[#1a3a2a] group-open:text-white">
+                Open path
+              </span>
+            </summary>
+
+            <div data-testid="geography-track-day-flow" className="border-t border-[#eee7dc] p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-black text-[#13251d]">Geography sprint state</p>
+                <span className="text-xs font-bold text-[#746f66]">Open the first unfinished day, then follow the button.</span>
+              </div>
+              <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                {[
+                  ["Talk passed", talkPassedCount],
+                  ["Lab completed", labCompleteCount],
+                  ["Blocked days", blockedCount],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-md border border-[#dcd5c7] bg-white/70 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+                {loopStates.map(({ session, state }) => {
+                  const canOpen = canOpenTrackDay(session.day);
+                  const content = (
+                    <>
+                      <p className="text-xs font-black uppercase tracking-[0.14em]">Day {session.day}</p>
+                      <p className="mt-1 line-clamp-2 text-sm font-black leading-5">{session.title}</p>
+                      <p className="mt-2 text-[11px] font-black uppercase tracking-[0.12em] opacity-75">
+                        {canOpen ? state.label : "Locked until current"}
+                      </p>
+                    </>
+                  );
+
+                  return canOpen ? (
+                    <Link
+                      key={session.day}
+                      href={state.href}
+                      data-testid={`track-day-${session.day}`}
+                      data-day-state="open"
+                      className={cn(
+                        "min-h-20 rounded-md border p-3 transition hover:-translate-y-0.5",
+                        state.tone,
+                        focusedDayNumber === session.day ? "ring-2 ring-[#1a3a2a]/25" : ""
+                      )}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <article
+                      key={session.day}
+                      data-testid={`track-day-${session.day}`}
+                      data-day-state="locked"
+                      aria-disabled="true"
+                      className="min-h-20 rounded-md border border-[#e3d9c7] bg-[#f7f4ee] p-3 text-[#9b9388]"
+                    >
+                      {content}
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <details
+          data-testid="geography-track-advanced-tools"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+        >
+          <summary className="cursor-pointer text-sm font-black text-[#13251d]">
+            Advanced progress diagnostics
+          </summary>
+          <div className="mt-5 flex flex-col gap-6">
         <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
             <Link href={`/upsc/geography?day=${nextFocusSession.day}`} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
@@ -232,8 +442,8 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
               { label: "Watched classes", value: stats.watchedCount, icon: PlayCircle },
               { label: "Talk passed", value: talkPassedCount, icon: BrainCircuit },
               { label: "Lab completed", value: labCompleteCount, icon: Layers3 },
-              { label: "MCQ command", value: mcqCommandCount, icon: ClipboardCheck },
-              { label: "MCQ attempted", value: stats.mcqAttemptedCount, icon: ClipboardCheck },
+              { label: "Practice complete", value: mcqCommandCount, icon: ClipboardCheck },
+              { label: "Practice attempted", value: stats.mcqAttemptedCount, icon: ClipboardCheck },
               { label: "Revisit queue", value: stats.revisitCount, icon: RefreshCcw },
               { label: "Blocked days", value: blockedCount, icon: Gauge },
               { label: "Command days", value: stats.commandCount, icon: CheckCircle2 },
@@ -348,17 +558,9 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
                     {group.sessions.map(({ session, progress, state }) => {
-                      return (
-                        <Link
-                          key={session.day}
-                          href={state.href}
-                          data-testid={`track-day-${session.day}`}
-                          className={cn(
-                            "min-h-24 rounded-md border p-3 transition hover:-translate-y-0.5",
-                            state.tone,
-                            focusedLoopState?.session.day === session.day ? "ring-2 ring-[#1a3a2a]/25" : ""
-                          )}
-                        >
+                      const canOpen = canOpenTrackDay(session.day);
+                      const content = (
+                        <>
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <p className="text-xs font-black uppercase tracking-[0.14em]">Day {session.day}</p>
                             <span className="flex items-center gap-1">
@@ -371,14 +573,40 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                           </div>
                           <p className="text-sm font-black leading-5">{session.title}</p>
                           <p className="mt-2 text-xs font-semibold opacity-75">
-                            {state.label} / {state.shortDetail}
+                            {canOpen ? `${state.label} / ${state.shortDetail}` : "Locked until the current topic is cleared"}
                           </p>
                           <p className="mt-2 text-[11px] font-black uppercase tracking-[0.12em] opacity-70">
                             {progress?.mcqAttempted
-                              ? `MCQ ${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? 0}`
-                              : progress?.labCompleted ? "Lab completed" : "Lab pending"}
+                              ? `Practice ${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? 0}`
+                              : progress?.labCompleted ? "Optional visual used" : "Optional visual available"}
                           </p>
+                        </>
+                      );
+
+                      return canOpen ? (
+                        <Link
+                          key={session.day}
+                          href={state.href}
+                          data-testid={`track-day-detail-${session.day}`}
+                          data-day-state="open"
+                          className={cn(
+                            "min-h-24 rounded-md border p-3 transition hover:-translate-y-0.5",
+                            state.tone,
+                            focusedLoopState?.session.day === session.day ? "ring-2 ring-[#1a3a2a]/25" : ""
+                          )}
+                        >
+                          {content}
                         </Link>
+                      ) : (
+                        <article
+                          key={session.day}
+                          data-testid={`track-day-detail-${session.day}`}
+                          data-day-state="locked"
+                          aria-disabled="true"
+                          className="min-h-24 rounded-md border border-[#e3d9c7] bg-[#f7f4ee] p-3 text-[#9b9388]"
+                        >
+                          {content}
+                        </article>
                       );
                     })}
                   </div>
@@ -390,7 +618,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
           <div className="grid gap-5">
             {focusedLoopState ? (
               <div
-                data-testid="geography-track-focused-day"
+                data-testid="geography-track-focused-day-detail"
                 className={cn("rounded-lg border p-5 shadow-sm", focusedLoopState.state.tone)}
               >
                 <p className="text-xs font-black uppercase tracking-[0.22em] opacity-75">Focused day</p>
@@ -400,7 +628,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                 <p className="mt-3 text-sm font-bold leading-6 opacity-80">{focusedLoopState.state.label}</p>
                 <p className="mt-1 text-xs font-semibold leading-5 opacity-75">{focusedLoopState.state.detail}</p>
                 <Link
-                  data-testid="geography-track-focused-route"
+                  data-testid="geography-track-focused-route-detail"
                   href={focusedLoopState.state.href}
                   className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
                 >
@@ -467,17 +695,19 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                   </div>
                 ) : null}
 
-                <div data-testid="geography-track-closeout-panel" className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#f3fbf7] p-4">
+                <div data-testid="geography-track-closeout-panel-detail" className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#f3fbf7] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Pilot closeout</p>
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Next step</p>
                       <h3 className="mt-1 text-lg font-black text-[#13251d]">
-                        {focusedDayComplete ? `Day ${nextFocusSession.day} complete` : `Day ${nextFocusSession.day} still needs proof`}
+                        {focusedDayComplete ? `Day ${nextFocusSession.day} complete` : `Continue Day ${nextFocusSession.day}`}
                       </h3>
                       <p className="mt-2 break-words text-sm font-bold leading-6 text-[#49675e]">
                         {focusedDayComplete
-                          ? "The student has Watch, Talk, Lab, and MCQ command proof. Return to the pilot page and save the final observation."
-                          : focusedReadiness?.nextState.detail ?? "Finish the active room before closing the pilot loop."}
+                          ? nextFocusSession.day < geographySessions.length
+                            ? "Your discussion and MCQ are complete. The next topic is ready."
+                            : "Your Geography sprint is complete. Review progress and revision dates."
+                          : focusedReadiness?.nextState.detail ?? "Continue the current step. The app will choose what comes next."}
                       </p>
                     </div>
                     <span className={cn(
@@ -486,13 +716,19 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                         ? "bg-[#e7f5ee] text-[#085041] ring-[#1d9e75]/25"
                         : "bg-[#fff4df] text-[#6f4a12] ring-[#ef9f27]/30"
                     )}>
-                      {focusedDayComplete ? "Feedback due" : focusedReadiness?.nextState.label ?? "In progress"}
+                      {focusedDayComplete ? "Next topic ready" : focusedReadiness?.nextState.label ?? "In progress"}
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <Link
-                      data-testid="geography-track-pilot-feedback-route"
+                      data-testid="geography-track-pilot-feedback-route-detail"
+                      data-learner-level={learnerLevel}
+                      data-focused-day={focusedDayNumber}
+                      data-day-complete={focusedDayComplete ? "true" : "false"}
+                      data-next-topic-day={nextFocusNextDay}
+                      data-next-action-href={focusedCloseoutHref}
+                      data-next-action-label={focusedCloseoutLabel}
                       href={focusedCloseoutHref}
                       className={cn(
                         "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-black transition",
@@ -503,13 +739,15 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
                     >
                       {focusedCloseoutLabel} <ArrowRight className="h-4 w-4" />
                     </Link>
-                    <Link
-                      data-testid="geography-track-recovery-route"
-                      href={`/upsc/geography/revisit?day=${nextFocusSession.day}`}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-                    >
-                      Open Revisit recovery <RefreshCcw className="h-4 w-4" />
-                    </Link>
+                    {focusedReadiness?.revisitNeeded ? (
+                      <Link
+                        data-testid="geography-track-recovery-route-detail"
+                        href={`/upsc/geography/revisit?day=${nextFocusSession.day}`}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                      >
+                        Revise weak point <RefreshCcw className="h-4 w-4" />
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -554,9 +792,10 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
               )}
             </div>
 
-            <GeographyLoopActions activeDay={nextFocusSession.day} labSlug={nextFocusLabSlug} current="track" />
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </div>
   );

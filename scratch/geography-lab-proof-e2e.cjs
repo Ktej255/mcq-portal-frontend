@@ -6,6 +6,7 @@ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "geography-lab-proof-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "geography-lab-proof-final.png");
 const progressKey = "sarit-upsc-geography-progress-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
 async function metrics(page) {
@@ -37,6 +38,23 @@ async function run() {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(
+    ({ key }) => {
+      localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_lab_proof");
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          level: "advanced",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    },
+    { key: profileKey }
+  );
 
   await page.goto(`${baseUrl}/upsc/geography/lab?mode=india-map&day=10`, { waitUntil: "domcontentloaded" });
   await page.evaluate((key) => {
@@ -60,52 +78,34 @@ async function run() {
   }, progressKey);
 
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByTestId("india-layered-atlas").waitFor({ timeout: 15000 });
-  await page.getByTestId("india-layer-national-parks").click();
-  await page.getByTestId("geography-lab-proof-stages").waitFor({ timeout: 15000 });
-
-  const proofLines = [
-    "Concept lock: protected areas must be read with relief, river, forest type and state location.",
-    "Map mechanism: national park location becomes meaningful when connected with foothill, floodplain or delta geography.",
-    "India example: Jim Corbett links Terai-Bhabar foothills, riverine forest and tiger habitat.",
-    "UPSC trap: protected area questions can mix state, river, biome and category, so label-only memory is weak.",
-    "Answer hook: map the place first, then connect habitat, physical region, conservation category and one statement trap.",
-  ];
-
-  for (let index = 0; index < proofLines.length; index += 1) {
-    await page.getByTestId("geography-lab-proof-input").fill(proofLines[index]);
-    await page.getByTestId("geography-lab-save-proof").click();
-    await page.waitForFunction(
-      ({ key, expected }) => {
-        const day = JSON.parse(window.localStorage.getItem(key) || "{}")["10"];
-        return (day?.labProofCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: progressKey, expected: index + 1 },
-      { timeout: 15000 }
-    );
+  await page.getByTestId("lab-proof-command-board").waitFor({ timeout: 15000 });
+  const stageVisible = await page.getByTestId("geography-lab-proof-stages").isVisible();
+  if (stageVisible) {
+    throw new Error("Manual lab proof stages should remain folded on first load.");
   }
+  await page.getByTestId("geography-lab-proof-input").fill(
+    "Protected area proof: map the physical region first, then connect habitat, conservation category, example and one statement trap."
+  );
+  await page.getByTestId("geography-lab-save-proof").click();
 
   const stored = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["10"], progressKey);
   if (!stored?.labCompleted || stored?.labMode !== "india-map" || stored?.labProofCompletedIds?.length !== 5) {
     throw new Error(`Lab proof did not complete correctly: ${JSON.stringify(stored)}`);
-  }
-  if (stored.labAtlasLayer !== "national-parks" || stored.labAtlasPoint !== "Jim Corbett NP") {
-    throw new Error(`Atlas selection was not preserved: ${JSON.stringify(stored)}`);
   }
   checks.push({
     label: "stored-geography-lab-proof",
     labCompleted: stored.labCompleted,
     labMode: stored.labMode,
     labProofCompletedIds: stored.labProofCompletedIds,
-    labAtlasLayer: stored.labAtlasLayer,
-    labAtlasPoint: stored.labAtlasPoint,
+    labEvidenceStatus: stored.labEvidenceStatus,
+    labNextRoute: stored.labNextRoute,
   });
   await assertNoOverflow(page, "geography-lab-proof", checks);
 
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=10`, { waitUntil: "domcontentloaded" });
-  await page.getByTestId("mcq-lab-gate").waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-lab-gate").getByText("Lab proof 5/5", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByText("Learning gate passed", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("Fresh MCQs pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("MCQ", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-mcq-advanced-tools").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "geography-mcq-lab-proof-gate", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

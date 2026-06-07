@@ -1,6 +1,7 @@
-import type { SubjectSession } from "@/lib/upsc/subjectPlans";
+import type { SubjectSession, SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
 
 export type SubjectAssessmentBand = "Revisit" | "Practice" | "Command";
+export const SUBJECT_RECALL_TARGET = 95;
 
 export type SubjectAssessment = {
   score: number;
@@ -78,6 +79,26 @@ export function getSubjectSubtopics(session: SubjectSession) {
         .filter(Boolean)
     )
   ).slice(0, 7);
+}
+
+const subjectGsCompatibility: Record<string, string> = {
+  environment: "GS Paper III: environment, ecology, biodiversity, climate, pollution, and conservation.",
+  "disaster-management": "GS Paper III: disaster management, risk assessment, preparedness, response, and recovery.",
+  economy: "GS Paper III: economic development, inclusive growth, budgeting, agriculture, industry, and external sector.",
+  "science-tech": "GS Paper III: science and technology applications, space, biotech, defence, health, and emerging tech.",
+  "polity-governance": "GS Paper II: Constitution, polity, governance, social justice, institutions, and welfare delivery.",
+  "internal-security-society": "GS Paper I/III: Indian society, social issues, internal security, border management, and cyber security.",
+  history: "GS Paper I: modern history, ancient history, medieval history, art, culture, sources, and heritage.",
+};
+
+export function getSubjectGsCompatibility(plan: Pick<SubjectSprintPlan, "slug" | "title">, session: SubjectSession) {
+  const syllabusLine = subjectGsCompatibility[plan.slug] ?? `UPSC GS syllabus: ${plan.title}.`;
+
+  return `${syllabusLine} Daily focus: ${session.chapter} - ${session.title}.`;
+}
+
+export function getSubjectSyllabusChips(session: SubjectSession) {
+  return getSubjectSubtopics(session).slice(0, 4);
 }
 
 export function getCompressedSubjectRecap(session: SubjectSession) {
@@ -212,14 +233,14 @@ export function assessSubjectExplanation(
     };
   }
 
-  if (score < 85) {
+  if (score < SUBJECT_RECALL_TARGET) {
     return {
       score,
       band: "Practice",
       matchedKeywords,
       missingKeywords,
-      summary: "The explanation has enough conceptual coverage for the lab. Add one stronger applied proof before MCQs.",
-      nextAction: "Open visual lab",
+      summary: `The explanation has usable logic, but recall has not reached ${SUBJECT_RECALL_TARGET}%. Use visual support or retry the oral answer before MCQs.`,
+      nextAction: "Repair toward 95%",
     };
   }
 
@@ -237,7 +258,7 @@ export function getSubjectTalkUnlockStage(assessment?: SubjectAssessment | null)
   const score = assessment?.score ?? 0;
   if (score < 40) return "revisit";
   if (score < 70) return "retry";
-  if (score < 85) return "lab";
+  if (score < SUBJECT_RECALL_TARGET) return "lab";
   return "mcq";
 }
 
@@ -259,8 +280,8 @@ export function buildSubjectMaicDiscussion(
   const verdictByStage: Record<SubjectTalkUnlockStage, string> = {
     revisit: "Revisit required: the explanation is too thin for forward movement.",
     retry: "Retry required: the student has partial logic, but the answer needs a cleaner mechanism and applied example.",
-    lab: "Visual Lab unlocked: the concept is good enough for applied proof before MCQs.",
-    mcq: "MCQ route conditionally unlocked: complete Visual Lab proof first if it is still pending.",
+    lab: `Support route unlocked: use Visual Lab or retry Talk until recall reaches ${SUBJECT_RECALL_TARGET}%.`,
+    mcq: `MCQ route unlocked: recall reached ${SUBJECT_RECALL_TARGET}%; Visual Lab remains optional support.`,
   };
 
   return {

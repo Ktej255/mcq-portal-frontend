@@ -56,20 +56,20 @@ export function GeographyLoopActions({
   const canGoNext = activeDay < geographyDayCount;
   const actions = [
     {
-      id: "watch" as const,
-      step: "01",
-      label: "Watch",
-      detail: "Class",
-      href: `/upsc/geography/watch?day=${activeDay}`,
-      icon: PlayCircle,
-    },
-    {
       id: "talk" as const,
-      step: "02",
+      step: "01",
       label: "Talk",
-      detail: "Explain",
+      detail: "Recall",
       href: `/upsc/geography/talk?day=${activeDay}`,
       icon: BrainCircuit,
+    },
+    {
+      id: "watch" as const,
+      step: "02",
+      label: "Watch",
+      detail: "Repair",
+      href: `/upsc/geography/watch?day=${activeDay}`,
+      icon: PlayCircle,
     },
     {
       id: "lab" as const,

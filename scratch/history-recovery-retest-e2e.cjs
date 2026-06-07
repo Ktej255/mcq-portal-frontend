@@ -100,7 +100,7 @@ async function run() {
             reflection: "Recovery proof rebuilt with chronology, source-map, personalities, causes, and consequences.",
             revisitQueued: false,
             activePromptLabel: "MCQ Revisit",
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             talkClassroomStage: "examiner-verdict",

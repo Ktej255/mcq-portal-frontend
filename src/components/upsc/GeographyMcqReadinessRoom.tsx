@@ -6,18 +6,18 @@ import {
   ArrowLeft,
   ArrowRight,
   BrainCircuit,
-  CheckCircle2,
   ClipboardCheck,
   Lock,
-  MapPinned,
-  UploadCloud,
+  RotateCcw,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
+import { GEOGRAPHY_RECALL_TARGET, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
 import { getGeographyBatchCode } from "@/lib/upsc/mcqContract";
 import { readLocalMcqCommandQuestionsForBatch, readMcqCommandBatchState } from "@/lib/upsc/mcqDraftBank";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
+import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 import type { QuestionPayload } from "@/services/api/adminService";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,66 @@ function resolveSession(day?: number): GeographySession {
   return geographySessions.find((session) => session.day === day) ?? geographySessions[0];
 }
 
-function labSlugForSession(labTitle: string) {
-  if (labTitle === "Monsoon Simulator") return "monsoon";
-  if (labTitle === "India Interactive Map") return "india-map";
-  if (labTitle === "Disaster Link") return "disaster-link";
-  if (labTitle === "Environment Bridge") return "environment-bridge";
-  if (labTitle === "MCQ Engine") return "mcq-engine";
-  return "earth-layers";
+function getOptionText(question: QuestionPayload, option: "A" | "B" | "C" | "D") {
+  const options = question.options_en;
+  if (!options || typeof options !== "object") return "";
+  return String((options as Record<string, unknown>)[option] ?? "");
+}
+
+function sanitizePracticeAnswers(value: unknown, questionCount: number): Record<number, string> {
+  if (!value || typeof value !== "object") return {};
+  const candidate = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(candidate)
+      .map(([key, option]) => [Number(key), option])
+      .filter(
+        ([index, option]) =>
+          Number.isInteger(index) &&
+          (index as number) >= 0 &&
+          (index as number) < questionCount &&
+          typeof option === "string" &&
+          ["A", "B", "C", "D"].includes(option)
+      )
+  ) as Record<number, string>;
+}
+
+function getMcqLevelCopy(learnerLevel: StudentLevel) {
+  if (learnerLevel === "advanced") {
+    return {
+      badge: "Advanced practice",
+      title: "Prove the gap is closed",
+      heroDetail:
+        "Answer a short fresh set. A strong score opens the next topic; a weak score opens a short repair.",
+      readyDetail:
+        "Answer one question at a time. The app will choose the next step.",
+      pendingDetail:
+        "Your diagnosis is saved. Practice will open when the next set is ready.",
+    };
+  }
+
+  if (learnerLevel === "intermediate") {
+    return {
+      badge: "Intermediate practice",
+      title: "Check the repaired gap",
+      heroDetail:
+        "Answer a short fresh set. A strong score opens the next topic; a weak score opens a short repair.",
+      readyDetail:
+        "Answer one question at a time. The app will choose the next step.",
+      pendingDetail:
+        "Your diagnosis is saved. Practice will open when the next set is ready.",
+    };
+  }
+
+  return {
+    badge: "Beginner practice",
+    title: "Practice after 95% recall",
+    heroDetail:
+      "You cleared the discussion. Now answer a short set; the app will send you forward or into a short repair.",
+    readyDetail:
+      "Answer one question at a time. The app will choose the next step.",
+    pendingDetail:
+      "Your discussion is saved. Practice will open when the next set is ready.",
+  };
 }
 
 export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number }) {
@@ -43,47 +96,208 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
   const batchCode = getGeographyBatchCode(activeSession);
   const [freshQuestions, setFreshQuestions] = useState<QuestionPayload[]>([]);
   const [batchStatus, setBatchStatus] = useState<"DRAFT" | "READY" | "EMPTY">("EMPTY");
-  const [saved, setSaved] = useState(false);
+  const [practiceStarted, setPracticeStarted] = useState(false);
+  const [currentPracticeIndex, setCurrentPracticeIndex] = useState(0);
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<number, string>>({});
+  const learnerLevel = readStudentProfile()?.level ?? "beginner";
+  const mcqLevelCopy = getMcqLevelCopy(learnerLevel);
 
   useEffect(() => {
-    const state = readMcqCommandBatchState(batchCode);
-    const questions = readLocalMcqCommandQuestionsForBatch(batchCode);
-    setFreshQuestions(questions);
-    setBatchStatus(state?.status ?? (questions.length > 0 ? "DRAFT" : "EMPTY"));
-  }, [batchCode]);
+    if (!isLoaded) return;
+    const timer = window.setTimeout(() => {
+      const state = readMcqCommandBatchState(batchCode);
+      const questions = readLocalMcqCommandQuestionsForBatch(batchCode);
+      const savedProgress = getDayProgress(activeSession.day);
+      const canRestorePractice = savedProgress?.mcqLastBatchCode === batchCode && !savedProgress?.mcqCompleted;
+      const restoredAnswers = canRestorePractice
+        ? sanitizePracticeAnswers(savedProgress?.mcqAnswerMap, questions.length)
+        : {};
+      const restoredAnsweredCount = Object.keys(restoredAnswers).length;
+      const firstUnansweredIndex = questions.findIndex((_, index) => !restoredAnswers[index]);
+      const restoredIndex =
+        canRestorePractice && typeof savedProgress?.mcqCurrentQuestionIndex === "number"
+          ? savedProgress.mcqCurrentQuestionIndex
+          : firstUnansweredIndex >= 0
+            ? firstUnansweredIndex
+            : 0;
+      setFreshQuestions(questions);
+      setBatchStatus(state?.status ?? (questions.length > 0 ? "DRAFT" : "EMPTY"));
+      setPracticeStarted(canRestorePractice && restoredAnsweredCount > 0);
+      setCurrentPracticeIndex(Math.max(0, Math.min(questions.length - 1, restoredIndex)));
+      setPracticeAnswers(restoredAnswers);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSession.day, batchCode, getDayProgress, isLoaded]);
 
   const talkCleared = hasGeographyTalkClearance(progress);
   const labProofCount = Math.min(progress?.labProofCompletedIds?.length ?? (progress?.labCompleted ? 5 : 0), 5);
   const labCleared = Boolean(progress?.labCompleted) && labProofCount >= 5;
-  const gatesCleared = talkCleared && labCleared;
+  const gatesCleared = talkCleared;
   const hasFreshQuestions = freshQuestions.length > 0;
   const isReady = gatesCleared && hasFreshQuestions && batchStatus === "READY";
-  const labHref = `/upsc/geography/lab?mode=${progress?.labMode ?? labSlugForSession(activeSession.lab)}&day=${activeSession.day}`;
+  const currentPracticeQuestion = freshQuestions[currentPracticeIndex];
+  const currentPracticeAnswer = practiceAnswers[currentPracticeIndex];
+  const answeredCount = freshQuestions.filter((_, index) => Boolean(practiceAnswers[index])).length;
+  const correctCount = freshQuestions.filter((question, index) => practiceAnswers[index] === question.correct_option).length;
+  const scorePercent = freshQuestions.length > 0 ? Math.round((correctCount / freshQuestions.length) * 100) : 0;
+  const isPracticeComplete = freshQuestions.length > 0 && answeredCount >= freshQuestions.length;
+  const practiceOutcome = !isPracticeComplete ? "Pending" : scorePercent >= 70 ? "Command" : "Revisit";
+  const hasSavedPracticeResult = Boolean(
+    progress?.mcqCompleted &&
+      progress.mcqLastBatchCode === batchCode &&
+      progress.mcqOutcome &&
+      progress.mcqOutcome !== "Pending"
+  );
+  const hasPracticeResult = isPracticeComplete || hasSavedPracticeResult;
+  const resolvedCorrectCount = isPracticeComplete ? correctCount : (progress?.mcqCorrectCount ?? 0);
+  const resolvedTotal = isPracticeComplete ? freshQuestions.length : (progress?.mcqTotal ?? freshQuestions.length);
+  const resolvedScorePercent = isPracticeComplete ? scorePercent : (progress?.mcqScorePercent ?? 0);
+  const resolvedOutcome = isPracticeComplete ? practiceOutcome : (progress?.mcqOutcome ?? "Pending");
   const revisitHref = `/upsc/geography/revisit?day=${activeSession.day}`;
+  const nextDayHref =
+    activeSession.day < geographySessions.length
+      ? getGuidedStudyEntryRoute(learnerLevel, activeSession.day + 1)
+      : "/upsc/geography/track";
+  const commandActionTitle = activeSession.day < geographySessions.length ? "Continue to next topic" : "Open progress review";
+  const nextActionTitle = hasPracticeResult
+    ? resolvedOutcome === "Command"
+      ? commandActionTitle
+      : "Repair this topic"
+    : !isReady
+      ? "Practice is being prepared"
+      : practiceStarted
+        ? "Answer this question"
+        : "Start practice";
+  const nextActionDetail = hasPracticeResult
+    ? resolvedOutcome === "Command"
+      ? `${resolvedCorrectCount}/${resolvedTotal} correct (${resolvedScorePercent}%). Your next topic is ready.`
+      : `${resolvedCorrectCount}/${resolvedTotal} correct (${resolvedScorePercent}%). Complete a short revision before trying again.`
+    : !isReady
+      ? `${mcqLevelCopy.pendingDetail} Return to Today for the next available task.`
+      : mcqLevelCopy.readyDetail;
+  const nextActionHref = hasPracticeResult
+    ? resolvedOutcome === "Command"
+      ? nextDayHref
+      : revisitHref
+    : `/upsc/geography/mcq-readiness?day=${activeSession.day}`;
+  const visibleTalkScore =
+    typeof progress?.talkScore === "number" ? progress.talkScore : GEOGRAPHY_RECALL_TARGET;
+  const mcqFlowSteps = [
+    {
+      label: `Talk ${GEOGRAPHY_RECALL_TARGET}%`,
+      detail: `Cleared at ${Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}% recall`,
+    },
+    {
+      label: "Fresh MCQ",
+      detail: isReady || hasPracticeResult ? "One question at a time" : "Preparing reviewed set",
+    },
+    {
+      label: resolvedOutcome === "Revisit" ? "Repair" : "Next topic",
+      detail:
+        hasPracticeResult && resolvedOutcome === "Command"
+          ? activeSession.day < geographySessions.length
+            ? `Day ${activeSession.day + 1} opens automatically`
+            : "Progress review opens"
+          : hasPracticeResult
+            ? "Short revision opens"
+            : "Result decides route",
+    },
+  ];
 
-  const savePractice = () => {
-    const total = Math.max(freshQuestions.length, 0);
+  const persistPracticeAnswer = (option: string) => {
+    const nextAnswers = {
+      ...practiceAnswers,
+      [currentPracticeIndex]: option,
+    };
+    const total = freshQuestions.length;
+    const nextAnsweredCount = freshQuestions.filter((_, index) => Boolean(nextAnswers[index])).length;
+    const nextCorrectCount = freshQuestions.filter((question, index) => nextAnswers[index] === question.correct_option).length;
+    const nextScorePercent = total > 0 ? Math.round((nextCorrectCount / total) * 100) : 0;
+    const nextComplete = total > 0 && nextAnsweredCount >= total;
+    const nextOutcome = !nextComplete ? "Pending" : nextScorePercent >= 70 ? "Command" : "Revisit";
+    const nextRoute =
+      nextOutcome === "Revisit"
+        ? revisitHref
+        : nextOutcome === "Command"
+          ? nextDayHref
+          : `/upsc/geography/mcq-readiness?day=${activeSession.day}`;
+
+    setPracticeAnswers(nextAnswers);
     saveDayProgress(activeSession.day, {
       mcqAttempted: total > 0,
-      mcqCompleted: total > 0,
-      mcqAnsweredCount: total,
-      mcqCorrectCount: total,
+      mcqCompleted: nextComplete,
+      mcqAnswerMap: nextAnswers,
+      mcqCurrentQuestionIndex: currentPracticeIndex,
+      mcqAnsweredCount: nextAnsweredCount,
+      mcqCorrectCount: nextCorrectCount,
       mcqTotal: total,
-      mcqScorePercent: total > 0 ? 100 : 0,
+      mcqScorePercent: nextScorePercent,
       mcqLastBatchCode: batchCode,
-      mcqOutcome: total > 0 ? "Command" : "Pending",
-      mcqRecommendedRoute: total > 0 ? `/upsc/geography?day=${activeSession.day + 1}` : `/upsc/geography/mcq-readiness?day=${activeSession.day}`,
-      mcqReviewSummary: total > 0 ? "Fresh MCQ practice marked complete locally." : "Fresh MCQs are not attached yet.",
-      mcqReadinessStatus: total > 0 ? "command" : "batch-pending",
-      mcqEvidenceAnchor: `${activeSession.title} / ${batchCode}`,
-      mcqNextRoute: total > 0 ? `/upsc/geography?day=${activeSession.day + 1}` : `/upsc/geography/mcq-readiness?day=${activeSession.day}`,
-      mcqNextActionLabel: total > 0 ? "Move to next day" : "Attach fresh MCQs",
+      mcqOutcome: nextOutcome,
+      mcqRecommendedRoute: nextRoute,
+      mcqReviewSummary: nextComplete
+        ? `${nextCorrectCount}/${total} correct (${nextScorePercent}%) for ${batchCode}.`
+        : `${nextAnsweredCount}/${total} fresh questions answered for ${batchCode}.`,
+      mcqReadinessStatus: !nextComplete ? "practice-active" : nextOutcome === "Command" ? "command" : "revisit",
+      mcqEvidenceAnchor: `${activeSession.title} / ${batchCode} / ${nextCorrectCount}/${total} correct`,
+      mcqNextRoute: nextRoute,
+      mcqNextActionLabel:
+        nextOutcome === "Revisit"
+          ? "Open short revision"
+          : nextOutcome === "Command"
+            ? activeSession.day < geographySessions.length
+              ? "Continue to next topic"
+              : "Open progress review"
+            : "Finish practice",
       mcqFreshQuestionCount: freshQuestions.length,
       mcqPlannedCount: Math.max(freshQuestions.length, 25),
       mcqQualityPassed: batchStatus === "READY",
       mcqQualityGateLabel: batchStatus,
+      revisitQueued: nextComplete && nextOutcome === "Revisit",
+      confidence: nextComplete ? (nextOutcome === "Command" ? "Command" : "Shaky") : progress?.confidence,
     });
-    setSaved(true);
+  };
+
+  const resetPractice = () => {
+    setPracticeStarted(false);
+    setCurrentPracticeIndex(0);
+    setPracticeAnswers({});
+    saveDayProgress(activeSession.day, {
+      mcqAttempted: undefined,
+      mcqCompleted: undefined,
+      mcqAnswerMap: undefined,
+      mcqCurrentQuestionIndex: undefined,
+      mcqAnsweredCount: undefined,
+      mcqCorrectCount: undefined,
+      mcqTotal: undefined,
+      mcqScorePercent: undefined,
+      mcqLastBatchCode: undefined,
+      mcqOutcome: undefined,
+      mcqRecommendedRoute: undefined,
+      mcqReviewSummary: undefined,
+      mcqReadinessStatus: isReady ? "practice-ready" : "batch-pending",
+      revisitQueued: false,
+      confidence: progress?.talkBand === "Command" ? "Command" : progress?.confidence,
+    });
+  };
+
+  const movePracticeIndex = (nextIndex: number) => {
+    const boundedIndex = Math.max(0, Math.min(freshQuestions.length - 1, nextIndex));
+    setCurrentPracticeIndex(boundedIndex);
+    saveDayProgress(activeSession.day, {
+      mcqAttempted: true,
+      mcqAnswerMap: practiceAnswers,
+      mcqCurrentQuestionIndex: boundedIndex,
+      mcqAnsweredCount: answeredCount,
+      mcqCorrectCount: correctCount,
+      mcqTotal: freshQuestions.length,
+      mcqScorePercent: scorePercent,
+      mcqLastBatchCode: batchCode,
+      mcqOutcome: "Pending",
+      mcqReadinessStatus: "practice-active",
+      mcqReviewSummary: `${answeredCount}/${freshQuestions.length} fresh questions answered.`,
+    });
   };
 
   if (!isLoaded) {
@@ -97,7 +311,6 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
   }
 
   if (!gatesCleared) {
-    const needsTalk = !talkCleared;
     return (
       <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
         <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
@@ -108,12 +321,12 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
               </div>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#9a6a16]">MCQ locked</p>
-                <h1 className="mt-2 text-3xl font-black tracking-tight">{needsTalk ? "Explain first" : "Visual proof first"}</h1>
+                <h1 className="mt-2 text-3xl font-black tracking-tight">Explain first</h1>
                 <p className="mt-3 text-sm font-semibold leading-6 text-[#6f4a12]">
-                  MCQ opens only after Talk and Visual Lab are complete. Current visual proof: {labProofCount}/5.
+                  MCQ opens after the discussion reaches the {GEOGRAPHY_RECALL_TARGET}% recall target.
                 </p>
-                <Link href={needsTalk ? `/upsc/geography/talk?day=${activeSession.day}` : labHref} className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
-                  {needsTalk ? "Open discussion" : "Open visual"} <ArrowRight className="ml-2 h-4 w-4" />
+                <Link href={`/upsc/geography/talk?day=${activeSession.day}`} className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
+                  Open discussion <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -125,50 +338,205 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section
+          data-testid="geography-mcq-level-shell"
+          data-learner-level={learnerLevel}
+          data-day={activeSession.day}
+          data-next-day={activeSession.day < geographySessions.length ? activeSession.day + 1 : "track"}
+          data-next-topic-route={nextDayHref}
+          data-visible-mode="single-action-practice"
+          data-student-surface="compact-one-action"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
+        >
           <Link href={`/upsc/geography?day=${activeSession.day}`} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
             <ArrowLeft className="h-4 w-4" /> Day funnel
           </Link>
 
-          <div className="grid gap-5 lg:grid-cols-[1fr_0.86fr]">
+          <div className={cn("grid gap-4 lg:items-start", practiceStarted && !hasPracticeResult ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_300px]")}>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">MCQ</Badge>
                 <span className="text-sm font-black text-[#1d9e75]">Day {activeSession.day}</span>
-                <span className="text-sm font-semibold text-[#746f66]">{batchCode}</span>
+                <span data-testid="geography-mcq-level-badge" className="text-sm font-semibold text-[#746f66]">
+                  {mcqLevelCopy.badge}
+                </span>
               </div>
-              <h1 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">{activeSession.title}</h1>
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                Solve only the fresh question set attached to this day. Old low-quality MCQs stay out of the student flow.
+              <h1 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">{activeSession.title}</h1>
+              <p data-testid="geography-mcq-level-copy" className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {mcqLevelCopy.heroDetail}
+              </p>
+              <details
+                data-testid="mcq-simple-flow-strip"
+                className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-black text-[#31443a]"
+              >
+                <summary className="cursor-pointer list-none text-[11px] uppercase tracking-[0.16em] text-[#085041]">
+                  Route logic
+                </summary>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {mcqFlowSteps.map((step, index) => (
+                    <div key={step.label} className="rounded-md bg-white px-3 py-2">
+                      <span className="text-[#1d9e75]">{index + 1}.</span> {step.label}
+                      <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-[#746f66]">
+                        {step.detail}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+              <p
+                data-testid="mcq-talk-clearance-proof"
+                className="mt-3 inline-flex rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#085041]"
+              >
+                Discussion cleared: {Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}% recall
               </p>
             </div>
 
-            <div className={cn("rounded-lg border p-4", isReady ? "border-[#1d9e75] bg-[#e7f5ee]" : "border-[#ef9f27]/55 bg-[#fff4df]")}>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Fresh set</p>
-              <h2 className="mt-2 text-xl font-black tracking-tight">{hasFreshQuestions ? `${freshQuestions.length} questions attached` : "Waiting for fresh MCQs"}</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                {hasFreshQuestions ? `Batch status: ${batchStatus}.` : "Once advanced MCQs are uploaded, this room becomes the practice step."}
-              </p>
-              {hasFreshQuestions ? (
-                <button
-                  type="button"
-                  data-testid="mcq-complete-practice"
-                  onClick={savePractice}
-                  className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-                >
-                  Mark practice done <CheckCircle2 className="ml-2 h-4 w-4" />
-                </button>
-              ) : (
-                <Link href="/admin/questions/bulk" className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
-                  Open upload <UploadCloud className="ml-2 h-4 w-4" />
-                </Link>
-              )}
-            </div>
+            {!practiceStarted || hasPracticeResult ? (
+              <div
+                data-testid="mcq-student-next-action-panel"
+                data-learner-level={learnerLevel}
+                data-outcome={resolvedOutcome}
+                data-next-action-route={nextActionHref}
+                data-next-topic-day={resolvedOutcome === "Command" && activeSession.day < geographySessions.length ? activeSession.day + 1 : ""}
+                data-visible-mode="single-action-practice"
+                data-student-surface="primary-action"
+                className={cn("rounded-lg border p-4", isReady || hasPracticeResult ? "border-[#1d9e75] bg-[#e7f5ee]" : "border-[#ef9f27]/55 bg-[#fff4df]")}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Do now</p>
+                <h2 className="mt-2 text-xl font-black tracking-tight">{nextActionTitle}</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{nextActionDetail}</p>
+                {hasPracticeResult ? (
+                  <Link
+                    data-testid="mcq-student-next-action"
+                    data-learner-level={learnerLevel}
+                    data-outcome={resolvedOutcome}
+                    data-next-action-route={nextActionHref}
+                    data-next-topic-day={resolvedOutcome === "Command" && activeSession.day < geographySessions.length ? activeSession.day + 1 : ""}
+                    href={nextActionHref}
+                    className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    {resolvedOutcome === "Command" ? commandActionTitle : "Open short revision"} <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                ) : isReady ? (
+                  <button
+                    type="button"
+                    data-testid="mcq-start-local-practice"
+                    onClick={() => setPracticeStarted(true)}
+                    className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    Start practice <ArrowRight className="ml-2 h-4 w-4" />
+                  </button>
+                ) : (
+                  <Link href={`/upsc/geography?day=${activeSession.day}`} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
+                    Return to Today <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+            ) : null}
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.86fr_1.14fr]">
+        {practiceStarted && currentPracticeQuestion && !hasPracticeResult && (
+          <section data-testid="mcq-local-practice-runner" data-student-surface="question-first" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Fresh question</p>
+                <h2 className="mt-1 text-lg font-black tracking-tight">
+                  Question {currentPracticeIndex + 1} of {freshQuestions.length}
+                </h2>
+              </div>
+              <span data-testid="mcq-local-practice-score" className="rounded-md bg-[#e7f5ee] px-3 py-2 text-xs font-black text-[#085041]">
+                Progress {answeredCount}/{freshQuestions.length} answered
+              </span>
+            </div>
+            <p className="mt-4 text-lg font-black leading-7 text-[#13251d]">{currentPracticeQuestion.text_en}</p>
+            <div className="mt-4 grid gap-3">
+              {(["A", "B", "C", "D"] as const).map((option) => {
+                const isSelected = currentPracticeAnswer === option;
+                const isCorrect = currentPracticeQuestion.correct_option === option;
+                const showResult = Boolean(currentPracticeAnswer);
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    data-testid={`mcq-practice-option-${option}`}
+                    onClick={() => persistPracticeAnswer(option)}
+                    disabled={Boolean(currentPracticeAnswer)}
+                    className={cn(
+                      "rounded-md border p-3 text-left text-sm font-bold leading-6 transition disabled:cursor-not-allowed",
+                      showResult && isCorrect && "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
+                      showResult && isSelected && !isCorrect && "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
+                      !showResult && "border-[#dcd5c7] bg-[#f7f4ee] text-[#25382f] hover:border-[#1d9e75]"
+                    )}
+                  >
+                    <span className="font-black">{option}.</span> {getOptionText(currentPracticeQuestion, option)}
+                  </button>
+                );
+              })}
+            </div>
+            {currentPracticeAnswer && (
+              <div data-testid="mcq-practice-feedback" className="mt-4 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-4">
+                <p className="text-sm font-black text-[#085041]">
+                  {currentPracticeAnswer === currentPracticeQuestion.correct_option ? "Correct answer" : `Correct option ${currentPracticeQuestion.correct_option}`}
+                </p>
+                {currentPracticeQuestion.explanation_en ? (
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{currentPracticeQuestion.explanation_en}</p>
+                ) : null}
+              </div>
+            )}
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button
+                type="button"
+                data-testid="mcq-previous-question"
+                onClick={() => movePracticeIndex(currentPracticeIndex - 1)}
+                disabled={currentPracticeIndex === 0}
+                className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                data-testid="mcq-next-question"
+                onClick={() => movePracticeIndex(currentPracticeIndex + 1)}
+                disabled={!currentPracticeAnswer || currentPracticeIndex === freshQuestions.length - 1}
+                className="inline-flex h-10 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              >
+                Next question <ArrowRight className="ml-2 h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        )}
+
+        {hasPracticeResult && (
+          <section
+            data-testid="mcq-practice-outcome-gate"
+            data-learner-level={learnerLevel}
+            data-outcome={resolvedOutcome}
+            data-next-action-route={nextActionHref}
+            data-next-topic-day={resolvedOutcome === "Command" && activeSession.day < geographySessions.length ? activeSession.day + 1 : ""}
+            className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-5 shadow-sm"
+          >
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Result</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight">{resolvedOutcome === "Command" ? "Command cleared" : "Short revision required"}</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+              {resolvedCorrectCount}/{resolvedTotal} correct ({resolvedScorePercent}%).
+            </p>
+            <p data-testid="mcq-next-topic-proof" className="mt-3 text-sm font-bold leading-6 text-[#49675e]">
+              {resolvedOutcome === "Command"
+                ? activeSession.day < geographySessions.length
+                  ? `Next opens Day ${activeSession.day + 1}: ${nextActionHref}`
+                  : `Next opens progress review: ${nextActionHref}`
+                : `Next opens short revision: ${nextActionHref}`}
+            </p>
+          </section>
+        )}
+
+        <details data-testid="geography-mcq-advanced-tools" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
+            Practice details
+          </summary>
+          <div className="mt-5 grid gap-5 lg:grid-cols-[0.86fr_1.14fr]">
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
@@ -181,10 +549,10 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
             </div>
             <div className="space-y-2">
               {[
-                ["Talk", talkCleared ? "Done" : "Pending"],
-                ["Visual", labCleared ? "Done" : "Pending"],
-                ["Fresh MCQ", hasFreshQuestions ? "Attached" : "Not uploaded"],
-                ["Quality", batchStatus],
+                ["Discussion", talkCleared ? "Done" : "Pending"],
+                ["Optional visual", labCleared ? "Used" : "Available"],
+                ["Practice", isReady || hasPracticeResult ? "Ready" : "Preparing"],
+                ["Next step", hasPracticeResult ? (resolvedOutcome === "Command" ? "Next topic" : "Short revision") : isReady ? "Answer MCQs" : "Return Today"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
                   <span className="text-sm font-black text-[#13251d]">{label}</span>
@@ -205,17 +573,26 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
               </div>
             </div>
             <p className="text-sm font-semibold leading-6 text-[#5d675f]">
-              If score is strong, the student moves to the next day. If weak, wrong concepts should enter Revisit.
-              Fresh uploaded MCQs will drive the real result.
+              A strong result opens your next topic. A weak result opens a short revision before you try again.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link href={revisitHref} className="inline-flex h-10 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]">
-                Open Revisit
+              <Link href={`/upsc/geography/lab?day=${activeSession.day}`} className="inline-flex h-10 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]">
+                Open optional visual
               </Link>
-              {saved && <span className="inline-flex h-10 items-center rounded-md bg-[#e7f5ee] px-3 text-sm font-black text-[#085041]">Practice saved</span>}
+              {practiceStarted || hasPracticeResult ? (
+                <button
+                  type="button"
+                  data-testid="mcq-reset-local-practice"
+                  onClick={resetPractice}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                >
+                  <RotateCcw className="h-4 w-4" /> Reset practice
+                </button>
+              ) : null}
             </div>
           </div>
-        </section>
+          </div>
+        </details>
       </div>
     </main>
   );

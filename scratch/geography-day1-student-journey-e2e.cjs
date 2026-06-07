@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const storageKey = "sarit-upsc-geography-progress-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const localDraftKey = "sarit-admin-bulk-question-drafts-v1";
@@ -141,12 +142,19 @@ async function seedFreshMcqs(page) {
   );
 }
 
-async function completeLabProof(page, stageText, expectedCount) {
-  await page.getByTestId("geography-lab-proof-stages").getByText(stageText, { exact: false }).click();
+async function completeLabProof(page, stageId, expectedCount) {
+  const proofStage = page.getByTestId(`lab-proof-${stageId}`).first();
+  if (!(await proofStage.isVisible().catch(() => false))) {
+    const advancedTools = page.getByTestId("geography-lab-advanced-tools");
+    if (!(await advancedTools.evaluate((element) => Boolean(element.open)).catch(() => false))) {
+      await advancedTools.locator("summary").click();
+    }
+  }
+  await page.getByTestId(`lab-proof-${stageId}`).first().click();
   await page.getByTestId("geography-lab-use-proof-suggestion").click();
   const proofInput = await page.getByTestId("geography-lab-proof-input").inputValue();
   if (!proofInput.trim()) {
-    throw new Error(`Proof suggestion did not load for ${stageText}.`);
+    throw new Error(`Proof suggestion did not load for ${stageId}.`);
   }
   await page.getByTestId("geography-lab-save-proof").click();
   await page.waitForFunction(
@@ -173,8 +181,19 @@ async function run() {
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ progressKey, localMcqKey, localDraftStorageKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localRosterKey, localCheckInKey, localInviteCode }) => {
+    ({ progressKey, studentProfileKey, localMcqKey, localDraftStorageKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localRosterKey, localCheckInKey, localInviteCode }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_day1_student_journey");
+      window.localStorage.setItem(
+        studentProfileKey,
+        JSON.stringify({
+          level: "advanced",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          updatedAt: new Date().toISOString(),
+        })
+      );
       window.localStorage.removeItem(progressKey);
       window.localStorage.removeItem(localMcqKey);
       window.localStorage.removeItem(localDraftStorageKey);
@@ -211,8 +230,8 @@ async function run() {
         JSON.stringify({
           checkedIds: [
             "geography-home",
-            "watch-room",
             "talk-room",
+            "watch-room",
             "visual-lab",
             "mcq-intake",
             "track-revisit",
@@ -225,6 +244,7 @@ async function run() {
     },
     {
       progressKey: storageKey,
+      studentProfileKey: profileKey,
       localMcqKey: mcqKey,
       localDraftStorageKey: localDraftKey,
       localFeedbackKey: feedbackKey,
@@ -237,38 +257,73 @@ async function run() {
   );
   await seedFreshMcqs(page);
 
-  await page.goto(`${baseUrl}/upsc/geography/watch?day=${day}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("watch-demo-player").waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-talk-handoff-packet").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-watch").getByText("You are in Watch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-watch").getByText("Talk with AI teacher", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "watch-initial", checks);
-
-  await page.getByTestId("watch-load-handoff").click();
-  await page.getByTestId("watch-save-handoff").click();
-  for (let index = 0; index < 5; index += 1) {
-    await page.getByTestId("watch-scene-complete").click();
-    await page.waitForFunction(
-      ({ key, selectedDay, expected }) => {
-        const progress = JSON.parse(window.localStorage.getItem(key) || "{}")[String(selectedDay)];
-        return (progress?.watchSceneCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: storageKey, selectedDay: day, expected: index + 1 },
-      { timeout: 15000 }
-    );
+  await page.goto(`${baseUrl}/upsc/geography?day=${day}`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("geography-today-simple-entry").waitFor({ timeout: 15000 });
+  const firstCommandHref = await page.getByTestId("command-next-action").getByRole("link").getAttribute("href");
+  checks.push({ label: "day1-command-starts-with-talk", href: firstCommandHref });
+  if (firstCommandHref !== `/upsc/geography/talk?day=${day}`) {
+    throw new Error(`Day 1 command should start with Talk, got ${firstCommandHref}`);
   }
-  await page.getByTestId("watch-route-gate").getByText("AI teacher unlocked", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-watch").getByText("Next", { exact: false }).waitFor({ timeout: 15000 });
+  await assertNoOverflow(page, "command-talk-first", checks);
+
+  await page.getByTestId("command-next-action").getByRole("link").click();
+  await page.waitForURL(`**/upsc/geography/talk?day=${day}`, { timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-teacher-question").getByText("What did you understand?", { exact: false }).waitFor({ timeout: 15000 });
+  const routeGateVisibleBeforeAnswer = await page.getByTestId("talk-route-gate").count().then((count) => count > 0);
+  checks.push({ label: "talk-route-hidden-before-answer", routeGateVisibleBeforeAnswer });
+  if (routeGateVisibleBeforeAnswer) {
+    throw new Error("Talk route gate should stay hidden until the student answers.");
+  }
+  await page.getByTestId("talk-answer-draft").fill(
+    [
+      "Earth as a system means lithosphere, atmosphere, hydrosphere and biosphere interact through energy and matter.",
+      "I know latitude, longitude, rotation and revolution affect location, time, seasons and map reading.",
+      "India examples include Himalaya, monsoon, river basins and coastal hazards where one sphere affects another.",
+      "My gap is exact map scale, time-zone logic and UPSC statement traps.",
+    ].join(" ")
+  );
+  await page.getByTestId("talk-assess-answer").click();
+  await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-primary-route").getByText("Open class", { exact: false }).waitFor({ timeout: 15000 });
+  const firstTalkHref = await page.getByTestId("talk-primary-route").getAttribute("href");
+  checks.push({ label: "initial-talk-routes-to-watch", href: firstTalkHref });
+  if (firstTalkHref !== `/upsc/geography/watch?day=${day}`) {
+    throw new Error(`Initial Talk should route to Watch repair class, got ${firstTalkHref}`);
+  }
+  const firstTalkProgress = await getProgress(page);
+  if (
+    typeof firstTalkProgress?.talkScore !== "number" ||
+    firstTalkProgress?.talkNextRoute !== `/upsc/geography/watch?day=${day}` ||
+    firstTalkProgress?.watched === true ||
+    firstTalkProgress?.revisitQueued === true
+  ) {
+    throw new Error(`Initial Talk did not persist a recall-first Watch gate: ${JSON.stringify(firstTalkProgress, null, 2)}`);
+  }
+  await assertNoOverflow(page, "talk-first-recall", checks);
+
+  await page.getByTestId("talk-primary-route").click();
+  await page.waitForURL(`**/upsc/geography/watch?day=${day}`, { timeout: 15000 });
+  await page.getByTestId("watch-complete-and-discuss").waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-watch-checkpoints").waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-watch-details").waitFor({ timeout: 15000 });
+  await assertNoOverflow(page, "watch-repair-class", checks);
+
+  await page.getByTestId("watch-complete-and-discuss").click();
+  await page.waitForURL(`**/upsc/geography/talk?day=${day}`, { timeout: 15000 });
   const watchProgress = await getProgress(page);
-  if (watchProgress?.watched !== true || watchProgress?.watchHandoffReady !== true) {
+  if (
+    watchProgress?.watched !== true ||
+    watchProgress?.watchHandoffReady !== true ||
+    watchProgress?.watchSceneCompletedIds?.length !== 5
+  ) {
     throw new Error(`Watch proof did not persist: ${JSON.stringify(watchProgress, null, 2)}`);
   }
 
-  await page.getByTestId("watch-primary-route").click();
-  await page.waitForURL(`**/upsc/geography/talk?day=${day}`, { timeout: 15000 });
-  await page.getByTestId("talk-route-gate").getByText("Awaiting MAIC oral check", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-talk").getByText("You are in Talk", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-talk").getByText("Assess explanation first", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-teacher-question").getByText("What did you understand?", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-details").locator("summary").first().click();
+  await page.getByTestId("talk-use-watch-recap").click();
   const handoffDraft = await page.getByTestId("talk-answer-draft").inputValue();
   if (!handoffDraft.includes("Concept:") || !handoffDraft.includes("UPSC trap:")) {
     throw new Error(`Talk room did not receive Watch handoff: ${handoffDraft}`);
@@ -283,26 +338,17 @@ async function run() {
       "UPSC trap: do not treat one sphere, one coordinate or one scale statement as a universal explanation; exceptions and interactions matter.",
     ].join(" ")
   );
-  await page.getByRole("button", { name: /Assess explanation/i }).click();
-  await page.getByTestId("talk-stage-peer-challenge").getByText("Active", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-challenge-response").fill(
-    [
-      "The weak point to defend is map proof.",
-      "Latitude, longitude, time, scale and direction must be attached to the Earth system because location changes insolation, climate and distance interpretation.",
-      "Himalaya affects atmosphere and hydrosphere, coasts modify rainfall, plateau relief shapes drainage, and river basins connect lithosphere with water flow.",
-      "UPSC trap: a statement that isolates one sphere or confuses local time, standard time, scale and map distance can look correct but fail due to exception.",
-    ].join(" ")
-  );
-  await page.getByTestId("talk-reassess-challenge").click();
-  await page.getByTestId("talk-stage-examiner-verdict").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-next-handoff").getByText("Open visual lab", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-talk").getByText("Open visual lab", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-assess-answer").click();
+  await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-primary-route").getByText("Open visual proof", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "talk-verdict", checks);
   const talkProgress = await getProgress(page);
   if (
-    talkProgress?.talkClassroomStage !== "examiner-verdict" ||
+    typeof talkProgress?.talkScore !== "number" ||
+    talkProgress.talkScore < 70 ||
     !["Practice", "Command"].includes(talkProgress?.talkBand) ||
-    !["lab", "mcq"].includes(talkProgress?.talkUnlockStage)
+    !["lab", "mcq"].includes(talkProgress?.talkUnlockStage) ||
+    !talkProgress?.talkNextRoute?.includes("/upsc/geography/lab")
   ) {
     throw new Error(`Talk verdict did not persist the lab gate: ${JSON.stringify(talkProgress, null, 2)}`);
   }
@@ -310,29 +356,22 @@ async function run() {
   await page.getByTestId("talk-primary-route").click();
   await page.waitForURL(`**/upsc/geography/lab?**day=${day}`, { timeout: 15000 });
   await page.getByTestId("lab-proof-command-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("lab-direct-mcq-route").getByText("MCQ locked", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-lab").getByText("You are in Visual Lab", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-lab").getByText("Finish lab proof", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("lab-evidence-status").getByText("proof pending", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "lab-locked", checks);
 
-  const stages = ["1. Concept lock", "2. Map mechanism", "3. India example", "4. UPSC trap", "5. Answer hook"];
-  for (let index = 0; index < stages.length; index += 1) {
-    await completeLabProof(page, stages[index], index + 1);
+  await page.getByTestId("geography-lab-use-proof-suggestion").click();
+  const proofInput = await page.getByTestId("geography-lab-proof-input").inputValue();
+  if (!proofInput.trim()) {
+    throw new Error("Geography visual proof suggestion did not load.");
   }
-  await page.getByTestId("lab-evidence-status").getByText("mcq ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("lab-direct-mcq-route").getByText("MCQ readiness", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-lab").getByText("Open MCQ readiness", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-lab-save-proof").click();
+  await page.waitForURL(`**/upsc/geography/mcq-readiness?day=${day}`, { timeout: 15000 });
   const labProgress = await getProgress(page);
   if (labProgress?.labCompleted !== true || labProgress?.labProofCompletedIds?.length !== 5) {
     throw new Error(`Lab proof did not persist the MCQ gate: ${JSON.stringify(labProgress, null, 2)}`);
   }
-
-  await page.getByTestId("lab-direct-mcq-route").click();
-  await page.waitForURL(`**/upsc/geography/mcq-readiness?day=${day}`, { timeout: 15000 });
-  await page.getByTestId("mcq-talk-gate").getByText("Learning gate passed", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-lab-gate").getByText("Lab proof 5/5", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-launcher").getByText("Student practice ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-batch-gate").getByText("Fresh batch ready", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-start-local-practice").waitFor({ timeout: 15000 });
+  await page.getByText("Start practice", { exact: false }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "mcq-ready", checks);
 
   await page.getByTestId("mcq-start-local-practice").click();
@@ -347,8 +386,11 @@ async function run() {
   await page.getByTestId("mcq-local-practice-runner").getByText("Question 3 of 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-C").click();
   await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-outcome-gate").getByText("Command retained", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-outcome-route").getByText("Review track", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-practice-outcome-gate").getByText("Command cleared", { exact: false }).waitFor({ timeout: 15000 });
+  const mcqOutcomeHref = await page.getByTestId("mcq-practice-outcome-route").getAttribute("href");
+  if (mcqOutcomeHref !== `/upsc/geography?day=${day + 1}`) {
+    throw new Error(`Command outcome should open Day ${day + 1}, got ${mcqOutcomeHref}`);
+  }
   await assertNoOverflow(page, "mcq-complete", checks);
 
   const mcqProgress = await getProgress(page);
@@ -365,13 +407,14 @@ async function run() {
   }
 
   await page.getByTestId("mcq-practice-outcome-route").click();
-  await page.waitForURL(`**/upsc/geography/track?day=${day}`, { timeout: 15000 });
-  await page.getByTestId("geography-readiness-snapshot").waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-1").getByText("MCQ practice done", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-1").getByText("MCQ 3/3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.waitForURL(`**/upsc/geography?day=2`, { timeout: 15000 });
+  await page.goto(`${baseUrl}/upsc/geography/track?day=${day}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.getByTestId("geography-track-simple-dashboard").waitFor({ timeout: 15000 });
   await page.getByTestId("geography-track-closeout-panel").getByText("Day 1 complete", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-track-closeout-panel").getByText("Return to pilot feedback", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-track-closeout-panel").getByText("Open Revisit recovery", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-track-closeout-panel").getByText("Revisit weak point", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-track-path-map").locator("summary").click();
+  await page.getByTestId("track-day-1").getByText("MCQ practice done", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "track-command", checks);
 
   await page.getByTestId("geography-track-pilot-feedback-route").click();
@@ -388,7 +431,7 @@ async function run() {
   await page.getByRole("button", { name: "Positive" }).click();
   await page
     .getByPlaceholder("Example: I completed Watch and Talk")
-    .fill("Completed Day 1 Watch, Talk, Visual Lab, MCQ command, Track review and returned to pilot feedback.");
+    .fill("Completed Day 1 Talk, Watch, Visual Lab, MCQ command, Track review and returned to pilot feedback.");
   await page.getByTestId("geography-student-feedback-save").click();
   await page.getByText("Feedback saved for the pilot review board.", { exact: false }).waitFor({ timeout: 15000 });
   const pilotFeedback = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "[]"), feedbackKey);
@@ -405,13 +448,13 @@ async function run() {
   }
 
   await page.goto(`${baseUrl}/upsc/geography/revisit?day=${day}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("revisit-diagnosis-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("revisit-recovery-ledger").waitFor({ timeout: 15000 });
+  await page.getByText("Recovery checklist", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("revisit-complete-and-talk").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "revisit-route", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=${day}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("mcq-practice-launcher").getByText("Student practice ready", { exact: false }).waitFor({ timeout: 15000 });
+  await page.locator("main").first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "mobile-mcq-ready", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
@@ -423,6 +466,7 @@ async function run() {
     allowedConsoleErrorFragments,
     baseUrl,
     checks,
+    firstTalkProgress,
     watchProgress,
     talkProgress,
     labProgress,

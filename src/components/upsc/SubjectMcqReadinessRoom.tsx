@@ -46,9 +46,9 @@ import { auditHistoryMcqBatch, type HistoryMcqQualityAudit } from "@/lib/upsc/hi
 import {
   getSubjectLabProofCompletion,
   getSubjectWatchCompletion,
-  isSubjectTalkReadyForLab,
   isSubjectTalkReadyForMcq,
 } from "@/lib/upsc/subjectProgressGates";
+import { SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
 import { useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
 import type { SubjectMcqReadinessStatus } from "@/lib/upsc/useSubjectProgress";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
@@ -140,6 +140,23 @@ function getOptionText(question: QuestionPayload, option: "A" | "B" | "C" | "D")
   return String((options as Record<string, unknown>)[option] ?? "");
 }
 
+function sanitizePracticeAnswers(value: unknown, questionCount: number): Record<number, string> {
+  if (!value || typeof value !== "object") return {};
+  const candidate = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(candidate)
+      .map(([key, option]) => [Number(key), option])
+      .filter(
+        ([index, option]) =>
+          Number.isInteger(index) &&
+          (index as number) >= 0 &&
+          (index as number) < questionCount &&
+          typeof option === "string" &&
+          ["A", "B", "C", "D"].includes(option)
+      )
+  ) as Record<number, string>;
+}
+
 function commandStatusClass(status: string) {
   if (status === "Done") return "bg-[var(--subject-light)] text-[var(--subject-dark)] ring-[var(--subject-ring)]";
   if (status === "Active") return "bg-[#fff4df] text-[#6f4a12] ring-[#ef9f27]/30";
@@ -206,11 +223,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
   const watchCompletion = getSubjectWatchCompletion(activeProgress);
   const labProofCompletion = getSubjectLabProofCompletion(activeProgress);
   const isWatchGateUnlocked = watchCompletion.complete;
-  const isTalkLabGateUnlocked = isSubjectTalkReadyForLab(activeProgress);
   const isTalkMcqGateUnlocked = isSubjectTalkReadyForMcq(activeProgress);
-  const activeLab = plan.labs.find((lab) => lab.title === activeSession.lab) ?? plan.labs[0];
-  const isLabGateUnlocked = labProofCompletion.complete;
-  const isStudentMcqUnlocked = isWatchGateUnlocked && isTalkMcqGateUnlocked && isLabGateUnlocked && isFreshBatchReady;
+  const isStudentMcqUnlocked = isWatchGateUnlocked && isTalkMcqGateUnlocked && isFreshBatchReady;
   const canStartPractice = isStudentMcqUnlocked && hasLocalQuestionContent;
   const currentPracticeQuestion = localBatchQuestions[currentPracticeIndex];
   const currentPracticeAnswer = practiceAnswers[currentPracticeIndex];
@@ -266,61 +280,46 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
         : `Complete all ${visiblePracticeTotal || localBatchQuestions.length || plannedCount} fresh questions before this day is cleared.`);
   const practiceGateStatus = isStudentMcqUnlocked ? "Student practice ready" : "Student practice blocked";
   const practiceGateDetail = !isStudentMcqUnlocked
-    ? "Complete Watch, Talk command, Visual Lab proof, attached fresh rows, and MCQ quality before practice becomes student-facing."
+    ? `Complete Watch, ${SUBJECT_RECALL_TARGET}% Talk recall, attached fresh rows, and MCQ quality before practice becomes student-facing. Visual Lab remains optional support.`
     : hasLocalQuestionContent
       ? `${localBatchQuestions.length} approved fresh question${localBatchQuestions.length === 1 ? "" : "s"} found for ${activeBatchCode}.`
-      : "The batch is marked ready, but no local question content is attached. Upload the fresh CSV to launch practice.";
+      : "The batch is marked ready, but no local question content is attached. Practice opens after the reviewed questions are added.";
+  const studentFallbackHref = `${basePath}?day=${activeSession.day}`;
   const learningGateStatus = !isProgressLoaded
     ? "Checking learning gate"
     : isStudentMcqUnlocked
-      ? "Student MCQ unlocked"
-      : "Student MCQ locked";
+      ? "Practice unlock ready"
+      : "Practice unlock blocked";
   const learningGateDetail = !isProgressLoaded
-    ? "Reading local Watch, Talk, Visual Lab, and fresh MCQ authoring progress for this day."
+    ? `Reading local Watch, ${SUBJECT_RECALL_TARGET}% Talk recall, optional Visual Lab, and fresh MCQ authoring progress for this day.`
     : !isWatchGateUnlocked
       ? `Complete the Watch room first. Current scene proof: ${watchCompletion.completed}/${watchCompletion.target}.`
-      : !isTalkLabGateUnlocked
-        ? "Ask the student to complete the AI teacher oral check first. Old-bank MCQs are intentionally not used here."
-        : !isLabGateUnlocked
-          ? `Talk is strong enough for applied work. Complete the Visual Lab proof engine: ${labProofCompletion.completed}/${labProofCompletion.target} proofs saved.`
-          : !isTalkMcqGateUnlocked
-            ? `Lab proof is saved, but Talk score is ${activeProgress?.talkScore ?? 0}%. Retry the oral check until it reaches command level.`
-            : !isFreshBatchReady
-              ? !isFreshCountReady
-                ? `Learning gates are clear. Author the fresh batch before student MCQ practice opens: ${draftedCount}/${plannedCount} drafted.`
-                : !isFreshContentCountReady
-                  ? `Fresh count is ready, but attached local content is ${localBatchQuestions.length}/${plannedCount}. Upload the fresh CSV rows.`
-                : mcqQualityAudit
-                  ? `Fresh count is ready, but ${plan.title} quality is ${mcqQualityAudit.score}%. Fix: ${mcqQualityAudit.warnings.join(", ")}.`
-                  : `Fresh count is ready, but quality review is still pending.`
-              : `Watch, Talk command, Lab proof, and ${draftedCount}/${plannedCount} fresh MCQs are ready.`;
+      : !isTalkMcqGateUnlocked
+        ? `Ask the student to complete the AI teacher oral check until recall reaches ${SUBJECT_RECALL_TARGET}%. Old-bank MCQs are intentionally not used here. Optional Visual Lab proof: ${labProofCompletion.completed}/${labProofCompletion.target}.`
+          : !isFreshBatchReady
+            ? !isFreshCountReady
+              ? `Learning gates are clear. Author the fresh batch before student MCQ practice opens: ${draftedCount}/${plannedCount} drafted.`
+              : !isFreshContentCountReady
+                ? `Fresh count is ready, but attached local content is ${localBatchQuestions.length}/${plannedCount}. Upload the fresh CSV rows.`
+              : mcqQualityAudit
+                ? `Fresh count is ready, but ${plan.title} quality is ${mcqQualityAudit.score}%. Fix: ${mcqQualityAudit.warnings.join(", ")}.`
+                : `Fresh count is ready, but quality review is still pending.`
+            : `Watch, ${SUBJECT_RECALL_TARGET}% Talk recall, and ${draftedCount}/${plannedCount} fresh MCQs are ready.`;
   const learningGateHref = !isWatchGateUnlocked
     ? `${basePath}/watch?day=${activeSession.day}`
-    : !isTalkLabGateUnlocked
+    : !isTalkMcqGateUnlocked
       ? `${basePath}/talk?day=${activeSession.day}`
-      : !isLabGateUnlocked
-        ? `${basePath}/lab?mode=${activeProgress?.labMode ?? activeLab?.slug ?? ""}&day=${activeSession.day}`
-        : !isTalkMcqGateUnlocked
-          ? `${basePath}/talk?day=${activeSession.day}`
-          : !isFreshBatchReady
-            ? "/admin/questions/bulk"
-            : `${basePath}/track`;
+        : !isFreshBatchReady
+          ? studentFallbackHref
+          : `${basePath}/track`;
   const learningGateAction = !isWatchGateUnlocked
     ? "Open class"
-    : !isTalkLabGateUnlocked
+    : !isTalkMcqGateUnlocked
       ? "Open AI teacher"
-      : !isLabGateUnlocked
-        ? "Open visual lab"
-        : !isTalkMcqGateUnlocked
-          ? "Retry oral check"
-          : !isFreshBatchReady
-            ? isFreshCountReady && isFreshContentCountReady && !isMcqQualityReady
-              ? "Fix MCQ quality"
-              : isFreshCountReady && !isFreshContentCountReady
-                ? "Upload fresh CSV"
-                : "Open bulk upload"
-            : "Track progress";
-  const mcqReadinessStatus: SubjectMcqReadinessStatus = !isWatchGateUnlocked || !isTalkMcqGateUnlocked || !isLabGateUnlocked
+      : !isFreshBatchReady
+          ? "Return to Today"
+          : "Track progress";
+  const mcqReadinessStatus: SubjectMcqReadinessStatus = !isWatchGateUnlocked || !isTalkMcqGateUnlocked
     ? "learning-blocked"
     : !isFreshCountReady
       ? "batch-pending"
@@ -347,29 +346,69 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
     command: "Command",
     revisit: "Revisit",
   }[mcqReadinessStatus];
-  const mcqNextRoute = !isWatchGateUnlocked || !isTalkMcqGateUnlocked || !isLabGateUnlocked
+  const mcqNextRoute = !isWatchGateUnlocked || !isTalkMcqGateUnlocked
     ? learningGateHref
     : !isFreshCountReady || !isFreshContentCountReady || !isMcqQualityReady
-      ? "/admin/questions/bulk"
+      ? `${basePath}/mcq-readiness?day=${activeSession.day}`
       : isPracticeComplete
         ? mcqRecommendedHref
         : `${basePath}/mcq-readiness?day=${activeSession.day}`;
-  const mcqNextActionLabel = !isWatchGateUnlocked || !isTalkMcqGateUnlocked || !isLabGateUnlocked
+  const mcqNextActionLabel = !isWatchGateUnlocked || !isTalkMcqGateUnlocked
     ? learningGateAction
     : !isFreshCountReady
-      ? "Draft fresh batch"
+      ? "Plan fresh MCQs"
       : !isFreshContentCountReady
         ? "Upload fresh CSV"
-        : !isMcqQualityReady
+      : !isMcqQualityReady
           ? "Fix MCQ quality"
           : isPracticeComplete
             ? mcqRecommendedLabel
             : isRecoveryRetestMode
               ? "Retest fresh MCQs"
-              : "Start local practice";
+              : "Start fresh MCQs";
+  const mcqStudentNextDetail =
+    !isWatchGateUnlocked || !isTalkMcqGateUnlocked
+      ? learningGateDetail
+      : !isFreshBatchReady
+        ? "Fresh reviewed MCQs are not ready yet. Attach the fresh CSV rows and clear quality review; practice opens automatically after the set is approved."
+        : isPracticeComplete
+          ? mcqOutcomeDetail
+          : "Answer the fresh topic questions once. Your score decides the next step automatically: Track if clear, Revisit if weak.";
+  const mcqPrimaryPracticeLabel = isRecoveryRetestMode ? "Retest fresh MCQs" : "Start fresh MCQs";
+  const mcqStudentReadinessCopy = !isWatchGateUnlocked
+    ? "First complete the short class. MCQs stay hidden until the concept is watched."
+    : !isTalkMcqGateUnlocked
+      ? `Explain the topic to the AI teacher until recall reaches ${SUBJECT_RECALL_TARGET}%.`
+      : !isFreshBatchReady
+        ? "Fresh MCQs are being prepared for this topic. The student can wait here without touching authoring tools."
+        : isPracticeComplete
+          ? mcqOutcomeDetail
+          : "You are clear to solve the fresh MCQ set. No old question bank is used in this step.";
+  const mcqStudentFlowItems = [
+    {
+      label: `${SUBJECT_RECALL_TARGET}% recall`,
+      value: activeProgress?.talkScore ? `${activeProgress.talkScore}% AI teacher score` : "AI teacher pending",
+      complete: isTalkMcqGateUnlocked,
+    },
+    {
+      label: "Fresh MCQ",
+      value: `${localBatchQuestions.length}/${plannedCount} topic questions`,
+      complete: isFreshBatchReady,
+    },
+    {
+      label: "Command score",
+      value: `${MCQ_COMMAND_SCORE}% needed`,
+      complete: isPracticeComplete && mcqOutcome === "Command",
+    },
+    {
+      label: "Next topic",
+      value: isPracticeComplete ? mcqRecommendedLabel : "opens after score",
+      complete: isPracticeComplete && mcqOutcome === "Command",
+    },
+  ];
   const mcqEvidenceAnchor = `${activeBatchCode} / ${activeSession.title} / ${localBatchQuestions.length}/${plannedCount} fresh`;
   const mcqPreflightSummary = [
-    `Learning: ${isWatchGateUnlocked && isTalkMcqGateUnlocked && isLabGateUnlocked ? "ready" : "locked"}`,
+    `Learning: ${isWatchGateUnlocked && isTalkMcqGateUnlocked ? "ready" : "locked"}`,
     `Batch: ${draftedCount}/${plannedCount}`,
     `Content: ${localBatchQuestions.length}/${plannedCount}`,
     `Quality: ${isMcqQualityReady ? "clear" : "review"}`,
@@ -385,8 +424,10 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
   const mcqCommandItems = [
     {
       label: "Learning proof",
-      status: isWatchGateUnlocked && isTalkMcqGateUnlocked && isLabGateUnlocked ? "Done" : "Locked",
-      detail: isWatchGateUnlocked && isTalkMcqGateUnlocked && isLabGateUnlocked ? "Watch, Talk, and Lab passed" : learningGateAction,
+      status: isWatchGateUnlocked && isTalkMcqGateUnlocked ? "Done" : "Locked",
+      detail: isWatchGateUnlocked && isTalkMcqGateUnlocked
+        ? `Watch and ${SUBJECT_RECALL_TARGET}% Talk passed`
+        : learningGateAction,
     },
     {
       label: "Fresh count",
@@ -410,18 +451,35 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
     },
   ];
 
+  // Local batch metadata is browser-storage backed, so it hydrates after mount.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (!isProgressLoaded) return;
     const batchState = readMcqCommandBatchState(activeBatchCode);
     const questions = readLocalMcqCommandQuestionsForBatch(activeBatchCode);
     const draftedFromStorage = Math.max(batchState?.drafted ?? 0, questions.length);
+    const savedProgress = getDayProgress(activeSession.day);
+    const canRestorePractice = savedProgress?.mcqLastBatchCode === activeBatchCode && !savedProgress?.mcqCompleted;
+    const restoredAnswers = canRestorePractice
+      ? sanitizePracticeAnswers(savedProgress?.mcqAnswerMap, questions.length)
+      : {};
+    const restoredAnsweredCount = Object.keys(restoredAnswers).length;
+    const firstUnansweredIndex = questions.findIndex((_, index) => !restoredAnswers[index]);
+    const restoredIndex =
+      canRestorePractice && typeof savedProgress?.mcqCurrentQuestionIndex === "number"
+        ? savedProgress.mcqCurrentQuestionIndex
+        : firstUnansweredIndex >= 0
+          ? firstUnansweredIndex
+          : 0;
     setPlannedCount(batchState?.planned ?? 25);
     setDraftedCount(draftedFromStorage);
     setDifficulty(batchState?.difficulty ?? "MEDIUM");
     setLocalBatchQuestions(questions);
-    setPracticeStarted(false);
-    setCurrentPracticeIndex(0);
-    setPracticeAnswers({});
-  }, [activeBatchCode]);
+    setPracticeStarted(canRestorePractice && (restoredAnsweredCount > 0 || savedProgress?.mcqAttempted === true));
+    setCurrentPracticeIndex(Math.max(0, Math.min(questions.length - 1, restoredIndex)));
+    setPracticeAnswers(restoredAnswers);
+  }, [activeBatchCode, activeSession.day, getDayProgress, isProgressLoaded]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!isProgressLoaded) return;
@@ -496,7 +554,22 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
   const startLocalPractice = () => {
     if (!canStartPractice) return;
     setPracticeStarted(true);
-    setCurrentPracticeIndex(0);
+    const firstUnansweredIndex = localBatchQuestions.findIndex((_, index) => !practiceAnswers[index]);
+    const nextIndex = firstUnansweredIndex >= 0 ? firstUnansweredIndex : 0;
+    setCurrentPracticeIndex(nextIndex);
+    saveDayProgress(activeSession.day, {
+      mcqAttempted: true,
+      mcqAnswerMap: practiceAnswers,
+      mcqCurrentQuestionIndex: nextIndex,
+      mcqAnsweredCount: answeredPracticeCount,
+      mcqCorrectCount: correctPracticeCount,
+      mcqTotal: localBatchQuestions.length,
+      mcqScorePercent: practicePercent,
+      mcqLastBatchCode: activeBatchCode,
+      mcqOutcome: "Pending",
+      mcqReadinessStatus: "practice-active",
+      mcqReviewSummary: `${answeredPracticeCount}/${localBatchQuestions.length} fresh questions answered for ${activeBatchCode}.`,
+    });
   };
 
   const selectPracticeAnswer = (option: string) => {
@@ -535,6 +608,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
     saveDayProgress(activeSession.day, {
       mcqAttempted: nextAnsweredCount > 0,
       mcqCompleted: nextIsComplete,
+      mcqAnswerMap: nextAnswers,
+      mcqCurrentQuestionIndex: currentPracticeIndex,
       mcqAnsweredCount: nextAnsweredCount,
       mcqCorrectCount: nextCorrectCount,
       mcqTotal: nextTotal,
@@ -570,6 +645,24 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
     });
   };
 
+  const movePracticeIndex = (nextIndex: number) => {
+    const boundedIndex = Math.max(0, Math.min(localBatchQuestions.length - 1, nextIndex));
+    setCurrentPracticeIndex(boundedIndex);
+    saveDayProgress(activeSession.day, {
+      mcqAttempted: true,
+      mcqAnswerMap: practiceAnswers,
+      mcqCurrentQuestionIndex: boundedIndex,
+      mcqAnsweredCount: answeredPracticeCount,
+      mcqCorrectCount: correctPracticeCount,
+      mcqTotal: localBatchQuestions.length,
+      mcqScorePercent: practicePercent,
+      mcqLastBatchCode: activeBatchCode,
+      mcqOutcome: "Pending",
+      mcqReadinessStatus: "practice-active",
+      mcqReviewSummary: `${answeredPracticeCount}/${localBatchQuestions.length} fresh questions answered for ${activeBatchCode}.`,
+    });
+  };
+
   const resetLocalPractice = () => {
     setPracticeStarted(false);
     setCurrentPracticeIndex(0);
@@ -577,6 +670,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
     saveDayProgress(activeSession.day, {
       mcqAttempted: undefined,
       mcqCompleted: undefined,
+      mcqAnswerMap: undefined,
+      mcqCurrentQuestionIndex: undefined,
       mcqAnsweredCount: undefined,
       mcqCorrectCount: undefined,
       mcqTotal: undefined,
@@ -588,7 +683,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
       mcqReadinessStatus: isStudentMcqUnlocked ? "practice-ready" : mcqReadinessStatus,
       mcqEvidenceAnchor,
       mcqNextRoute: isStudentMcqUnlocked ? `${basePath}/mcq-readiness?day=${activeSession.day}` : mcqNextRoute,
-      mcqNextActionLabel: isStudentMcqUnlocked ? "Start local practice" : mcqNextActionLabel,
+      mcqNextActionLabel: isStudentMcqUnlocked ? "Start fresh MCQs" : mcqNextActionLabel,
       mcqPreflightSummary,
       mcqFreshQuestionCount: localBatchQuestions.length,
       mcqPlannedCount: plannedCount,
@@ -631,7 +726,281 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section data-testid="mcq-simple-step" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <Link href={basePath} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+                <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+              </Link>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">MCQ</Badge>
+                <span className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] px-3 py-1 text-xs font-black text-[var(--subject-heading)]">
+                  Day {activeSession.day}
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-3 py-1 text-xs font-bold text-[#5d675f]">
+                  {activeBatchCode}
+                </span>
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">{activeSession.chapter}</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+                {activeSession.title}
+              </h1>
+              <p data-testid="mcq-student-readiness-copy" className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {mcqStudentReadinessCopy}
+              </p>
+            </div>
+
+            <div data-testid="mcq-primary-action" className="w-full rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 lg:max-w-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Next action</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight text-[var(--subject-heading)]">{mcqNextActionLabel}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{mcqStudentNextDetail}</p>
+              {hasLocalQuestionContent && !practiceStarted && !isPracticeComplete ? (
+                <div data-testid="mcq-top-start-practice" className="mt-4">
+                  <button
+                    type="button"
+                    data-testid="mcq-start-local-practice"
+                    onClick={startLocalPractice}
+                    disabled={!canStartPractice}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {canStartPractice ? mcqPrimaryPracticeLabel : mcqNextActionLabel} <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href={mcqNextRoute}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  {mcqNextActionLabel} <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div data-testid="mcq-student-flow" className="mt-5 grid gap-3 md:grid-cols-4">
+            {mcqStudentFlowItems.map((item, index) => (
+              <div
+                key={item.label}
+                className={cn(
+                  "rounded-lg border bg-white p-3",
+                  item.complete ? "border-[var(--subject-accent)]" : "border-[var(--subject-border)]"
+                )}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-[var(--subject-heading)]">{item.label}</p>
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-md text-xs font-black",
+                      item.complete ? "bg-[var(--subject-light)] text-[var(--subject-dark)]" : "bg-[var(--subject-bg)] text-[#746f66]"
+                    )}
+                  >
+                    {item.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#5d675f]">{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <details
+            data-testid="mcq-readiness-command-board"
+            className="group mt-5 rounded-lg border border-[var(--subject-border)] bg-white shadow-sm"
+          >
+            <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Readiness checks</p>
+                <h3 className="text-lg font-black text-[var(--subject-heading)]">{practiceGateStatus}</h3>
+              </div>
+              <span
+                data-testid="mcq-preflight-status"
+                className={cn(
+                  "rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.12em] ring-1",
+                  mcqReadinessStatus === "practice-ready" || mcqReadinessStatus === "command"
+                    ? "bg-[var(--subject-light)] text-[var(--subject-dark)] ring-[var(--subject-ring)]"
+                    : "bg-[#fff4df] text-[#6f4a12] ring-[#ef9f27]/30"
+                )}
+              >
+                {mcqReadinessLabel}
+              </span>
+            </summary>
+            <div className="hidden border-t border-[var(--subject-border)] p-4 group-open:block">
+              <p data-testid="mcq-evidence-anchor" className="break-words rounded-md bg-[var(--subject-light)] p-3 text-xs font-bold leading-5 text-[var(--subject-dark)]">
+                {mcqEvidenceAnchor}
+              </p>
+              <p data-testid="mcq-next-decision" className="mt-3 rounded-md bg-[var(--subject-bg)] p-3 text-sm font-black text-[var(--subject-heading)]">
+                Next: {mcqNextActionLabel}
+              </p>
+              <div data-testid="mcq-gate-checklist" className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  { label: "Watch", value: `${watchCompletion.completed}/${watchCompletion.target}`, complete: isWatchGateUnlocked },
+                  { label: "Talk", value: activeProgress?.talkScore ? `${activeProgress.talkScore}% / ${SUBJECT_RECALL_TARGET}%` : "Pending", complete: isTalkMcqGateUnlocked },
+                  { label: "Visual support", value: `${labProofCompletion.completed}/${labProofCompletion.target} optional proofs`, complete: true },
+                  { label: "Fresh MCQ", value: `${localBatchQuestions.length}/${plannedCount}`, complete: isFreshBatchReady },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={cn(
+                      "rounded-md border p-3",
+                      item.complete ? "border-[var(--subject-accent)] bg-white text-[var(--subject-heading)]" : "border-[#ef9f27]/40 bg-[#fff4df] text-[#6f4a12]"
+                    )}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="text-sm font-black">{item.label}</p>
+                      {item.complete ? <CheckCircle2 className="h-4 w-4 text-[var(--subject-accent)]" /> : <LockKeyhole className="h-4 w-4" />}
+                    </div>
+                    <p className="text-xs font-bold leading-5">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
+
+          <div
+            data-testid="mcq-practice-launcher"
+            className={cn(
+              "mt-5 rounded-lg border p-4",
+              isStudentMcqUnlocked ? "border-[var(--subject-accent)] bg-[var(--subject-light)]" : "border-[var(--subject-border)] bg-[var(--subject-bg)]"
+            )}
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Practice</p>
+                <h3 className="mt-1 text-xl font-black tracking-tight text-[var(--subject-heading)]">{practiceGateStatus}</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{practiceGateDetail}</p>
+              </div>
+              {hasLocalQuestionContent ? (
+                <span
+                  data-testid="mcq-single-start-note"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] lg:w-auto"
+                >
+                  {practiceStarted
+                    ? "Practice in progress"
+                    : isPracticeComplete
+                      ? mcqOutcomeTitle
+                      : isRecoveryRetestMode
+                        ? "Use the next action to retest"
+                        : "Use the next action to start"}
+                </span>
+              ) : (
+                <span
+                  data-testid="mcq-fresh-content-pending"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[#6f4a12] lg:w-auto"
+                >
+                  Fresh MCQs not attached yet
+                </span>
+              )}
+            </div>
+
+            {practiceStarted && currentPracticeQuestion ? (
+              <div data-testid="mcq-local-practice-runner" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-white/85 p-4">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Question</p>
+                    <h3 className="mt-1 text-xl font-black text-[var(--subject-heading)]">
+                      {currentPracticeIndex + 1} of {localBatchQuestions.length}
+                    </h3>
+                  </div>
+                  <span data-testid="mcq-local-practice-score" className="rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                    Score {correctPracticeCount}/{localBatchQuestions.length} ({practicePercent}%)
+                  </span>
+                </div>
+                <p className="rounded-md bg-[var(--subject-bg)] p-3 text-base font-black leading-7 text-[var(--subject-heading)]">
+                  {currentPracticeQuestion.text_en}
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {(["A", "B", "C", "D"] as const).map((option) => {
+                    const isSelected = currentPracticeAnswer === option;
+                    const isCorrect = currentPracticeQuestion.correct_option === option;
+                    const showResult = Boolean(currentPracticeAnswer);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        data-testid={`mcq-practice-option-${option}`}
+                        onClick={() => selectPracticeAnswer(option)}
+                        disabled={Boolean(currentPracticeAnswer)}
+                        className={cn(
+                          "min-h-14 rounded-md border px-3 py-2 text-left text-sm font-bold leading-6 transition disabled:cursor-not-allowed",
+                          showResult && isCorrect && "border-[var(--subject-accent)] bg-[var(--subject-light)] text-[var(--subject-dark)]",
+                          showResult && isSelected && !isCorrect && "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
+                          !showResult && "border-[var(--subject-border)] bg-white text-[#34453b] hover:border-[var(--subject-accent)]"
+                        )}
+                      >
+                        <span className="font-black">{option}.</span> {getOptionText(currentPracticeQuestion, option)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {currentPracticeAnswer ? (
+                  <div data-testid="mcq-practice-feedback" className="mt-4 rounded-md border border-[var(--subject-accent)] bg-[var(--subject-light)] p-3">
+                    <p className="text-sm font-black text-[var(--subject-dark)]">
+                      {currentPracticeAnswer === currentPracticeQuestion.correct_option ? "Correct answer" : "Review this trap"}
+                    </p>
+                    {currentPracticeQuestion.explanation_en ? (
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{currentPracticeQuestion.explanation_en}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    data-testid="mcq-previous-question"
+                    onClick={() => movePracticeIndex(currentPracticeIndex - 1)}
+                    disabled={currentPracticeIndex === 0}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-bold text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="mcq-next-question"
+                    onClick={() => movePracticeIndex(currentPracticeIndex + 1)}
+                    disabled={currentPracticeIndex === localBatchQuestions.length - 1}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetLocalPractice}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-bold text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)]"
+                  >
+                    <RotateCcw className="h-4 w-4" /> Reset
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {visiblePracticeTotal > 0 && (practiceStarted || Boolean(hasPersistedMcqForBatch && activeProgress?.mcqAttempted)) ? (
+              <div data-testid="mcq-practice-outcome-gate" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-white/75 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Practice outcome</p>
+                <h3 className="mt-1 text-xl font-black text-[var(--subject-heading)]">{mcqOutcomeTitle}</h3>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#49675e]">{mcqOutcomeDetail}</p>
+                {mcqOutcome !== "Pending" ? (
+                  <span data-testid="mcq-local-practice-score" className="mt-3 inline-flex rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                    Score {visibleCorrectCount}/{visiblePracticeTotal} ({visiblePracticePercent}%)
+                  </span>
+                ) : null}
+                {mcqOutcome !== "Pending" ? (
+                  <Link
+                    data-testid="mcq-practice-outcome-route"
+                    href={mcqRecommendedHref}
+                    className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
+                  >
+                    {mcqRecommendedLabel} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <details data-testid="mcq-advanced-tools" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[var(--subject-dark)]">
+            Advanced MCQ authoring and quality controls
+          </summary>
+          <div className="mt-5 space-y-6">
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
             <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
@@ -709,16 +1078,13 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                           isTalkMcqGateUnlocked ? "border-[var(--subject-accent)] bg-white/70 text-[var(--subject-dark)]" : "border-[#ef9f27]/40 bg-white/70 text-[#6f4a12]"
                         )}
                       >
-                        <CheckCircle2 className="h-4 w-4" /> {isTalkMcqGateUnlocked ? "Talk command" : "Talk pending"}
+                        <CheckCircle2 className="h-4 w-4" /> {isTalkMcqGateUnlocked ? "95% Talk cleared" : "Talk below 95%"}
                       </span>
                       <span
                         data-testid="mcq-lab-gate"
-                        className={cn(
-                          "inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-xs font-black",
-                          isLabGateUnlocked ? "border-[var(--subject-accent)] bg-white/70 text-[var(--subject-dark)]" : "border-[#ef9f27]/40 bg-white/70 text-[#6f4a12]"
-                        )}
+                        className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[var(--subject-accent)] bg-white/70 px-3 text-xs font-black text-[var(--subject-dark)]"
                       >
-                        <Layers3 className="h-4 w-4" /> {isLabGateUnlocked ? "Lab proof done" : "Lab proof pending"}
+                        <Layers3 className="h-4 w-4" /> Visual support optional
                       </span>
                       <span
                         className={cn(
@@ -756,11 +1122,11 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             </div>
           </div>
 
-          <div data-testid="mcq-gate-checklist" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm xl:col-span-2">
+          <div data-testid="mcq-gate-checklist-detail" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm xl:col-span-2">
             <div className="mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">Student unlock checklist</p>
-                <h2 className="text-2xl font-black tracking-tight text-[var(--subject-heading)]">Proof before practice</h2>
+                <h2 className="text-2xl font-black tracking-tight text-[var(--subject-heading)]">Practice unlock proof</h2>
               </div>
               <ShieldCheck className="h-6 w-6 text-[var(--subject-dark)]" />
             </div>
@@ -774,13 +1140,15 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                 },
                 {
                   label: "AI teacher",
-                  detail: activeProgress?.talkScore ? `${activeProgress.talkScore}% score` : "No command score yet",
+                  detail: activeProgress?.talkScore
+                    ? `${activeProgress.talkScore}% score / ${SUBJECT_RECALL_TARGET}% target`
+                    : "No Talk clearance yet",
                   complete: isTalkMcqGateUnlocked,
                 },
                 {
-                  label: "Visual lab",
-                  detail: `${labProofCompletion.completed}/${labProofCompletion.target} proof stages completed`,
-                  complete: isLabGateUnlocked,
+                  label: "Visual support",
+                  detail: `${labProofCompletion.completed}/${labProofCompletion.target} optional proof stages saved`,
+                  complete: true,
                 },
                 {
                   label: "Fresh MCQs",
@@ -818,17 +1186,17 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             </div>
           </div>
 
-          <div data-testid="mcq-readiness-command-board" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm xl:col-span-2">
+          <div data-testid="mcq-readiness-command-board-detail" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm xl:col-span-2">
             <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">MCQ readiness command board</p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-[var(--subject-heading)]">Fresh-batch preflight is locally saved</h2>
-                <p data-testid="mcq-evidence-anchor" className="mt-2 break-words text-sm font-bold leading-6 text-[#657066]">
+                <p data-testid="mcq-evidence-anchor-detail" className="mt-2 break-words text-sm font-bold leading-6 text-[#657066]">
                   {mcqEvidenceAnchor}
                 </p>
               </div>
               <span
-                data-testid="mcq-preflight-status"
+                data-testid="mcq-preflight-status-detail"
                 className={cn(
                   "inline-flex min-h-9 max-w-full items-center break-words rounded-md px-3 text-xs font-black uppercase tracking-[0.12em] ring-1 sm:shrink-0",
                   mcqReadinessStatus === "practice-ready" || mcqReadinessStatus === "command"
@@ -857,7 +1225,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-[var(--subject-light)] p-3">
-              <p data-testid="mcq-next-decision" className="break-words text-sm font-black text-[var(--subject-dark)]">
+              <p data-testid="mcq-next-decision-detail" className="break-words text-sm font-black text-[var(--subject-dark)]">
                 Next: {mcqNextActionLabel}
               </p>
               <Link
@@ -875,7 +1243,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
           </div>
 
           <div
-            data-testid="mcq-practice-launcher"
+            data-testid="mcq-practice-launcher-detail"
             className={cn(
               "rounded-lg border p-5 shadow-sm xl:col-span-2",
               isStudentMcqUnlocked ? "border-[var(--subject-accent)] bg-[var(--subject-light)]" : "border-[var(--subject-border)] bg-[var(--subject-card)]"
@@ -928,7 +1296,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
               {hasLocalQuestionContent ? (
                 <button
                   type="button"
-                  data-testid="mcq-start-local-practice"
+                  data-testid="mcq-start-local-practice-detail"
                   onClick={startLocalPractice}
                   disabled={!canStartPractice}
                   className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
@@ -1009,7 +1377,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             )}
 
             {practiceStarted && currentPracticeQuestion && (
-              <div data-testid="mcq-local-practice-runner" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-white/85 p-4">
+              <div data-testid="mcq-local-practice-runner-detail" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-white/85 p-4">
                 <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Local practice</p>
@@ -1019,7 +1387,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <span
-                      data-testid="mcq-local-practice-score"
+                      data-testid="mcq-local-practice-score-detail"
                       className="inline-flex min-h-9 w-full items-center justify-center rounded-md bg-[var(--subject-light)] px-3 text-xs font-black text-[var(--subject-dark)] sm:w-auto"
                     >
                       Score {correctPracticeCount}/{localBatchQuestions.length} ({practicePercent}%)
@@ -1043,10 +1411,11 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                       <button
                         key={option}
                         type="button"
-                        data-testid={`mcq-practice-option-${option}`}
+                        data-testid={`mcq-practice-option-detail-${option}`}
                         onClick={() => selectPracticeAnswer(option)}
+                        disabled={Boolean(currentPracticeAnswer)}
                         className={cn(
-                          "min-h-14 rounded-md border px-3 py-2 text-left text-sm font-bold leading-6 transition",
+                          "min-h-14 rounded-md border px-3 py-2 text-left text-sm font-bold leading-6 transition disabled:cursor-not-allowed",
                           showResult && isCorrect && "border-[var(--subject-accent)] bg-[var(--subject-light)] text-[var(--subject-dark)]",
                           showResult && isSelected && !isCorrect && "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
                           !showResult && "border-[var(--subject-border)] bg-white text-[#34453b] hover:border-[var(--subject-accent)]"
@@ -1059,7 +1428,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                 </div>
 
                 {currentPracticeAnswer && (
-                  <div data-testid="mcq-practice-feedback" className="mt-4 rounded-md border border-[var(--subject-accent)] bg-[var(--subject-light)] p-3">
+                  <div data-testid="mcq-practice-feedback-detail" className="mt-4 rounded-md border border-[var(--subject-accent)] bg-[var(--subject-light)] p-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm font-black text-[var(--subject-dark)]">
                         {currentPracticeAnswer === currentPracticeQuestion.correct_option ? "Correct answer" : "Review this trap"}
@@ -1079,7 +1448,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setCurrentPracticeIndex((current) => Math.max(0, current - 1))}
+                    data-testid="mcq-previous-question-detail"
+                    onClick={() => movePracticeIndex(currentPracticeIndex - 1)}
                     disabled={currentPracticeIndex === 0}
                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-bold text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                   >
@@ -1087,7 +1457,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentPracticeIndex((current) => Math.min(localBatchQuestions.length - 1, current + 1))}
+                    data-testid="mcq-next-question-detail"
+                    onClick={() => movePracticeIndex(currentPracticeIndex + 1)}
                     disabled={currentPracticeIndex === localBatchQuestions.length - 1}
                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                   >
@@ -1106,7 +1477,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
 
             {visiblePracticeTotal > 0 && (practiceStarted || Boolean(hasPersistedMcqForBatch && activeProgress?.mcqAttempted)) && (
               <div
-                data-testid="mcq-practice-outcome-gate"
+                data-testid="mcq-practice-outcome-gate-detail"
                 className={cn(
                   "mt-4 rounded-lg border p-4",
                   mcqOutcome === "Command" && "border-[var(--subject-accent)] bg-[var(--subject-light)]",
@@ -1137,7 +1508,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
                     </span>
                   ) : (
                     <Link
-                      data-testid="mcq-practice-outcome-route"
+                      data-testid="mcq-practice-outcome-route-detail"
                       href={mcqRecommendedHref}
                       className={cn(
                         "inline-flex h-10 w-full items-center justify-center gap-2 rounded-md px-3 text-sm font-black text-white transition sm:w-auto",
@@ -1394,6 +1765,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             ))}
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </div>
   );

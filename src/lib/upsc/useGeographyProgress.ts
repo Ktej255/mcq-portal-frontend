@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { geographySessions } from "@/lib/upsc/plan";
+import {
+  loadRemoteSubjectProgress,
+  mergeProgressMaps,
+  saveRemoteSubjectProgress,
+  upscLearnerStateClearedEvent,
+} from "@/lib/upsc/learnerPersistence";
 import type {
   GeographyAssessmentBand,
   GeographyAssessmentRubricItem,
@@ -14,6 +20,7 @@ export type GeographyConfidence = "Shaky" | "Working" | "Command";
 export type GeographyMentorMode = "Map logic" | "Cause-effect" | "UPSC trap";
 export type GeographyWatchState = "Queued" | "In class" | "Watched";
 export type GeographyTalkDiscussionStep = "explain" | "challenge" | "verdict";
+export type GeographyTalkTeacherStatus = "answer-required" | "repair-required" | "mcq-ready";
 export type GeographyTalkClassroomStage = "watch-proof" | "student-explain" | "peer-challenge" | "examiner-verdict";
 export type GeographyLabProofStage = "concept" | "map" | "example" | "trap" | "answer";
 export type GeographyLabEvidenceStatus = "proof-pending" | "talk-required" | "mcq-ready";
@@ -40,6 +47,10 @@ export type GeographyDayProgress = {
   watchSceneCompletedIds?: string[];
   watchHandoffSummary?: string;
   watchHandoffReady?: boolean;
+  learnerLevel?: "Beginner" | "Intermediate" | "Advanced";
+  studyWindow?: string;
+  baselineKnowledge?: string;
+  baselineSavedAt?: string;
   confidence?: GeographyConfidence;
   mentorMode?: GeographyMentorMode;
   reflection?: string;
@@ -64,6 +75,17 @@ export type GeographyDayProgress = {
   talkClassroomStage?: GeographyTalkClassroomStage;
   talkNextRoute?: string;
   talkNextActionLabel?: string;
+  teacherMode?: "gemini" | "local-fallback";
+  teacherPromptVersion?: string;
+  teacherRubricVersion?: string;
+  teacherRecallTarget?: number;
+  teacherCoachSummary?: string;
+  teacherCoachNextPrompt?: string;
+  teacherProviderScore?: number;
+  talkTeacherFollowUpPrompt?: string;
+  talkTeacherFollowUpAnswer?: string;
+  talkTeacherTurnCount?: number;
+  talkTeacherStatus?: GeographyTalkTeacherStatus;
   recoveryCompleted?: boolean;
   recoveryStepIndex?: number;
   recoveryProofCompletedIds?: string[];
@@ -91,6 +113,8 @@ export type GeographyDayProgress = {
   labNextActionLabel?: string;
   mcqAttempted?: boolean;
   mcqCompleted?: boolean;
+  mcqAnswerMap?: Record<number, string>;
+  mcqCurrentQuestionIndex?: number;
   mcqAnsweredCount?: number;
   mcqCorrectCount?: number;
   mcqTotal?: number;
@@ -116,6 +140,13 @@ export type GeographyDayProgress = {
 
 type GeographyProgressMap = Record<string, GeographyDayProgress>;
 
+export type GeographySpacedRevisionItem = {
+  source: (typeof geographySessions)[number];
+  due: (typeof geographySessions)[number];
+  progress: GeographyDayProgress;
+  dueDay: number;
+};
+
 const STORAGE_KEY = "sarit-upsc-geography-progress-v1";
 
 function readProgress(): GeographyProgressMap {
@@ -136,17 +167,68 @@ function writeProgress(progress: GeographyProgressMap) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
 }
 
+function hasStartedTopic(progress?: GeographyDayProgress) {
+  return Boolean(
+    progress?.watched ||
+      progress?.reflection?.trim() ||
+      progress?.baselineSavedAt ||
+      typeof progress?.talkScore === "number" ||
+      progress?.labCompleted ||
+      progress?.mcqAttempted
+  );
+}
+
+function hasClearedSpacedRevision(progress?: GeographyDayProgress) {
+  return Boolean(
+    progress?.confidence === "Command" ||
+      (progress?.revisitQueued === false && progress?.activePromptLabel === "Revisit") ||
+      progress?.recoveryStatus === "talk-ready"
+  );
+}
+
 export function useGeographyProgress() {
   const [progress, setProgress] = useState<GeographyProgressMap>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      setProgress(readProgress());
+      const localProgress = readProgress();
+      setProgress(localProgress);
       setIsLoaded(true);
+
+      void loadRemoteSubjectProgress<GeographyDayProgress>("geography").then((remoteProgress) => {
+        if (cancelled) return;
+        if (!remoteProgress) {
+          if (Object.keys(localProgress).length) void saveRemoteSubjectProgress("geography", localProgress);
+          return;
+        }
+        const mergedProgress = mergeProgressMaps(localProgress, remoteProgress);
+        writeProgress(mergedProgress);
+        setProgress((current) => mergeProgressMaps(current, mergedProgress));
+        if (Object.keys(localProgress).length) void saveRemoteSubjectProgress("geography", mergedProgress);
+      });
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncLocalProgress = () => {
+      const localProgress = readProgress();
+      if (Object.keys(localProgress).length) void saveRemoteSubjectProgress("geography", localProgress);
+    };
+    const clearInMemoryProgress = () => setProgress(readProgress());
+
+    window.addEventListener("online", syncLocalProgress);
+    window.addEventListener(upscLearnerStateClearedEvent, clearInMemoryProgress);
+    return () => {
+      window.removeEventListener("online", syncLocalProgress);
+      window.removeEventListener(upscLearnerStateClearedEvent, clearInMemoryProgress);
+    };
   }, []);
 
   const saveDayProgress = useCallback((day: number, patch: Omit<Partial<GeographyDayProgress>, "day">) => {
@@ -163,6 +245,7 @@ export function useGeographyProgress() {
         [key]: nextDay,
       };
       writeProgress(next);
+      void saveRemoteSubjectProgress("geography", next);
       return next;
     });
   }, []);
@@ -180,6 +263,18 @@ export function useGeographyProgress() {
     const revisitDays = geographySessions.filter((session) => progress[String(session.day)]?.revisitQueued);
     const mcqAttemptedDays = geographySessions.filter((session) => progress[String(session.day)]?.mcqAttempted);
     const mcqCompletedDays = geographySessions.filter((session) => progress[String(session.day)]?.mcqCompleted);
+    const spacedRevisionItems = geographySessions
+      .map((source) => {
+        const sourceProgress = progress[String(source.day)];
+        const dueDay = Math.min(source.day + 2, geographySessions.length);
+        const due = geographySessions.find((session) => session.day === dueDay);
+        if (!sourceProgress || !due || !hasStartedTopic(sourceProgress) || hasClearedSpacedRevision(sourceProgress)) {
+          return null;
+        }
+        return { source, due, progress: sourceProgress, dueDay };
+      })
+      .filter((item): item is GeographySpacedRevisionItem => Boolean(item));
+    const spacedRevisionDays = spacedRevisionItems.map((item) => item.source);
 
     return {
       watchedCount: watchedDays.length,
@@ -187,6 +282,7 @@ export function useGeographyProgress() {
       commandCount: commandDays.length,
       shakyCount: shakyDays.length,
       revisitCount: revisitDays.length,
+      spacedRevisionCount: spacedRevisionDays.length,
       mcqAttemptedCount: mcqAttemptedDays.length,
       mcqCompletedCount: mcqCompletedDays.length,
       watchedDays,
@@ -194,6 +290,8 @@ export function useGeographyProgress() {
       commandDays,
       shakyDays,
       revisitDays,
+      spacedRevisionDays,
+      spacedRevisionItems,
       mcqAttemptedDays,
       mcqCompletedDays,
       watchCompletionPercent: Math.round((watchedDays.length / geographySessions.length) * 100),

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import { adminService, QuestionPayload, Test, Topic } from '@/services/api/adminService';
+import { legacyApiEnabled } from '@/env';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -396,6 +398,7 @@ function buildGeographyBulkAudits(questions: QuestionPayload[]): GeographyBulkAu
 }
 
 export default function BulkUploadPage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<RawQuestion[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
@@ -424,7 +427,19 @@ export default function BulkUploadPage() {
   useEffect(() => {
     setUpscContext(readUpscBulkContext());
 
+    const useLocalMetadata = () => {
+      setTests(LOCAL_TESTS_FALLBACK);
+      setTopics(LOCAL_TOPICS_FALLBACK);
+      setSelectedTestId(LOCAL_TESTS_FALLBACK[0].id);
+      setSelectedTopicId(LOCAL_TOPICS_FALLBACK[0].id);
+    };
+
     const loadMetadata = async () => {
+      if (!legacyApiEnabled) {
+        useLocalMetadata();
+        return;
+      }
+
       try {
         const [testsData, topicsData] = await Promise.all([
           adminService.getTests(),
@@ -433,10 +448,7 @@ export default function BulkUploadPage() {
         setTests(testsData);
         setTopics(topicsData);
       } catch {
-        setTests(LOCAL_TESTS_FALLBACK);
-        setTopics(LOCAL_TOPICS_FALLBACK);
-        setSelectedTestId(LOCAL_TESTS_FALLBACK[0].id);
-        setSelectedTopicId(LOCAL_TOPICS_FALLBACK[0].id);
+        useLocalMetadata();
         toast.info("Using local UPSC metadata fallback.");
       }
     };
@@ -505,6 +517,23 @@ export default function BulkUploadPage() {
     }
 
     setIsUploading(true);
+    const saveLocalDraft = () => {
+      appendLocalBulkQuestionDraft({
+        importMode,
+        questions: formattedQuestions,
+      });
+      toast.success(`Saved ${formattedQuestions.length} questions to local draft bank.`);
+      setData([]);
+      setFile(null);
+      setImportMode("EMPTY");
+    };
+
+    if (!legacyApiEnabled) {
+      saveLocalDraft();
+      setIsUploading(false);
+      return;
+    }
+
     try {
       await adminService.bulkCreateQuestions(formattedQuestions);
       toast.success(`Successfully imported ${formattedQuestions.length} questions!`);
@@ -513,14 +542,7 @@ export default function BulkUploadPage() {
       setImportMode("EMPTY");
     } catch {
       if (typeof window !== "undefined") {
-        appendLocalBulkQuestionDraft({
-          importMode,
-          questions: formattedQuestions,
-        });
-        toast.success(`Backend offline. Saved ${formattedQuestions.length} questions to local draft bank.`);
-        setData([]);
-        setFile(null);
-        setImportMode("EMPTY");
+        saveLocalDraft();
         return;
       }
 
@@ -532,7 +554,7 @@ export default function BulkUploadPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bulk Question Ingestion</h1>
           <p className="text-muted-foreground">Import large question banks via CSV for scaling subjects.</p>
@@ -546,6 +568,23 @@ export default function BulkUploadPage() {
           </Button>
         </div>
       </div>
+
+      {!legacyApiEnabled && (
+        <div
+          data-testid="bulk-local-draft-mode"
+          className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em]">Local Draft Mode</p>
+            <p className="mt-1 text-sm font-semibold">
+              Fresh UPSC imports are stored in this browser for founder review. The retired API stays isolated until the replacement backend is approved.
+            </p>
+          </div>
+          <Badge variant="outline" className="w-fit border-amber-400 bg-white/70 font-bold text-amber-900 dark:bg-zinc-950/40 dark:text-amber-100">
+            Legacy API off
+          </Badge>
+        </div>
+      )}
 
       {upscContext.hasContext && (
         <div
@@ -568,6 +607,11 @@ export default function BulkUploadPage() {
               <Link
                 data-testid="bulk-return-to-mcq"
                 href={upscContext.returnPath}
+                onClick={(event) => {
+                  event.preventDefault();
+                  toast.dismiss();
+                  window.setTimeout(() => router.push(upscContext.returnPath), 350);
+                }}
                 className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 text-sm font-bold text-emerald-900 transition hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-950 dark:text-emerald-100"
               >
                 Return to MCQ readiness

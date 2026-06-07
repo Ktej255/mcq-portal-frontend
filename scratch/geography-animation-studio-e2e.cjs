@@ -1,6 +1,7 @@
 const { chromium } = require("playwright");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 
 async function assertNoOverflow(page, label) {
   const metrics = await page.evaluate(() => ({
@@ -46,13 +47,34 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.addInitScript(() => {
+  await page.addInitScript(({ studentProfileKey }) => {
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_animation_studio");
-  });
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "beginner",
+        preparationStage: "not-started",
+        studyWindow: "60",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        attemptHistory: "no-attempt",
+        learningPattern: "deep-work",
+        mindState: "calm",
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }, { studentProfileKey: profileKey });
 
-  await page.goto(`${baseUrl}/upsc/geography`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByRole("link", { name: /Animation studio/i }).waitFor({ timeout: 15000 });
-  await page.getByRole("link", { name: /Animation studio/i }).click();
+  await page.goto(`${baseUrl}/upsc/geography/watch?day=2`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.getByTestId("day2-universe-visual").waitFor({ timeout: 15000 });
+  const learnerStudioLinks = await page.getByRole("link", { name: /Animation studio/i }).count();
+  if (learnerStudioLinks !== 0) {
+    throw new Error(`Expected the beginner lesson to hide the operator-heavy studio link, received ${learnerStudioLinks}.`);
+  }
+  checks.push(await assertNoOverflow(page, "geography-day2-learner-visual-without-studio-link"));
+
+  await page.goto(`${baseUrl}/upsc/geography/animation-studio`, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("geography-animation-studio").waitFor({ timeout: 15000 });
   await page.getByTestId("geography-animation-title").getByText("Universe to Earth: Scale, Solar System, Seasons", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Universe first", { exact: true }).waitFor({ timeout: 15000 });
@@ -63,6 +85,20 @@ async function run() {
   await page.getByTestId("geography-animation-active-frame").getByText("Where is Earth?", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("universe-orbital-mechanism-scene").getByText("23.5 deg tilt locked", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("universe-orbital-mechanism-scene").getByText("Direct rays vs slant rays", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-animation-frame-3").click();
+  const motionProgressBeforePlay = await page.getByTestId("universe-orbit-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(260);
+  const motionProgressWhilePlaying = await page.getByTestId("universe-orbit-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  if (motionProgressBeforePlay === motionProgressWhilePlaying) {
+    throw new Error(`Expected continuous Universe orbit motion while playing: ${motionProgressBeforePlay}`);
+  }
+  checks.push({
+    label: "geography-universe-continuous-orbit-motion",
+    motionProgressBeforePlay,
+    motionProgressWhilePlaying,
+  });
   await page.getByTestId("geography-animation-frame-7").click();
   await page.getByText("June solstice", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Sept equinox", { exact: true }).waitFor({ timeout: 15000 });
@@ -266,6 +302,19 @@ async function run() {
   await page.getByTestId("geography-animation-frame-3").click();
   await page.getByTestId("geography-animation-active-frame").getByText("Mantle convection", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Convection current moves plates", { exact: true }).waitFor({ timeout: 15000 });
+  const earthInteriorProgressBeforePlay = await page.getByTestId("earth-interior-continuous-convection-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(260);
+  const earthInteriorProgressWhilePlaying = await page.getByTestId("earth-interior-continuous-convection-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  if (earthInteriorProgressBeforePlay === earthInteriorProgressWhilePlaying) {
+    throw new Error(`Expected continuous Earth-interior convection motion while playing: ${earthInteriorProgressBeforePlay}`);
+  }
+  checks.push({
+    label: "geography-earth-interior-continuous-convection-motion",
+    motionProgressBeforePlay: earthInteriorProgressBeforePlay,
+    motionProgressWhilePlaying: earthInteriorProgressWhilePlaying,
+  });
   await page.getByTestId("geography-animation-frame-4").click();
   await page.getByTestId("geography-animation-active-frame").getByText("Divergent boundary", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Divergent: new crust", { exact: true }).waitFor({ timeout: 15000 });
@@ -297,6 +346,19 @@ async function run() {
   await page.getByTestId("geography-animation-frame-5").click();
   await page.getByTestId("geography-animation-active-frame").getByText("Explosive eruption", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Explosive ash column", { exact: true }).waitFor({ timeout: 15000 });
+  const volcanismProgressBeforePlay = await page.getByTestId("volcanism-continuous-eruption-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(260);
+  const volcanismProgressWhilePlaying = await page.getByTestId("volcanism-continuous-eruption-motion").getAttribute("data-motion-progress");
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  if (volcanismProgressBeforePlay === volcanismProgressWhilePlaying) {
+    throw new Error(`Expected continuous Volcanism eruption motion while playing: ${volcanismProgressBeforePlay}`);
+  }
+  checks.push({
+    label: "geography-volcanism-continuous-eruption-motion",
+    motionProgressBeforePlay: volcanismProgressBeforePlay,
+    motionProgressWhilePlaying: volcanismProgressWhilePlaying,
+  });
   await page.getByTestId("geography-animation-frame-6").click();
   await page.getByTestId("geography-animation-active-frame").getByText("Intrusive landforms", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Intrusive landforms cool below surface", { exact: true }).waitFor({ timeout: 15000 });
@@ -687,6 +749,7 @@ async function run() {
   await page.getByText("Animation-ready topics", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Next Universe animation build queue", { exact: true }).waitFor({ timeout: 15000 });
   checks.push(await assertNoOverflow(page, "geography-animation-studio-mobile"));
+  await page.screenshot({ path: "scratch/geography-animation-studio-mobile-final.png", fullPage: true });
 
   await browser.close();
 

@@ -5,12 +5,15 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "geography-30-day-production-audit-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "geography-30-day-production-audit-final.png");
+const profileKey = "sarit-upsc-student-profile-v1";
+const progressKey = "sarit-upsc-geography-progress-v1";
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
 const labSlugByTitle = {
   "Earth Layers Lab": "earth-layers",
   "Monsoon Simulator": "monsoon",
   "India Interactive Map": "india-map",
+  "Universe Foundation Visual": "universe",
   "Disaster Link": "disaster-link",
   "Environment Bridge": "environment-bridge",
   "MCQ Engine": "mcq-engine",
@@ -47,6 +50,82 @@ function parseGeographySessions() {
   return sessions.sort((a, b) => a.day - b.day);
 }
 
+async function seedRouteState(page, room, day) {
+  await page.evaluate(
+    ({ profileKey, progressKey, room, day }) => {
+      const now = new Date().toISOString();
+      window.MOCK_TOKEN = "MOCK_TOKEN_geography_30_day_production_audit";
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_30_day_production_audit");
+      window.localStorage.setItem(
+        profileKey,
+        JSON.stringify({
+          level: "beginner",
+          preparationStage: "not-started",
+          studyWindow: "60",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          attemptHistory: "no-attempt",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: now,
+        })
+      );
+
+      const current = JSON.parse(window.localStorage.getItem(progressKey) || "{}");
+      const dayKey = String(day);
+      const watchedProgress = {
+        day,
+        watched: true,
+        watchState: "Watched",
+        watchSceneCompletedIds: [
+          `${day}-briefing`,
+          `${day}-mechanism`,
+          `${day}-map`,
+          `${day}-trap`,
+          `${day}-recap`,
+        ],
+        watchHandoffReady: true,
+        updatedAt: now,
+      };
+      const talkProgress = {
+        ...watchedProgress,
+        talkScore: 96,
+        talkBand: "Command",
+        talkUnlockStage: "mcq",
+        talkVerdict: "MCQ route unlocked: the 95% recall target is cleared.",
+        reflection: "Concept, mechanism, map proof, example, and UPSC trap are clear.",
+      };
+
+      if (room === "command") {
+        current[dayKey] = {
+          day,
+          watchState: "Queued",
+          updatedAt: now,
+        };
+      } else if (room === "watch") {
+        delete current[dayKey];
+      } else if (room === "talk") {
+        current[dayKey] = watchedProgress;
+      } else if (room === "revisit") {
+        current[dayKey] = {
+          ...watchedProgress,
+          talkScore: 38,
+          talkBand: "Revisit",
+          revisitQueued: true,
+          recoveryWeakSkill: "Map proof",
+          recoveryDiagnosisSummary: "Repair one map-linked weak point before MCQ.",
+        };
+      } else {
+        current[dayKey] = talkProgress;
+      }
+
+      window.localStorage.setItem(progressKey, JSON.stringify(current));
+    },
+    { profileKey, progressKey, room, day }
+  );
+}
+
 async function assertNoOverflow(page, label, checks) {
   const metrics = await page.evaluate(() => {
     const bodyText = document.body.innerText;
@@ -55,7 +134,9 @@ async function assertNoOverflow(page, label, checks) {
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
       bodyScrollWidth: document.body.scrollWidth,
-      hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
+      hasHorizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 2 ||
+        document.body.scrollWidth > document.documentElement.clientWidth + 2,
       containsOldBranding: /AntiGravity|ANTIGRAVITY|antigravity/i.test(bodyText),
     };
   });
@@ -68,6 +149,15 @@ async function assertNoOverflow(page, label, checks) {
 async function expectVisible(page, label, locator) {
   await locator.first().waitFor({ timeout: 15000 });
   return { label };
+}
+
+async function expectHiddenDetails(page, label, testId, checks) {
+  const state = await page.getByTestId(testId).evaluate((element) => ({
+    open: element.open,
+    text: element.textContent?.slice(0, 160) || "",
+  }));
+  checks.push({ label, state });
+  if (state.open) throw new Error(`${label} should start folded: ${JSON.stringify(state)}`);
 }
 
 async function expectPageText(page, label, text) {
@@ -93,57 +183,74 @@ function routeDefinitions(session) {
     {
       room: "command",
       path: `/upsc/geography?day=${session.day}`,
-      critical: async (page) => {
+      critical: async (page, checks) => {
+        await expectVisible(page, "command-simple-entry", page.getByTestId("geography-today-simple-entry"));
         await expectVisible(page, "command-next-action", page.getByTestId("command-next-action"));
-        await expectVisible(page, "command-readiness-score", page.getByTestId("command-readiness-score"));
+        await expectHiddenDetails(page, "command-funnel-folded", "geography-command-funnel-details", checks);
+        await expectHiddenDetails(page, "command-controls-folded", "geography-command-advanced-controls", checks);
       },
     },
     {
       room: "watch",
       path: `/upsc/geography/watch?day=${session.day}`,
-      critical: async (page) => {
-        await expectVisible(page, "watch-player", page.getByTestId("watch-demo-player"));
-        await expectVisible(page, "watch-scene-engine", page.getByTestId("watch-scene-engine"));
+      critical: async (page, checks) => {
+        await expectVisible(page, "watch-shell", page.getByTestId("geography-watch-simple-repair"));
+        await expectVisible(page, "watch-player", page.getByTestId("watch-topic-player"));
+        await expectVisible(page, "watch-primary-action", page.getByTestId("watch-complete-and-discuss"));
+        await expectHiddenDetails(page, "watch-checkpoints-folded", "geography-watch-checkpoints", checks);
+        await expectHiddenDetails(page, "watch-details-folded", "geography-watch-details", checks);
       },
     },
     {
       room: "talk",
       path: `/upsc/geography/talk?day=${session.day}`,
-      critical: async (page) => {
+      critical: async (page, checks) => {
+        await expectVisible(page, "talk-simple-panel", page.getByTestId("geography-talk-simple-panel"));
         await expectVisible(page, "talk-answer", page.getByTestId("talk-answer-draft"));
-        await expectVisible(page, "talk-discussion", page.getByTestId("talk-discussion-window"));
+        await expectVisible(page, "talk-recall-meter", page.getByTestId("talk-recall-target-meter"));
+        await expectHiddenDetails(page, "talk-details-folded", "geography-talk-details", checks);
       },
     },
     {
       room: "lab",
       path: `/upsc/geography/lab?mode=${session.labSlug}&day=${session.day}`,
-      critical: async (page) => {
+      critical: async (page, checks) => {
+        await expectVisible(page, "lab-simple-surface", page.getByTestId("geography-lab-simple-surface"));
         await expectVisible(page, "lab-proof-board", page.getByTestId("lab-proof-command-board"));
-        await expectVisible(page, "lab-proof-stages", page.getByTestId("geography-lab-proof-stages"));
+        await expectVisible(page, "lab-skip-mcq", page.getByTestId("lab-continue-without-visual"));
+        await expectHiddenDetails(page, "lab-visual-board-folded", "geography-lab-visual-board", checks);
+        await expectHiddenDetails(page, "lab-advanced-tools-folded", "geography-lab-advanced-tools", checks);
       },
     },
     {
       room: "mcq",
       path: `/upsc/geography/mcq-readiness?day=${session.day}`,
-      critical: async (page) => {
-        await expectVisible(page, "mcq-board", page.getByTestId("mcq-readiness-command-board"));
-        await expectVisible(page, "mcq-status", page.getByTestId("mcq-preflight-status"));
+      critical: async (page, checks) => {
+        await expectVisible(page, "mcq-level-shell", page.getByTestId("geography-mcq-level-shell"));
+        await expectVisible(page, "mcq-flow-strip", page.getByTestId("mcq-simple-flow-strip"));
+        await expectVisible(page, "mcq-next-action-panel", page.getByTestId("mcq-student-next-action-panel"));
+        await expectHiddenDetails(page, "mcq-advanced-tools-folded", "geography-mcq-advanced-tools", checks);
       },
     },
     {
       room: "track",
       path: `/upsc/geography/track?day=${session.day}`,
-      critical: async (page) => {
-        await expectVisible(page, "track-focused-day", page.getByTestId("geography-track-focused-day"));
-        await expectVisible(page, "track-ledger", page.getByTestId("geography-focused-evidence-ledger"));
+      critical: async (page, checks) => {
+        await expectVisible(page, "track-simple-dashboard", page.getByTestId("geography-track-simple-dashboard"));
+        await expectVisible(page, "track-four-signal-surface", page.getByTestId("geography-track-four-signal-surface"));
+        await expectVisible(page, "track-focused-route", page.getByTestId("geography-track-focused-route"));
+        await expectHiddenDetails(page, "track-path-map-folded", "geography-track-path-map", checks);
+        await expectHiddenDetails(page, "track-advanced-tools-folded", "geography-track-advanced-tools", checks);
       },
     },
     {
       room: "revisit",
       path: `/upsc/geography/revisit?day=${session.day}`,
-      critical: async (page) => {
-        await expectVisible(page, "revisit-diagnosis", page.getByTestId("revisit-diagnosis-board"));
-        await expectVisible(page, "revisit-ledger", page.getByTestId("revisit-recovery-ledger"));
+      critical: async (page, checks) => {
+        await expectVisible(page, "revisit-simple-panel", page.getByTestId("geography-revisit-simple-panel"));
+        await expectVisible(page, "revisit-note-surface", page.getByTestId("geography-revisit-note-surface"));
+        await expectVisible(page, "revisit-action-card", page.getByTestId("geography-revisit-action-card"));
+        await expectHiddenDetails(page, "revisit-checklist-folded", "geography-revisit-checklist", checks);
       },
     },
   ];
@@ -160,16 +267,14 @@ async function runViewport(browser, sessions, viewport, label) {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.addInitScript(() => {
-    window.MOCK_TOKEN = "MOCK_TOKEN_geography_30_day_audit";
-    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_30_day_audit");
-  });
 
   for (const session of sessions) {
     for (const route of routeDefinitions(session)) {
+      await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await seedRouteState(page, route.room, session.day);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: "domcontentloaded", timeout: 45000 });
       await expectPageText(page, `${label}-${route.room}-day-${session.day}-title`, session.title);
-      await route.critical(page);
+      await route.critical(page, checks);
       await assertNoOverflow(page, `${label}-${route.room}-day-${session.day}`, checks);
       findings.push({
         viewport: label,
@@ -223,7 +328,22 @@ async function run() {
   if (!evidence.passed) {
     throw new Error(JSON.stringify(evidence, null, 2));
   }
-  console.log(JSON.stringify(evidence, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        baseUrl,
+        sessionCount: evidence.sessionCount,
+        routeCountPerViewport: evidence.routeCountPerViewport,
+        totalRouteChecks: evidence.totalRouteChecks,
+        consoleErrors: evidence.consoleErrors,
+        blockingConsoleErrors: evidence.blockingConsoleErrors,
+        pageErrors: evidence.pageErrors,
+        passed: evidence.passed,
+      },
+      null,
+      2
+    )
+  );
 }
 
 run().catch((error) => {

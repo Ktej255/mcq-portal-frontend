@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,11 +16,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const pathname = usePathname();
 
   // Mock role for now - in production this comes from user metadata or backend
-  const isLocalMockAdmin =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
-    localStorage.getItem("MOCK_TOKEN")?.startsWith("MOCK_TOKEN");
-  const isAdmin = user?.email?.endsWith('@admin.com') || user?.email === 'sarit.kumar.dev@gmail.com' || isLocalMockAdmin;
+  const isAdmin = isMasterEmail(user?.email) || isLocalMockMasterSession();
   const userRole = isAdmin ? 'ADMIN' : 'STUDENT';
 
   useEffect(() => {

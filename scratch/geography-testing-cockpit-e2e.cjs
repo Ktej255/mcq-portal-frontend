@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const feedbackKey = "sarit-upsc-geography-pilot-feedback-v1";
 const releaseKey = "sarit-upsc-geography-pilot-release-v1";
@@ -39,8 +40,23 @@ async function assertNoOverflow(page, label, checks) {
 
 async function seedDayOneCommand(page) {
   await page.evaluate(
-    ({ localProgressKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localCheckInKey, localRosterKey, localInviteCode }) => {
-      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_testing_cockpit");
+    ({ localProfileKey, localProgressKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localCheckInKey, localRosterKey, localInviteCode }) => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_geography_testing_cockpit");
+      window.localStorage.setItem(
+        localProfileKey,
+        JSON.stringify({
+          level: "beginner",
+          preparationStage: "not-started",
+          studyWindow: "60",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          attemptHistory: "no-attempt",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        }),
+      );
       window.localStorage.removeItem(localFeedbackKey);
       window.localStorage.removeItem(localReleaseKey);
       window.localStorage.removeItem(localFounderReviewKey);
@@ -71,17 +87,17 @@ async function seedDayOneCommand(page) {
             watchSceneCompletedIds: ["1-briefing", "1-mechanism", "1-map", "1-trap", "1-recap"],
             watchHandoffReady: true,
             watchHandoffSummary: "Concept, mechanism, map/example, and UPSC trap saved for testing.",
-            talkScore: 82,
-            talkBand: "Practice",
-            talkUnlockStage: "lab",
+            talkScore: 96,
+            talkBand: "Command",
+            talkUnlockStage: "mcq",
             talkClassroomStage: "examiner-verdict",
-            talkNextRoute: "/upsc/geography/lab?mode=earth-layers&day=1",
-            talkNextActionLabel: "Open visual lab",
+            talkNextRoute: "/upsc/geography/mcq-readiness?day=1",
+            talkNextActionLabel: "Open MCQ practice",
             reflection: "Testing seed: Earth system answer passed Talk with map and trap proof.",
             confidence: "Command",
             revisitQueued: false,
             labCompleted: true,
-            labMode: "earth-layers",
+            labMode: "india-map",
             labProofCompletedIds: [
               "1-earth-layers-concept",
               "1-earth-layers-map",
@@ -107,6 +123,7 @@ async function seedDayOneCommand(page) {
       );
     },
     {
+      localProfileKey: profileKey,
       localProgressKey: progressKey,
       localFeedbackKey: feedbackKey,
       localReleaseKey: releaseKey,
@@ -137,8 +154,9 @@ async function run() {
   await page.getByTestId("geography-testing-link-card").getByText("/upsc/geography/pilot", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-pilot-release-state").getByText("Operator sign-off required", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-pilot-sharing-rules").getByText("Maximum testers: 3", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-pilot-script").getByText("Complete all five Visual Lab proof stages", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("testing-gate-watch-proof").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-pilot-script").getByText("Use the optional India-map visual", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("testing-gate-learn-proof").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("testing-gate-discuss-verdict").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("testing-gate-mcq-command").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "testing-cockpit-desktop", checks);
 
@@ -207,11 +225,15 @@ async function run() {
   await page.getByTestId("geography-student-check-in-save").click();
   await page.getByTestId("geography-student-pilot-check-in").getByText("Checked in: Pilot Tester B", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-student-pilot-start").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Review Track and save final feedback", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-script").getByText("Room 1: Watch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-script").getByText("Room 4: MCQ and Track", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-stuck-rule").getByText("Do not skip to the next room", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-gates").getByText("Step 1: Watch", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Save final feedback", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-script").getByText("Step 1: Learn", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-script").getByText("Step 3: MCQ", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-stuck-rule").getByText("Do not skip ahead", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-gates").getByText("Step 1: Learn", { exact: false }).waitFor({ timeout: 15000 });
+  const pilotJumpLinks = await page.getByTestId("geography-student-pilot-gates").getByRole("link").count();
+  if (pilotJumpLinks !== 0) {
+    throw new Error(`Student pilot exposed ${pilotJumpLinks} skip-ahead links.`);
+  }
   const studentRouteText = await page.locator("body").innerText();
   if (/Admin view|Open Testing Cockpit|Operator sign-off required/i.test(studentRouteText)) {
     throw new Error("Student pilot route leaked operator/admin language.");
@@ -220,7 +242,7 @@ async function run() {
   await page.getByRole("button", { name: "Visual Lab" }).click();
   await page.getByRole("button", { name: "Positive" }).click();
   await page
-    .getByPlaceholder("Example: I completed Watch and Talk")
+    .getByPlaceholder("Example: I completed the lesson and discussion")
     .fill("The Day 1 student path is clear and the Visual Lab instruction tells me where to go next.");
   await page.getByTestId("geography-student-feedback-save").click();
   await page.getByText("Feedback saved for the pilot review board.", { exact: false }).waitFor({ timeout: 15000 });

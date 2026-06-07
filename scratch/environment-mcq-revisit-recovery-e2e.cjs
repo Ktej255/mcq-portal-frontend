@@ -81,7 +81,7 @@ async function run() {
           confidence: "Shaky",
           reflection: "Protected areas are linked through category, map, species, threat, and institution.",
           revisitQueued: true,
-          talkScore: 92,
+          talkScore: 96,
           talkBand: "Command",
           talkUnlockStage: "mcq",
           labCompleted: true,
@@ -129,10 +129,10 @@ async function run() {
   }, { progressKey, mcqKey, localDraftKey, questions: [makeQuestion(1), makeQuestion(2), makeQuestion(3)] });
   await page.reload({ waitUntil: "networkidle" });
   await page.getByTestId("revisit-mcq-summary").getByText("1/3 correct", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByText("MCQ retest after recovery", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("revisit-simple-step").getByText("MCQ retest after recovery", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-mcq-revisit-before-recovery", checks);
 
-  await page.getByPlaceholder("Write the recovery note or corrected explanation here.").fill(
+  await page.getByTestId("subject-revisit-repair-note").fill(
     "Recovered MCQ trap: protected area categories differ by notification, rights, core-buffer logic, habitat, corridor need, and species threat. I will retest the fresh batch now."
   );
   await page.getByRole("button", { name: /Mark recovered/i }).click();
@@ -160,13 +160,12 @@ async function run() {
 
   await page.getByTestId("revisit-primary-route").click();
   await page.waitForURL("**/upsc/environment/mcq-readiness?day=5", { timeout: 15000 });
-  await page.getByTestId("environment-mcq-quality-score").getByText("100%", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-launcher").getByText("Student practice ready", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-mcq-revisit-retest-route", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/environment/revisit?day=5`, { waitUntil: "networkidle" });
-  await page.getByText("No revisit queue yet", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("revisit-simple-step").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-mcq-revisit-mobile-cleared", checks);
   await page.screenshot({ path: path.join(__dirname, "environment-mcq-revisit-recovery-final.png"), fullPage: true });
 

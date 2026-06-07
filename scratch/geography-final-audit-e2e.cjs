@@ -4,6 +4,7 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const progressKey = "sarit-upsc-geography-progress-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const localDraftKey = "sarit-admin-bulk-question-drafts-v1";
 const evidencePath = path.join(__dirname, "geography-final-audit-e2e-evidence.json");
@@ -69,39 +70,6 @@ function buildMcqQuestion(batchCode, index, correctOption) {
   };
 }
 
-async function completeVisualLab(page, checks) {
-  await page.goto(`${baseUrl}/upsc/geography/lab?mode=india-map&day=13`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("lab-proof-command-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("india-layer-wildlife-sanctuaries").click();
-  await page.getByTestId("india-atlas-point-wayanad-wls").click();
-  await assertNoOverflow(page, "main-lab-initial", checks);
-
-  const stages = [
-    "1. Concept lock",
-    "2. Map mechanism",
-    "3. India example",
-    "4. UPSC trap",
-    "5. Answer hook",
-  ];
-
-  for (let index = 0; index < stages.length; index += 1) {
-    await page.getByTestId("geography-lab-proof-stages").getByText(stages[index], { exact: false }).click();
-    await page.getByTestId("geography-lab-use-proof-suggestion").click();
-    await page.getByTestId("geography-lab-save-proof").click();
-    await page.waitForFunction(
-      ({ key, expected }) => {
-        const day = JSON.parse(window.localStorage.getItem(key) || "{}")["13"];
-        return (day?.labProofCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: progressKey, expected: index + 1 },
-      { timeout: 15000 }
-    );
-  }
-
-  await page.getByTestId("lab-evidence-status").getByText("mcq ready", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "main-lab-complete", checks);
-}
-
 async function seedFreshMcqs(page) {
   const questions = [buildMcqQuestion("GEO-D13", 1, "A"), buildMcqQuestion("GEO-D13", 2, "B")];
   await page.evaluate(
@@ -137,16 +105,16 @@ async function seedFreshMcqs(page) {
 async function completeMcqPractice(page, checks) {
   await seedFreshMcqs(page);
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=13`, { waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("mcq-readiness-command-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-preflight-status").getByText("Practice ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-next-decision").getByText("Start local practice", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-student-next-action-panel").waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-start-local-practice").click();
   await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 2", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-A").click();
+  await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: /Next question/i }).click();
   await page.getByTestId("mcq-local-practice-runner").getByText("Question 2 of 2", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-B").click();
-  await page.getByTestId("mcq-practice-outcome-gate").getByText("Command retained", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-practice-outcome-gate").getByText("Command cleared", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-student-next-action").getByText("Continue to next topic", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "main-mcq-command", checks);
 }
 
@@ -162,49 +130,43 @@ async function completeMainSuccessPath(page, checks) {
     { progressStorageKey: progressKey, localMcqKey: mcqKey, localDraftStorageKey: localDraftKey }
   );
   await page.reload({ waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("watch-demo-player").waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-scene-engine").getByText("Scene playback", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-topic-player").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "main-watch-initial", checks);
 
-  for (let index = 0; index < 5; index += 1) {
-    await page.getByTestId("watch-scene-complete").click();
-    await page.waitForFunction(
-      ({ key, expected }) => {
-        const day = JSON.parse(window.localStorage.getItem(key) || "{}")["13"];
-        return (day?.watchSceneCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: progressKey, expected: index + 1 },
-      { timeout: 15000 }
-    );
-  }
-  await page.getByTestId("watch-route-gate").getByText("AI teacher unlocked", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-primary-route").click();
+  await page.getByTestId("watch-complete-and-discuss").click();
   await page.waitForURL("**/upsc/geography/talk?day=13", { timeout: 15000 });
-  await page.getByText("AI teacher oral check", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "main-talk-from-watch", checks);
 
   await page.getByTestId("talk-answer-draft").fill(
     [
-      "Resources and agriculture cluster through location advantages, rainfall, irrigation, soil, relief, transport and market access.",
-      "Minerals concentrate in belts because geology and relief create deposits, while agriculture changes with soil, climate, irrigation and technology.",
-      "The India map proof includes mineral belts, crop belts, western and eastern coasts, plateau regions, irrigation zones and agro-climatic regions.",
-      "The mechanism is not one-factor; rainfall, soil, relief, water, labour, market and policy combine to create regional specialization.",
-      "UPSC can trap by saying one factor alone explains every crop or mineral industry, so exceptions and regional examples are essential.",
+      "Resources and agriculture in India Map Command require minerals, energy, irrigation, crops, and agro-climatic logic.",
+      "First, location advantages cause crops, minerals, and industries to cluster where relief, rainfall, soil, transport, and market access connect.",
+      "Because irrigation and energy affect regional specialization, map proof such as Deccan plateau mineral belts, western coast, eastern plains, and Ganga irrigation regions explains the pattern.",
+      "Finally, the UPSC trap is to assume every industry or crop belt is identical or that only one factor controls all locations; check the regional exception.",
     ].join(" ")
   );
-  await page.getByRole("button", { name: /Assess explanation/i }).click();
-  await page.getByTestId("talk-stage-peer-challenge").getByText("Active", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-challenge-response").fill(
-    [
-      "The map proof is the key.",
-      "A crop belt must be explained through rainfall, soil, irrigation and markets; a mineral belt must be explained through geology, transport and industry.",
-      "For example plateau mineral belts and irrigated crop regions are different map patterns.",
-      "The trap is to overgeneralize one variable like rainfall or mineral availability without checking region, relief and infrastructure.",
-    ].join(" ")
+  await page.getByTestId("talk-assess-answer").click();
+  await page.waitForFunction(
+    () =>
+      Boolean(document.querySelector('[data-testid="talk-primary-route"]')) ||
+      Boolean(document.querySelector('[data-testid="talk-teacher-follow-up"]')),
+    null,
+    { timeout: 15000 }
   );
-  await page.getByTestId("talk-reassess-challenge").click();
-  await page.getByTestId("talk-stage-examiner-verdict").getByText("Done", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-next-handoff").getByText("Open visual lab", { exact: false }).waitFor({ timeout: 15000 });
+  if (await page.getByTestId("talk-teacher-follow-up").isVisible().catch(() => false)) {
+    await page.getByTestId("talk-challenge-response").fill(
+      [
+        "Resources and agriculture need the complete India Map Command chain: minerals, energy, irrigation, crops, agro-climatic logic, and location advantages.",
+        "A crop belt must be explained through rainfall, soil, irrigation, and markets; a mineral belt must be explained through geology, transport, energy, and industries.",
+        "For example, Deccan plateau mineral belts and Ganga irrigated crop regions are different map patterns because their causes and effects differ.",
+        "The UPSC trap is to overgeneralize one variable or say every region is identical without checking relief, infrastructure, and exceptions.",
+      ].join(" ")
+    );
+    await page.getByTestId("talk-reassess-challenge").click();
+  }
+  await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-primary-route").getByText("Open MCQ", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "main-talk-complete", checks);
 
   const talkProgress = await getProgress(page, 13);
@@ -212,26 +174,21 @@ async function completeMainSuccessPath(page, checks) {
     throw new Error(`Main path Talk did not clear: ${JSON.stringify(talkProgress, null, 2)}`);
   }
 
-  await completeVisualLab(page, checks);
   await completeMcqPractice(page, checks);
 
   const mainProgress = await getProgress(page, 13);
   if (
-    mainProgress?.labCompleted !== true ||
-    mainProgress?.labEvidenceStatus !== "mcq-ready" ||
     mainProgress?.mcqReadinessStatus !== "command" ||
     mainProgress?.mcqOutcome !== "Command" ||
     mainProgress?.mcqScorePercent !== 100 ||
-    mainProgress?.mcqNextRoute !== "/upsc/geography/track?day=13"
+    mainProgress?.mcqNextRoute !== "/upsc/geography/watch?day=14"
   ) {
     throw new Error(`Main Geography path did not finish in command state: ${JSON.stringify(mainProgress, null, 2)}`);
   }
 
   await page.goto(`${baseUrl}/upsc/geography/track?day=13`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-focused-evidence-ledger").getByText("100% ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-evidence-mcq-outcome").getByText("2/2 correct", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "main-track-100-ready", checks);
+  await page.getByTestId("geography-track-simple-dashboard").waitFor({ timeout: 15000 });
+  await assertNoOverflow(page, "main-track-simple-dashboard", checks);
 
   return mainProgress;
 }
@@ -251,50 +208,31 @@ async function completeRevisitBranch(page, checks) {
     window.localStorage.setItem(key, JSON.stringify(current));
   }, progressKey);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByText("AI teacher oral check", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByPlaceholder("Write the explanation in your own words.").fill("I do not know Indian Monsoon yet.");
-  await page.getByRole("button", { name: /Assess explanation/i }).click();
-  await page.getByTestId("talk-route-gate").getByText("MCQ locked: revisit first", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-answer-draft").fill("I do not know Indian Monsoon yet.");
+  await page.getByTestId("talk-assess-answer").click();
+  await page.getByTestId("talk-primary-route").getByText("Open short revision", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "branch-talk-revisit-queued", checks);
 
   await page.getByTestId("talk-primary-route").click();
   await page.waitForURL("**/upsc/geography/revisit?day=10", { timeout: 15000 });
-  await page.getByTestId("revisit-recovery-ledger").waitFor({ timeout: 15000 });
-  await page.getByTestId("revisit-recovery-status").getByText("Recovery pending", { exact: false }).waitFor({ timeout: 15000 });
-
-  const recoveryLines = [
-    "Recall proof: Indian Monsoon requires ITCZ, jet streams, onset, break, retreat and rainfall variability.",
-    "Explain proof: unequal heating shifts pressure, winds and rainfall through Arabian Sea and Bay branches.",
-    "Map proof: Western Ghats, Himalaya, rain shadow and Bay branch must be placed on the India map.",
-    "Trap proof: monsoon is not uniform, not only rainfall, and not explained by one pressure factor alone.",
-    "Retest proof: I can now explain monsoon mechanism with map logic and one UPSC exception.",
-  ];
-
-  for (let index = 0; index < recoveryLines.length; index += 1) {
-    await page.getByTestId("revisit-recovery-note").fill(recoveryLines[index]);
-    await page.getByTestId("revisit-save-proof").click();
-    await page.waitForFunction(
-      ({ key, expected }) => {
-        const day = JSON.parse(window.localStorage.getItem(key) || "{}")["10"];
-        return (day?.recoveryProofCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: progressKey, expected: index + 1 },
-      { timeout: 15000 }
-    );
-  }
-
-  await page.getByTestId("revisit-recovery-status").getByText("Talk ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("revisit-primary-route").click();
+  await page.getByTestId("geography-revisit-simple-panel").waitFor({ timeout: 15000 });
+  await page.getByTestId("revisit-repair-note").fill(
+    "I corrected the monsoon mechanism with ITCZ movement, jet streams, Arabian Sea and Bay branches, Western Ghats rain shadow, and one non-uniform rainfall trap."
+  );
+  await page.getByTestId("revisit-repair-note").blur();
+  await page.getByText("Repair note saved.", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("revisit-complete-and-talk").click();
   await page.waitForURL("**/upsc/geography/talk?day=10", { timeout: 15000 });
-  await page.getByTestId("talk-route-gate").getByText("Awaiting MAIC oral check", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "branch-talk-after-revisit", checks);
 
   const branchProgress = await getProgress(page, 10);
   if (
+    branchProgress?.recoveryCompleted !== true ||
     branchProgress?.revisitQueued !== false ||
     branchProgress?.recoveryStatus !== "talk-ready" ||
-    branchProgress?.recoveryNextRoute !== "/upsc/geography/talk?day=10" ||
-    branchProgress?.talkBand !== undefined
+    branchProgress?.recoveryNextRoute !== "/upsc/geography/talk?day=10"
   ) {
     throw new Error(`Revisit branch did not reset Talk gate correctly: ${JSON.stringify(branchProgress, null, 2)}`);
   }
@@ -309,10 +247,25 @@ async function run() {
   const pageErrors = [];
   const checks = [];
 
-  await page.addInitScript(() => {
+  await page.addInitScript(({ studentProfileKey }) => {
     window.MOCK_TOKEN = "MOCK_TOKEN_geography_final_audit";
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_final_audit");
-  });
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "beginner",
+        preparationStage: "not-started",
+        studyWindow: "60",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        attemptHistory: "no-attempt",
+        learningPattern: "deep-work",
+        mindState: "calm",
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }, { studentProfileKey: profileKey });
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -324,7 +277,7 @@ async function run() {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/geography/track?day=13`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-focused-evidence-ledger").waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-track-simple-dashboard").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "final-audit-mobile-track", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

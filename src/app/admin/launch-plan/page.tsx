@@ -20,8 +20,10 @@ import {
   launchFocusAreas,
   launchReadinessMetrics,
   launchVerdictCards,
+  liveReleaseBoundary,
   may24Plan,
   may25Plan,
+  may31Plan,
   nextSixDayFocus,
   type DeliveryFocusItem,
   type DeliveryStatus,
@@ -125,6 +127,12 @@ export default function AdminLaunchPlanPage() {
           >
             MCQ Upload <ArrowRight className="h-4 w-4" />
           </Link>
+          <Link
+            href="/admin/feature-inventory"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 text-sm font-bold text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-900"
+          >
+            Feature Inventory <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
 
@@ -145,14 +153,14 @@ export default function AdminLaunchPlanPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              24 May to 25 May operating answer
+              24 May to 31 May operating answer
             </p>
             <h2 className="mt-2 text-2xl font-black text-zinc-950 dark:text-zinc-50">
               Geography stays first; student pilot is the next gate
             </h2>
             <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-              May 24 local build work is effectively closed. The remaining work is the human founder pass, fresh
-              content import, and controlled student feedback cycle before widening beyond the first testers.
+              May 24 local loop work is retained as historical evidence. The current release boundary is the live
+              Supabase migration, Google OAuth continuity rehearsal, final Day 1 content pass, and controlled feedback cycle.
             </p>
           </div>
           <div className="grid min-w-[260px] gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -214,6 +222,46 @@ export default function AdminLaunchPlanPage() {
         <div>
           {immediateLaunchActions.map((item) => (
             <ProgressLine key={item.title} item={item} />
+          ))}
+        </div>
+      </section>
+
+      <section
+        data-testid="admin-live-release-boundary"
+        className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
+            <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950 dark:text-zinc-50">
+              <ShieldCheck className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+              Live Release Boundary
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+              Operator-only sequence for the remaining console work. Complete these receipts in order before a public student invite.
+            </p>
+          </div>
+          <Badge variant="outline" className="h-7 rounded-md border-amber-200 bg-amber-50 px-2 font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+            External proof required
+          </Badge>
+        </div>
+
+        <div className="divide-y divide-zinc-100 border-y border-zinc-100 dark:divide-zinc-800 dark:border-zinc-800">
+          {liveReleaseBoundary.map((gate) => (
+            <div key={gate.step} className="grid gap-3 py-4 lg:grid-cols-[64px_1fr_1fr]">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">Step {gate.step}</p>
+                <div className="mt-2"><StatusBadge status={gate.status} /></div>
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-zinc-950 dark:text-zinc-50">{gate.title}</h3>
+                <p className="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">{gate.controlPlane}</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{gate.operatorAction}</p>
+              </div>
+              <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-950">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">Proof receipt</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{gate.proofReceipt}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -312,7 +360,7 @@ export default function AdminLaunchPlanPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        {[may24Plan, may25Plan].map((plan) => (
+        {[may24Plan, may25Plan, may31Plan].map((plan) => (
           <div key={plan.date} className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

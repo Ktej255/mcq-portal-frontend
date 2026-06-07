@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-environment-progress-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const evidencePath = path.join(__dirname, "environment-readiness-dashboard-e2e-evidence.json");
@@ -54,7 +55,7 @@ const seededProgress = {
     watchState: "Watched",
     watchSceneCompletedIds: completeIds,
     reflection: "Protected areas explained with category rules and map examples.",
-    talkScore: 88,
+    talkScore: 96,
     talkBand: "Command",
     talkUnlockStage: "mcq",
     labCompleted: true,
@@ -68,12 +69,21 @@ const seededProgress = {
     watchState: "Watched",
     watchSceneCompletedIds: completeIds,
     reflection: "Species conservation explained through IUCN, CITES, habitat, and examples.",
-    talkScore: 92,
+    talkScore: 96,
     talkBand: "Command",
     talkUnlockStage: "mcq",
     labCompleted: true,
     labMode: "biodiversity-map",
     labProofCompletedIds: completeIds,
+    mcqAttempted: true,
+    mcqCompleted: true,
+    mcqAnsweredCount: 25,
+    mcqCorrectCount: 23,
+    mcqTotal: 25,
+    mcqScorePercent: 92,
+    mcqLastBatchCode: "ENV-D06",
+    mcqOutcome: "Command",
+    mcqReadinessStatus: "command",
     confidence: "Command",
   },
 };
@@ -111,11 +121,24 @@ async function assertNoOverflow(page, label, checks) {
 
 async function seedLocalState(page) {
   await page.evaluate(
-    ({ mcqKey: batchKey, progressKey: subjectKey, mcqState, progressState }) => {
+    ({ mcqKey: batchKey, profileKey: studentProfileKey, progressKey: subjectKey, mcqState, progressState }) => {
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_environment_readiness_dashboard");
+      window.localStorage.setItem(
+        studentProfileKey,
+        JSON.stringify({
+          level: "advanced",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          updatedAt: new Date().toISOString(),
+        })
+      );
       window.localStorage.setItem(subjectKey, JSON.stringify(progressState));
       window.localStorage.setItem(batchKey, JSON.stringify(mcqState));
     },
     {
+      profileKey,
       progressKey,
       mcqKey,
       progressState: seededProgress,
@@ -140,7 +163,17 @@ async function run() {
   await seedLocalState(page);
 
   await page.goto(`${baseUrl}/upsc/environment/track?day=3`, { waitUntil: "networkidle" });
-  await page.getByTestId("subject-readiness-snapshot").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-simple-dashboard").waitFor({ timeout: 15000 });
+  await page.getByTestId("track-focused-route").waitFor({ timeout: 15000 });
+  const advancedOpenBefore = await page.getByTestId("subject-track-advanced-tools").evaluate((element) => element.open);
+  const readinessVisibleBefore = await page.getByTestId("subject-readiness-snapshot").isVisible();
+  if (advancedOpenBefore || readinessVisibleBefore) {
+    throw new Error(
+      `Track advanced tools should start folded: ${JSON.stringify({ advancedOpenBefore, readinessVisibleBefore })}`
+    );
+  }
+  await page.getByTestId("subject-track-advanced-tools").locator(":scope > summary").click();
+  await page.getByTestId("subject-readiness-snapshot").waitFor({ state: "visible", timeout: 15000 });
   await page.getByTestId("subject-next-action-queue").waitFor({ timeout: 15000 });
   await page.getByTestId("subject-focused-stage-checklist").waitFor({ timeout: 15000 });
   await page.getByText("42%", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -164,14 +197,27 @@ async function run() {
 
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto(`${baseUrl}/upsc/environment/track?day=3`, { waitUntil: "networkidle" });
-  await page.getByTestId("subject-readiness-snapshot").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-simple-dashboard").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-advanced-tools").locator(":scope > summary").click();
+  await page.getByTestId("subject-readiness-snapshot").waitFor({ state: "visible", timeout: 15000 });
   await assertNoOverflow(page, "environment-track-readiness-mobile", checks);
 
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.goto(`${baseUrl}/upsc/environment?day=6`, { waitUntil: "networkidle" });
-  await page.getByText("Day 6 of 20", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-simple-student-flow").getByText("Day 6 of 20", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-command-next-action").waitFor({ timeout: 15000 });
-  await page.getByTestId("subject-command-subject-readiness").waitFor({ timeout: 15000 });
+  const commandPlannerOpenBefore = await page.getByTestId("subject-planner-details").evaluate((element) => element.open);
+  const commandReadinessVisibleBefore = await page.getByTestId("subject-command-subject-readiness").isVisible();
+  if (commandPlannerOpenBefore || commandReadinessVisibleBefore) {
+    throw new Error(
+      `Command planner details should start folded: ${JSON.stringify({
+        commandPlannerOpenBefore,
+        commandReadinessVisibleBefore,
+      })}`
+    );
+  }
+  await page.getByTestId("subject-planner-details").locator(":scope > summary").click();
+  await page.getByTestId("subject-command-subject-readiness").waitFor({ state: "visible", timeout: 15000 });
 
   const commandNextAction = await page.getByTestId("subject-command-next-action").textContent();
   if (!commandNextAction?.includes("Command ready") || !commandNextAction?.includes("100% ready")) {

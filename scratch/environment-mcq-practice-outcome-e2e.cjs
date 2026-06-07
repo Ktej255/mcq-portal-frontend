@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-environment-progress-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const localDraftKey = "sarit-admin-bulk-question-drafts-v1";
@@ -67,9 +68,24 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
+  await page.addInitScript(() => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_environment_mcq_practice");
+  });
+
   await page.goto(`${baseUrl}/upsc/environment/mcq-readiness?day=5`, { waitUntil: "networkidle" });
   await page.evaluate(
-    ({ progressKey: localProgressKey, mcqKey: localMcqKey, localDraftKey: localLocalDraftKey, questions }) => {
+    ({ profileKey: localProfileKey, progressKey: localProgressKey, mcqKey: localMcqKey, localDraftKey: localLocalDraftKey, questions }) => {
+      window.localStorage.setItem(
+        localProfileKey,
+        JSON.stringify({
+          level: "advanced",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          updatedAt: new Date().toISOString(),
+        })
+      );
       window.localStorage.setItem(
         localProgressKey,
         JSON.stringify({
@@ -82,7 +98,7 @@ async function run() {
             confidence: "Command",
             reflection: "Protected areas are linked through category, map, species, threat, and institution.",
             revisitQueued: false,
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             labCompleted: true,
@@ -117,24 +133,41 @@ async function run() {
         ])
       );
     },
-    { progressKey, mcqKey, localDraftKey, questions: [makeQuestion(1), makeQuestion(2), makeQuestion(3)] }
+    { profileKey, progressKey, mcqKey, localDraftKey, questions: [makeQuestion(1), makeQuestion(2), makeQuestion(3)] }
   );
   await page.reload({ waitUntil: "networkidle" });
   await page.getByTestId("mcq-practice-launcher").getByText("Student practice ready", { exact: false }).waitFor({ timeout: 15000 });
+  const preflightOpen = await page
+    .getByTestId("mcq-readiness-command-board")
+    .evaluate((element) => Boolean(element.open));
+  if (preflightOpen) {
+    throw new Error("MCQ readiness proof should start folded for students.");
+  }
+  await page.getByTestId("mcq-top-start-practice").waitFor({ timeout: 15000 });
+  const startButtonCount = await page.getByTestId("mcq-start-local-practice").count();
+  const topStartDisabled = await page.getByTestId("mcq-start-local-practice").isDisabled();
+  if (startButtonCount !== 1) {
+    throw new Error(`MCQ page should expose exactly one start-practice button, found ${startButtonCount}.`);
+  }
+  if (topStartDisabled) {
+    throw new Error("Expected top next-action button to start practice when gates and local content are ready.");
+  }
+  await page.getByTestId("mcq-advanced-tools").click();
   await page.getByTestId("environment-mcq-quality-score").getByText("100%", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-local-question-preview").getByText("protected areas", { exact: false }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-practice-ready", checks);
 
+  await page.getByTestId("mcq-advanced-tools").click();
   await page.getByTestId("mcq-start-local-practice").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-local-practice-runner").getByText("1 of 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-A").click();
   await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: /Next question/i }).click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 2 of 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-local-practice-runner").getByText("2 of 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-B").click();
   await page.getByTestId("mcq-practice-feedback").getByText("Review this trap", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: /Next question/i }).click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 3 of 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-local-practice-runner").getByText("3 of 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-B").click();
   await page.getByTestId("mcq-practice-outcome-gate").getByText("Revisit queued", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-local-practice-score").getByText("Score 1/3", { exact: false }).waitFor({ timeout: 15000 });
@@ -153,11 +186,16 @@ async function run() {
   }
 
   await page.goto(`${baseUrl}/upsc/environment/track?day=5`, { waitUntil: "networkidle" });
-  await page.getByTestId("track-day-5").getByText("MCQ practice done / 1/3 correct", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-advanced-tools").click();
+  await page.getByTestId("track-day-detail-5").getByText("MCQ practice done / 1/3 correct", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-focused-mcq-outcome").getByText("Score 1/3", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-track-mcq-outcome", checks);
 
   await page.goto(`${baseUrl}/upsc/environment/revisit?day=5`, { waitUntil: "networkidle" });
+  const revisitSummaryOpen = await page.getByTestId("revisit-mcq-summary").evaluate((element) => Boolean(element.open));
+  if (!revisitSummaryOpen) {
+    await page.getByTestId("revisit-mcq-summary").locator("summary").click();
+  }
   await page.getByTestId("revisit-mcq-summary").getByText("1/3 correct", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-revisit-mcq-summary", checks);
 

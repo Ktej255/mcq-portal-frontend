@@ -58,7 +58,7 @@ const seedProgress = {
       "Day 4 History proof links chronology, source-map pairing, personalities, consequences, and UPSC trap repair.",
     confidence: "Command",
     reflection: "Revolt of 1857 answer uses chronology, region map, source anchor, personalities, causes, and consequences.",
-    talkScore: 92,
+    talkScore: 96,
     talkBand: "Command",
     talkUnlockStage: "mcq",
     talkClassroomStage: "examiner-verdict",

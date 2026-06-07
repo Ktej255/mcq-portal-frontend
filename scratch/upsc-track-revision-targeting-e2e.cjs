@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "upsc-track-revision-targeting-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "upsc-track-revision-targeting-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
@@ -41,6 +42,20 @@ async function assertNoOverflow(page, label, checks) {
 }
 
 async function clearAndSeed(page) {
+  await page.addInitScript((studentProfileKey) => {
+    localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_upsc_track_revision_targeting");
+    localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, profileKey);
   await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "domcontentloaded" });
   await page.evaluate((slugs) => {
     for (const slug of slugs) window.localStorage.removeItem(`sarit-upsc-${slug}-progress-v1`);
@@ -103,7 +118,43 @@ async function run() {
   await page.goto(`${baseUrl}/upsc/environment/track?day=5`, { waitUntil: "domcontentloaded" });
   await page.getByTestId("track-focused-day").waitFor({ timeout: 15000 });
   await page.getByTestId("track-focused-day").getByText("Day 5", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-focused-day").getByText("Lab proof pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-focused-day").getByText("Visual proof pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-learning-gap").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-next-revision").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-track-trend").waitFor({ timeout: 15000 });
+  const environmentRevisionHref = await page.getByTestId("subject-track-next-revision").getAttribute("href");
+  const environmentRevisionText = await page.getByTestId("subject-track-next-revision").innerText();
+  checks.push({ label: "environment-day-3-revision-targets-source-topic", environmentRevisionHref, environmentRevisionText });
+  if (
+    environmentRevisionHref !== "/upsc/environment/revisit?day=5" ||
+    !environmentRevisionText.includes("Day 5") ||
+    !environmentRevisionText.includes("study Day 7")
+  ) {
+    throw new Error(
+      `Environment Day-3 revision should route to original Day 5 topic: ${JSON.stringify({
+        environmentRevisionHref,
+        environmentRevisionText,
+      })}`
+    );
+  }
+  const monthlyPathCardCount = await page.getByTestId("subject-track-monthly-path").count();
+  if (monthlyPathCardCount !== 0) {
+    throw new Error(`Monthly path should stay folded, found ${monthlyPathCardCount} visible card(s).`);
+  }
+  const dayPathOpenBefore = await page.getByTestId("subject-track-day-flow").evaluate((element) => element.open);
+  const advancedOpenBefore = await page.getByTestId("subject-track-advanced-tools").evaluate((element) => element.open);
+  if (dayPathOpenBefore || advancedOpenBefore) {
+    throw new Error(
+      `Track secondary surfaces should start folded: ${JSON.stringify({ dayPathOpenBefore, advancedOpenBefore })}`
+    );
+  }
+  const dayFiveVisibleBefore = await page.getByTestId("track-day-5").isVisible();
+  if (dayFiveVisibleBefore) {
+    throw new Error("Track day map is visible before the student opens it.");
+  }
+  await page.getByTestId("subject-track-day-flow").locator("summary").click();
+  await page.getByTestId("track-day-5").waitFor({ state: "visible", timeout: 15000 });
+  checks.push({ label: "environment-track-secondary-surfaces-folded", dayPathOpenBefore, advancedOpenBefore });
   await assertNoOverflow(page, "environment-track-focused-day", checks);
   await page.getByTestId("track-focused-route").click();
   await page.waitForURL("**/upsc/environment/lab?mode=biodiversity-map&day=5", { timeout: 15000 });

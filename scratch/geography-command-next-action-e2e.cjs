@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "geography-command-next-action-e2e-evidence.json");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
@@ -47,8 +48,6 @@ async function seedCommandMemory(page) {
           },
           "4": {
             day: 4,
-            watched: true,
-            watchState: "Watched",
             confidence: "Working",
             talkBand: "Practice",
             talkScore: 76,
@@ -61,7 +60,7 @@ async function seedCommandMemory(page) {
             watchState: "Watched",
             confidence: "Command",
             talkBand: "Command",
-            talkScore: 88,
+            talkScore: 96,
             revisitQueued: false,
             labCompleted: true,
             labMode: "monsoon",
@@ -74,7 +73,7 @@ async function seedCommandMemory(page) {
             watchState: "Watched",
             confidence: "Command",
             talkBand: "Command",
-            talkScore: 84,
+            talkScore: 97,
             revisitQueued: false,
             labCompleted: true,
             labMode: "monsoon",
@@ -87,7 +86,7 @@ async function seedCommandMemory(page) {
             watchState: "Watched",
             confidence: "Command",
             talkBand: "Command",
-            talkScore: 91,
+            talkScore: 98,
             revisitQueued: false,
             labCompleted: true,
             labMode: "earth-layers",
@@ -130,6 +129,50 @@ async function expectActiveAction(page, label, expectedHref, checks) {
   }
 }
 
+async function seedCompletedDay(page) {
+  await page.evaluate(
+    ({ progressKey: localProgressKey, mcqKey: localMcqKey }) => {
+      window.localStorage.setItem(
+        localProgressKey,
+        JSON.stringify({
+          "1": {
+            day: 1,
+            watched: true,
+            watchState: "Watched",
+            watchSceneCompletedIds: ["1-briefing", "1-mechanism", "1-map", "1-trap", "1-recap"],
+            reflection: "Geographic thinking connects location, scale, map proof and one UPSC trap.",
+            confidence: "Command",
+            talkBand: "Command",
+            talkScore: 96,
+            talkUnlockStage: "mcq",
+            revisitQueued: false,
+            mcqAttempted: true,
+            mcqCompleted: true,
+            mcqCorrectCount: 2,
+            mcqTotal: 2,
+            mcqScorePercent: 100,
+            mcqOutcome: "Command",
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      );
+      window.localStorage.setItem(
+        localMcqKey,
+        JSON.stringify({
+          "GEO-D01": {
+            planned: 2,
+            drafted: 2,
+            difficulty: "MEDIUM",
+            status: "READY",
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      );
+    },
+    { progressKey, mcqKey }
+  );
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -141,6 +184,21 @@ async function run() {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript((studentProfileKey) => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_command_next_action");
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        preparationStage: "multiple-attempts",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, profileKey);
 
   await page.goto(`${baseUrl}/upsc/geography?day=1`, { waitUntil: "networkidle" });
   await page.evaluate(
@@ -153,41 +211,57 @@ async function run() {
   await seedCommandMemory(page);
   await page.reload({ waitUntil: "networkidle" });
 
-  await expectActiveAction(page, "Watch pending", "/upsc/geography/watch?day=1", checks);
+  await expectActiveAction(page, "Talk pending", "/upsc/geography/talk?day=1", checks);
+  await page.getByTestId("geography-command-advanced-controls").locator("summary").click();
   await page.getByTestId("command-day-state-2").getByText("Talk pending", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("command-day-state-3").getByText("Revisit required", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("command-day-state-4").getByText("Lab pending", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("command-day-state-5").getByText("Fresh MCQ needed", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("command-day-state-6").getByText("MCQ drafting", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("command-day-state-7").getByText("MCQ batch ready", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("command-day-state-3").getByText("Revisit next", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("command-day-state-4").getByText("Repair next", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("command-day-state-5").getByText("MCQ next", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("command-day-state-6").getByText("MCQ next", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("command-day-state-7").getByText("MCQ next", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "command-next-action-desktop", checks);
 
   await page.getByTestId("command-day-4").click();
-  await expectActiveAction(page, "Lab pending", "/upsc/geography/lab?mode=disaster-link&day=4", checks);
+  await expectActiveAction(page, "Watch pending", "/upsc/geography/watch?day=4", checks);
 
   await page.getByTestId("command-day-5").click();
-  await expectActiveAction(page, "Fresh MCQ needed", "/upsc/geography/mcq-readiness?day=5", checks);
+  await expectActiveAction(page, "Practice is being prepared", "/upsc/geography/mcq-readiness?day=5", checks);
 
   await page.getByTestId("command-day-6").click();
-  await expectActiveAction(page, "MCQ drafting", "/upsc/geography/mcq-readiness?day=6", checks);
+  await expectActiveAction(page, "Practice is being prepared", "/upsc/geography/mcq-readiness?day=6", checks);
 
   await page.getByTestId("command-day-7").click();
-  await expectActiveAction(page, "MCQ batch ready", "/upsc/geography/mcq-readiness?day=7", checks);
+  await expectActiveAction(page, "Practice ready", "/upsc/geography/mcq-readiness?day=7", checks);
 
   await page.goto(`${baseUrl}/upsc/geography/track`, { waitUntil: "networkidle" });
-  await page.getByTestId("track-day-1").getByText("Watch pending / Start class", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-2").getByText("Talk pending / Oral check", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-3").getByText("Revisit required / Repair first", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-4").getByText("Lab pending / 0/5 lab proofs", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-5").getByText("Fresh MCQ needed / Author batch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-6").getByText("MCQ drafting / 12/25 fresh", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-day-7").getByText("MCQ batch ready / 25/25 fresh", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-track-path-map").locator("summary").click();
+  await page.getByTestId("track-day-1").getByText("Talk pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-2").getByText("Talk pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-3").getByText("Revisit required", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-4").getByText("Watch pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-5").getByText("Practice is being prepared", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-6").getByText("Practice is being prepared", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-7").getByText("Practice ready", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "track-shared-loop-state-desktop", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/geography?day=7`, { waitUntil: "networkidle" });
-  await expectActiveAction(page, "MCQ batch ready", "/upsc/geography/mcq-readiness?day=7", checks);
+  await expectActiveAction(page, "Practice ready", "/upsc/geography/mcq-readiness?day=7", checks);
   await assertNoOverflow(page, "command-next-action-mobile", checks);
+
+  await seedCompletedDay(page);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto(`${baseUrl}/upsc/geography/track?day=1`, { waitUntil: "networkidle" });
+  await page.getByTestId("geography-track-focused-day").getByText("Start Day 2", { exact: false }).waitFor({ timeout: 15000 });
+  const nextTopicHref = await page.getByTestId("geography-track-focused-route").getAttribute("href");
+  const duplicateCloseoutCount = await page.getByTestId("geography-track-closeout-panel").count();
+  const dayMapVisibleBeforeOpen = await page.getByTestId("track-day-1").isVisible();
+  const advancedToolsOpen = await page.getByTestId("geography-track-advanced-tools").evaluate((element) => element.open);
+  checks.push({ label: "track-single-next-topic-action", nextTopicHref, duplicateCloseoutCount, dayMapVisibleBeforeOpen, advancedToolsOpen });
+  if (nextTopicHref !== "/upsc/geography/talk?day=2" || duplicateCloseoutCount !== 0 || dayMapVisibleBeforeOpen || advancedToolsOpen) {
+    throw new Error(`Track should expose one folded, next-topic handoff: ${JSON.stringify({ nextTopicHref, duplicateCloseoutCount, dayMapVisibleBeforeOpen, advancedToolsOpen })}`);
+  }
+  await assertNoOverflow(page, "track-single-action-desktop", checks);
 
   await page.screenshot({ path: path.join(__dirname, "geography-command-next-action-final.png"), fullPage: true });
 

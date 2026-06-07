@@ -7,9 +7,9 @@ import { ArrowRight, BookOpenCheck, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { env } from "@/env";
+import { isLocalTestingHost } from "@/lib/auth/local-testing";
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
-const previewLoginEnabled = env.NEXT_PUBLIC_STUDENT_PREVIEW_LOGIN !== "false";
 const studentPreviewRoutes = ["/dashboard", "/upsc", "/reports", "/revision", "/history", "/tests"];
 
 const isStudentPreviewRoute = (path: string) => {
@@ -21,18 +21,12 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/dashboard";
   const [previewMode, setPreviewMode] = useState(false);
+  const [localTestingHost, setLocalTestingHost] = useState(false);
 
   useEffect(() => {
-    const hostname = window.location.hostname;
-    const isLocalTestingHost = ["localhost", "127.0.0.1"].includes(hostname);
-    const isVercelStudentHost =
-      hostname === "upsc-command.vercel.app" ||
-      hostname.endsWith("-ktej255-gmailcoms-projects.vercel.app");
-
-    setPreviewMode(
-      (isLocalTestingHost || (previewLoginEnabled && isVercelStudentHost)) &&
-        isStudentPreviewRoute(redirectPath)
-    );
+    const isLocalHost = isLocalTestingHost();
+    setLocalTestingHost(isLocalHost);
+    setPreviewMode(isLocalHost && isStudentPreviewRoute(redirectPath));
   }, [redirectPath]);
 
   useEffect(() => {
@@ -43,7 +37,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const token = searchParams.get("token");
-    if (token && token.startsWith("MOCK_TOKEN") && !authLoading && !user) {
+    if (isLocalTestingHost() && token && token.startsWith("MOCK_TOKEN") && !authLoading && !user) {
       if (authDebug) console.info("AUTH | AUTO_LOGIN | MOCK_TOKEN detected");
 
       let email = "student-preview@upsc.local";
@@ -115,8 +109,9 @@ export default function LoginPage() {
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Login</p>
           <h2 className="mt-2 text-2xl font-black tracking-tight">Continue to UPSC Command</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-            Google login will be used for real student accounts. During beta preview, public study routes can open
-            directly for testing.
+            {localTestingHost
+              ? "Google login will be used for real student accounts. Local study routes can open directly for testing."
+              : "Use your Google account to open your personal study workspace and synchronized learning progress."}
           </p>
 
           <div className="mt-6 space-y-3">
@@ -127,14 +122,16 @@ export default function LoginPage() {
             >
               Connect with Google <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => devLogin("student-preview@upsc.local", "student-preview", redirectPath)}
-              className="h-12 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
-            >
-              Continue as Student Preview
-            </Button>
+            {localTestingHost ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => devLogin("student-preview@upsc.local", "student-preview", redirectPath)}
+                className="h-12 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
+              >
+                Continue as Student Preview
+              </Button>
+            ) : null}
           </div>
         </section>
       </div>

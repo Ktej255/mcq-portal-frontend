@@ -13,6 +13,7 @@ import {
   isSubjectTalkReadyForLab,
   isSubjectTalkReadyForMcq,
 } from "@/lib/upsc/subjectProgressGates";
+import { SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 
 type QueueSession = SubjectSession | GeographySession;
@@ -225,34 +226,23 @@ function getActionForDay(
       room: "Talk",
       actionLabel: progress?.talkScore ? "Retry AI teacher" : "Open AI teacher",
       statusLabel: progress?.talkScore ? "Talk retry required" : "Talk pending",
-      detail: progress?.talkScore ? `Score ${progress.talkScore}%. Reach 70% to open applied lab.` : "Explain the topic in your own words.",
+      detail: progress?.talkScore
+        ? `Score ${progress.talkScore}%. Reach 70% for visual support, then ${SUBJECT_RECALL_TARGET}% for MCQ.`
+        : "Explain the topic in your own words.",
       badge: "Oral",
-      tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
-    });
-  }
-
-  if (!labCompletion.complete) {
-    return buildItem(subject, session, {
-      priority: 4,
-      href: `${subject.href}/lab?mode=${progress?.labMode ?? labSlug}&day=${session.day}`,
-      room: "Lab",
-      actionLabel: "Complete lab proof",
-      statusLabel: "Lab proof pending",
-      detail: `${labCompletion.completed}/${labCompletion.target} proof stages saved.`,
-      badge: "Proof",
       tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
     });
   }
 
   if (!isSubjectTalkReadyForMcq(progress)) {
     return buildItem(subject, session, {
-      priority: 5,
-      href: `${subject.href}/talk?day=${session.day}`,
-      room: "Talk",
-      actionLabel: "Reach command score",
-      statusLabel: "Talk command needed",
-      detail: `Current score ${progress?.talkScore ?? 0}%. Reach 85% before MCQ readiness opens.`,
-      badge: "Command",
+      priority: 4,
+      href: `${subject.href}/lab?mode=${progress?.labMode ?? labSlug}&day=${session.day}`,
+      room: "Lab",
+      actionLabel: "Use visual support",
+      statusLabel: "Recall support pending",
+      detail: `Current score ${progress?.talkScore ?? 0}%; target ${SUBJECT_RECALL_TARGET}%. Optional visual proof: ${labCompletion.completed}/${labCompletion.target}.`,
+      badge: "Support",
       tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
     });
   }
@@ -291,7 +281,7 @@ function getActionForDay(
     room: "Track",
     actionLabel: "Review progress",
     statusLabel: "Day ready",
-    detail: `Watch, Talk, Lab proof, and MCQ Command are complete for ${activeBatchCode}.`,
+    detail: `Watch, ${SUBJECT_RECALL_TARGET}% Talk recall, and MCQ Command are complete for ${activeBatchCode}. Visual support remains optional.`,
     badge: "Ready",
     tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
   });

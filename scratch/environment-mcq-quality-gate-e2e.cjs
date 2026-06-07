@@ -75,7 +75,7 @@ async function seed(page, questions, status = "READY") {
             confidence: "Command",
             reflection: "Protected areas are linked through category, map, species, threat, and institution.",
             revisitQueued: false,
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             labCompleted: true,

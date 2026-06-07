@@ -82,7 +82,7 @@ async function seed(page, questions, status = "READY") {
             confidence: "Command",
             reflection: "Revolt of 1857 is ready through chronology, source-map proof, centre, leader, cause, response, and consequence.",
             revisitQueued: false,
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             talkClassroomStage: "examiner-verdict",

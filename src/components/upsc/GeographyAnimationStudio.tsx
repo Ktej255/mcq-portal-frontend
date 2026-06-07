@@ -32,8 +32,9 @@ function frameTone(index: number) {
   return "from-[#3b2f12] via-[#62491d] to-[#13251d]";
 }
 
-function UniversePreview({ frameIndex }: { frameIndex: number }) {
-  const orbitProgress = Math.min(Math.max((frameIndex - 2) / 4, 0), 1);
+function UniversePreview({ frameIndex, motionProgress }: { frameIndex: number; motionProgress: number }) {
+  const frameOrbitProgress = Math.min(Math.max((frameIndex - 2) / 4, 0), 1);
+  const orbitProgress = (frameOrbitProgress + motionProgress) % 1;
   const earthX = 210 + Math.cos(orbitProgress * Math.PI * 1.65) * 132;
   const earthY = 142 + Math.sin(orbitProgress * Math.PI * 1.65) * 72;
   const showScale = frameIndex <= 1;
@@ -113,8 +114,10 @@ function UniversePreview({ frameIndex }: { frameIndex: number }) {
             </text>
             <ellipse cx="210" cy="142" rx="132" ry="72" fill="none" stroke="#d1fae5" strokeWidth="2" strokeDasharray="6 6" opacity="0.7" />
             <ellipse cx="210" cy="142" rx="96" ry="52" fill="none" stroke="#a7f3d0" strokeWidth="1" strokeDasharray="3 8" opacity="0.25" />
-            <circle cx={earthX} cy={earthY} r="20" fill="#2dd4bf" />
-            <path d={`M ${earthX - 8} ${earthY - 17} C ${earthX + 6} ${earthY - 11}, ${earthX + 10} ${earthY + 6}, ${earthX - 5} ${earthY + 17}`} stroke="#134e4a" strokeWidth="3" fill="none" opacity="0.75" />
+            <g data-testid="universe-orbit-motion" data-motion-progress={motionProgress.toFixed(3)}>
+              <circle cx={earthX} cy={earthY} r="20" fill="#2dd4bf" />
+              <path d={`M ${earthX - 8} ${earthY - 17} C ${earthX + 6} ${earthY - 11}, ${earthX + 10} ${earthY + 6}, ${earthX - 5} ${earthY + 17}`} stroke="#134e4a" strokeWidth="3" fill="none" opacity="0.75" />
+            </g>
             {showTilt ? (
               <>
                 <line x1={earthX - 10} y1={earthY + 28} x2={earthX + 10} y2={earthY - 28} stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" />
@@ -2284,7 +2287,7 @@ function TidesPreview({ frameIndex }: { frameIndex: number }) {
   );
 }
 
-function EarthInteriorPreview({ frameIndex }: { frameIndex: number }) {
+function EarthInteriorPreview({ frameIndex, motionProgress }: { frameIndex: number; motionProgress: number }) {
   const showLithosphere = frameIndex >= 1;
   const showConvection = frameIndex >= 2;
   const showDivergent = frameIndex >= 3;
@@ -2294,6 +2297,15 @@ function EarthInteriorPreview({ frameIndex }: { frameIndex: number }) {
   const showTrap = frameIndex >= 7;
   const showProof = frameIndex >= 8;
   const earth = { x: 140, y: 154, r: 82 };
+  const convectionAngle = motionProgress * Math.PI * 2;
+  const leftConvectionPoint = {
+    x: earth.x - 30 + Math.cos(convectionAngle) * 28,
+    y: earth.y + Math.sin(convectionAngle) * 52,
+  };
+  const rightConvectionPoint = {
+    x: earth.x + 30 + Math.cos(-convectionAngle) * 28,
+    y: earth.y + Math.sin(-convectionAngle) * 52,
+  };
 
   return (
     <div
@@ -2381,6 +2393,10 @@ function EarthInteriorPreview({ frameIndex }: { frameIndex: number }) {
             <path d="M 130 94 L 119 92 L 126 104 Z" fill="#fef3c7" />
             <path d="M 174 98 C 204 116, 202 166, 170 192" fill="none" stroke="#fef3c7" strokeWidth="4" strokeLinecap="round" />
             <path d="M 170 192 L 181 188 L 174 181 Z" fill="#fef3c7" />
+            <g data-testid="earth-interior-continuous-convection-motion" data-motion-progress={motionProgress.toFixed(3)}>
+              <circle cx={leftConvectionPoint.x} cy={leftConvectionPoint.y} r="7" fill="#fef3c7" opacity="0.96" />
+              <circle cx={rightConvectionPoint.x} cy={rightConvectionPoint.y} r="7" fill="#fb923c" opacity="0.96" />
+            </g>
             <text x="140" y="48" textAnchor="middle" fill="#fef3c7" fontSize="11" fontWeight="900">
               Convection current moves plates
             </text>
@@ -2503,7 +2519,7 @@ function EarthInteriorPreview({ frameIndex }: { frameIndex: number }) {
   );
 }
 
-function VolcanismPreview({ frameIndex }: { frameIndex: number }) {
+function VolcanismPreview({ frameIndex, motionProgress }: { frameIndex: number; motionProgress: number }) {
   const showChamber = frameIndex >= 1;
   const showVent = frameIndex >= 2;
   const showEffusive = frameIndex >= 3;
@@ -2513,6 +2529,11 @@ function VolcanismPreview({ frameIndex }: { frameIndex: number }) {
   const showHazard = frameIndex >= 7;
   const showTrap = frameIndex >= 8;
   const showProof = frameIndex >= 9;
+  const magmaPulse = 1 + Math.sin(motionProgress * Math.PI * 2) * 0.08;
+  const magmaRiseY = 222 - motionProgress * 118;
+  const lavaAdvanceX = 218 + motionProgress * 128;
+  const lavaAdvanceY = 135 + motionProgress * 48;
+  const ashLift = motionProgress * 24;
 
   return (
     <div
@@ -2569,7 +2590,7 @@ function VolcanismPreview({ frameIndex }: { frameIndex: number }) {
 
         {showChamber ? (
           <g>
-            <ellipse cx="204" cy="238" rx="58" ry="26" fill="url(#magmaGlow)" opacity="0.96" />
+            <ellipse cx="204" cy="238" rx={58 * magmaPulse} ry={26 * magmaPulse} fill="url(#magmaGlow)" opacity="0.96" />
             <text x="204" y="242" textAnchor="middle" fill="#fff7ed" fontSize="10" fontWeight="900">
               magma chamber
             </text>
@@ -2587,6 +2608,10 @@ function VolcanismPreview({ frameIndex }: { frameIndex: number }) {
             <text x="202" y="72" textAnchor="middle" fill="#fed7aa" fontSize="10" fontWeight="900">
               crater
             </text>
+            <g data-testid="volcanism-continuous-eruption-motion" data-motion-progress={motionProgress.toFixed(3)}>
+              <circle cx="202" cy={magmaRiseY} r="7" fill="#fef3c7" opacity="0.94" />
+              <circle cx="202" cy={magmaRiseY + 14} r="4" fill="#fb923c" opacity="0.82" />
+            </g>
           </g>
         ) : null}
 
@@ -2597,11 +2622,13 @@ function VolcanismPreview({ frameIndex }: { frameIndex: number }) {
             <text x="314" y="148" textAnchor="middle" fill="#fed7aa" fontSize="10" fontWeight="900">
               Effusive lava flow
             </text>
+            <circle cx={lavaAdvanceX} cy={lavaAdvanceY} r="6" fill="#fef3c7" opacity="0.94" />
+            <circle cx={212 - motionProgress * 76} cy={132 + motionProgress * 42} r="5" fill="#fb923c" opacity="0.9" />
           </g>
         ) : null}
 
         {showExplosive ? (
-          <g>
+          <g transform={`translate(0 ${-ashLift})`}>
             <path d="M 202 88 C 182 60, 176 34, 198 18 C 222 0, 256 18, 250 43 C 286 34, 316 50, 310 78 C 286 102, 242 96, 202 88 Z" fill="url(#ashColumnGradient)" opacity="0.9" />
             <path d="M 202 92 C 195 62, 208 40, 224 26" stroke="#f97316" strokeWidth="5" fill="none" strokeLinecap="round" />
             {[178, 190, 222, 242, 268, 292].map((x, index) => (
@@ -5096,7 +5123,7 @@ function PlanetComparisonPreview({ frameIndex }: { frameIndex: number }) {
   );
 }
 
-function AnimationPreview({ slug, frameIndex }: { slug: string; frameIndex: number }) {
+function AnimationPreview({ slug, frameIndex, motionProgress }: { slug: string; frameIndex: number; motionProgress: number }) {
   if (slug === "big-bang-expansion") return <BigBangPreview frameIndex={frameIndex} />;
   if (slug === "solar-system-formation") return <SolarSystemFormationPreview frameIndex={frameIndex} />;
   if (slug === "sun-structure-solar-energy") return <SunStructurePreview frameIndex={frameIndex} />;
@@ -5106,8 +5133,8 @@ function AnimationPreview({ slug, frameIndex }: { slug: string; frameIndex: numb
   if (slug === "latitude-longitude-time") return <LatitudeLongitudeTimePreview frameIndex={frameIndex} />;
   if (slug === "heat-zones-earth") return <HeatZonesPreview frameIndex={frameIndex} />;
   if (slug === "tides-gravity-coast") return <TidesPreview frameIndex={frameIndex} />;
-  if (slug === "earth-interior-plate-movement") return <EarthInteriorPreview frameIndex={frameIndex} />;
-  if (slug === "volcanism-eruption-landforms") return <VolcanismPreview frameIndex={frameIndex} />;
+  if (slug === "earth-interior-plate-movement") return <EarthInteriorPreview frameIndex={frameIndex} motionProgress={motionProgress} />;
+  if (slug === "volcanism-eruption-landforms") return <VolcanismPreview frameIndex={frameIndex} motionProgress={motionProgress} />;
   if (slug === "earthquakes-seismic-waves") return <EarthquakePreview frameIndex={frameIndex} />;
   if (slug === "tsunami-seafloor-coastal-impact") return <TsunamiPreview frameIndex={frameIndex} />;
   if (slug === "mountain-building-fold-fault") return <MountainBuildingPreview frameIndex={frameIndex} />;
@@ -5120,7 +5147,7 @@ function AnimationPreview({ slug, frameIndex }: { slug: string; frameIndex: numb
   if (slug === "soil-formation-soil-profile") return <SoilFormationPreview frameIndex={frameIndex} />;
   if (slug === "planet-comparison-terrestrial-jovian") return <PlanetComparisonPreview frameIndex={frameIndex} />;
   if (slug === "moon-phases-eclipses") return <MoonEclipsePreview frameIndex={frameIndex} />;
-  return <UniversePreview frameIndex={frameIndex} />;
+  return <UniversePreview frameIndex={frameIndex} motionProgress={motionProgress} />;
 }
 
 export function GeographyAnimationStudio({ initialSlug }: { initialSlug?: string }) {
@@ -5128,12 +5155,14 @@ export function GeographyAnimationStudio({ initialSlug }: { initialSlug?: string
   const activeBlueprint = useMemo(() => getGeographyAnimationBlueprint(activeSlug), [activeSlug]);
   const [activeFrameIndex, setActiveFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [motionProgress, setMotionProgress] = useState(0);
   const activeFrame = activeBlueprint.frames[activeFrameIndex] ?? activeBlueprint.frames[0];
   const progress = Math.round(((activeFrameIndex + 1) / activeBlueprint.frames.length) * 100);
 
   useEffect(() => {
     setActiveFrameIndex(0);
     setIsPlaying(false);
+    setMotionProgress(0);
   }, [activeSlug]);
 
   useEffect(() => {
@@ -5150,6 +5179,14 @@ export function GeographyAnimationStudio({ initialSlug }: { initialSlug?: string
     }, 1400);
     return () => window.clearInterval(interval);
   }, [activeBlueprint.frames.length, isPlaying]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = window.setInterval(() => {
+      setMotionProgress((current) => (current + 0.015) % 1);
+    }, 80);
+    return () => window.clearInterval(interval);
+  }, [isPlaying]);
 
   return (
     <div data-testid="geography-animation-studio" className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -5264,7 +5301,7 @@ export function GeographyAnimationStudio({ initialSlug }: { initialSlug?: string
               </div>
             </div>
 
-            <AnimationPreview slug={activeBlueprint.slug} frameIndex={activeFrameIndex} />
+            <AnimationPreview slug={activeBlueprint.slug} frameIndex={activeFrameIndex} motionProgress={motionProgress} />
 
             <div className="mt-4 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5290,6 +5327,7 @@ export function GeographyAnimationStudio({ initialSlug }: { initialSlug?: string
                     onClick={() => {
                       setIsPlaying(false);
                       setActiveFrameIndex(0);
+                      setMotionProgress(0);
                     }}
                     className="inline-flex h-10 items-center gap-2 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-bold text-[#13251d] transition hover:bg-[#fdfaf3]"
                   >

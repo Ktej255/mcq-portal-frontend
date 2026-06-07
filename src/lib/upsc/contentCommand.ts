@@ -27,70 +27,70 @@ export const defaultContentState: ContentState = {
 
 const geographyClassPacks: Record<number, ContentState> = {
   1: {
-    videoStatus: "Ready",
+    videoStatus: "Drafted",
     notesStatus: "Ready",
-    transcriptStatus: "Ready",
+    transcriptStatus: "Drafted",
     sourceType: "Local",
-    lessonTitle: "Earth as a System: Origin, Structure, Coordinates, and Time",
-    lessonPromise: "By the end, the student can explain Earth as interacting spheres and use latitude, longitude, time, scale, and direction without treating them as isolated facts.",
+    lessonTitle: "Geographic Thinking and Map Relationships",
+    lessonPromise: "By the end, the student can move from what and where to why, then explain one India location through relationship, site, situation, and scale.",
     notesPreview: [
-      "Earth system = lithosphere, atmosphere, hydrosphere, and biosphere exchanging energy and matter.",
-      "Latitude controls insolation pattern; longitude anchors local time and standard time logic.",
-      "Rotation creates day-night rhythm; revolution and axial tilt create seasonal variation.",
-      "Map scale and direction turn conceptual geography into location proof for UPSC statements.",
-      "UPSC trap: one factor rarely explains the whole outcome; always test interaction and exception.",
+      "Geography studies spatial distribution: identify what exists, where it appears, and why it is there.",
+      "Absolute location uses coordinates; relative location explains a place through nearby rivers, routes, coasts, passes, and regions.",
+      "Site describes what a place is like; situation describes where it sits in relation to other places.",
+      "Scale changes the answer: local, regional, national, and global views can reveal different patterns.",
+      "UPSC map questions increasingly test relationships: river to sea, pass to state, strait to water bodies, and park to location.",
     ],
     transcriptSummary:
-      "Start with Earth as interacting spheres. Move into location logic: latitude, longitude, rotation, revolution, time zones, map scale, and direction. Close with India/world examples and the common UPSC trap of overgeneralizing one location factor.",
+      "Start with the geographic questions what, where, and why. Separate absolute from relative location, then distinguish site, situation, and scale. Close with an India relationship drill and the trap of memorizing names without map connections.",
     studentHandoff:
-      "Explain Earth as a system through spheres, energy flow, coordinates, time, map scale, one India/world example, and one UPSC trap. Do not list terms without mechanism.",
+      "Explain one place through what it is, where it is, why the location matters, one India map relationship, and one UPSC trap. Do not list names without connections.",
     contentNote:
-      "Day 1 local class pack is staged: 75-minute lesson structure, notes preview, transcript summary, and Talk handoff are ready for controlled testing.",
-    updatedAt: "2026-05-24T00:00:00.000Z",
+      "Day 1 portal-native foundation draft is source-backed and ready for controlled testing. Final recorded lecture media, transcript approval, detailed visual proof, and fresh advanced MCQs remain open.",
+    updatedAt: "2026-05-31T00:00:00.000Z",
   },
   2: {
-    videoStatus: "Ready",
+    videoStatus: "Drafted",
     notesStatus: "Ready",
-    transcriptStatus: "Ready",
+    transcriptStatus: "Drafted",
     sourceType: "Local",
-    lessonTitle: "Interior of the Earth: Layers, Density, and Seismic Evidence",
-    lessonPromise: "The student can infer crust, mantle, core, discontinuities, and material states from seismic wave behavior instead of memorizing layer names.",
+    lessonTitle: "Origin and Evolution of Earth: Expansion, Accretion, and Differentiation",
+    lessonPromise: "The student can explain one causal chain from expansion of space to a differentiated Earth with atmosphere and hydrosphere instead of memorizing disconnected universe facts.",
     notesPreview: [
-      "Earth interior is inferred mainly from seismic waves, density, meteorites, gravity, and magnetic evidence.",
-      "S-waves do not pass through liquids; P-wave speed and bending reveal material changes.",
-      "Moho, Gutenberg, and Lehmann discontinuities mark changes in composition or state.",
-      "Crust is thin and variable; mantle drives convection; outer core is liquid and inner core is solid.",
-      "UPSC trap: layer depth, material state, and wave behavior are often mixed in statement questions.",
+      "The Big Bang model describes expansion of space, not a central explosion moving through pre-existing empty space.",
+      "As the universe cooled, matter became stable and gravity organized larger structures such as stars and galaxies.",
+      "The solar system formed from a rotating nebula; repeated collisions and accretion built planetesimals and planets.",
+      "Young Earth differentiated as denser material moved inward and lighter material formed outer layers.",
+      "Cooling, outgassing, and condensation prepared atmosphere and hydrosphere. UPSC trap: do not treat the sequence as unrelated facts.",
     ],
     transcriptSummary:
-      "Move from evidence to inference: why direct drilling is limited, how P and S waves behave, how discontinuities are detected, and why density/state changes explain the layered Earth model.",
+      "Follow one visual sequence: expansion of space, cooling and stable matter, gravity-led structure, solar-nebula accretion, differentiation of young Earth, and the formation of atmosphere and hydrosphere. Close with the UPSC trap that expansion is not an explosion into existing empty space.",
     studentHandoff:
-      "Explain Earth interior through evidence first, then layers, discontinuities, wave behavior, and one UPSC trap about S-waves or core state.",
+      "Speak the five-step chain in your own words: expansion, gravity, accretion, differentiation, atmosphere and hydrosphere. Then explain why Big Bang should not be pictured as an ordinary explosion.",
     contentNote:
-      "Day 2 class pack is staged with seismic evidence logic, layer notes, transcript summary, and Talk handoff for Interior of the Earth.",
-    updatedAt: "2026-05-24T00:00:00.000Z",
+      "Day 2 portal-native visual lesson is source-backed by the local NCERT Origin and Evolution of Earth chapter and the portal animation blueprint. Final recorded media and transcript approval remain open.",
+    updatedAt: "2026-06-01T00:00:00.000Z",
   },
   3: {
     videoStatus: "Ready",
     notesStatus: "Ready",
     transcriptStatus: "Ready",
     sourceType: "Local",
-    lessonTitle: "Plate Tectonics: Drift, Boundaries, Ridges, Trenches, and Hazards",
-    lessonPromise: "The student can explain why earthquakes, volcanoes, mountains, trenches, and ridges cluster along plate margins.",
+    lessonTitle: "Interior of Earth and Plate Movement: Seismic Evidence, Layers, and Boundaries",
+    lessonPromise: "The student can move from seismic evidence and Earth layers to mantle behavior, plate boundaries, and the clustered pattern of hazards.",
     notesPreview: [
-      "Continental drift proposed movement; sea-floor spreading supplied ocean-floor evidence.",
-      "Divergent boundaries create ridges and new crust; convergent boundaries create trenches, arcs, and mountains.",
-      "Transform boundaries generate earthquakes without major crust creation or destruction.",
-      "Distribution of earthquakes and volcanoes is map evidence for plate margins.",
-      "UPSC trap: not every plate boundary creates volcanoes, and boundary type decides hazard pattern.",
+      "Earth interior is inferred mainly from seismic waves, density, meteorites, gravity, and magnetic evidence.",
+      "S-waves do not pass through liquids; P-wave speed and bending reveal material changes inside Earth.",
+      "Crust, mantle, and core must be connected with lithosphere, asthenosphere, convection, and plate movement.",
+      "Divergent, convergent, and transform boundaries create different combinations of ridges, trenches, mountains, volcanoes, and earthquakes.",
+      "UPSC trap: not every boundary creates volcanoes, and layer depth, material state, and hazard pattern must not be mixed.",
     ],
     transcriptSummary:
-      "Build tectonics as a map pattern: drift evidence, spreading, subduction, boundary types, and the hazard logic behind earthquakes, volcanoes, ridges, trenches, and mountains.",
+      "Move from evidence to mechanism: seismic-wave behavior, layered Earth, mantle dynamics, continental drift and sea-floor spreading evidence, then the three boundary types and their hazard-map signatures.",
     studentHandoff:
-      "Explain plate tectonics with one boundary type, one landform, one hazard map cue, and one trap about volcano distribution or transform margins.",
+      "Explain one chain from seismic evidence to moving plates, then compare one boundary type with its landform, hazard map cue, and a trap about S-waves, core state, or volcano distribution.",
     contentNote:
-      "Day 3 class pack is staged for tectonic mechanism, boundary map logic, and hazard distribution proof.",
-    updatedAt: "2026-05-24T00:00:00.000Z",
+      "Day 3 compact bridge preserves Earth-interior evidence and plate-boundary logic inside the 30-day Geography schedule. The portal-native learner visual is wired for Watch and optional Earth Layers review.",
+    updatedAt: "2026-06-01T00:00:00.000Z",
   },
   4: {
     videoStatus: "Ready",
@@ -111,7 +111,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one geomorphic process through agent, mechanism, landform, climate control, and a trap that confuses erosion with weathering.",
     contentNote:
-      "Day 4 class pack is staged for geomorphic process discipline and Disaster Link lab handoff.",
+      "Day 4 class pack is staged for geomorphic process discipline. The portal-native learner visual is wired for Watch and optional Disaster Link review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   5: {
@@ -133,7 +133,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain air movement through pressure gradient and Coriolis, then connect belts and winds to one UPSC trap about direction or seasonal shift.",
     contentNote:
-      "Day 5 class pack is staged for climatology base and Monsoon Simulator preparation.",
+      "Day 5 class pack is staged for climatology base. The portal-native learner visual is wired for Watch and optional Monsoon Simulator review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   6: {
@@ -155,7 +155,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one current-location pair through temperature, salinity/upwelling, climate effect, and one trap about deserts or fisheries.",
     contentNote:
-      "Day 6 class pack is staged for ocean-current map logic and MCQ readiness handoff.",
+      "Day 6 class pack is staged for ocean-current map logic. The portal-native learner visual is wired for Watch and optional Monsoon Simulator review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   7: {
@@ -177,7 +177,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one integrated physical geography chain using location, tectonics or landform, climate/ocean effect, and one UPSC trap.",
     contentNote:
-      "Day 7 consolidation pack is staged with integrated recap, weak-topic generation, and mixed physical geography drill handoff.",
+      "Day 7 consolidation pack is staged with integrated recap, weak-topic generation, and mixed physical geography drill handoff. The portal-native learner visual is wired for Watch and optional Earth Layers review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   8: {
@@ -199,7 +199,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain India physiography through one relief division, its map location, river or climate impact, economic use, and one UPSC trap about boundary or state-location confusion.",
     contentNote:
-      "Day 8 India Physiography class pack is staged for India Map Command with relief-to-risk logic and Talk handoff.",
+      "Day 8 India Physiography class pack is staged for India Map Command with relief-to-risk logic and Talk handoff. The portal-native learner visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   9: {
@@ -221,7 +221,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one Indian river system through source, slope, basin, tributary, state path, outlet, and one trap about tributary or flow direction.",
     contentNote:
-      "Day 9 Indian Drainage class pack is staged with basin behavior, tributary traps, and map drill handoff.",
+      "Day 9 Indian Drainage class pack is staged with basin behavior, tributary traps, and map drill handoff. The portal-native learner visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   10: {
@@ -243,7 +243,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain monsoon in five steps with one branch, one rainfall contrast, one variability factor, and one UPSC trap about direction or region.",
     contentNote:
-      "Day 10 Indian Monsoon class pack is staged for Monsoon Simulator, mechanism recall, and regional rainfall proof.",
+      "Day 10 Indian Monsoon class pack is staged for Monsoon Simulator, mechanism recall, and regional rainfall proof. The portal-native learner visual is wired for Watch and optional Monsoon Simulator review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   11: {
@@ -265,7 +265,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one Indian climate region through control factors, rainfall season, temperature pattern, map example, and one trap about western disturbances or rain shadow.",
     contentNote:
-      "Day 11 Climate Regions of India class pack is staged with regional climate proof and rainfall-map handoff.",
+      "Day 11 Climate Regions of India class pack is staged with regional climate proof and rainfall-map handoff. The portal-native learner visual is wired for Watch and optional Monsoon Simulator review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   12: {
@@ -287,7 +287,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one soil or vegetation type through formation factor, region, crop or species link, limitation, conservation issue, and one UPSC trap.",
     contentNote:
-      "Day 12 Soils and Vegetation class pack is staged with Environment Bridge handoff and soil-location-crop discipline.",
+      "Day 12 Soils and Vegetation class pack is staged with Environment Bridge handoff and soil-location-crop discipline. The portal-native learner visual is wired for Watch and optional Environment Bridge review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   13: {
@@ -309,7 +309,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one crop, mineral, or energy resource through location factor, state/region, economic use, sustainability issue, and one UPSC trap.",
     contentNote:
-      "Day 13 Resources and Agriculture class pack is staged for map-resource-crop integration and mixed MCQ readiness.",
+      "Day 13 Resources and Agriculture class pack is staged with India Interactive Map handoff and resource-crop-location discipline. The portal-native learner visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   14: {
@@ -331,7 +331,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one India map chain across relief, river or climate, soil or crop, resource or hazard, and one trap that mixes facts from different regions.",
     contentNote:
-      "Day 14 India Map Drill consolidation pack is staged with blank-map recall, weak-area generation, and mixed drill handoff.",
+      "Day 14 India Map Drill consolidation pack is staged with blank-map recall, weak-area generation, and mixed drill handoff. The portal-native layered map visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   15: {
@@ -353,7 +353,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one population pattern through physical factor, economic factor, migration factor, demographic indicator, map example, and one UPSC trap.",
     contentNote:
-      "Day 15 Population Geography class pack is staged for human geography launch and India map linkage.",
+      "Day 15 Population Geography class pack is staged for human geography launch and India map linkage. The portal-native population-pattern visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   16: {
@@ -375,7 +375,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one settlement type through site, situation, morphology, function, hierarchy, Indian example, and one UPSC trap.",
     contentNote:
-      "Day 16 Settlements class pack is staged with site-situation discipline and map-based examples.",
+      "Day 16 Settlements class pack is staged with site-situation discipline and map-based examples. The portal-native settlement-pattern visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   17: {
@@ -397,7 +397,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one economic activity through sector, input, location factor, technology or market link, development change, and one UPSC trap.",
     contentNote:
-      "Day 17 Economic Activities class pack is staged with sector classification and development-shift handoff.",
+      "Day 17 Economic Activities class pack is staged with sector classification and development-shift handoff. The portal-native sector-transition visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   18: {
@@ -419,7 +419,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one corridor, port, or network through location, hinterland, economic effect, regional risk, and one UPSC trap.",
     contentNote:
-      "Day 18 Transport and Trade class pack is staged with corridor-port-network map discipline.",
+      "Day 18 Transport and Trade class pack is staged with corridor-port-network map discipline. The portal-native connectivity visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   19: {
@@ -441,7 +441,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one industry through raw material or market factor, transport, labor or technology, region, policy/environment issue, and one UPSC trap.",
     contentNote:
-      "Day 19 Industry Location class pack is staged with factor-example comparison and regional industry map handoff.",
+      "Day 19 Industry Location class pack is staged with factor-example comparison and regional industry map handoff. The portal-native location-factor visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   20: {
@@ -463,7 +463,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one regional development issue through location factor, infrastructure or governance factor, indicator, policy response, sustainability risk, and one UPSC trap.",
     contentNote:
-      "Day 20 Regional Development class pack is staged with governance-geography bridge and sustainability framing.",
+      "Day 20 Regional Development class pack is staged with governance-geography bridge and sustainability framing. The portal-native disparity visual is wired for Watch and optional Environment Bridge review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   21: {
@@ -485,7 +485,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one integrated human geography chain through population or settlement, economic activity, transport or industry, regional outcome, and one UPSC trap.",
     contentNote:
-      "Day 21 Human Geography Consolidation pack is staged with weak-topic generation and mixed human geography drill handoff.",
+      "Day 21 Human Geography Consolidation pack is staged with weak-topic generation and mixed human geography drill handoff. The portal-native integration visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   22: {
@@ -507,7 +507,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one atlas location through direction, neighboring area, physical feature, human or current link, and one UPSC trap about wrong regional pairing.",
     contentNote:
-      "Day 22 Atlas Mastery class pack is staged with map recall, location context, and recurring UPSC location discipline.",
+      "Day 22 Atlas Mastery class pack is staged with map recall, location context, and recurring UPSC location discipline. The portal-native atlas visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   23: {
@@ -529,7 +529,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one PYQ-style trap through tested concept, location or process, why the statement is tempting, why it fails, and how to avoid it.",
     contentNote:
-      "Day 23 PYQ Pattern Reading class pack is staged with MCQ Engine handoff and trap-tagging discipline.",
+      "Day 23 PYQ Pattern Reading class pack is staged with MCQ Engine handoff and trap-tagging discipline. The portal-native trap-reading visual is wired for Watch and optional MCQ Engine review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   24: {
@@ -551,7 +551,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one disaster through hazard mechanism, vulnerable region, exposure, mitigation, institution or policy link, and one UPSC trap.",
     contentNote:
-      "Day 24 Disaster Geography Bridge class pack is staged with disaster-link lab handoff and risk framework discipline.",
+      "Day 24 Disaster Geography Bridge class pack is staged with disaster-link lab handoff and risk framework discipline. The portal-native hazard-to-risk visual is wired for Watch and optional Disaster Link review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   25: {
@@ -573,7 +573,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one environment-geography link through biome or habitat, climate factor, species or conservation region, map cue, and one UPSC trap.",
     contentNote:
-      "Day 25 Environment Geography Bridge class pack is staged with Environment Bridge handoff and conservation-location discipline.",
+      "Day 25 Environment Geography Bridge class pack is staged with Environment Bridge handoff and conservation-location discipline. The portal-native biome-to-conservation visual is wired for Watch and optional Environment Bridge review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   26: {
@@ -595,7 +595,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one Geography mains answer structure through intro, mechanism, map or diagram, example, conclusion, and one trap that weakens the answer.",
     contentNote:
-      "Day 26 Mains Geography Application class pack is staged with answer-writing and diagram discipline.",
+      "Day 26 Mains Geography Application class pack is staged with answer-writing and diagram discipline. The portal-native answer-writing visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   27: {
@@ -617,7 +617,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one integrated Geography chain through concept, location, impact, related chapter, weak area, and one UPSC trap.",
     contentNote:
-      "Day 27 Full Geography Drill class pack is staged with subject-wide integration and heatmap handoff.",
+      "Day 27 Full Geography Drill class pack is staged with subject-wide integration and heatmap handoff. The portal-native integration visual is wired for Watch and optional MCQ Engine review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   28: {
@@ -639,7 +639,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one weak area through mistake type, root cause, repair action, map or concept proof, retest plan, and one trap to avoid.",
     contentNote:
-      "Day 28 Weak Area Repair class pack is staged with recovery workflow, retest logic, and revision queue handoff.",
+      "Day 28 Weak Area Repair class pack is staged with recovery workflow, retest logic, and revision queue handoff. The portal-native targeted-recovery visual is wired for Watch and optional MCQ Engine review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   29: {
@@ -661,7 +661,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one mock mistake through category, correct concept, map or process repair, retest cue, priority, and one trap that caused the error.",
     contentNote:
-      "Day 29 Final Mock and Review class pack is staged with mock analysis and final revision queue discipline.",
+      "Day 29 Final Mock and Review class pack is staged with mock analysis and final revision queue discipline. The portal-native mock-analysis visual is wired for Watch and optional MCQ Engine review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
   30: {
@@ -683,7 +683,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain Geography command status through strongest area, weakest area, map confidence, retest need, revision date, and one final UPSC trap.",
     contentNote:
-      "Day 30 Geography Command Day class pack is staged with final recall, confidence audit, and revision-lock handoff.",
+      "Day 30 Geography Command Day class pack is staged with final recall, confidence audit, and revision-lock handoff. The portal-native command-day visual is wired for Watch and optional India Interactive Map review.",
     updatedAt: "2026-05-24T00:00:00.000Z",
   },
 };

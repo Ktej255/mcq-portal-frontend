@@ -1,292 +1,272 @@
-"use client";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  CircleAlert,
+  CircleDashed,
+  ClipboardList,
+  Database,
+  FileSearch,
+  ListChecks,
+  ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  countInventoryStatuses,
+  morningBatchCorpusSummary,
+  releaseGates,
+} from "@/lib/upsc/featureInventory";
+import { geographyDay1Recommendation } from "@/lib/upsc/geographyDay1ContentIntake";
+import {
+  immediateLaunchActions,
+  launchReadinessMetrics,
+  type DeliveryStatus,
+} from "@/lib/upsc/launchDeliveryPlan";
 
-import React, { useEffect, useState } from 'react';
-import { adminService } from '@/services/api/adminService';
-import { 
-  Users, FileText, TrendingUp, 
-  BarChart3, Clock, ShieldAlert, RotateCcw
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell 
-} from 'recharts';
+const actionStatusStyles: Record<DeliveryStatus, string> = {
+  done: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  "in-progress": "border-blue-200 bg-blue-50 text-blue-800",
+  pending: "border-zinc-200 bg-zinc-100 text-zinc-700",
+  risk: "border-amber-200 bg-amber-50 text-amber-800",
+};
 
-const COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6'];
-type StatColor = 'blue' | 'indigo' | 'emerald' | 'amber';
+const actionStatusLabels: Record<DeliveryStatus, string> = {
+  done: "Done",
+  "in-progress": "In progress",
+  pending: "Pending",
+  risk: "Risk",
+};
 
-interface PipelineHealth {
-  pipeline?: {
-    total_processed?: number;
-    failure_rate?: number;
-    pending_tasks?: number;
-  };
-  accuracy_drift?: {
-    quality_baseline_status?: string;
-    avg_hallucination_score?: number;
-  };
-}
-
-interface StatCardProps {
-  title: string;
-  value: React.ReactNode;
-  icon: React.ReactNode;
-  trend: string;
-  color: StatColor;
-}
-
-interface IntegrityItemProps {
-  title: string;
-  count: number;
-  severity: 'high' | 'medium' | 'low';
-}
+const operatorLinks = [
+  {
+    href: "/admin/launch-plan",
+    title: "Launch Plan",
+    detail: "Daily work log, next actions, controlled tester gate, and stop-sharing rules.",
+    icon: ClipboardList,
+  },
+  {
+    href: "/admin/feature-inventory",
+    title: "Feature Inventory",
+    detail: "Verified, partial, external-apply, and isolated features with the Day 1 source packet.",
+    icon: ListChecks,
+  },
+  {
+    href: "/admin/prelims-audit-v2",
+    title: "Prelims V2 Audit",
+    detail: "Master-only Morning Batch corpus room with public claims locked until proof review.",
+    icon: FileSearch,
+  },
+  {
+    href: "/admin/questions/bulk",
+    title: "Fresh MCQ Upload",
+    detail: "Attach fresh audited MCQs to the exact subject, day, and batch after quality review.",
+    icon: Database,
+  },
+];
 
 export default function AdminDashboard() {
-  const stats = {
-    totalStudents: 128,
-    totalTests: 45,
-    activeAttempts: 12,
-    avgScore: 74.5,
-    completionRate: 88,
-  };
-  const [pipelineHealth, setPipelineHealth] = useState<PipelineHealth | null>(null);
-
-  const chartData = [
-    { name: 'Physics', value: 85 },
-    { name: 'Chemistry', value: 72 },
-    { name: 'Maths', value: 68 },
-    { name: 'Biology', value: 91 },
-  ];
-
-  useEffect(() => {
-    const fetchAdminStats = async () => {
-      try {
-        const health = await adminService.getPipelineObservability();
-        setPipelineHealth(health);
-      } catch (err) {
-        console.error("Failed to fetch admin stats:", err);
-      }
-    };
-    fetchAdminStats();
-  }, []);
+  const inventoryCounts = countInventoryStatuses();
+  const completeGateCount = releaseGates.filter((gate) => gate.complete).length;
+  const openGateCount = releaseGates.length - completeGateCount;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Administrative Console</h1>
-        <p className="text-muted-foreground">Global overview of platform performance and student engagement.</p>
-      </div>
+    <div className="space-y-6" data-testid="admin-operator-dashboard">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 pb-6">
+        <div className="max-w-3xl">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Verified Local Snapshot
+          </div>
+          <h1 className="text-3xl font-black text-zinc-950">UPSC Operator Console</h1>
+          <p className="mt-3 text-base leading-7 text-zinc-600">
+            Honest operating view for the Geography pilot. No sample student counts, simulated analytics, or
+            backend-dependent claims are shown here.
+          </p>
+        </div>
+        <Link
+          href="/admin/launch-plan"
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-zinc-950 px-4 text-sm font-bold text-white transition hover:bg-zinc-800"
+        >
+          Open Launch Plan <ArrowRight className="h-4 w-4" />
+        </Link>
+      </header>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Students" 
-          value={stats.totalStudents} 
-          icon={<Users className="w-5 h-5 text-blue-600" />} 
-          trend="+12% this month"
-          color="blue"
-        />
-        <StatCard 
-          title="Active Tests" 
-          value={stats.totalTests} 
-          icon={<FileText className="w-5 h-5 text-indigo-600" />} 
-          trend="8 new added"
-          color="indigo"
-        />
-        <StatCard 
-          title="Avg. Performance" 
-          value={`${stats.avgScore}%`} 
-          icon={<TrendingUp className="w-5 h-5 text-emerald-600" />} 
-          trend="+2.4% vs last week"
-          color="emerald"
-        />
-        <StatCard 
-          title="Live Attempts" 
-          value={stats.activeAttempts} 
-          icon={<Clock className="w-5 h-5 text-amber-600" />} 
-          trend="Real-time tracking"
-          color="amber"
-        />
-      </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Readiness summary">
+        {launchReadinessMetrics.map((metric) => (
+          <div key={metric.label} className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-bold text-zinc-500">{metric.label}</p>
+            <p className="mt-3 text-3xl font-black text-zinc-950">{metric.value}</p>
+            <p className="mt-3 text-sm leading-6 text-zinc-600">{metric.detail}</p>
+          </div>
+        ))}
+      </section>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* Main Analytics Chart */}
-        <div className="lg:col-span-2 p-8 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary" />
-              Engagement Trends
+      <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" data-testid="admin-dashboard-release-gates">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950">
+                <ShieldCheck className="h-5 w-5 text-emerald-700" />
+                Release Gate
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500">The live boundary before a real-student invite.</p>
+            </div>
+            <Badge variant="outline" className="h-7 rounded-md border-rose-200 bg-rose-50 px-2 font-bold text-rose-800">
+              {completeGateCount}/{releaseGates.length} closed
+            </Badge>
+          </div>
+          <div className="mt-4 divide-y divide-zinc-100">
+            {releaseGates.map((gate) => {
+              const Icon = gate.complete ? CheckCircle2 : CircleDashed;
+              return (
+                <div key={gate.title} className="flex gap-3 py-3">
+                  <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${gate.complete ? "text-emerald-600" : "text-amber-600"}`} />
+                  <div>
+                    <p className="text-sm font-black text-zinc-950">{gate.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-600">{gate.detail}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="flex items-center gap-2 text-lg font-black text-zinc-950">
+              <ListChecks className="h-5 w-5 text-emerald-700" />
+              Feature Ledger
             </h2>
-            <select className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 border-none rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-primary">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 500}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                  cursor={{fill: '#f4f4f5'}}
-                />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={50}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* System Health / Alerts */}
-        <div className="space-y-6">
-          <div className="p-8 bg-zinc-950 text-white rounded-3xl shadow-xl shadow-zinc-200 dark:shadow-none overflow-hidden relative">
-            <div className="relative z-10">
-              <h2 className="text-xl font-bold mb-6">Integrity Overview</h2>
-              <div className="space-y-4">
-                <IntegrityItem title="Tab Switches" count={42} severity="high" />
-                <IntegrityItem title="Multiple Logins" count={5} severity="medium" />
-                <IntegrityItem title="Rapid Responses" count={128} severity="low" />
+            <p className="mt-1 text-sm leading-6 text-zinc-500">Current audited feature counts.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Verified</p>
+                <p className="mt-2 text-2xl font-black text-emerald-950">{inventoryCounts.verified}</p>
               </div>
-              <button className="w-full mt-8 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all border border-white/10">
-                View All Security Logs
-              </button>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700">Partial</p>
+                <p className="mt-2 text-2xl font-black text-amber-950">{inventoryCounts.partial}</p>
+              </div>
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-700">External apply</p>
+                <p className="mt-2 text-2xl font-black text-blue-950">{inventoryCounts.external}</p>
+              </div>
+              <div className="rounded-md border border-zinc-200 bg-zinc-100 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-zinc-600">Isolated</p>
+                <p className="mt-2 text-2xl font-black text-zinc-950">{inventoryCounts.isolated}</p>
+              </div>
             </div>
-            {/* Background Decorative Element */}
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500/20 blur-3xl rounded-full"></div>
+            <Link
+              href="/admin/feature-inventory"
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-900 transition hover:bg-zinc-50"
+            >
+              Inspect Ledger <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
 
-          <div className="p-8 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <h2 className="text-xl font-bold mb-6">Database Ingestion</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Total Questions</span>
-                <span className="text-sm font-bold">12,482</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Total Subjects</span>
-                <span className="text-sm font-bold">12</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full mt-2">
-                <div className="h-full bg-primary rounded-full w-3/4"></div>
-              </div>
-              <p className="text-[10px] text-muted-foreground">75% of ingestion capacity utilized.</p>
-            </div>
-          </div>
-
-          {/* PHASE 6: PIPELINE OBSERVABILITY */}
-          {pipelineHealth && (
-            <div className={`p-8 rounded-3xl border shadow-sm ${pipelineHealth.accuracy_drift?.quality_baseline_status === 'ATTENTION_REQUIRED' ? 'bg-red-50 border-red-200' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}>
-              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <ShieldAlert className="w-6 h-6 text-primary" />
-                Pipeline Health
-              </h2>
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Processed</p>
-                    <p className="text-xl font-black">{pipelineHealth.pipeline?.total_processed}</p>
-                  </div>
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Failures</p>
-                    <p className={`text-xl font-black ${(pipelineHealth.pipeline?.failure_rate ?? 0) > 5 ? 'text-red-500' : ''}`}>
-                      {(pipelineHealth.pipeline?.failure_rate ?? 0).toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Narrative Quality (Hallucination)</span>
-                    <Badge variant={(pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0) > 0.2 ? 'destructive' : 'secondary'}>
-                      {(pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0).toFixed(2)}
-                    </Badge>
-                  </div>
-                  <Progress value={(1 - (pipelineHealth.accuracy_drift?.avg_hallucination_score ?? 0)) * 100} className="h-1.5" />
-                </div>
-
-                {(pipelineHealth.pipeline?.pending_tasks ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-800 text-xs font-medium">
-                    <Clock className="w-4 h-4 animate-spin" />
-                    {pipelineHealth.pipeline?.pending_tasks} analysis tasks in queue
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* MAINTENANCE & CALIBRATION */}
-          <div className="p-8 bg-zinc-900 text-white rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-1000">
-              <RotateCcw className="w-32 h-32" />
-            </div>
-            <div className="relative z-10 space-y-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-amber-500" />
-                System Maintenance
-              </h2>
-              <p className="text-sm text-zinc-400 leading-relaxed">
-                Trigger institutional calibration to synchronize question difficulty with real student performance metrics.
-              </p>
-              <Button 
-                onClick={async () => {
-                  const res = await adminService.recalibrateBatches();
-                  toast.success("Calibration sequence initiated: " + res.job_id);
-                }}
-                className="w-full h-14 rounded-2xl bg-zinc-100 text-zinc-950 font-black text-sm uppercase tracking-widest hover:bg-white transition-all active:scale-95"
-              >
-                Recalibrate Intelligence
-              </Button>
-            </div>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-5 shadow-sm">
+            <h2 className="flex items-center gap-2 text-lg font-black text-rose-950">
+              <CircleAlert className="h-5 w-5 text-rose-700" />
+              Share Status
+            </h2>
+            <p className="mt-2 text-xl font-black text-rose-950">Do not invite students yet</p>
+            <p className="mt-2 text-sm leading-6 text-rose-800">
+              {openGateCount} release gates remain open. Geography stays first until live identity continuity and the
+              real Day 1 pack pass together.
+            </p>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-function StatCard({ title, value, icon, trend, color }: StatCardProps) {
-  const colorMap: Record<StatColor, string> = {
-    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600',
-    indigo: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600',
-    emerald: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600',
-    amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600',
-  };
-
-  return (
-    <div className="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group">
-      <div className="flex items-center gap-4 mb-4">
-        <div className={`p-3 rounded-2xl ${colorMap[color]} group-hover:scale-110 transition-transform`}>
-          {icon}
-        </div>
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" data-testid="admin-dashboard-action-queue">
         <div>
-          <p className="text-sm font-semibold text-muted-foreground">{title}</p>
-          <p className="text-2xl font-black">{value}</p>
+          <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950">
+            <ClipboardList className="h-5 w-5 text-emerald-700" />
+            Immediate Action Queue
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">Close these in order before subject expansion.</p>
         </div>
-      </div>
-      <p className="text-xs font-bold text-muted-foreground flex items-center gap-1">
-        {trend}
-      </p>
-    </div>
-  );
-}
+        <div className="mt-4 divide-y divide-zinc-100">
+          {immediateLaunchActions.map((item) => (
+            <div key={item.title} className="py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-zinc-950">{item.title}</p>
+                  <p className="mt-1 text-xs font-bold text-zinc-500">{item.owner}</p>
+                </div>
+                <Badge variant="outline" className={`h-7 rounded-md px-2 font-bold ${actionStatusStyles[item.status]}`}>
+                  {actionStatusLabels[item.status]}
+                </Badge>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-zinc-600">{item.outcome}</p>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-md bg-zinc-100">
+                  <div className="h-full rounded-md bg-emerald-600" style={{ width: `${item.percent}%` }} />
+                </div>
+                <span className="w-12 text-right text-xs font-black tabular-nums text-zinc-700">{item.percent}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-function IntegrityItem({ title, count, severity }: IntegrityItemProps) {
-  const dotColor = severity === 'high' ? 'bg-red-500' : severity === 'medium' ? 'bg-amber-500' : 'bg-emerald-500';
-  return (
-    <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
-      <div className="flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full ${dotColor} animate-pulse`}></div>
-        <span className="text-sm font-medium opacity-80">{title}</span>
-      </div>
-      <span className="text-sm font-bold">{count}</span>
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm" data-testid="admin-dashboard-day1-decision">
+          <h2 className="flex items-center gap-2 text-lg font-black text-emerald-950">
+            <BookOpenCheck className="h-5 w-5 text-emerald-700" />
+            Geography Day 1 Decision
+          </h2>
+          <p className="mt-3 text-sm font-black leading-6 text-emerald-950">
+            Day 1: {geographyDay1Recommendation.proposedDay1}
+          </p>
+          <p className="mt-1 text-sm font-black leading-6 text-emerald-950">
+            Day 2: {geographyDay1Recommendation.proposedDay2}
+          </p>
+          <p className="mt-3 text-sm leading-6 text-emerald-800">{geographyDay1Recommendation.decision}</p>
+          <Link
+            href="/admin/feature-inventory"
+            className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100"
+          >
+            Inspect Day 1 Sources <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" data-testid="admin-dashboard-corpus-summary">
+          <h2 className="flex items-center gap-2 text-lg font-black text-zinc-950">
+            <Database className="h-5 w-5 text-emerald-700" />
+            Morning Batch V2 Corpus
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-zinc-500">
+            Internal discovery index. Public coverage remains locked until manual proof review.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {morningBatchCorpusSummary.slice(0, 4).map((item) => (
+              <div key={item.label} className="border-l-2 border-emerald-600 pl-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-zinc-500">{item.label}</p>
+                <p className="mt-2 text-2xl font-black text-zinc-950">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Operator rooms">
+        {operatorLinks.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              <Icon className="h-5 w-5 text-emerald-700" />
+              <h2 className="mt-4 text-base font-black text-zinc-950">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">{item.detail}</p>
+            </Link>
+          );
+        })}
+      </section>
     </div>
   );
 }

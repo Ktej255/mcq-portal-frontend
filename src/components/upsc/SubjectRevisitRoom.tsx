@@ -70,7 +70,12 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
   const { getDayProgress, isLoaded, saveDayProgress, stats } = useSubjectProgress(plan.slug, plan.sessions);
   const boundedInitialDay =
     initialDay && Number.isFinite(initialDay) ? Math.min(Math.max(initialDay, 1), plan.sessions.length) : undefined;
-  const suggestedDay = boundedInitialDay ?? stats.revisitDays[0]?.day ?? stats.shakyDays[0]?.day ?? Math.min(10, plan.sessions.length);
+  const suggestedDay =
+    boundedInitialDay ??
+    stats.revisitDays[0]?.day ??
+    stats.spacedRevisionDays[0]?.day ??
+    stats.shakyDays[0]?.day ??
+    Math.min(10, plan.sessions.length);
   const [activeDay, setActiveDay] = useState(suggestedDay);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [recoveryNote, setRecoveryNote] = useState("");
@@ -138,7 +143,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
       label: "Retest route",
       value: activeProgress?.mcqRecoveryCompleted ? "Unlocked" : "Locked",
       detail: activeProgress?.mcqRecoveryCompleted
-        ? "Recovery saved. Retest the same fresh batch from MCQ readiness."
+        ? "Recovery saved. Retest the same fresh practice batch."
         : "Mark recovered only after the repair note is written.",
       complete: Boolean(activeProgress?.mcqRecoveryCompleted),
     },
@@ -147,6 +152,14 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
     ? `${basePath}/mcq-readiness?day=${activeSession.day}`
     : `${basePath}/talk?day=${activeSession.day}`;
   const recoveryReturnLabel = isMcqRecoveryFlow ? "Retest fresh MCQs" : "Return to AI teacher";
+  const recoveryWeakPoint = isMcqRecoveryFlow
+    ? "Fresh MCQ trap"
+    : activeProgress?.activePromptLabel ?? activeProgress?.talkBand ?? nextGate.label;
+  const recoveryFocus =
+    activeProgress?.mcqReviewSummary ??
+    activeProgress?.assessmentSummary ??
+    activeProgress?.talkVerdict ??
+    activeStep.instruction;
   const themeStyle = getSubjectThemeStyle(plan);
 
   useEffect(() => {
@@ -235,7 +248,189 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section data-testid="revisit-simple-step" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <Link href={basePath} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+                <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+              </Link>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">Revisit</Badge>
+                <span className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] px-3 py-1 text-xs font-black text-[var(--subject-heading)]">
+                  Day {activeSession.day}
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-3 py-1 text-xs font-bold text-[#5d675f]">
+                  {isMcqRecoveryFlow ? "MCQ repair" : "Concept repair"}
+                </span>
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">{activeSession.chapter}</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+                {activeSession.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                Repair the weak point once, then return to the next gate.
+              </p>
+              <div className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Weak point</p>
+                <p className="mt-1 text-base font-black leading-6 text-[var(--subject-heading)]">{recoveryWeakPoint}</p>
+                <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[#49675e]">{recoveryFocus}</p>
+              </div>
+            </div>
+
+            {justRecovered ? (
+              <div className="w-full rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4 lg:max-w-sm">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Next room</p>
+                <h2 className="mt-2 text-xl font-black tracking-tight text-[var(--subject-heading)]">{recoveryReturnLabel}</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                  {isMcqRecoveryFlow
+                    ? "Retest the same fresh MCQ batch."
+                    : `Return to ${nextGate.label}.`}
+                </p>
+                <Link
+                  href={recoveryReturnHref}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  {recoveryReturnLabel}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            ) : null}
+          </div>
+
+          {activeProgress?.mcqReviewSummary ? (
+            <details data-testid="revisit-mcq-summary" className="mt-5 rounded-md border border-[#ef9f27]/45 bg-[#fff4df] p-4">
+              <summary className="cursor-pointer text-sm font-black text-[#6f4a12]">Why this was queued</summary>
+              <p className="mt-3 text-sm font-bold leading-6 text-[#6f4a12]">{activeProgress.mcqReviewSummary}</p>
+            </details>
+          ) : null}
+
+          <div className="mt-5 grid gap-5">
+            <div className="rounded-lg border border-[var(--subject-border)] bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Repair note</p>
+              <h3 className="mt-1 text-lg font-black text-[var(--subject-heading)]">What was corrected?</h3>
+              <textarea
+                data-testid="subject-revisit-repair-note"
+                value={recoveryNote}
+                onChange={(event) => {
+                  setRecoveryNote(event.target.value);
+                  setJustRecovered(false);
+                }}
+                placeholder="Write the recovery note or corrected explanation here."
+                className="mt-4 min-h-36 w-full resize-y rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 text-sm font-semibold leading-6 text-[var(--subject-heading)] outline-none transition placeholder:text-[#8d8579] focus:border-[var(--subject-accent)] focus:ring-2 focus:ring-[var(--subject-ring)]"
+              />
+              <button
+                type="button"
+                data-testid="subject-revisit-mark-recovered"
+                onClick={markRecovered}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Mark recovered
+              </button>
+              {justRecovered ? (
+                <div data-testid="revisit-return-gate" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4">
+                  <p className="text-sm font-black text-[var(--subject-dark)]">Recovery saved locally.</p>
+                  <p className="mt-1 text-sm font-bold leading-6 text-[#49675e]">
+                    {isMcqRecoveryFlow ? "Retest the fresh MCQ batch now." : `Next gate: ${nextGate.label}.`}
+                  </p>
+                  <Link
+                    data-testid="revisit-primary-route"
+                    href={recoveryReturnHref}
+                    className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
+                  >
+                    {recoveryReturnLabel} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            <details data-testid="revisit-repair-gates" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
+              <summary className="flex cursor-pointer list-none flex-col gap-3 text-sm font-black text-[var(--subject-dark)] sm:flex-row sm:items-center sm:justify-between">
+                <span>Optional gate snapshot</span>
+                <span className="rounded-md bg-white px-3 py-2 text-[11px] font-black text-[var(--subject-heading)] ring-1 ring-[var(--subject-ring)]">
+                  Open proof gates
+                </span>
+              </summary>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {[
+                  {
+                    label: "Watch",
+                    value: `${watchCompletion.completed}/${watchCompletion.target}`,
+                    complete: watchCompletion.complete,
+                    icon: Video,
+                  },
+                  {
+                    label: "Talk",
+                    value: activeProgress?.talkScore ? `${activeProgress.talkScore}%` : "Not scored",
+                    complete: talkMcqReady,
+                    icon: BrainCircuit,
+                  },
+                  {
+                    label: "Lab",
+                    value: `${labProofCompletion.completed}/${labProofCompletion.target}`,
+                    complete: labProofCompletion.complete,
+                    icon: LockKeyhole,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={cn(
+                      "rounded-md border bg-white p-3",
+                      item.complete ? "border-[var(--subject-accent)]" : "border-[#ef9f27]/40"
+                    )}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <item.icon className={cn("h-4 w-4", item.complete ? "text-[var(--subject-accent)]" : "text-[#9a6a16]")} />
+                      {item.complete ? <CheckCircle2 className="h-4 w-4 text-[var(--subject-accent)]" /> : null}
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--subject-accent)]">{item.label}</p>
+                    <p className="mt-1 text-sm font-black text-[var(--subject-heading)]">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+
+          <details data-testid="subject-revisit-recovery-checklist" className="mt-5 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
+            <summary className="cursor-pointer text-sm font-black text-[var(--subject-dark)]">
+              Optional recovery checklist
+            </summary>
+            <div className="mt-4 grid gap-2 sm:grid-cols-5">
+              {recoverySteps.map((step, index) => {
+                const isActive = activeStepIndex === index;
+                return (
+                  <button
+                    key={step.label}
+                    type="button"
+                    aria-pressed={isActive}
+                    data-testid={`subject-revisit-step-${step.label.toLowerCase()}`}
+                    onClick={() => setActiveStepIndex(index)}
+                    className={cn(
+                      "min-h-16 rounded-md border p-2 text-left text-xs font-black transition",
+                      isActive
+                        ? "border-[var(--subject-dark)] bg-[var(--subject-dark)] text-white"
+                        : "border-[var(--subject-border)] bg-white text-[var(--subject-heading)] hover:border-[var(--subject-accent)]"
+                    )}
+                  >
+                    <span className="block text-[10px] uppercase tracking-[0.12em]">Step {index + 1}</span>
+                    <span className="mt-1 block">{step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 rounded-md bg-white p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Do this now</p>
+              <p className="mt-2 text-base font-black leading-7 text-[var(--subject-heading)]">{activeStep.instruction}</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{activeStep.check}</p>
+            </div>
+          </details>
+        </section>
+
+        <details data-testid="revisit-advanced-tools" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[var(--subject-dark)]">
+            Advanced recovery queue and saved context
+          </summary>
+          <div className="mt-5 space-y-6">
         <section className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
             <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
@@ -267,7 +462,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
             </div>
 
             {activeProgress?.mcqReviewSummary && (
-              <div data-testid="revisit-mcq-summary" className="mt-4 rounded-md border border-[#ef9f27]/45 bg-[#fff4df] p-4">
+              <div data-testid="revisit-mcq-summary-detail" className="mt-4 rounded-md border border-[#ef9f27]/45 bg-[#fff4df] p-4">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-[#6f4a12]">MCQ trigger</p>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#6f4a12]">{activeProgress.mcqReviewSummary}</p>
               </div>
@@ -336,7 +531,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
                 title={
                   isMcqRecoveryFlow
                     ? "This recovery was triggered by fresh MCQ practice. Recovered students should retest the batch."
-                    : "MCQ readiness opens after Watch scenes, AI teacher command, and Lab proof are complete."
+                    : "Fresh practice opens after Watch scenes, AI teacher command, and Lab proof are complete."
                 }
               >
                 <LockKeyhole className="h-4 w-4" /> {isMcqRecoveryFlow ? "MCQ retest after recovery" : "MCQ after proof gates"}
@@ -483,7 +678,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
               </div>
             ) : null}
 
-            <div data-testid="revisit-repair-gates" className="mt-5 grid gap-2 sm:grid-cols-3">
+            <div data-testid="revisit-repair-gates-detail" className="mt-5 grid gap-2 sm:grid-cols-3">
               {[
                 {
                   label: "Watch scenes",
@@ -492,13 +687,13 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
                   icon: Video,
                 },
                 {
-                  label: "Talk command",
+                  label: "95% recall",
                   value: activeProgress?.talkScore ? `${activeProgress.talkScore}%` : "Not scored",
                   complete: talkMcqReady,
                   icon: BrainCircuit,
                 },
                 {
-                  label: "Lab proof",
+                  label: "Visual support",
                   value: `${labProofCompletion.completed}/${labProofCompletion.target}`,
                   complete: labProofCompletion.complete,
                   icon: LockKeyhole,
@@ -540,7 +735,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
             </button>
 
             {justRecovered && (
-              <div data-testid="revisit-return-gate" className="mt-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
+              <div data-testid="revisit-return-gate-detail" className="mt-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
                   <div>
@@ -553,7 +748,7 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
                   </div>
                 </div>
                 <Link
-                  data-testid="revisit-primary-route"
+                  data-testid="revisit-primary-route-detail"
                   href={recoveryReturnHref}
                   className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d] sm:w-auto"
                 >
@@ -575,6 +770,8 @@ export function SubjectRevisitRoom({ plan, initialDay }: { plan: SubjectSprintPl
             <SubjectLoopActions plan={plan} activeDay={activeSession.day} current="revisit" />
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </div>
   );

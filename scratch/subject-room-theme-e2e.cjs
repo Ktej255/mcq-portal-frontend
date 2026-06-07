@@ -6,6 +6,7 @@ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "subject-room-theme-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "subject-room-theme-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
+const profileKey = "sarit-upsc-student-profile-v1";
 
 const subject = {
   slug: "economy",
@@ -100,6 +101,20 @@ async function run() {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript((studentProfileKey) => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_subject_room_theme");
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }, profileKey);
 
   for (const route of subject.routes) {
     inspected.push(await inspectRoute(page, route, checks));

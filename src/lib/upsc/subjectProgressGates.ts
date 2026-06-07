@@ -1,5 +1,7 @@
 import type { SubjectSession, SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
+import { SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
+import type { StudentLevel } from "@/lib/upsc/studentProfile";
 
 export const SUBJECT_WATCH_SCENE_TARGET = 5;
 export const SUBJECT_LAB_PROOF_TARGET = 5;
@@ -40,31 +42,74 @@ export function isSubjectTalkReadyForLab(progress?: SubjectDayProgress) {
 
 export function isSubjectTalkReadyForMcq(progress?: SubjectDayProgress) {
   const score = progress?.talkScore ?? 0;
-  return progress?.talkUnlockStage === "mcq" || progress?.talkBand === "Command" || score >= 85;
+  return score >= SUBJECT_RECALL_TARGET;
+}
+
+export function isSubjectPreRepairTalkAssessment(progress?: SubjectDayProgress) {
+  return Boolean(progress?.talkNextRoute?.includes("/watch"));
+}
+
+export function isSubjectRevisitRequired(progress?: SubjectDayProgress) {
+  const revisitSignal =
+    progress?.talkUnlockStage === "revisit" ||
+    progress?.talkBand === "Revisit" ||
+    progress?.talkUnlockStage === "retry";
+
+  return Boolean(progress?.revisitQueued) || (!isSubjectPreRepairTalkAssessment(progress) && revisitSignal);
 }
 
 export function getSubjectLearningGate(
   plan: SubjectSprintPlan,
   session: SubjectSession,
-  progress?: SubjectDayProgress
+  progress?: SubjectDayProgress,
+  learnerLevel: StudentLevel = "intermediate"
 ): SubjectLearningGate {
   const basePath = `/upsc/${plan.slug}`;
   const activeLab = plan.labs.find((lab) => lab.title === session.lab) ?? plan.labs[0];
   const watchCompletion = getSubjectWatchCompletion(progress);
   const labProofCompletion = getSubjectLabProofCompletion(progress);
+  const hasTalkAssessment = typeof progress?.talkScore === "number";
+  const revisitRequired = isSubjectRevisitRequired(progress);
 
-  if (!watchCompletion.complete) {
+  if (!hasTalkAssessment) {
+    if (learnerLevel === "beginner" && !watchCompletion.complete) {
+      return {
+        id: "watch",
+        label: "Start lesson",
+        detail: "Beginner path: watch one 10-15 minute topic first",
+        href: `${basePath}/watch?day=${session.day}`,
+        actionLabel: "Open lesson",
+        tone: "border-[#dcd5c7] bg-[#fffdf8] text-[#746f66]",
+      };
+    }
+
+    return {
+      id: "talk",
+      label: watchCompletion.complete ? "Talk pending" : "Recall first",
+      detail: watchCompletion.complete
+        ? `Discuss until recall reaches ${SUBJECT_RECALL_TARGET}%`
+        : "Answer before content so the AI can diagnose the exact gap",
+      href: `${basePath}/talk?day=${session.day}`,
+      actionLabel: watchCompletion.complete ? "Open AI teacher" : "Start recall",
+      tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
+    };
+  }
+
+  if (!watchCompletion.complete && (learnerLevel === "beginner" || !isSubjectTalkReadyForMcq(progress))) {
     return {
       id: "watch",
-      label: "Watch pending",
-      detail: `${watchCompletion.completed}/${watchCompletion.target} scenes`,
+      label: learnerLevel === "beginner" ? "Finish lesson" : "Watch the exact gap",
+      detail:
+        learnerLevel === "beginner"
+          ? `${watchCompletion.completed}/${watchCompletion.target} scenes complete before Talk`
+          : `Recall ${progress?.talkScore ?? 0}% saved; ${watchCompletion.completed}/${watchCompletion.target} repair scenes`,
       href: `${basePath}/watch?day=${session.day}`,
-      actionLabel: "Open class",
+      actionLabel: learnerLevel === "beginner" ? "Open lesson" : "Open repair",
       tone: "border-[#dcd5c7] bg-[#fffdf8] text-[#746f66]",
     };
   }
 
-  if (progress?.revisitQueued || progress?.talkUnlockStage === "revisit" || progress?.talkBand === "Revisit") {
+  if (revisitRequired) {
     return {
       id: "revisit",
       label: "Revisit required",
@@ -86,34 +131,25 @@ export function getSubjectLearningGate(
     };
   }
 
-  if (!labProofCompletion.complete) {
-    return {
-      id: "lab",
-      label: "Lab proof pending",
-      detail: `${labProofCompletion.completed}/${labProofCompletion.target} proofs`,
-      href: `${basePath}/lab?mode=${progress?.labMode ?? activeLab?.slug ?? ""}&day=${session.day}`,
-      actionLabel: "Open visual lab",
-      tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
-    };
-  }
-
   if (!isSubjectTalkReadyForMcq(progress)) {
     return {
-      id: "talk",
-      label: "Talk command needed",
-      detail: `Score ${progress?.talkScore ?? 0}%`,
-      href: `${basePath}/talk?day=${session.day}`,
-      actionLabel: "Retry oral check",
+      id: "lab",
+      label: "Recall support",
+      detail: `Score ${progress?.talkScore ?? 0}%; target ${SUBJECT_RECALL_TARGET}%`,
+      href: `${basePath}/lab?mode=${progress?.labMode ?? activeLab?.slug ?? ""}&day=${session.day}`,
+      actionLabel: "Use visual support",
       tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
     };
   }
 
   return {
     id: "mcq",
-    label: "MCQ readiness open",
-    detail: "Author fresh batch",
+    label: "Fresh practice open",
+    detail: labProofCompletion.complete
+      ? "Recall target and optional visual proof are complete"
+      : "Recall target reached; visual proof remains optional",
     href: `${basePath}/mcq-readiness?day=${session.day}`,
-    actionLabel: "Open MCQ readiness",
+    actionLabel: "Open practice",
     tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
   };
 }

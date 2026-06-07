@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectAssessmentBand, SubjectMaicTurn, SubjectTalkUnlockStage } from "@/lib/upsc/subjectLearning";
+import {
+  loadRemoteSubjectProgress,
+  mergeProgressMaps,
+  saveRemoteSubjectProgress,
+  upscLearnerStateClearedEvent,
+} from "@/lib/upsc/learnerPersistence";
 
 export type SubjectConfidence = "Shaky" | "Working" | "Command";
 export type SubjectMentorMode = "Concept logic" | "Cause-effect" | "UPSC trap";
@@ -36,6 +42,10 @@ export type SubjectDayProgress = {
   watchMediaReadyIds?: string[];
   watchMediaAssetSources?: SubjectWatchMediaAssetMap;
   watchMediaTranscript?: string;
+  learnerLevel?: "Beginner" | "Intermediate" | "Advanced";
+  studyWindow?: string;
+  baselineKnowledge?: string;
+  baselineSavedAt?: string;
   confidence?: SubjectConfidence;
   mentorMode?: SubjectMentorMode;
   reflection?: string;
@@ -53,6 +63,14 @@ export type SubjectDayProgress = {
   talkNextRoute?: string;
   talkNextActionLabel?: string;
   talkPreliminaryScore?: number;
+  teacherMode?: "gemini" | "local-fallback";
+  teacherPromptVersion?: string;
+  teacherRubricVersion?: string;
+  teacherRecallTarget?: number;
+  teacherCoachSummary?: string;
+  teacherCoachNextPrompt?: string;
+  teacherProviderScore?: number;
+  talkTeacherFollowUpPrompt?: string;
   labCompleted?: boolean;
   labMode?: string;
   labInsight?: string;
@@ -62,6 +80,8 @@ export type SubjectDayProgress = {
   labProofSummary?: string;
   mcqAttempted?: boolean;
   mcqCompleted?: boolean;
+  mcqAnswerMap?: Record<number, string>;
+  mcqCurrentQuestionIndex?: number;
   mcqAnsweredCount?: number;
   mcqCorrectCount?: number;
   mcqTotal?: number;
@@ -97,6 +117,13 @@ export type SubjectDayProgress = {
 
 type SubjectProgressMap = Record<string, SubjectDayProgress>;
 
+export type SubjectSpacedRevisionItem = {
+  source: SubjectSession;
+  due: SubjectSession;
+  progress: SubjectDayProgress;
+  dueDay: number;
+};
+
 function storageKey(subjectSlug: string) {
   return `sarit-upsc-${subjectSlug}-progress-v1`;
 }
@@ -119,17 +146,68 @@ function writeProgress(subjectSlug: string, progress: SubjectProgressMap) {
   window.localStorage.setItem(storageKey(subjectSlug), JSON.stringify(progress));
 }
 
+function hasStartedTopic(progress?: SubjectDayProgress) {
+  return Boolean(
+    progress?.watched ||
+      progress?.reflection?.trim() ||
+      progress?.baselineSavedAt ||
+      typeof progress?.talkScore === "number" ||
+      progress?.labCompleted ||
+      progress?.mcqAttempted
+  );
+}
+
+function hasClearedSpacedRevision(progress?: SubjectDayProgress) {
+  return Boolean(
+    progress?.confidence === "Command" ||
+      progress?.revisitQueued === false && progress?.activePromptLabel === "Revisit" ||
+      progress?.mcqRecoveryResolved
+  );
+}
+
 export function useSubjectProgress(subjectSlug: string, sessions: SubjectSession[]) {
   const [progress, setProgress] = useState<SubjectProgressMap>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      setProgress(readProgress(subjectSlug));
+      const localProgress = readProgress(subjectSlug);
+      setProgress(localProgress);
       setIsLoaded(true);
+
+      void loadRemoteSubjectProgress<SubjectDayProgress>(subjectSlug).then((remoteProgress) => {
+        if (cancelled) return;
+        if (!remoteProgress) {
+          if (Object.keys(localProgress).length) void saveRemoteSubjectProgress(subjectSlug, localProgress);
+          return;
+        }
+        const mergedProgress = mergeProgressMaps(localProgress, remoteProgress);
+        writeProgress(subjectSlug, mergedProgress);
+        setProgress((current) => mergeProgressMaps(current, mergedProgress));
+        if (Object.keys(localProgress).length) void saveRemoteSubjectProgress(subjectSlug, mergedProgress);
+      });
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [subjectSlug]);
+
+  useEffect(() => {
+    const syncLocalProgress = () => {
+      const localProgress = readProgress(subjectSlug);
+      if (Object.keys(localProgress).length) void saveRemoteSubjectProgress(subjectSlug, localProgress);
+    };
+    const clearInMemoryProgress = () => setProgress(readProgress(subjectSlug));
+
+    window.addEventListener("online", syncLocalProgress);
+    window.addEventListener(upscLearnerStateClearedEvent, clearInMemoryProgress);
+    return () => {
+      window.removeEventListener("online", syncLocalProgress);
+      window.removeEventListener(upscLearnerStateClearedEvent, clearInMemoryProgress);
+    };
   }, [subjectSlug]);
 
   const saveDayProgress = useCallback(
@@ -147,6 +225,7 @@ export function useSubjectProgress(subjectSlug: string, sessions: SubjectSession
           [key]: nextDay,
         };
         writeProgress(subjectSlug, next);
+        void saveRemoteSubjectProgress(subjectSlug, next);
         return next;
       });
     },
@@ -161,6 +240,18 @@ export function useSubjectProgress(subjectSlug: string, sessions: SubjectSession
     const commandDays = sessions.filter((session) => progress[String(session.day)]?.confidence === "Command");
     const shakyDays = sessions.filter((session) => progress[String(session.day)]?.confidence === "Shaky");
     const revisitDays = sessions.filter((session) => progress[String(session.day)]?.revisitQueued);
+    const spacedRevisionItems = sessions
+      .map((source) => {
+        const sourceProgress = progress[String(source.day)];
+        const dueDay = Math.min(source.day + 2, sessions.length);
+        const due = sessions.find((session) => session.day === dueDay);
+        if (!sourceProgress || !due || !hasStartedTopic(sourceProgress) || hasClearedSpacedRevision(sourceProgress)) {
+          return null;
+        }
+        return { source, due, progress: sourceProgress, dueDay };
+      })
+      .filter((item): item is SubjectSpacedRevisionItem => Boolean(item));
+    const spacedRevisionDays = spacedRevisionItems.map((item) => item.source);
 
     return {
       watchedCount: watchedDays.length,
@@ -168,11 +259,14 @@ export function useSubjectProgress(subjectSlug: string, sessions: SubjectSession
       commandCount: commandDays.length,
       shakyCount: shakyDays.length,
       revisitCount: revisitDays.length,
+      spacedRevisionCount: spacedRevisionDays.length,
       watchedDays,
       savedDays,
       commandDays,
       shakyDays,
       revisitDays,
+      spacedRevisionDays,
+      spacedRevisionItems,
       watchCompletionPercent: Math.round((watchedDays.length / sessions.length) * 100),
       completionPercent: Math.round((savedDays.length / sessions.length) * 100),
     };

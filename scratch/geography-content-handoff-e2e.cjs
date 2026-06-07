@@ -70,8 +70,8 @@ async function run() {
   const pageErrors = [];
 
   await page.addInitScript(() => {
-    window.MOCK_TOKEN = "MOCK_TOKEN_geography_content_handoff";
-    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_content_handoff");
+    window.MOCK_TOKEN = "MOCK_TOKEN_MASTER_geography_content_handoff";
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_geography_content_handoff");
   });
 
   page.on("console", (message) => {

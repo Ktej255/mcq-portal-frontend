@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import {
+  ArrowRight,
   BrainCircuit,
+  ChevronDown,
   ClipboardCheck,
   Layers3,
   LineChart,
   PlayCircle,
   RefreshCcw,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import type { SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
@@ -39,54 +42,102 @@ export function SubjectLoopActions({
   const activeLab = plan.labs.find((lab) => lab.title === activeSession.lab) ?? plan.labs[0];
   const loopDetail = detail ?? `Move through the same ${plan.title} workflow from any room.`;
   const themeStyle = getSubjectThemeStyle(plan);
-  const actions = [
+  const actions: Array<{
+    id: SubjectLoopRoom;
+    label: string;
+    detail: string;
+    href: string;
+    icon: LucideIcon;
+  }> = [
     {
-      id: "watch" as const,
-      label: "Watch",
-      detail: "Class",
+      id: "watch",
+      label: "Lesson",
+      detail: "10-15 min topic",
       href: `${basePath}/watch?day=${boundedDay}`,
       icon: PlayCircle,
     },
     {
-      id: "talk" as const,
-      label: "Talk",
-      detail: "Explain",
+      id: "talk",
+      label: "AI discussion",
+      detail: "95% recall",
       href: `${basePath}/talk?day=${boundedDay}`,
       icon: BrainCircuit,
     },
-    ...(activeLab
-      ? [
-          {
-            id: "lab" as const,
-            label: "Lab",
-            detail: "Visual",
-            href: `${basePath}/lab?mode=${activeLab.slug}&day=${boundedDay}`,
-            icon: Layers3,
-          },
-        ]
-      : []),
     {
-      id: "mcq" as const,
-      label: "MCQ",
+      id: "mcq",
+      label: "Fresh MCQ",
       detail: "Practice",
       href: `${basePath}/mcq-readiness?day=${boundedDay}`,
       icon: ClipboardCheck,
     },
     {
-      id: "track" as const,
+      id: "track",
       label: "Track",
       detail: "Progress",
-      href: `${basePath}/track`,
+      href: `${basePath}/track?day=${boundedDay}`,
       icon: LineChart,
     },
     {
-      id: "revisit" as const,
+      id: "revisit",
       label: "Revisit",
       detail: "Repair",
       href: `${basePath}/revisit?day=${boundedDay}`,
       icon: RefreshCcw,
     },
+    ...(activeLab
+      ? [
+          {
+            id: "lab" as const,
+            label: "Visual support",
+            detail: "Optional",
+            href: `${basePath}/lab?mode=${activeLab.slug}&day=${boundedDay}`,
+            icon: Layers3,
+          },
+        ]
+      : []),
   ];
+  const currentAction = actions.find((action) => action.id === current) ?? actions[0];
+  const guidedNextByRoom: Record<SubjectLoopRoom, { label: string; detail: string; href: string; icon: LucideIcon }> = {
+    watch: {
+      label: "AI discussion",
+      detail: "Explain the lesson until recall reaches 95%.",
+      href: `${basePath}/talk?day=${boundedDay}`,
+      icon: BrainCircuit,
+    },
+    talk: {
+      label: "Fresh MCQ",
+      detail: "Open practice only after the recall gate is ready.",
+      href: `${basePath}/mcq-readiness?day=${boundedDay}`,
+      icon: ClipboardCheck,
+    },
+    lab: {
+      label: "AI discussion",
+      detail: "Use support, then explain again.",
+      href: `${basePath}/talk?day=${boundedDay}`,
+      icon: BrainCircuit,
+    },
+    mcq: {
+      label: "Track progress",
+      detail: "Check command, revisit, and next topic.",
+      href: `${basePath}/track?day=${boundedDay}`,
+      icon: LineChart,
+    },
+    track: {
+      label: "Day overview",
+      detail: "Return to the day card and selected task.",
+      href: `${basePath}?day=${boundedDay}`,
+      icon: LineChart,
+    },
+    revisit: {
+      label: "AI discussion",
+      detail: "Explain again after the repair note.",
+      href: `${basePath}/talk?day=${boundedDay}`,
+      icon: BrainCircuit,
+    },
+  };
+  const nextAction = current ? guidedNextByRoom[current] : guidedNextByRoom.watch;
+  const CurrentIcon = currentAction.icon;
+  const NextIcon = nextAction.icon;
 
   return (
     <div
@@ -96,7 +147,7 @@ export function SubjectLoopActions({
       style={themeStyle}
       className={cn("rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm", className)}
     >
-      <div className="mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">{title}</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[var(--subject-muted)]">{loopDetail}</p>
@@ -106,10 +157,56 @@ export function SubjectLoopActions({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {actions.map((action) => {
-          const isCurrent = current === action.id;
-          return (
+      <div
+        data-testid="subject-loop-one-action"
+        className="grid gap-3 rounded-lg border border-[var(--subject-ring)] bg-[var(--subject-light)] p-3 xl:grid-cols-[1fr_auto_auto_auto]"
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white text-[var(--subject-dark)] shadow-sm">
+            <CurrentIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+              Current step
+            </p>
+            <p className="mt-1 text-base font-black text-[var(--subject-heading)]">{currentAction.label}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[var(--subject-muted)]">
+              Guided next: {nextAction.label} - {activeSession.title}
+            </p>
+          </div>
+        </div>
+        <Link
+          href={nextAction.href}
+          data-testid="subject-loop-current-route"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90"
+        >
+          Open next <NextIcon className="h-4 w-4" />
+        </Link>
+        <Link
+          href={currentAction.href}
+          data-testid="subject-loop-current-room-route"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-4 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-bg)]"
+        >
+          Stay here <ArrowRight className="h-4 w-4" />
+        </Link>
+        <Link
+          href={`${basePath}?day=${boundedDay}`}
+          data-testid="subject-loop-day-overview"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--subject-border)] bg-white px-4 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-bg)]"
+        >
+          Day overview
+        </Link>
+      </div>
+
+      <details data-testid="subject-loop-room-switcher" className="mt-3 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)] marker:hidden">
+          Switch room
+          <ChevronDown className="h-4 w-4" />
+        </summary>
+        <div className="grid gap-2 border-t border-[var(--subject-border)] p-3 sm:grid-cols-2 xl:grid-cols-3">
+          {actions.map((action) => {
+            const isCurrent = current === action.id;
+            return (
             <Link
               key={action.id}
               href={action.href}
@@ -136,9 +233,10 @@ export function SubjectLoopActions({
                 <span className="mt-0.5 block text-xs font-semibold opacity-70">{action.detail}</span>
               </span>
             </Link>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
 }

@@ -62,7 +62,7 @@ async function run() {
 
   await page.getByRole("button", { name: /Activate local UPSC access/i }).click();
   await page.waitForURL(`${baseUrl}/upsc`, { timeout: 15000 });
-  await page.getByText("Geography is the first live subject room.", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("UPSC self-study profile", { exact: false }).waitFor({ timeout: 15000 });
 
   const storedAccess = await page.evaluate(() => {
     const rawPass = localStorage.getItem("sarit-upsc-access-pass-v1");
@@ -79,7 +79,7 @@ async function run() {
     tokenPresent: Boolean(storedAccess.token && storedAccess.token.startsWith("MOCK_TOKEN")),
     passStatus: storedAccess.pass?.status,
     passProduct: storedAccess.pass?.product,
-    landedOnUpsc: storedAccess.bodyText.includes("Student landing after payment"),
+    landedOnUpsc: storedAccess.bodyText.includes("UPSC self-study profile"),
     containsOldBranding:
       storedAccess.bodyText.includes("AntiGravity") ||
       storedAccess.bodyText.includes("ANTIGRAVITY") ||

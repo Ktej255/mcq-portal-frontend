@@ -7,11 +7,9 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
-  Compass,
   MessageSquareText,
   MonitorCheck,
   PlayCircle,
-  RefreshCcw,
   Send,
   ShieldCheck,
   TriangleAlert,
@@ -72,11 +70,10 @@ export function GeographyTestingPilotRoom() {
   const dayOne = geographySessions[0];
   const dayOneProgress = getDayProgress(1);
   const readinessSnapshot = buildGeographyReadinessSnapshot(progress, { isLoaded });
-  const dayOneReadiness = getGeographyDayReadiness(dayOne, dayOneProgress, { isLoaded, labSlug: "earth-layers" });
+  const dayOneReadiness = getGeographyDayReadiness(dayOne, dayOneProgress, { isLoaded, labSlug: "india-map" });
   const origin = typeof window === "undefined" ? "http://127.0.0.1:3001" : window.location.origin;
   const testingLink = `${origin}/upsc/geography/pilot`;
   const watchProofCount = Math.min(dayOneProgress?.watchSceneCompletedIds?.length ?? 0, 5);
-  const labProofCount = Math.min(dayOneProgress?.labProofCompletedIds?.length ?? 0, 5);
   const openFeedbackCount = feedbackEntries.filter((entry) => entry.status === "open").length;
   const blockerCount = feedbackEntries.filter((entry) => entry.severity === "Blocker" && entry.status === "open").length;
 
@@ -90,14 +87,14 @@ export function GeographyTestingPilotRoom() {
         href: "/upsc/geography/pilot",
       },
       {
-        label: "Watch proof",
-        detail: `${watchProofCount}/5 Day 1 class scenes saved.`,
+        label: "Learn proof",
+        detail: `${watchProofCount}/5 Day 1 lesson scenes saved.`,
         done: dayOneReadiness.watchComplete,
         icon: PlayCircle,
         href: "/upsc/geography/watch?day=1",
       },
       {
-        label: "Talk verdict",
+        label: "Discuss verdict",
         detail:
           typeof dayOneProgress?.talkScore === "number"
             ? `${dayOneProgress.talkScore}/100 ${dayOneProgress.talkBand ?? "Talk"} verdict.`
@@ -105,13 +102,6 @@ export function GeographyTestingPilotRoom() {
         done: dayOneReadiness.talkClear,
         icon: MessageSquareText,
         href: "/upsc/geography/talk?day=1",
-      },
-      {
-        label: "Visual Lab proof",
-        detail: `${labProofCount}/5 visual proof stages saved.`,
-        done: dayOneReadiness.labComplete,
-        icon: Compass,
-        href: "/upsc/geography/lab?mode=earth-layers&day=1",
       },
       {
         label: "MCQ command",
@@ -122,15 +112,8 @@ export function GeographyTestingPilotRoom() {
         icon: ClipboardCheck,
         href: "/upsc/geography/mcq-readiness?day=1",
       },
-      {
-        label: "Track and Revisit",
-        detail: "Student can inspect outcome and recovery route after practice.",
-        done: dayOneReadiness.mcqCommand,
-        icon: RefreshCcw,
-        href: "/upsc/geography/track?day=1",
-      },
     ],
-    [dayOneProgress, dayOneReadiness, isLoaded, labProofCount, watchProofCount]
+    [dayOneProgress, dayOneReadiness, isLoaded, watchProofCount]
   );
 
   const completedGateCount = pilotGates.filter((gate) => gate.done).length;
@@ -270,11 +253,11 @@ export function GeographyTestingPilotRoom() {
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[
                 "Open the testing link and start Geography Day 1.",
-                "Watch all five class scenes and save the Talk handoff.",
-                "Explain the concept in Talk and answer the peer challenge.",
-                "Complete all five Visual Lab proof stages.",
-                "Attempt the local MCQ practice only after the fresh batch gate is ready.",
-                "Open Track and Revisit, then save feedback from the cockpit.",
+                "Complete one focused 10-15 minute lesson.",
+                "Explain the concept in Discuss until recall reaches 95%.",
+                "Attempt fresh MCQs after the recall target is cleared.",
+                "Use the optional India-map visual only when extra support helps.",
+                "Save one observation after the student completes the core loop.",
               ].map((item, index) => (
                 <div key={item} className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">Step {index + 1}</p>

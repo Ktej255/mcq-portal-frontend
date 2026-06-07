@@ -11,10 +11,13 @@ import {
   getSubjectLabProofCompletion,
   getSubjectLearningGate,
   getSubjectWatchCompletion,
+  isSubjectRevisitRequired,
   isSubjectTalkReadyForLab,
   isSubjectTalkReadyForMcq,
   type SubjectLearningGateId,
 } from "@/lib/upsc/subjectProgressGates";
+import { SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
+import type { StudentLevel } from "@/lib/upsc/studentProfile";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 
 export type SubjectReadinessStageId = "watch" | "talk" | "revisit" | "lab" | "mcq";
@@ -65,8 +68,8 @@ export type SubjectReadinessSnapshot = {
 
 const gatePriority: Record<SubjectLearningGateId, number> = {
   revisit: 0,
-  watch: 1,
-  talk: 2,
+  talk: 1,
+  watch: 2,
   lab: 3,
   mcq: 4,
 };
@@ -104,13 +107,13 @@ function scoreForDay({
   progress?: SubjectDayProgress;
 }) {
   const talkScore = progress?.talkScore ?? 0;
-  const watchScore = watchComplete ? 15 : 0;
-  const talkGateScore = talkMcqReady ? 30 : talkLabReady ? 20 : talkScore > 0 ? 8 : 0;
+  const watchScore = watchComplete ? 20 : 0;
+  const talkGateScore = talkMcqReady ? 35 : talkLabReady ? 22 : talkScore > 0 ? 8 : 0;
   const revisitScore = !revisitNeeded && watchComplete && talkScore > 0 ? 10 : 0;
-  const labScore = labComplete ? 20 : 0;
+  const labScore = labComplete ? 5 : 0;
   const draftRatio = batchPlanned > 0 ? Math.min(1, batchDrafted / batchPlanned) : 0;
   const mcqScore = mcqPracticeCommand
-    ? 25
+    ? 30
     : mcqPracticeComplete
       ? 15
       : batchReady
@@ -123,10 +126,11 @@ function scoreForDay({
 export function getSubjectDayReadiness(
   plan: SubjectSprintPlan,
   session: SubjectSession,
-  progress?: SubjectDayProgress
+  progress?: SubjectDayProgress,
+  learnerLevel: StudentLevel = "intermediate"
 ): SubjectDayReadiness {
   const basePath = `/upsc/${plan.slug}`;
-  const learningGate = getSubjectLearningGate(plan, session, progress);
+  const learningGate = getSubjectLearningGate(plan, session, progress, learnerLevel);
   const watchCompletion = getSubjectWatchCompletion(progress);
   const labCompletion = getSubjectLabProofCompletion(progress);
   const batchCode = getSubjectBatchCode(plan.slug, session.day);
@@ -140,13 +144,9 @@ export function getSubjectDayReadiness(
   const watchComplete = watchCompletion.complete;
   const talkLabReady = isSubjectTalkReadyForLab(progress);
   const talkMcqReady = isSubjectTalkReadyForMcq(progress);
-  const revisitNeeded =
-    Boolean(progress?.revisitQueued) ||
-    progress?.talkUnlockStage === "revisit" ||
-    progress?.talkBand === "Revisit" ||
-    isUpscMcqRevisitOutcome(progress, batchCode);
+  const revisitNeeded = isSubjectRevisitRequired(progress) || isUpscMcqRevisitOutcome(progress, batchCode);
   const labComplete = labCompletion.complete;
-  const isCommandReady = watchComplete && talkMcqReady && !revisitNeeded && labComplete && batchReady && mcqPracticeCommand;
+  const isCommandReady = watchComplete && talkMcqReady && !revisitNeeded && batchReady && mcqPracticeCommand;
   const score = scoreForDay({
     watchComplete,
     talkLabReady,
@@ -166,33 +166,33 @@ export function getSubjectDayReadiness(
     : learningGate.id === "mcq" && batchReady && progress?.mcqAttempted && !mcqPracticeComplete
       ? "Finish MCQ practice"
       : learningGate.id === "mcq" && batchReady
-        ? "MCQ practice needed"
+        ? "Fresh practice ready"
         : learningGate.id === "mcq" && batchDrafted > 0
-          ? "MCQ drafting"
+          ? "Practice set waiting"
           : learningGate.id === "mcq"
-            ? "Fresh MCQ needed"
+            ? "Practice not attached"
             : learningGate.label;
   const detail = isCommandReady
     ? `MCQ command ${progress?.mcqScorePercent ?? 0}% from ${batchCode}`
     : learningGate.id === "mcq"
       ? batchReady
-        ? progress?.mcqAttempted
-          ? `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? 0} MCQs answered`
-          : `${batchDrafted}/${batchPlanned} fresh MCQs ready; practice pending`
-        : `${batchDrafted}/${batchPlanned} fresh MCQs drafted`
+          ? progress?.mcqAttempted
+            ? `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? 0} MCQs answered`
+          : `${batchDrafted}/${batchPlanned} fresh questions ready`
+        : "A reviewed fresh set is required before practice"
       : learningGate.detail;
   const href = isCommandReady ? `${basePath}/track?day=${session.day}` : learningGate.href;
   const actionLabel = isCommandReady
     ? "Track command"
     : learningGate.id === "mcq" && batchReady
-      ? "Run MCQ practice"
+      ? "Open practice"
       : learningGate.id === "mcq" && batchDrafted > 0
-        ? "Continue authoring"
+        ? "Open practice room"
         : learningGate.actionLabel;
   const tone = isCommandReady ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : learningGate.tone;
-  const talkActive = watchComplete && !revisitNeeded && !talkMcqReady;
-  const labActive = talkLabReady && !revisitNeeded && !labComplete;
-  const mcqActive = talkMcqReady && labComplete && (!batchReady || !mcqPracticeCommand);
+  const talkActive = !revisitNeeded && !talkMcqReady;
+  const labActive = talkLabReady && !talkMcqReady && !revisitNeeded && !labComplete;
+  const mcqActive = talkMcqReady && (!batchReady || !mcqPracticeCommand);
   const mcqDetail = mcqPracticeCommand
     ? `Command ${progress?.mcqScorePercent ?? 0}%`
     : mcqPracticeComplete
@@ -227,16 +227,16 @@ export function getSubjectDayReadiness(
     mcqPracticeCommand,
     stages: [
       {
+        id: "talk",
+        label: "95% recall",
+        detail: typeof progress?.talkScore === "number" ? `${progress.talkScore}% / ${SUBJECT_RECALL_TARGET}% target` : "AI teacher check",
+        status: stageStatus(talkMcqReady, talkActive, revisitNeeded),
+      },
+      {
         id: "watch",
         label: "Watch",
         detail: `${watchCompletion.completed}/${watchCompletion.target} scenes`,
         status: stageStatus(watchComplete, learningGate.id === "watch"),
-      },
-      {
-        id: "talk",
-        label: "Talk",
-        detail: typeof progress?.talkScore === "number" ? `${progress.talkScore}% oral score` : "AI teacher check",
-        status: stageStatus(talkMcqReady, talkActive, revisitNeeded),
       },
       {
         id: "revisit",
@@ -246,15 +246,15 @@ export function getSubjectDayReadiness(
       },
       {
         id: "lab",
-        label: "Lab",
-        detail: `${labCompletion.completed}/${labCompletion.target} proofs`,
-        status: stageStatus(labComplete, labActive, revisitNeeded || !talkLabReady),
+        label: "Visual support",
+        detail: `${labCompletion.completed}/${labCompletion.target} optional proofs`,
+        status: stageStatus(labComplete, labActive),
       },
       {
         id: "mcq",
         label: "MCQ",
         detail: mcqDetail,
-        status: stageStatus(mcqPracticeCommand, mcqActive, revisitNeeded || !talkMcqReady || !labComplete),
+        status: stageStatus(mcqPracticeCommand, mcqActive, revisitNeeded || !talkMcqReady),
       },
     ],
   };
@@ -262,10 +262,11 @@ export function getSubjectDayReadiness(
 
 export function buildSubjectReadinessSnapshot(
   plan: SubjectSprintPlan,
-  progressMap: Record<string, SubjectDayProgress>
+  progressMap: Record<string, SubjectDayProgress>,
+  learnerLevel: StudentLevel = "intermediate"
 ): SubjectReadinessSnapshot {
   const days = plan.sessions.map((session) =>
-    getSubjectDayReadiness(plan, session, progressMap[String(session.day)])
+    getSubjectDayReadiness(plan, session, progressMap[String(session.day)], learnerLevel)
   );
   const totalDays = days.length || 1;
   const score = Math.round(days.reduce((sum, day) => sum + day.score, 0) / totalDays);

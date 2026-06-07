@@ -3,12 +3,30 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "subject-lab-proof-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "subject-lab-proof-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
 function storageKey(subjectSlug) {
   return `sarit-upsc-${subjectSlug}-progress-v1`;
+}
+
+async function seedProfile(page) {
+  await page.addInitScript((studentProfileKey) => {
+    localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_subject_lab_proof");
+    localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, profileKey);
 }
 
 async function metrics(page) {
@@ -20,6 +38,24 @@ async function metrics(page) {
   }));
 }
 
+function makeTalkClearedProgress(day, score = 82) {
+  return {
+    day,
+    watched: true,
+    watchState: "Watched",
+    watchSceneCompletedIds: ["scene-1", "scene-2", "scene-3", "scene-4", "scene-5"],
+    reflection:
+      "Student explained the concept with mechanism, example, actor, trap and revision hook before entering Visual Lab.",
+    talkScore: score,
+    talkBand: score >= 85 ? "Command" : "Practice",
+    talkUnlockStage: score >= 85 ? "mcq" : "lab",
+    talkVerdict: "Visual Lab unlocked after AI teacher check.",
+    talkClassroomStage: "examiner-verdict",
+    talkDiscussionStep: "verdict",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const consoleErrors = [];
@@ -28,6 +64,7 @@ async function run() {
 
   async function verifyEnvironmentLab(viewportName, viewport) {
     const page = await browser.newPage({ viewport });
+    await seedProfile(page);
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(`[${viewportName}] ${message.text()}`);
     });
@@ -39,25 +76,64 @@ async function run() {
     await page.evaluate((key) => window.localStorage.removeItem(key), storageKey("environment"));
     await page.reload({ waitUntil: "domcontentloaded" });
 
-    await page.getByTestId("subject-lab-proof-engine").waitFor({ timeout: 15000 });
-    await page.getByTestId("subject-lab-proof-list").waitFor({ timeout: 15000 });
-    await page.getByText("1. Concept proof", { exact: false }).waitFor({ timeout: 15000 });
-
-    await page.getByTestId("subject-lab-proof-complete").click();
-    await page.getByText("2. Applied case", { exact: false }).waitFor({ timeout: 15000 });
-
-    for (let i = 0; i < 4; i += 1) {
-      await page.getByTestId("subject-lab-proof-complete").click();
+    await page.getByTestId("subject-lab-talk-first-gate").waitFor({ timeout: 15000 });
+    const gateText = await page.getByTestId("subject-lab-talk-first-gate").innerText();
+    if (!gateText.includes("Explain the topic first")) {
+      throw new Error(`${viewportName} lab should block visual proof until Talk is cleared.`);
+    }
+    const lockedOneActionCount = await page.getByTestId("subject-lab-one-action").count();
+    if (lockedOneActionCount !== 0) {
+      throw new Error(`${viewportName} lab should not show proof controls before Talk clearance.`);
+    }
+    const talkFirstHref = await page.getByTestId("subject-lab-talk-first-route").getAttribute("href");
+    if (talkFirstHref !== "/upsc/environment/talk?day=5") {
+      throw new Error(`${viewportName} lab Talk-first route is wrong: ${talkFirstHref}`);
     }
 
-    await page.getByText("5/5 proof stages", { exact: false }).waitFor({ timeout: 15000 });
+    await page.evaluate(
+      ({ key, progress }) => {
+        window.localStorage.setItem(key, JSON.stringify({ "5": progress }));
+      },
+      { key: storageKey("environment"), progress: makeTalkClearedProgress(5, 82) }
+    );
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    await page.getByTestId("subject-lab-one-action").waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-lab-proof-engine").waitFor({ timeout: 15000 });
+    const oneActionText = await page.getByTestId("subject-lab-one-action").innerText();
+    if (!oneActionText.includes("Write one line")) {
+      throw new Error(`${viewportName} lab should lead with the one-line proof action.`);
+    }
+    const visualSurfaceOpen = await page
+      .getByTestId("subject-lab-visual-surface")
+      .evaluate((element) => Boolean(element.open));
+    if (visualSurfaceOpen) {
+      throw new Error(`${viewportName} visual board should start folded`);
+    }
+    const proofEngineOpen = await page
+      .getByTestId("subject-lab-proof-engine")
+      .evaluate((element) => Boolean(element.open));
+    if (proofEngineOpen) {
+      throw new Error(`${viewportName} proof stage drawer should start folded`);
+    }
+    const proofChecklistOpen = await page
+      .getByTestId("subject-lab-proof-list")
+      .evaluate((element) => Boolean(element.open));
+    if (proofChecklistOpen) {
+      throw new Error(`${viewportName} proof checklist should start folded`);
+    }
+    await page.locator('[data-testid="subject-lab-proof-engine"] > summary').click();
+    await page.getByTestId("subject-lab-proof-list").waitFor({ timeout: 15000 });
+    await page.getByText("1. Concept proof", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByText("Write this in your words", { exact: false }).waitFor({ timeout: 15000 });
     await page
       .getByPlaceholder("Write the concept, case, map point, or UPSC trap", { exact: false })
       .fill(
         "Biodiversity proof: classify protected area category, link the map region, species, threat, legal rule and institution. UPSC can create traps by mixing national park, sanctuary, biosphere reserve and conservation reserve permissions."
       );
-    await page.getByRole("button", { name: /Mark lab complete/i }).click();
+    await page.getByRole("button", { name: /Save proof and continue/i }).click();
     await page.getByText("Lab saved locally", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByText("5/5 proof stages", { exact: false }).waitFor({ timeout: 15000 });
 
     const progress = await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
@@ -85,6 +161,7 @@ async function run() {
 
   async function verifyEconomyLab() {
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+    await seedProfile(page);
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(`[economy] ${message.text()}`);
     });
@@ -93,9 +170,30 @@ async function run() {
     await page.goto(`${baseUrl}/upsc/economy/lab?mode=inflation-dashboard&day=3`, {
       waitUntil: "domcontentloaded",
     });
+    await page.evaluate(
+      ({ key, progress }) => {
+        window.localStorage.setItem(key, JSON.stringify({ "3": progress }));
+      },
+      { key: storageKey("economy"), progress: makeTalkClearedProgress(3, 88) }
+    );
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByTestId("subject-lab-one-action").waitFor({ timeout: 15000 });
     await page.getByTestId("subject-lab-proof-engine").waitFor({ timeout: 15000 });
+    const proofEngineOpen = await page
+      .getByTestId("subject-lab-proof-engine")
+      .evaluate((element) => Boolean(element.open));
+    if (proofEngineOpen) {
+      throw new Error("Economy proof stage drawer should start folded");
+    }
+    const proofChecklistOpen = await page
+      .getByTestId("subject-lab-proof-list")
+      .evaluate((element) => Boolean(element.open));
+    if (proofChecklistOpen) {
+      throw new Error("Economy proof checklist should start folded");
+    }
+    await page.locator('[data-testid="subject-lab-proof-engine"] > summary').click();
     await page.getByTestId("subject-lab-proof-list").waitFor({ timeout: 15000 });
-    await page.getByText("Student proof prompt", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByText("Write this in your words", { exact: false }).waitFor({ timeout: 15000 });
 
     const pageMetrics = await metrics(page);
     checks.push({ viewport: "desktop", route: "economy-lab", metrics: pageMetrics });

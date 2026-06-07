@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/clean-next-output.mjs && next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:launch-env": "node scripts/verify-launch-env-boundary.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

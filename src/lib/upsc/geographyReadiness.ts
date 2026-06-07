@@ -1,9 +1,11 @@
 import { labSlugForGeographySession } from "@/lib/upsc/geographyLearning";
 import { getGeographyLoopState, type GeographyLoopState } from "@/lib/upsc/geographyLoopState";
+import { GEOGRAPHY_RECALL_TARGET } from "@/lib/upsc/guidedStudy";
 import { getGeographyBatchCode } from "@/lib/upsc/mcqContract";
 import { readMcqCommandBatchState } from "@/lib/upsc/mcqDraftBank";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import type { GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import type { StudentLevel } from "@/lib/upsc/studentProfile";
 
 export type GeographyReadinessStageId = "watch" | "talk" | "revisit" | "lab" | "mcq";
 export type GeographyReadinessStageStatus = "complete" | "active" | "blocked" | "waiting";
@@ -56,18 +58,17 @@ function stageStatus(isComplete: boolean, isActive: boolean, isBlocked: boolean)
 function readinessLabel(score: number, nextState: GeographyLoopState, mcqCommand: boolean) {
   if (mcqCommand && score >= 95) return "Command ready";
   if (nextState.room === "revisit") return "Recovery due";
-  if (nextState.room === "watch") return "Class pending";
-  if (nextState.room === "talk") return "Oral check pending";
-  if (nextState.room === "lab") return "Visual proof pending";
-  if (nextState.room === "mcq") return "MCQ phase";
+  if (nextState.room === "talk") return "Recall pending";
+  if (nextState.room === "watch") return "Class repair pending";
+  if (nextState.room === "mcq") return "Practice phase";
   return "Reading local status";
 }
 
 function nextActionPriority(day: GeographyDayReadiness) {
   const roomPriority: Record<string, number> = {
     revisit: 1,
-    watch: 2,
-    talk: 3,
+    talk: 2,
+    watch: 3,
     lab: 4,
     mcq: 5,
     loading: 9,
@@ -79,7 +80,7 @@ function nextActionPriority(day: GeographyDayReadiness) {
 export function getGeographyDayReadiness(
   session: GeographySession,
   progress?: GeographyDayProgress,
-  options: { isLoaded?: boolean; labSlug?: string } = {}
+  options: { isLoaded?: boolean; labSlug?: string; learnerLevel?: StudentLevel } = {}
 ): GeographyDayReadiness {
   const nextState = getGeographyLoopState(session, progress, options);
   const watchProofCount = Math.min(progress?.watchSceneCompletedIds?.length ?? (progress?.watched ? 5 : 0), 5);
@@ -89,61 +90,65 @@ export function getGeographyDayReadiness(
   const mcqPlanned = batchState?.planned ?? 25;
   const watchComplete = Boolean(progress?.watched) && watchProofCount >= 5;
   const revisitNeeded = Boolean(progress?.revisitQueued || progress?.talkBand === "Revisit");
-  const talkClear = !revisitNeeded && (typeof progress?.talkScore === "number" ? progress.talkScore >= 70 : progress?.talkBand === "Command");
+  const talkClear =
+    !revisitNeeded &&
+    (typeof progress?.talkScore === "number" ? progress.talkScore >= GEOGRAPHY_RECALL_TARGET : progress?.talkBand === "Command");
   const recoveryComplete = Boolean(progress?.recoveryCompleted && !revisitNeeded) || Boolean(watchComplete && !revisitNeeded && progress?.talkScore);
   const labComplete = Boolean(progress?.labCompleted) && labProofCount >= 5;
   const mcqCommand =
     !revisitNeeded &&
     (progress?.mcqOutcome === "Command" ||
       Boolean(progress?.mcqCompleted && typeof progress?.mcqScorePercent === "number" && progress.mcqScorePercent >= 70));
-  const talkPartial = typeof progress?.talkScore === "number" ? Math.min(18, Math.round((progress.talkScore / 70) * 25)) : 0;
-  const mcqPoints = mcqCommand ? 30 : progress?.mcqCompleted ? 20 : batchState?.status === "READY" ? 15 : mcqDrafted > 0 ? 8 : 0;
+  const talkPartial =
+    typeof progress?.talkScore === "number"
+      ? Math.min(48, Math.round((progress.talkScore / GEOGRAPHY_RECALL_TARGET) * 50))
+      : 0;
+  const mcqPoints = mcqCommand ? 50 : progress?.mcqCompleted ? 30 : batchState?.status === "READY" ? 15 : mcqDrafted > 0 ? 8 : 0;
   const score = Math.min(
     100,
-    (watchComplete ? 15 : watchProofCount * 3) +
-      (talkClear ? 25 : talkPartial) +
-      (recoveryComplete ? 10 : 0) +
-      (labComplete ? 20 : labProofCount * 4) +
+    (talkClear ? 50 : talkPartial) +
       mcqPoints
   );
 
   const stages: GeographyReadinessStage[] = [
     {
-      id: "watch",
-      label: "Watch",
-      status: stageStatus(watchComplete, nextState.room === "watch", false),
-      href: `/upsc/geography/watch?day=${session.day}`,
-      detail: `${watchProofCount}/5 scene proofs`,
-    },
-    {
       id: "talk",
       label: "Talk",
-      status: stageStatus(talkClear, nextState.room === "talk", !watchComplete || revisitNeeded),
+      status: stageStatus(talkClear, nextState.room === "talk", revisitNeeded),
       href: `/upsc/geography/talk?day=${session.day}`,
       detail: typeof progress?.talkScore === "number" ? `${progress.talkScore}/100 oral score` : "AI teacher check",
     },
     {
-      id: "revisit",
-      label: "Revisit",
-      status: stageStatus(recoveryComplete, nextState.room === "revisit", !watchComplete),
-      href: `/upsc/geography/revisit?day=${session.day}`,
-      detail: revisitNeeded ? progress?.recoveryDiagnosisSummary ?? "Weak concept repair required" : "No active recovery",
+      id: "watch",
+      label: "Watch",
+      status: stageStatus(watchComplete, nextState.room === "watch", !talkClear || revisitNeeded),
+      href: `/upsc/geography/watch?day=${session.day}`,
+      detail: `${watchProofCount}/5 scene proofs`,
     },
     {
       id: "lab",
-      label: "Visual Lab",
-      status: stageStatus(labComplete, nextState.room === "lab", !talkClear || revisitNeeded),
+      label: "Visual Lab (optional)",
+      status: stageStatus(labComplete, nextState.room === "lab", false),
       href: `/upsc/geography/lab?mode=${options.labSlug ?? progress?.labMode ?? labSlugForGeographySession(session.lab)}&day=${session.day}`,
-      detail: `${labProofCount}/5 visual proofs`,
+      detail: `${labProofCount}/5 optional visual activities`,
     },
     {
       id: "mcq",
-      label: "MCQ",
-      status: stageStatus(mcqCommand, nextState.room === "mcq", !labComplete || revisitNeeded),
+      label: "Practice",
+      status: stageStatus(mcqCommand, nextState.room === "mcq", !talkClear || revisitNeeded),
       href: `/upsc/geography/mcq-readiness?day=${session.day}`,
       detail: progress?.mcqCompleted
         ? `${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? mcqPlanned} correct`
-        : `${mcqDrafted}/${mcqPlanned} fresh drafted`,
+        : batchState?.status === "READY"
+          ? "Reviewed practice is ready"
+          : "Reviewed practice is being prepared",
+    },
+    {
+      id: "revisit",
+      label: "Revisit",
+      status: stageStatus(recoveryComplete, nextState.room === "revisit", false),
+      href: `/upsc/geography/revisit?day=${session.day}`,
+      detail: revisitNeeded ? progress?.recoveryDiagnosisSummary ?? "Weak concept repair required" : "No active recovery",
     },
   ];
 
@@ -170,10 +175,13 @@ export function getGeographyDayReadiness(
 
 export function buildGeographyReadinessSnapshot(
   progressMap: Record<string, GeographyDayProgress>,
-  options: { isLoaded?: boolean } = {}
+  options: { isLoaded?: boolean; learnerLevel?: StudentLevel } = {}
 ): GeographyReadinessSnapshot {
   const days = geographySessions.map((session) =>
-    getGeographyDayReadiness(session, progressMap[String(session.day)], { isLoaded: options.isLoaded })
+    getGeographyDayReadiness(session, progressMap[String(session.day)], {
+      isLoaded: options.isLoaded,
+      learnerLevel: options.learnerLevel,
+    })
   );
   const score = Math.round(days.reduce((sum, day) => sum + day.score, 0) / geographySessions.length);
   const stageCounts = days.reduce<Record<GeographyReadinessStageId, number>>(
@@ -185,7 +193,7 @@ export function buildGeographyReadinessSnapshot(
     },
     { watch: 0, talk: 0, revisit: 0, lab: 0, mcq: 0 }
   );
-  const blockedCount = days.filter((day) => ["watch", "talk", "revisit", "lab"].includes(day.nextState.room)).length;
+  const blockedCount = days.filter((day) => ["watch", "talk", "revisit"].includes(day.nextState.room)).length;
   const revisitCount = days.filter((day) => day.revisitNeeded).length;
   const commandCount = days.filter((day) => day.mcqCommand).length;
   const nextActions = days
@@ -201,7 +209,7 @@ export function buildGeographyReadinessSnapshot(
     detail:
       score >= 95 && commandCount === geographySessions.length
         ? "All 30 Geography days have local command proof."
-        : `${blockedCount} days still need Watch, Talk, Revisit, or Lab gates before full command.`,
+        : `${blockedCount} days still need a lesson, discussion, or short revision before practice is complete.`,
     stageCounts,
     blockedCount,
     revisitCount,

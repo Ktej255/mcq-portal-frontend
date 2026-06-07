@@ -7,10 +7,8 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
-  Compass,
   MessageSquareText,
   PlayCircle,
-  RefreshCcw,
   type LucideIcon,
   Send,
   ShieldCheck,
@@ -136,7 +134,7 @@ export function GeographyStudentPilotRoom() {
 
   const dayOne = geographySessions[0];
   const dayOneProgress = getDayProgress(1);
-  const dayOneReadiness = getGeographyDayReadiness(dayOne, dayOneProgress, { isLoaded, labSlug: "earth-layers" });
+  const dayOneReadiness = getGeographyDayReadiness(dayOne, dayOneProgress, { isLoaded, labSlug: "india-map" });
   const openBlockerCount = feedbackEntries.filter((entry) => entry.status === "open" && entry.severity === "Blocker").length;
   const releaseBlockedByFeedback = openBlockerCount > 0;
   const releaseApproved = releaseDecision.status === "approved" && !releaseBlockedByFeedback;
@@ -146,45 +144,32 @@ export function GeographyStudentPilotRoom() {
   const journeySteps = useMemo(
     () => [
       {
-        label: "Watch",
-        detail: "Complete the Day 1 concept scenes and save the learning handoff.",
+        label: "Learn",
+        detail: "Complete the focused Day 1 lesson and save the discussion handoff.",
         done: dayOneReadiness.watchComplete,
         icon: PlayCircle,
         href: "/upsc/geography/watch?day=1",
       },
       {
-        label: "Talk",
-        detail: "Explain the topic to the AI teacher and clear the discussion verdict.",
+        label: "Discuss",
+        detail: "Explain the topic to the AI teacher and build recall to 95%.",
         done: dayOneReadiness.talkClear,
         icon: MessageSquareText,
         href: "/upsc/geography/talk?day=1",
       },
       {
-        label: "Visual Lab",
-        detail: "Finish the map and proof stages before MCQ practice opens.",
-        done: dayOneReadiness.labComplete,
-        icon: Compass,
-        href: "/upsc/geography/lab?mode=earth-layers&day=1",
-      },
-      {
         label: "MCQ",
-        detail: "Attempt the fresh practice only after the Day 1 quality gate is ready.",
+        detail: "Attempt fresh practice after the discussion clears the recall target.",
         done: dayOneReadiness.mcqCommand,
         icon: ClipboardCheck,
         href: "/upsc/geography/mcq-readiness?day=1",
-      },
-      {
-        label: "Track",
-        detail: "Review your result and open the recovery path if needed.",
-        done: dayOneReadiness.mcqCommand,
-        icon: RefreshCcw,
-        href: "/upsc/geography/track?day=1",
       },
     ],
     [dayOneReadiness],
   );
 
   const completedStepCount = journeySteps.filter((step) => step.done).length;
+  const activeStepIndex = journeySteps.findIndex((step) => !step.done);
   const currentAction: PilotAction = releaseBlockedByFeedback
     ? {
         label: "Pilot paused for review",
@@ -208,58 +193,46 @@ export function GeographyStudentPilotRoom() {
         }
     : !dayOneReadiness.watchComplete
       ? {
-          label: "Start Watch room",
-          detail: "Complete all Day 1 scenes and save the Talk handoff before moving ahead.",
+          label: "Start lesson",
+          detail: "Complete the focused Day 1 lesson and save the discussion handoff before moving ahead.",
           href: "/upsc/geography/watch?day=1",
           icon: PlayCircle,
         }
       : !dayOneReadiness.talkClear
         ? {
-            label: "Continue Talk room",
-            detail: "Explain the topic, answer the peer challenge, and wait for the AI teacher verdict.",
+            label: "Continue discussion",
+            detail: "Explain the topic, answer the peer challenge, and build your recall score to 95%.",
             href: "/upsc/geography/talk?day=1",
             icon: MessageSquareText,
           }
-        : !dayOneReadiness.labComplete
-          ? {
-              label: "Complete Visual Lab",
-              detail: "Save all five visual proof stages before opening MCQ readiness.",
-              href: "/upsc/geography/lab?mode=earth-layers&day=1",
-              icon: Compass,
-            }
-          : !dayOneReadiness.mcqCommand
+        : !dayOneReadiness.mcqCommand
             ? {
-                label: "Open MCQ readiness",
-                detail: "Attempt the fresh Day 1 practice after Watch, Talk, and Lab proof are saved.",
+                label: "Open MCQ practice",
+                detail: "Your discussion cleared the recall target. Attempt the fresh Day 1 practice now.",
                 href: "/upsc/geography/mcq-readiness?day=1",
                 icon: ClipboardCheck,
               }
             : {
-                label: "Review Track and save final feedback",
-                detail: "Open Track/Revisit, then save one observation on this pilot page.",
-                href: "/upsc/geography/track?day=1",
-                icon: RefreshCcw,
+                label: "Save final feedback",
+                detail: "Your core loop is complete. Save one observation below; Track and Revisit remain available when needed.",
+                href: "/upsc/geography/pilot#pilot-feedback",
+                icon: CheckCircle2,
               };
   const CurrentActionIcon = currentAction.icon;
   const testerScript = [
     {
-      label: "Room 1: Watch",
-      detail: "Finish five class scenes and save the Talk handoff packet.",
+      label: "Step 1: Learn",
+      detail: "Finish the focused 10-15 minute lesson and save the discussion handoff.",
       done: dayOneReadiness.watchComplete,
     },
     {
-      label: "Room 2: Talk",
-      detail: "Explain the topic, answer the peer challenge, and follow the saved route decision.",
+      label: "Step 2: Discuss",
+      detail: "Explain the topic, answer the peer challenge, and build recall to 95%.",
       done: dayOneReadiness.talkClear,
     },
     {
-      label: "Room 3: Visual Lab",
-      detail: "Save concept, map, example, UPSC trap, and answer-hook proof.",
-      done: dayOneReadiness.labComplete,
-    },
-    {
-      label: "Room 4: MCQ and Track",
-      detail: "Attempt fresh practice, review Track, then return here to submit feedback.",
+      label: "Step 3: MCQ",
+      detail: "Attempt fresh practice, then return here to submit one observation.",
       done: dayOneReadiness.mcqCommand,
     },
   ];
@@ -329,7 +302,7 @@ export function GeographyStudentPilotRoom() {
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Geography pilot</Badge>
-              <span className="text-sm font-bold text-[#776f64]">Day 1 / Earth system</span>
+              <span className="text-sm font-bold text-[#776f64]">Day 1 / Geographic thinking</span>
             </div>
 
             <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">Controlled student route</p>
@@ -337,19 +310,11 @@ export function GeographyStudentPilotRoom() {
               Start Geography Day 1 from one clean path.
             </h1>
             <p className="mt-4 max-w-3xl text-base font-medium leading-7 text-[#5d675f]">
-              Move in sequence: Watch, Talk, Visual Lab, MCQ, Track, and Revisit. Save feedback at the end so the first batch can be improved before June 1.
+              Follow one short loop: Learn, Discuss, MCQ. Use the India-map visual only when it helps, then save feedback at the end.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              {pilotNavigationUnlocked ? (
-                <Link
-                  href={currentAction.href}
-                  data-testid="geography-student-pilot-start"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-                >
-                  {currentAction.label} <ArrowRight className="h-4 w-4" />
-                </Link>
-              ) : (
+            {!pilotNavigationUnlocked ? (
+              <div className="mt-6">
                 <span
                   data-testid="geography-student-pilot-start-locked"
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#ef9f27]/55 bg-[#fff4df] px-4 text-sm font-black text-[#6f4a12]"
@@ -360,14 +325,8 @@ export function GeographyStudentPilotRoom() {
                       ? "Pilot opens after final approval"
                       : "Check in before starting"}
                 </span>
-              )}
-              <Link
-                href="/upsc/geography"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-              >
-                Geography home <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+              </div>
+            ) : null}
           </div>
 
           <div
@@ -425,9 +384,10 @@ export function GeographyStudentPilotRoom() {
                 {pilotNavigationUnlocked ? (
                   <Link
                     href={currentAction.href}
+                    data-testid="geography-student-pilot-start"
                     className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
                   >
-                    Open current room <ArrowRight className="h-4 w-4" />
+                    Continue <ArrowRight className="h-4 w-4" />
                   </Link>
                 ) : null}
               </div>
@@ -446,12 +406,12 @@ export function GeographyStudentPilotRoom() {
                 {
                   label: "Resume rule",
                   value: "Return here",
-                  detail: "This page will reopen the correct current room if you pause.",
+                  detail: "This page will reopen the correct next step if you pause.",
                 },
                 {
                   label: "Finish rule",
                   value: "Save feedback",
-                  detail: "Submit one observation after Track or Revisit before closing.",
+                  detail: "Submit one observation after MCQ before closing.",
                 },
               ].map((item) => (
                 <div key={item.label} className="rounded-md border border-[#cfe5dc] bg-[#fffdf8]/80 p-3">
@@ -529,7 +489,7 @@ export function GeographyStudentPilotRoom() {
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">First tester script</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">Follow the rooms in order.</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">Follow the steps in order.</h2>
               </div>
               <span className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#085041]">
                 Stop if stuck
@@ -558,7 +518,7 @@ export function GeographyStudentPilotRoom() {
             <div data-testid="geography-student-pilot-stuck-rule" className="mt-4 rounded-md border border-[#ef9f27]/45 bg-[#fff4df] p-3">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[#9a6a16]">If stuck</p>
               <p className="mt-2 text-sm font-bold leading-6 text-[#6f4a12]">
-                Do not skip to the next room. Save feedback with the exact room name, then return to the previous completed room.
+                Do not skip ahead. Save feedback with the exact step name, then return to the previous completed step.
               </p>
             </div>
           </div>
@@ -572,7 +532,7 @@ export function GeographyStudentPilotRoom() {
               </div>
               <div>
                 <p className="text-sm font-black text-[#13251d]">Your Day 1 path</p>
-                <p className="text-xs font-semibold text-[#746f66]">Use the rooms in this order</p>
+                <p className="text-xs font-semibold text-[#746f66]">Three steps only</p>
               </div>
             </div>
 
@@ -591,34 +551,54 @@ export function GeographyStudentPilotRoom() {
                       </div>
                     </div>
                     <span className="shrink-0 rounded bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                      {pilotNavigationUnlocked ? (step.done ? "Done" : "Open") : releaseApproved ? "Check in" : "Paused"}
+                      {pilotNavigationUnlocked
+                        ? step.done
+                          ? "Done"
+                          : index === activeStepIndex
+                            ? "Next"
+                            : "Later"
+                        : releaseApproved
+                          ? "Check in"
+                          : "Paused"}
                     </span>
                   </div>
                 );
 
-                return pilotNavigationUnlocked ? (
-                  <Link
-                    key={step.label}
-                    href={step.href}
-                    className={cn("rounded-md border p-4 transition hover:-translate-y-0.5", gateTone(step.done))}
-                  >
-                    {content}
-                  </Link>
-                ) : (
+                return (
                   <div
                     key={step.label}
-                    data-testid={`geography-student-pilot-gate-paused-${index + 1}`}
-                    aria-disabled="true"
-                    className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4 text-[#776f64]"
+                    data-testid={`geography-student-pilot-step-${index + 1}`}
+                    aria-current={pilotNavigationUnlocked && index === activeStepIndex ? "step" : undefined}
+                    className={cn(
+                      "rounded-md border p-4",
+                      pilotNavigationUnlocked ? gateTone(step.done) : "border-[#dcd5c7] bg-[#f7f4ee] text-[#776f64]",
+                    )}
                   >
                     {content}
                   </div>
                 );
               })}
             </div>
+            {pilotNavigationUnlocked ? (
+              <Link
+                href="/upsc/geography/lab?mode=india-map&day=1"
+                data-testid="geography-student-pilot-optional-visual"
+                className="mt-4 flex items-center justify-between gap-3 rounded-md border border-dashed border-[#b9d9cd] bg-[#f7f4ee] p-3 text-sm font-bold text-[#49675e] transition hover:border-[#1d9e75]"
+              >
+                <span>Need a visual explanation? Open the optional India-map support.</span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </Link>
+            ) : (
+              <div
+                data-testid="geography-student-pilot-optional-visual-locked"
+                className="mt-4 rounded-md border border-dashed border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-bold text-[#776f64]"
+              >
+                Optional India-map support opens after pilot check-in.
+              </div>
+            )}
           </div>
 
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+          <div id="pilot-feedback" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
                 <ShieldCheck className="h-5 w-5" />
@@ -688,7 +668,7 @@ export function GeographyStudentPilotRoom() {
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                   rows={5}
-                  placeholder="Example: I completed Watch and Talk, but I was unsure where to go after the Visual Lab."
+                  placeholder="Example: I completed the lesson and discussion, but I was unsure what to do next."
                   className="resize-none rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                 />
               </label>

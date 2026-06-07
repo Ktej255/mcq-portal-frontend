@@ -71,12 +71,12 @@ export const geographyFounderReviewItems: GeographyFounderReviewItem[] = [
   {
     id: "visual-lab",
     label: "Visual Lab",
-    detail: "All five proof stages are visible and MCQ stays locked until proof is saved.",
-    href: "/upsc/geography/lab?day=1",
+    detail: "Optional India-map support is understandable and never blocks a learner who cleared discussion.",
+    href: "/upsc/geography/lab?mode=india-map&day=1",
     passCriteria: [
-      "The lab shows map/concept proof stages, not an empty shell.",
-      "MCQ remains locked until required proof is saved.",
-      "The Lab to MCQ route is clear after proof completion.",
+      "The optional lab shows map and concept activities, not an empty shell.",
+      "A learner who clears discussion can continue directly to MCQ without opening the lab.",
+      "The optional Lab to MCQ route remains clear when the learner chooses visual support.",
     ],
   },
   {
@@ -93,7 +93,7 @@ export const geographyFounderReviewItems: GeographyFounderReviewItem[] = [
   {
     id: "track-revisit",
     label: "Track and Revisit",
-    detail: "Command outcome and recovery route are clear after practice.",
+    detail: "Optional progress review and recovery routes remain clear after practice.",
     href: "/upsc/geography/track?day=1",
     passCriteria: [
       "Track shows the Day 1 command outcome and closeout.",

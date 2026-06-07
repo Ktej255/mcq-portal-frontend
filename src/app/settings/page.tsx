@@ -1,77 +1,116 @@
 "use client";
 
-import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Bell, Database, Lock, Shield, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, ArrowRight, BrainCircuit, Clock3, RefreshCcw, Target } from "lucide-react";
 
-const settingGroups = [
-  {
-    title: "Local Access",
-    description: "Testing mode keeps the portal usable while Firebase and backend services are offline.",
-    icon: Lock,
-    status: "Local bypass active",
+import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
+import {
+  readStudentProfile,
+  readSyncedStudentProfile,
+  type StudentProfile,
+} from "@/lib/upsc/studentProfile";
+
+const copy = {
+  level: {
+    beginner: "Beginner",
+    intermediate: "Intermediate",
+    advanced: "Advanced",
   },
-  {
-    title: "UPSC Workspace",
-    description: "Daily launcher, subject rooms, MCQ command, and readiness audit share local progress state.",
-    icon: SlidersHorizontal,
-    status: "Connected",
+  learningStyle: {
+    "watch-first": "Watch first",
+    "talk-first": "Talk first",
+    "practice-first": "Practice first",
+    mixed: "Mixed",
   },
-  {
-    title: "Draft Storage",
-    description: "Offline MCQ imports are preserved in the browser draft bank until the backend is available.",
-    icon: Database,
-    status: "Browser local",
+  weakSignal: {
+    retention: "Retention",
+    "concept-clarity": "Concept clarity",
+    "mcq-traps": "MCQ traps",
+    "answer-writing": "Answer writing",
   },
-  {
-    title: "Notifications",
-    description: "Local reminders and progress nudges are staged for the classroom workflow.",
-    icon: Bell,
-    status: "Planned",
-  },
-];
+} as const;
 
 export default function SettingsPage() {
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfile(readStudentProfile());
+    void readSyncedStudentProfile().then((syncedProfile) => {
+      if (!cancelled) setProfile(syncedProfile);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const preferences = [
+    {
+      label: "Level",
+      value: profile ? copy.level[profile.level] : "Not set",
+      icon: BrainCircuit,
+    },
+    {
+      label: "Daily time",
+      value: profile ? `${profile.studyWindow} minutes` : "Not set",
+      icon: Clock3,
+    },
+    {
+      label: "Learning style",
+      value: profile ? copy.learningStyle[profile.learningStyle] : "Not set",
+      icon: RefreshCcw,
+    },
+    {
+      label: "Weakest signal",
+      value: profile ? copy.weakSignal[profile.weakSignal] : "Not set",
+      icon: Target,
+    },
+  ];
+
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-zinc-50 p-6 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 md:p-10">
-        <div className="mx-auto max-w-5xl space-y-8">
-          <header className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:flex-row md:items-center md:justify-between">
+      <main className="min-h-screen bg-[#f7f4ee] px-4 py-6 text-[#13251d] md:px-8 md:py-10">
+        <div className="mx-auto max-w-5xl">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-black text-[#085041] hover:underline">
+            <ArrowLeft className="h-4 w-4" /> Back to Today
+          </Link>
+
+          <section
+            data-testid="student-settings-learning-preferences"
+            className="mt-6 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+          >
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Settings</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Learning preferences</h1>
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+              These choices help the portal keep your daily plan focused. Update them when your study routine changes.
+            </p>
+          </section>
+
+          <section className="mt-5 grid gap-4 sm:grid-cols-2">
+            {preferences.map((item) => (
+              <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <item.icon className="h-5 w-5 text-[#085041]" />
+                <p className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</p>
+                <h2 className="mt-2 text-xl font-black tracking-tight">{item.value}</h2>
+              </div>
+            ))}
+          </section>
+
+          <section className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <div>
-              <Badge variant="outline" className="mb-3 font-bold uppercase tracking-widest">
-                Portal Settings
-              </Badge>
-              <h1 className="text-3xl font-black tracking-tight">Institutional Preferences</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Local controls for the UPSC portal while the cloud stack is offline.
+              <h2 className="text-lg font-black tracking-tight">Adjust your plan</h2>
+              <p className="mt-1 text-sm font-medium leading-6 text-[#657066]">
+                Review the setup questions, then return to the one next action on Today.
               </p>
             </div>
-            <Button className="h-11 rounded-xl font-bold">
-              <Shield className="mr-2 h-4 w-4" />
-              Local Safe Mode
-            </Button>
-          </header>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            {settingGroups.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                      <item.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="font-black">{item.title}</h2>
-                      <Badge variant="secondary" className="mt-1 text-[10px] font-bold uppercase tracking-wider">
-                        {item.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">{item.description}</p>
-              </article>
-            ))}
+            <Link
+              href="/upsc#upsc-intake"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              Review preferences <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </section>
         </div>
       </main>

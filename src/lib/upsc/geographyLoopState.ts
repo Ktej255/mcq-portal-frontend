@@ -1,22 +1,23 @@
-import { labSlugForGeographySession } from "@/lib/upsc/geographyLearning";
 import { getGeographyBatchCode } from "@/lib/upsc/mcqContract";
 import { readMcqCommandBatchState } from "@/lib/upsc/mcqDraftBank";
 import type { GeographySession } from "@/lib/upsc/plan";
+import type { StudentLevel } from "@/lib/upsc/studentProfile";
+import { GEOGRAPHY_RECALL_TARGET, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
 import type { GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 
 export type GeographyLoopRoom = "watch" | "talk" | "revisit" | "lab" | "mcq" | "loading";
 
 export type GeographyLoopStateLabel =
   | "Loading local status"
-  | "Watch pending"
+  | "Lesson pending"
   | "Talk pending"
+  | "Watch pending"
   | "Revisit required"
   | "Lab pending"
-  | "Fresh MCQ needed"
-  | "MCQ drafting"
-  | "MCQ batch ready"
-  | "MCQ practice active"
-  | "MCQ practice done";
+  | "Practice is being prepared"
+  | "Practice ready"
+  | "Practice in progress"
+  | "Practice complete";
 
 export type GeographyLoopState = {
   label: GeographyLoopStateLabel;
@@ -29,44 +30,32 @@ export type GeographyLoopState = {
 };
 
 export function hasGeographyTalkClearance(progress?: GeographyDayProgress) {
-  if (typeof progress?.talkScore === "number") return progress.talkScore >= 70;
+  if (typeof progress?.talkScore === "number") return progress.talkScore >= GEOGRAPHY_RECALL_TARGET;
   return progress?.talkBand === "Command";
 }
 
 export function getGeographyLoopState(
   session: GeographySession,
   progress?: GeographyDayProgress,
-  options: { isLoaded?: boolean; labSlug?: string } = {}
+  options: { isLoaded?: boolean; labSlug?: string; learnerLevel?: StudentLevel } = {}
 ): GeographyLoopState {
   const isLoaded = options.isLoaded ?? true;
-  const labSlug = options.labSlug ?? progress?.labMode ?? labSlugForGeographySession(session.lab);
-  const labProofCount = Math.min(progress?.labProofCompletedIds?.length ?? (progress?.labCompleted ? 5 : 0), 5);
+  const learnerLevel = options.learnerLevel ?? "intermediate";
+  const entryRoute = getGuidedStudyEntryRoute(learnerLevel, session.day);
 
   if (!isLoaded) {
     return {
       label: "Loading local status",
-      detail: "Reading this day's Watch, Talk, Lab, and MCQ memory from the local browser.",
+      detail: "Reading this day's guided lesson, discussion, and MCQ memory from the local browser.",
       shortDetail: "Reading local memory",
-      href: `/upsc/geography/watch?day=${session.day}`,
-      cta: "Open class",
+      href: entryRoute,
+      cta: learnerLevel === "beginner" ? "Start lesson" : "Start diagnosis",
       room: "loading",
       tone: "border-[#d7d0c0] bg-[#f7f4ee] text-[#5f665f]",
     };
   }
 
-  if (!progress?.watched) {
-    return {
-      label: "Watch pending",
-      detail: "Start with the concept class before discussion, lab, or MCQ practice unlocks.",
-      shortDetail: "Start class",
-      href: `/upsc/geography/watch?day=${session.day}`,
-      cta: "Open class",
-      room: "watch",
-      tone: "border-[#cde2da] bg-[#e7f5ee] text-[#085041]",
-    };
-  }
-
-  if (progress.revisitQueued || progress.talkBand === "Revisit") {
+  if (progress?.revisitQueued || progress?.talkBand === "Revisit") {
     return {
       label: "Revisit required",
       detail: "Repair the weak concept first, then return to the Talk room for a fresh explanation.",
@@ -78,27 +67,47 @@ export function getGeographyLoopState(
     };
   }
 
-  if (!hasGeographyTalkClearance(progress)) {
+  if (learnerLevel === "beginner" && !progress?.watched) {
     return {
-      label: "Talk pending",
-      detail: "Explain the class to the AI teacher and cross the Practice or Command band.",
-      shortDetail: "Oral check",
-      href: `/upsc/geography/talk?day=${session.day}`,
-      cta: "Open talk room",
-      room: "talk",
-      tone: "border-[#bdddd3] bg-[#effaf5] text-[#085041]",
+      label: "Lesson pending",
+      detail: "Start with one 10-15 minute topic. Discussion opens immediately after the lesson.",
+      shortDetail: "Learn one topic",
+      href: `/upsc/geography/watch?day=${session.day}`,
+      cta: "Start lesson",
+      room: "watch",
+      tone: "border-[#cde2da] bg-[#e7f5ee] text-[#085041]",
     };
   }
 
-  if (!progress.labCompleted || labProofCount < 5) {
+  if (
+    learnerLevel !== "beginner" &&
+    typeof progress?.talkScore === "number" &&
+    !hasGeographyTalkClearance(progress) &&
+    !progress?.watched
+  ) {
     return {
-      label: "Lab pending",
-      detail: `Save five visual proof stages from the map or simulator before MCQ readiness. Current proof: ${labProofCount}/5.`,
-      shortDetail: `${labProofCount}/5 lab proofs`,
-      href: `/upsc/geography/lab?mode=${labSlug}&day=${session.day}`,
-      cta: "Open visual lab",
-      room: "lab",
-      tone: "border-[#8db7d8] bg-[#edf7ff] text-[#23406f]",
+      label: "Watch pending",
+      detail: "Your explanation exposed a gap. Open only the short repair lesson selected for this topic.",
+      shortDetail: "Repair the diagnosed gap",
+      href: `/upsc/geography/watch?day=${session.day}`,
+      cta: "Open repair lesson",
+      room: "watch",
+      tone: "border-[#cde2da] bg-[#e7f5ee] text-[#085041]",
+    };
+  }
+
+  if (!hasGeographyTalkClearance(progress)) {
+    return {
+      label: "Talk pending",
+      detail:
+        learnerLevel === "beginner"
+          ? `Explain the lesson in your own words. The teacher keeps repairing recall until it reaches ${GEOGRAPHY_RECALL_TARGET}%.`
+          : `Explain what you know first. The teacher diagnoses missing UPSC concepts and keeps repairing recall until it reaches ${GEOGRAPHY_RECALL_TARGET}%.`,
+      shortDetail: learnerLevel === "beginner" ? "Discuss the lesson" : "Diagnose first",
+      href: `/upsc/geography/talk?day=${session.day}`,
+      cta: learnerLevel === "beginner" ? "Start discussion" : "Start diagnosis",
+      room: "talk",
+      tone: "border-[#bdddd3] bg-[#effaf5] text-[#085041]",
     };
   }
 
@@ -106,11 +115,11 @@ export function getGeographyLoopState(
   if (batchState?.status === "READY") {
     if (progress?.mcqCompleted) {
       return {
-        label: "MCQ practice done",
-        detail: `${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? batchState.planned} correct in local fresh practice.`,
+        label: "Practice complete",
+        detail: `${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? batchState.planned} correct. Open the result for your next step.`,
         shortDetail: `${progress.mcqCorrectCount ?? 0}/${progress.mcqTotal ?? batchState.planned} correct`,
         href: `/upsc/geography/mcq-readiness?day=${session.day}`,
-        cta: "Review practice",
+        cta: "Open result",
         room: "mcq",
         tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
       };
@@ -118,9 +127,9 @@ export function getGeographyLoopState(
 
     if (progress?.mcqAttempted) {
       return {
-        label: "MCQ practice active",
-        detail: `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? batchState.planned} fresh questions attempted locally.`,
-        shortDetail: `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? batchState.planned} attempted`,
+        label: "Practice in progress",
+        detail: `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? batchState.planned} questions answered.`,
+        shortDetail: `${progress.mcqAnsweredCount ?? 0}/${progress.mcqTotal ?? batchState.planned} answered`,
         href: `/upsc/geography/mcq-readiness?day=${session.day}`,
         cta: "Continue practice",
         room: "mcq",
@@ -129,11 +138,11 @@ export function getGeographyLoopState(
     }
 
     return {
-      label: "MCQ batch ready",
-      detail: `${batchState.drafted}/${batchState.planned} fresh questions are mapped to this day.`,
-      shortDetail: `${batchState.drafted}/${batchState.planned} fresh`,
+      label: "Practice ready",
+      detail: "Your reviewed practice set is ready.",
+      shortDetail: "Reviewed practice",
       href: `/upsc/geography/mcq-readiness?day=${session.day}`,
-      cta: "Open practice",
+      cta: "Start practice",
       room: "mcq",
       tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
     };
@@ -141,22 +150,22 @@ export function getGeographyLoopState(
 
   if ((batchState?.drafted ?? 0) > 0) {
     return {
-      label: "MCQ drafting",
-      detail: `${batchState?.drafted ?? 0}/${batchState?.planned ?? 25} fresh questions are drafted locally.`,
-      shortDetail: `${batchState?.drafted ?? 0}/${batchState?.planned ?? 25} fresh`,
+      label: "Practice is being prepared",
+      detail: "Your discussion is saved. This reviewed practice set will open when it is ready.",
+      shortDetail: "Preparing practice",
       href: `/upsc/geography/mcq-readiness?day=${session.day}`,
-      cta: "Finish batch",
+      cta: "View status",
       room: "mcq",
       tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
     };
   }
 
   return {
-    label: "Fresh MCQ needed",
-    detail: "The learning loop is ready; now attach a fresh MCQ batch for this day.",
-    shortDetail: "Author batch",
+    label: "Practice is being prepared",
+    detail: "Your discussion is saved. This reviewed practice set will open when it is ready.",
+    shortDetail: "Preparing practice",
     href: `/upsc/geography/mcq-readiness?day=${session.day}`,
-    cta: "Plan MCQs",
+    cta: "View status",
     room: "mcq",
     tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
   };

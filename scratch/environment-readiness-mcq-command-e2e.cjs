@@ -26,6 +26,7 @@ async function assertNoOverflow(page, label, checks) {
 async function seedBase(page, progressPatch = {}) {
   await page.evaluate(
     ({ progressKey: localProgressKey, mcqKey: localMcqKey, progressPatch: localPatch }) => {
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_environment_readiness_mcq_command");
       window.localStorage.setItem(
         localProgressKey,
         JSON.stringify({
@@ -38,7 +39,7 @@ async function seedBase(page, progressPatch = {}) {
             confidence: "Command",
             reflection: "Protected areas are linked through category, map, species, threat, and institution.",
             revisitQueued: false,
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             labCompleted: true,
@@ -67,6 +68,14 @@ async function seedBase(page, progressPatch = {}) {
   );
 }
 
+async function openAdvancedDetails(page) {
+  const advancedTools = page.getByTestId("subject-track-advanced-tools");
+  await advancedTools.waitFor({ timeout: 15000 });
+  await advancedTools.evaluate((node) => {
+    node.open = true;
+  });
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -79,12 +88,13 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto(`${baseUrl}/upsc/environment/track?day=5`, { waitUntil: "networkidle" });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await seedBase(page);
-  await page.reload({ waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/upsc/environment/track?day=5`, { waitUntil: "networkidle" });
+  await openAdvancedDetails(page);
   await page.getByTestId("subject-readiness-snapshot").getByText("Command ready", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-readiness-snapshot").getByText("0/20", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("track-focused-day").getByText("MCQ practice needed", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-focused-day").getByText("Fresh practice ready", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-focused-stage-checklist").getByText("Practice pending", { exact: false }).waitFor({ timeout: 15000 });
   const pendingRoute = await page.getByTestId("track-focused-route").getAttribute("href");
   if (pendingRoute !== "/upsc/environment/mcq-readiness?day=5") {
@@ -105,6 +115,7 @@ async function run() {
     mcqReviewSummary: "3/3 correct (100%). Command gate cleared for ENV-D05.",
   });
   await page.reload({ waitUntil: "networkidle" });
+  await openAdvancedDetails(page);
   await page.getByTestId("subject-readiness-snapshot").getByText("1/20", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByText("MCQ command", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("track-focused-day").getByText("Command ready", { exact: false }).waitFor({ timeout: 15000 });

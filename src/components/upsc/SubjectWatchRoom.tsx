@@ -37,21 +37,20 @@ import {
 import { buildScienceTechWatchScenes, getScienceTechLearningPack } from "@/lib/upsc/scienceTechLearningDecks";
 import type { SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
 import { getSubjectBatchCode } from "@/lib/upsc/subjectPlans";
-import { buildSubjectWatchScenes, getCompressedSubjectRecap } from "@/lib/upsc/subjectLearning";
+import { buildSubjectWatchScenes, getCompressedSubjectRecap, SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { type SubjectWatchMediaAssetMap, type SubjectWatchState, useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
+import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
 
 const watchStates: Array<{ label: SubjectWatchState; detail: string }> = [
-  { label: "Queued", detail: "Class is planned for this subject day." },
-  { label: "In class", detail: "Session is active and notes are being built." },
-  { label: "Watched", detail: "Class is complete and ready for Talk/Test." },
+  { label: "Queued", detail: "Focused topic is planned for this subject day." },
+  { label: "In class", detail: "The 10-15 minute topic is active." },
+  { label: "Watched", detail: "Topic is complete and ready for Talk/Test." },
 ];
 
-function parseDurationMinutes(duration: string) {
-  const match = duration.match(/\d+/);
-  return match ? Number(match[0]) : 75;
-}
+const FOCUSED_TOPIC_DURATION_MINUTES = 12;
+const DEMO_RECAP_MINUTES = 6;
 
 function stateTone(state: SubjectWatchState) {
   if (state === "Watched") return "border-[var(--subject-accent)] bg-[var(--subject-light)] text-[var(--subject-dark)]";
@@ -71,14 +70,27 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [mediaAssetSources, setMediaAssetSources] = useState<SubjectWatchMediaAssetMap>({});
   const [mediaTranscript, setMediaTranscript] = useState("");
   const [watchNote, setWatchNote] = useState("");
+  const [baselineKnowledge, setBaselineKnowledge] = useState("");
   const [savedNote, setSavedNote] = useState(false);
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
   const [handoffStatus, setHandoffStatus] = useState<"Idle" | "Armed" | "Opening">("Idle");
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
+  const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
   const handoffTimersRef = useRef<number[]>([]);
 
   const activeSession = plan.sessions.find((session) => session.day === activeDay) ?? plan.sessions[0];
-  const durationMinutes = useMemo(() => parseDurationMinutes(activeSession.duration), [activeSession.duration]);
+  const activeDayProgress = getDayProgress(activeSession.day);
+  const recallScore = activeDayProgress?.talkScore;
+  const savedRecall = activeDayProgress?.reflection?.trim() || baselineKnowledge.trim();
+  const hasSavedRecall = Boolean(savedRecall) || typeof recallScore === "number";
+  const isBeginner = learnerLevel === "beginner";
+  const isHydratedForActiveDay = hydratedDay === activeDay;
+  const hasTalkAssessment = typeof recallScore === "number";
+  const isPracticeReady =
+    (hasTalkAssessment && (recallScore ?? 0) >= SUBJECT_RECALL_TARGET) || activeDayProgress?.talkUnlockStage === "mcq";
+  const hasRepairDiagnosis = !isBeginner && hasTalkAssessment && !isPracticeReady;
+  const canUseWatchContent = isBeginner || hasRepairDiagnosis || hasSavedRecall;
+  const durationMinutes = FOCUSED_TOPIC_DURATION_MINUTES;
   const weekSessions = useMemo(
     () => plan.sessions.filter((session) => session.week === activeSession.week),
     [activeSession.week, plan.sessions]
@@ -86,7 +98,42 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const watchProgress = watchState === "Watched" ? 100 : Math.round((watchMinutes / durationMinutes) * 100);
   const basePath = `/upsc/${plan.slug}`;
   const batchCode = getSubjectBatchCode(plan.slug, activeSession.day);
-  const demoMinutes = Math.max(6, Math.min(8, Math.round(durationMinutes / 10)));
+  const demoMinutes = DEMO_RECAP_MINUTES;
+  const watchModeCopy = watchState === "Watched"
+    ? {
+        badge: "Lesson complete",
+        headline: "Discuss what you learned",
+        intro: "Class proof is saved. The next step is to explain the topic to the AI teacher.",
+        nextTitle: "Return to Talk",
+        nextDetail: "Explain the improved answer and clear the 95% recall gate before MCQs.",
+        playerPrompt: "Discussion is ready",
+      }
+    : isBeginner
+      ? {
+          badge: "Guided lesson",
+          headline: "Watch one focused topic",
+          intro: "Beginner path: finish this 10-15 minute topic, discuss it with the AI teacher, then unlock fresh MCQs.",
+          nextTitle: "Finish lesson -> AI discussion",
+          nextDetail: "Do not choose the next step manually. Complete the lesson and the app sends you to Talk.",
+          playerPrompt: "Use the lesson player below",
+        }
+      : hasSavedRecall
+        ? {
+            badge: "Repair class",
+            headline: "Repair the exact gap",
+            intro: `Your recall is saved${typeof recallScore === "number" ? ` at ${recallScore}%` : ""}. Use this class only to repair the missing pieces.`,
+            nextTitle: "Repair, then return",
+            nextDetail: "Complete the short class proof. The app will then return you to the AI teacher.",
+            playerPrompt: "Use the repair player below",
+          }
+        : {
+            badge: "Recall first",
+            headline: "Start with diagnosis",
+            intro: "Answer first in Talk so the AI teacher can identify the real gap before opening content.",
+            nextTitle: "Start with recall",
+            nextDetail: "Speak first. The class opens only after the AI teacher knows what to repair.",
+            playerPrompt: "Start recall first",
+          };
   const compressedRecap = useMemo(() => getCompressedSubjectRecap(activeSession), [activeSession]);
   const environmentPack = useMemo(
     () => (plan.slug === "environment" ? getEnvironmentLearningPack(activeSession) : null),
@@ -162,6 +209,26 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     ? Math.round((completedMediaSlotIds.length / historyLectureMediaDeck.assetSlots.length) * 100)
     : 0;
   const themeStyle = getSubjectThemeStyle(plan);
+  const watchFlowGate =
+    !isHydratedForActiveDay
+      ? null
+      : !isBeginner && !hasTalkAssessment
+        ? {
+            eyebrow: "Diagnosis first",
+            title: "Explain before watching",
+            detail: "For self-study and attempt-level students, the AI teacher first checks what you already know. Then the class opens only for the exact gap.",
+            href: `${basePath}/talk?day=${activeSession.day}`,
+            cta: "Start recall",
+          }
+        : !isBeginner && isPracticeReady
+          ? {
+              eyebrow: "Practice ready",
+              title: "MCQ is already open",
+              detail: `Your recall has reached ${SUBJECT_RECALL_TARGET}%. Use fresh questions now; the class remains optional support.`,
+              href: `${basePath}/mcq-readiness?day=${activeSession.day}`,
+              cta: "Open practice",
+            }
+          : null;
 
   const classBlocks = useMemo(
     () => [
@@ -179,6 +246,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     const timer = window.setTimeout(() => {
       const saved = getDayProgress(activeDay);
       const nextState = saved?.watchState ?? (saved?.watched ? "Watched" : "Queued");
+      setLearnerLevel(readStudentProfile()?.level ?? "beginner");
       setWatchState(nextState);
       setWatchMinutes(saved?.watchMinutes ?? (saved?.watched ? durationMinutes : 0));
       setActiveSceneIndex(Math.min(Math.max(saved?.watchSceneIndex ?? 0, 0), watchScenes.length - 1));
@@ -187,6 +255,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       setMediaAssetSources(saved?.watchMediaAssetSources ?? {});
       setMediaTranscript(saved?.watchMediaTranscript ?? "");
       setWatchNote(saved?.watchNote ?? "");
+      setBaselineKnowledge(saved?.baselineKnowledge ?? "");
       setSavedNote(false);
       setIsDemoPlaying(false);
       setHandoffStatus("Idle");
@@ -214,9 +283,12 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     watchMediaReadyIds?: string[];
     watchMediaAssetSources?: SubjectWatchMediaAssetMap;
     watchMediaTranscript?: string;
+    baselineKnowledge?: string;
+    baselineSavedAt?: string;
     watched?: boolean;
   } = {}) => {
     const nextState = patch.watchState ?? watchState;
+    const existing = getDayProgress(activeSession.day);
     saveDayProgress(activeSession.day, {
       watched: patch.watched ?? nextState === "Watched",
       watchState: nextState,
@@ -227,6 +299,8 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       watchMediaReadyIds: patch.watchMediaReadyIds ?? completedMediaSlotIds,
       watchMediaAssetSources: patch.watchMediaAssetSources ?? mediaAssetSources,
       watchMediaTranscript: patch.watchMediaTranscript ?? mediaTranscript,
+      baselineKnowledge: patch.baselineKnowledge ?? baselineKnowledge,
+      baselineSavedAt: patch.baselineSavedAt ?? existing?.baselineSavedAt ?? (baselineKnowledge.trim() ? new Date().toISOString() : undefined),
     });
   };
 
@@ -241,6 +315,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     setMediaAssetSources({});
     setMediaTranscript("");
     setWatchNote("");
+    setBaselineKnowledge("");
     setSavedNote(false);
     setIsDemoPlaying(false);
     setHandoffStatus("Idle");
@@ -383,6 +458,8 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
         watchSceneIndex: watchScenes.length - 1,
         watchSceneCompletedIds: watchScenes.map((scene) => scene.id),
         watchNote,
+        baselineKnowledge,
+        baselineSavedAt: new Date().toISOString(),
       });
 
       const routeTimer = window.setTimeout(() => {
@@ -417,11 +494,53 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     router.push(`${basePath}/talk?day=${activeSession.day}`);
   };
 
-  if (!isLoaded) {
+  if (!isLoaded || !isHydratedForActiveDay) {
     return (
       <div style={themeStyle} className="flex min-h-screen items-center justify-center bg-[var(--subject-bg)] text-[var(--subject-text)]">
         <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-6 text-sm font-black">
           Loading {plan.title} class room...
+        </div>
+      </div>
+    );
+  }
+
+  if (watchFlowGate) {
+    return (
+      <div
+        data-testid="subject-room-shell"
+        data-room="watch-gate"
+        data-subject={plan.slug}
+        data-subject-accent={plan.accent}
+        style={themeStyle}
+        className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
+      >
+        <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+          <Link href={basePath} className="inline-flex min-h-10 items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+            <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+          </Link>
+          <section
+            data-testid="subject-watch-flow-gate"
+            className="rounded-lg border border-[#dcd5c7] bg-[var(--subject-card)] p-6 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--subject-dark)] text-white">
+                <BrainCircuit className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">{watchFlowGate.eyebrow}</p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)]">{watchFlowGate.title}</h1>
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">{watchFlowGate.detail}</p>
+                <Link
+                  data-testid="subject-watch-flow-gate-action"
+                  href={watchFlowGate.href}
+                  className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  {watchFlowGate.cta}
+                  <BrainCircuit className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -436,7 +555,376 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section
+          data-testid="subject-watch-simple-repair"
+          data-duration-minutes={durationMinutes}
+          data-visible-mode="focused-topic-player"
+          className="order-1 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7"
+        >
+          <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+            <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+          </Link>
+
+          <div className="grid gap-5 lg:grid-cols-[1fr_270px] lg:items-start">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">
+                  {watchModeCopy.badge}
+                </Badge>
+                <span className="text-sm font-black text-[var(--subject-accent)]">Day {activeSession.day}</span>
+                <span data-testid="subject-watch-visible-duration" className="text-sm font-semibold text-[#746f66]">
+                  {durationMinutes} min focused topic
+                </span>
+              </div>
+              <p className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-accent)]">
+                {activeSession.chapter}
+              </p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+                {activeSession.title}
+              </h1>
+              <p
+                data-testid="subject-watch-path-headline"
+                className="mt-3 text-lg font-black leading-7 text-[var(--subject-heading)]"
+              >
+                {watchModeCopy.headline}
+              </p>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {watchModeCopy.intro}
+              </p>
+              <div
+                data-testid="subject-watch-simple-loop"
+                className="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--subject-dark)]"
+              >
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-2.5 py-1.5">
+                  Topic
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-2.5 py-1.5">
+                  AI discussion
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-2.5 py-1.5">
+                  95% recall
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-2.5 py-1.5">
+                  Fresh MCQ
+                </span>
+              </div>
+              {hasSavedRecall && (
+                <div className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">
+                    Recall gap
+                  </p>
+                  <p className="mt-2 line-clamp-2 text-sm font-bold leading-6 text-[var(--subject-heading)]">
+                    {savedRecall || activeSession.talk}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div
+              className={cn(
+                "rounded-lg border p-4",
+                watchState === "Watched"
+                  ? "border-[var(--subject-accent)] bg-[var(--subject-light)]"
+                  : "border-[#ef9f27]/55 bg-[#fff4df]"
+              )}
+            >
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Next</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">
+                {watchModeCopy.nextTitle}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                {watchModeCopy.nextDetail}
+              </p>
+              {watchState === "Watched" ? (
+                <Link
+                  href={`${basePath}/talk?day=${activeSession.day}`}
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  Return to Talk <BrainCircuit className="h-4 w-4" />
+                </Link>
+              ) : canUseWatchContent ? (
+                <div
+                  data-testid="watch-player-prompt"
+                  className="mt-4 rounded-md border border-[var(--subject-border)] bg-white/65 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--subject-dark)]"
+                >
+                  {watchModeCopy.playerPrompt}
+                </div>
+              ) : !hasSavedRecall ? (
+                <Link
+                  href={`${basePath}/talk?day=${activeSession.day}`}
+                  data-testid="watch-start-recall-first"
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  Start recall first <BrainCircuit className="h-4 w-4" />
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <details data-testid="subject-baseline-check" className="group order-3 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] shadow-sm">
+          <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Saved recall</p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-[var(--subject-heading)]">
+                {hasSavedRecall ? "Talk diagnosis is attached" : "Recall happens in Talk"}
+              </h2>
+            </div>
+            <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-[var(--subject-border)] bg-white px-3 text-xs font-black text-[var(--subject-dark)]">
+              Open
+            </span>
+          </summary>
+          <div className="hidden border-t border-[var(--subject-border)] p-4 group-open:block">
+            <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">Topic</p>
+              <p className="mt-2 text-sm font-black leading-5 text-[var(--subject-heading)]">{activeSession.title}</p>
+              {!hasSavedRecall && (
+                <Link
+                  href={`${basePath}/talk?day=${activeSession.day}`}
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white"
+                >
+                  Start recall first
+                </Link>
+              )}
+            </div>
+            <div
+              data-testid="subject-baseline-readonly"
+              className="mt-4 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+                Student input rule
+              </p>
+              <p className="mt-2 text-sm font-bold leading-6 text-[var(--subject-heading)]">
+                {hasSavedRecall
+                  ? "This recall came from Talk. Watch only repairs the class gap."
+                  : "No writing is needed here. Use Talk to explain the topic, then Watch opens only when a lesson or repair is needed."}
+              </p>
+              {hasSavedRecall ? (
+                <p className="mt-3 line-clamp-3 text-sm font-semibold leading-6 text-[#5d675f]">{savedRecall}</p>
+              ) : null}
+            </div>
+          </div>
+        </details>
+
+        {canUseWatchContent && (
+          <section
+            data-testid="subject-watch-visual-surface"
+            className="order-2 overflow-hidden rounded-lg bg-[#13251d] text-white shadow-sm ring-1 ring-white/10"
+            style={{
+              background:
+                "radial-gradient(circle at 25% 20%, var(--subject-accent-glow), transparent 28%), linear-gradient(135deg, var(--subject-dark), #111827)",
+            }}
+          >
+            <div className="flex flex-col gap-4 border border-white/10 bg-white/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#13251d]">
+                  <Video className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
+                    Lesson player
+                  </p>
+                  <h2 className="mt-1 text-xl font-black tracking-tight">{activeSession.title}</h2>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em]">
+                  {batchCode}
+                </span>
+                <span
+                  data-testid="subject-watch-focus-duration"
+                  className="rounded-md bg-white px-3 py-2 text-xs font-black text-[var(--subject-dark)]"
+                >
+                  10-15 min focus
+                </span>
+              </div>
+            </div>
+            <div className="p-5">
+              <div
+                data-testid="subject-watch-topic-player"
+                data-duration-minutes={durationMinutes}
+                data-visible-mode="single-action-player"
+                className="flex min-h-[34rem] flex-col justify-between rounded-lg border border-white/10 bg-white/5 p-5 md:min-h-[38rem] lg:min-h-[42rem]"
+              >
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
+                    Teacher-led session
+                  </p>
+                  <h2 className="mt-3 text-3xl font-black tracking-tight">{activeSession.title}</h2>
+                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/75">{activeSession.watch}</p>
+                  <div
+                    data-testid="subject-watch-player-flow"
+                    className="mt-5 grid gap-2 text-xs font-black uppercase tracking-[0.1em] text-white/90 sm:grid-cols-2 lg:grid-cols-4"
+                  >
+                    {["Topic", "10-15 min lesson", "AI discussion", `${SUBJECT_RECALL_TARGET}% recall`].map((step, index) => (
+                      <div key={step} className="flex min-h-12 items-center gap-2 rounded-md border border-white/10 bg-white/10 px-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[var(--subject-dark)]">
+                          {index + 1}
+                        </span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div
+                    data-testid="subject-watch-player-next-step"
+                    className="mb-4 rounded-md border border-white/10 bg-white/10 p-3"
+                  >
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-light)]">
+                      Next opens automatically
+                    </p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-white/75">
+                      Complete this class once. The app sends you to the AI teacher discussion before MCQs.
+                    </p>
+                  </div>
+                  <div className="mb-3 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-white/75">
+                    <span>{watchMinutes} of {durationMinutes} min focused topic</span>
+                    <span>{watchProgress}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/15">
+                    <div className="h-full rounded-full bg-[var(--subject-accent)]" style={{ width: `${watchProgress}%` }} />
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={playDemoLesson}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-white px-4 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] sm:w-auto"
+                    >
+                      <PlayCircle className="h-4 w-4" /> Play demo
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="watch-complete-and-discuss"
+                      data-action-location="player"
+                      onClick={completeAndDiscuss}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-accent)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+                    >
+                      {isBeginner ? "Finish lesson and discuss" : "Finish repair and discuss"}
+                      <BrainCircuit className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {canUseWatchContent && (
+          <details
+            data-testid="subject-watch-scene-engine"
+            className="group order-4 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] shadow-sm"
+          >
+          <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Optional proof checkpoints</p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-[var(--subject-heading)]">
+                {completedSceneIds.length}/{watchScenes.length} saved
+              </h2>
+            </div>
+            <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-[var(--subject-border)] bg-white px-3 text-xs font-black text-[var(--subject-dark)]">
+              Open if needed
+            </span>
+          </summary>
+          <div className="hidden border-t border-[var(--subject-border)] p-5 group-open:block md:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">One repair checkpoint</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--subject-heading)]">
+                  {`${activeSceneIndex + 1}. ${activeScene?.title ?? "Class proof"}`}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">{activeScene?.narration}</p>
+              </div>
+              <span className="rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                {completedSceneIds.length}/{watchScenes.length} complete
+              </span>
+            </div>
+
+            <div className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Checkpoint</p>
+              <p className="mt-2 text-sm font-bold leading-6 text-[var(--subject-heading)]">{activeScene?.checkpoint}</p>
+            </div>
+
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#eee6d8]">
+              <div className="h-full rounded-full bg-[var(--subject-accent)]" style={{ width: `${sceneProgress}%` }} />
+            </div>
+
+            <div className="mt-4">
+              <button
+                type="button"
+                data-testid="subject-watch-scene-complete"
+                onClick={completeActiveScene}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Save repair checkpoint
+              </button>
+            </div>
+
+            <details
+              data-testid="subject-watch-scene-list"
+              className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3"
+            >
+              <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]">
+                Scene checklist and navigation
+              </summary>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => selectScene(activeSceneIndex - 1)}
+                  disabled={activeSceneIndex === 0}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous checkpoint
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectScene(activeSceneIndex + 1)}
+                  disabled={activeSceneIndex === watchScenes.length - 1}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                >
+                  Next checkpoint <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-5">
+                {watchScenes.map((scene, index) => {
+                  const isActive = activeSceneIndex === index;
+                  const isComplete = completedSceneIds.includes(scene.id);
+                  return (
+                    <button
+                      key={scene.id}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => selectScene(index)}
+                      className={cn(
+                        "min-h-20 rounded-md border p-3 text-left transition",
+                        isActive
+                          ? "border-[var(--subject-dark)] bg-[var(--subject-dark)] text-white"
+                          : isComplete
+                            ? "border-[var(--subject-accent)] bg-[var(--subject-light)] text-[var(--subject-dark)] hover:border-[var(--subject-dark)]"
+                            : "border-[var(--subject-border)] bg-white text-[var(--subject-text)] hover:border-[var(--subject-accent)]"
+                      )}
+                    >
+                      <span className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em]">
+                        Scene {index + 1}
+                        {isComplete && <CheckCircle2 className="h-4 w-4" />}
+                      </span>
+                      <span className="mt-2 block text-sm font-bold leading-5">{scene.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+          </details>
+        )}
+
+        {canUseWatchContent && (
+          <details data-testid="subject-watch-details" className="order-5 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[var(--subject-dark)]">
+            Advanced class details, notes, and playlist
+          </summary>
+          <div className="mt-5 grid gap-5">
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
             <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
@@ -489,7 +977,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
 
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm">
             <div
-              data-testid="subject-watch-visual-surface"
+              data-testid="subject-watch-visual-surface-detail"
               className="relative min-h-80 overflow-hidden rounded-lg bg-[var(--subject-panel)] p-5 text-white"
               style={{
                 background:
@@ -522,7 +1010,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                             : "Demo video ready"}
                       </p>
                       <p className="mt-2 text-sm font-semibold leading-6 text-[#dce8e2]">
-                        Compressed {demoMinutes}-minute recap for this {durationMinutes}-minute class, built for fast revision before discussion.
+                        Compressed {demoMinutes}-minute recap for this {durationMinutes}-minute topic, built for fast revision before discussion.
                       </p>
                       {handoffStatus !== "Idle" && (
                         <div
@@ -551,7 +1039,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                     </div>
                   </div>
 
-                  <div data-testid="subject-watch-scene-engine" className="mt-4 rounded-md border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <div data-testid="subject-watch-scene-engine-detail" className="mt-4 rounded-md border border-white/15 bg-white/10 p-4 backdrop-blur">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
@@ -597,7 +1085,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                       </button>
                       <button
                         type="button"
-                        data-testid="subject-watch-scene-complete"
+                        data-testid="subject-watch-scene-complete-detail"
                         onClick={completeActiveScene}
                         className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#ef9f27] px-3 text-sm font-black text-[#13251d] transition hover:bg-[#f3b85c] sm:w-auto"
                       >
@@ -616,7 +1104,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                 </div>
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-[#dff7ee]">
-                    <span>{watchMinutes} of {durationMinutes} min</span>
+                    <span>{watchMinutes} of {durationMinutes} min topic</span>
                     <span>{watchProgress}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white/15">
@@ -635,7 +1123,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
               <h2 className="text-2xl font-black tracking-tight text-[var(--subject-heading)]">Build the topic before testing</h2>
             </div>
 
-            <div data-testid="subject-watch-scene-list" className="mb-5 grid gap-2 md:grid-cols-5">
+            <div data-testid="subject-watch-scene-list-detail" className="mb-5 grid gap-2 md:grid-cols-5">
               {watchScenes.map((scene, index) => {
                 const isActive = activeSceneIndex === index;
                 const isComplete = completedSceneIds.includes(scene.id);
@@ -928,7 +1416,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
 
             <div className="mt-5 rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-[var(--subject-dark)]">Class minutes</p>
+                <p className="text-sm font-black text-[var(--subject-dark)]">Topic minutes</p>
                 <p className="text-sm font-black text-[var(--subject-dark)]">{watchMinutes}/{durationMinutes}</p>
               </div>
               <input
@@ -1032,6 +1520,9 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             })}
           </div>
         </section>
+          </div>
+        </details>
+        )}
       </div>
     </div>
   );

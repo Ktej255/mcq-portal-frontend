@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const feedbackKey = "sarit-upsc-geography-pilot-feedback-v1";
 const releaseKey = "sarit-upsc-geography-pilot-release-v1";
@@ -39,8 +40,23 @@ async function assertNoOverflow(page, label, checks) {
 
 async function seedApprovedZeroProgress(page) {
   await page.evaluate(
-    ({ localProgressKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localCheckInKey, localRosterKey, localInviteCode }) => {
+    ({ localProfileKey, localProgressKey, localFeedbackKey, localReleaseKey, localFounderReviewKey, localCheckInKey, localRosterKey, localInviteCode }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_zero_start");
+      window.localStorage.setItem(
+        localProfileKey,
+        JSON.stringify({
+          level: "beginner",
+          preparationStage: "not-started",
+          studyWindow: "60",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          attemptHistory: "no-attempt",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        }),
+      );
       window.localStorage.removeItem(localProgressKey);
       window.localStorage.removeItem(localFeedbackKey);
       window.localStorage.removeItem(localCheckInKey);
@@ -88,6 +104,7 @@ async function seedApprovedZeroProgress(page) {
       );
     },
     {
+      localProfileKey: profileKey,
       localProgressKey: progressKey,
       localFeedbackKey: feedbackKey,
       localReleaseKey: releaseKey,
@@ -124,16 +141,22 @@ async function run() {
   await page.getByTestId("geography-student-pilot-session-guide").getByText("Save feedback", { exact: false }).waitFor({ timeout: 15000 });
   const startLinksBeforeCheckIn = await page.getByTestId("geography-student-pilot-start").count();
   if (startLinksBeforeCheckIn !== 0) {
-    throw new Error("Student pilot exposed the Start Watch link before check-in.");
+    throw new Error("Student pilot exposed the Start lesson link before check-in.");
   }
+  const optionalVisualLinksBeforeCheckIn = await page.getByTestId("geography-student-pilot-optional-visual").count();
+  if (optionalVisualLinksBeforeCheckIn !== 0) {
+    throw new Error("Student pilot exposed optional visual navigation before check-in.");
+  }
+  await page.getByTestId("geography-student-pilot-optional-visual-locked").waitFor({ timeout: 15000 });
   await page.getByTestId("geography-student-pilot-check-in").getByText("Name pending", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByLabel("Pilot check-in name").fill("Zero Start Tester");
   await page.getByLabel("Pilot check-in contact").fill("Local Batch A");
   await page.getByLabel("Pilot invite code").fill(inviteCode);
   await page.getByTestId("geography-student-check-in-save").click();
   await page.getByTestId("geography-student-pilot-check-in").getByText("Checked in: Zero Start Tester", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Start Watch room", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Complete all Day 1 scenes", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Start lesson", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Complete the focused Day 1 lesson", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-optional-visual").waitFor({ timeout: 15000 });
   await page.getByLabel("Pilot student name").inputValue().then((value) => {
     if (value !== "Zero Start Tester") throw new Error(`Check-in did not sync the feedback name: ${value}`);
   });
@@ -145,10 +168,13 @@ async function run() {
   if (rosterAfterCheckIn[0]?.status !== "invited") {
     throw new Error(`Check-in did not mark the roster entry invited: ${JSON.stringify(rosterAfterCheckIn)}`);
   }
-  await page.getByTestId("geography-student-pilot-script").getByText("Room 1: Watch", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-script").getByText("Step 1: Learn", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-student-pilot-script-step-1").getByText("Test", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-gates").getByText("Step 1: Watch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByRole("link", { name: /Step 1: Watch/i }).getByText("Open", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-gates").getByText("Step 1: Learn", { exact: false }).waitFor({ timeout: 15000 });
+  const zeroProgressJumpLinks = await page.getByTestId("geography-student-pilot-gates").getByRole("link").count();
+  if (zeroProgressJumpLinks !== 0) {
+    throw new Error(`Student pilot exposed ${zeroProgressJumpLinks} skip-ahead links.`);
+  }
 
   const zeroProgress = await page.evaluate((key) => window.localStorage.getItem(key), progressKey);
   if (zeroProgress !== null) {
@@ -163,10 +189,9 @@ async function run() {
 
   await page.getByTestId("geography-student-pilot-start").click();
   await page.waitForURL("**/upsc/geography/watch?day=1", { timeout: 15000 });
-  await page.getByTestId("watch-demo-player").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-watch").getByText("You are in Watch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-handoff-next-watch").getByText("Talk with AI teacher", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-handoff-ready-state").getByText("Draft empty", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-topic-player").waitFor({ timeout: 15000 });
+  await page.getByText("Start with this focused lesson.", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByRole("button", { name: "Finish lesson and discuss" }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "zero-progress-watch-desktop", checks);
 
   const progressAfterOpen = await page.evaluate((key) => window.localStorage.getItem(key), progressKey);
@@ -176,7 +201,7 @@ async function run() {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/geography/pilot`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Start Watch room", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Start lesson", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "zero-progress-pilot-mobile", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
@@ -208,9 +233,13 @@ async function run() {
   if (startLinksWhileBlocked !== 0) {
     throw new Error("Student pilot still exposed a start link while open Blocker feedback exists.");
   }
-  await page.getByTestId("geography-student-pilot-gate-paused-1").getByText("Step 1: Watch", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-gate-paused-1").getByText("Paused", { exact: true }).waitFor({ timeout: 15000 });
-  const blockedGateLinks = await page.getByRole("link", { name: /Step 1: Watch/i }).count();
+  const optionalVisualLinksWhileBlocked = await page.getByTestId("geography-student-pilot-optional-visual").count();
+  if (optionalVisualLinksWhileBlocked !== 0) {
+    throw new Error("Student pilot still exposed optional visual navigation while open Blocker feedback exists.");
+  }
+  await page.getByTestId("geography-student-pilot-step-1").getByText("Step 1: Learn", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-step-1").getByText("Paused", { exact: true }).waitFor({ timeout: 15000 });
+  const blockedGateLinks = await page.getByTestId("geography-student-pilot-gates").getByRole("link").count();
   if (blockedGateLinks !== 0) {
     throw new Error("Student pilot still exposed clickable Day 1 path cards while open Blocker feedback exists.");
   }
@@ -222,12 +251,12 @@ async function run() {
   }, feedbackKey);
   await page.goto(`${baseUrl}/upsc/geography/pilot`, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("geography-student-pilot-release-state").getByText("Ready for controlled testing", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Start Watch room", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Start lesson", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByLabel("Pilot student name").fill("Self Blocker Tester");
   await page.getByRole("button", { name: "Access" }).click();
   await page.getByRole("button", { name: "Blocker" }).click();
   await page
-    .getByPlaceholder("Example: I completed Watch and Talk")
+    .getByPlaceholder("Example: I completed the lesson and discussion")
     .fill("I cannot continue from the pilot page and need admin review before another student uses this link.");
   await page.getByTestId("geography-student-feedback-save").click();
   await page.getByText("Blocker saved. Pilot paused until admin review.", { exact: true }).waitFor({ timeout: 15000 });
@@ -242,15 +271,22 @@ async function run() {
   if (startLinksAfterSelfBlocker !== 0) {
     throw new Error("Student pilot still exposed a start link immediately after self-reporting a Blocker.");
   }
-  await page.getByTestId("geography-student-pilot-gate-paused-1").getByText("Paused", { exact: true }).waitFor({ timeout: 15000 });
+  const optionalVisualLinksAfterSelfBlocker = await page.getByTestId("geography-student-pilot-optional-visual").count();
+  if (optionalVisualLinksAfterSelfBlocker !== 0) {
+    throw new Error("Student pilot still exposed optional visual navigation after self-reporting a Blocker.");
+  }
+  await page.getByTestId("geography-student-pilot-step-1").getByText("Paused", { exact: true }).waitFor({ timeout: 15000 });
   await page.evaluate((key) => {
     const entries = JSON.parse(window.localStorage.getItem(key) || "[]");
     window.localStorage.setItem(key, JSON.stringify(entries.map((entry) => ({ ...entry, status: "reviewed" }))));
     window.dispatchEvent(new CustomEvent("geography-pilot-feedback-updated"));
   }, feedbackKey);
   await page.getByTestId("geography-student-pilot-release-state").getByText("Ready for controlled testing", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Start Watch room", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByRole("link", { name: /Step 1: Watch/i }).getByText("Open", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Start lesson", { exact: false }).waitFor({ timeout: 15000 });
+  const resumedJumpLinks = await page.getByTestId("geography-student-pilot-gates").getByRole("link").count();
+  if (resumedJumpLinks !== 0) {
+    throw new Error(`Resumed student pilot exposed ${resumedJumpLinks} skip-ahead links.`);
+  }
 
   const blockingConsoleErrors = consoleErrors.filter(
     (message) => !allowedConsoleErrorFragments.some((fragment) => message.includes(fragment)),

@@ -4,7 +4,7 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Bell, User, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -30,14 +30,8 @@ export function DashboardHeader({ onMenuClick }: HeaderProps) {
         <span>{pageTitle}</span>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center">
         <LanguageSwitcher />
-        <Button variant="ghost" size="icon" className="text-muted-foreground">
-          <Bell className="w-5 h-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="bg-accent rounded-full text-accent-foreground">
-          <User className="w-5 h-5" />
-        </Button>
       </div>
     </header>
   );

@@ -12,8 +12,13 @@ import {
 import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { resolveToken } from "../auth/token-strategy";
+import { clearLocalMockToken, isLocalTestingHost, readLocalMockToken } from "../auth/local-testing";
 import { activeAuthProvider, env, missingFirebaseEnvVars, missingSupabaseEnvVars } from "@/env";
 import { supabase } from "@/lib/supabase/client";
+import {
+  clearLocalUpscLearnerState,
+  reconcileLocalUpscLearnerIdentity,
+} from "@/lib/upsc/learnerPersistence";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 type AuthUser = User | {
@@ -71,6 +76,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   const devLogin = useCallback((email: string, uid: string, redirectPath?: string) => {
+    if (!isLocalTestingHost()) return;
     if (authDebug) console.info("AUTH | DEV LOGIN TRIGGERED | Email:", email);
     const token = `MOCK_TOKEN_local_${uid}`;
     const mockUser = {
@@ -95,9 +101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (authDebug) console.info("AUTH | AuthProvider Mount | Auth Initialized:", !!auth);
 
     if (typeof window !== "undefined") {
-      const hostname = window.location.hostname;
-      const isLocalTestingHost = hostname === "localhost" || hostname === "127.0.0.1";
-      if (mockAuthEnabled && isLocalTestingHost) {
+      if (mockAuthEnabled && isLocalTestingHost()) {
         const params = new URLSearchParams(window.location.search);
         const redirectPath = params.get("redirect") || "/dashboard";
         devLogin("validator@upsc.local", "local-dev-validator", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
@@ -107,8 +111,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     // DEV BYPASS RESTORATION
     if (typeof window !== 'undefined') {
-      const savedToken = localStorage.getItem("MOCK_TOKEN");
-      if (savedToken && savedToken.startsWith("MOCK_TOKEN")) {
+      const savedToken = readLocalMockToken();
+      if (savedToken) {
         if (authDebug) console.info("AUTH | Restoring MOCK_TOKEN session");
         (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = savedToken;
         
@@ -146,6 +150,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       let cancelled = false;
       supabase.auth.getSession().then(({ data }) => {
         if (cancelled) return;
+        reconcileLocalUpscLearnerIdentity(data.session?.user.id);
         setUser(data.session?.user ? mapSupabaseUser(data.session.user, data.session.access_token) : null);
         setLoading(false);
       });
@@ -153,6 +158,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, session) => {
+        reconcileLocalUpscLearnerIdentity(session?.user.id);
         setUser(session?.user ? mapSupabaseUser(session.user, session.access_token) : null);
         setLoading(false);
         if (session?.user && window.location.pathname.startsWith("/login")) {
@@ -196,6 +202,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("AUTH | Token retrieval error on state change:", tokenErr);
         }
       }
+      reconcileLocalUpscLearnerIdentity(currentUser?.uid);
       settled = true;
       setUser(currentUser);
       setLoading(false);
@@ -252,8 +259,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     if (authDebug) console.info("AUTH | logout triggered");
+    if (readLocalMockToken()) {
+      reconcileLocalUpscLearnerIdentity(null);
+      clearLocalUpscLearnerState();
+      clearLocalMockToken();
+      localStorage.removeItem('mcq-timer-storage');
+      localStorage.removeItem('mcq-exam-storage');
+      setUser(null);
+      setLoading(false);
+      router.push("/login");
+      return;
+    }
+
     if (activeAuthProvider === "supabase" && supabase) {
       await supabase.auth.signOut();
+      reconcileLocalUpscLearnerIdentity(null);
+      clearLocalUpscLearnerState();
+      clearLocalMockToken();
       localStorage.removeItem('mcq-timer-storage');
       localStorage.removeItem('mcq-exam-storage');
       router.push("/login");
@@ -263,6 +285,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!auth) return;
     try {
       await signOut(auth);
+      reconcileLocalUpscLearnerIdentity(null);
+      clearLocalUpscLearnerState();
+      clearLocalMockToken();
       if (authDebug) console.info("AUTH | signOut SUCCESS");
       // Clear persisted stores
       localStorage.removeItem('mcq-timer-storage');

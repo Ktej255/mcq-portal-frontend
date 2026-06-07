@@ -1,0 +1,661 @@
+{
+  "generatedAt": "2026-06-04T04:05:31.980Z",
+  "auditVersion": "v2",
+  "root": "D:\\Graphology\\Paid Students\\Mians ready Dec 2025\\Morning Batch",
+  "visibility": {
+    "studentVisible": false,
+    "masterOnly": true,
+    "rawInstitutionNamesSuppressed": true,
+    "hiddenNamePathHits": 4
+  },
+  "totals": {
+    "allFiles": 1504,
+    "supportedDocuments": 1247,
+    "nonTextOrMediaAssets": 257,
+    "totalBytes": 9941940742
+  },
+  "byExtension": [
+    {
+      "name": ".pdf",
+      "count": 1194
+    },
+    {
+      "name": ".sw",
+      "count": 129
+    },
+    {
+      "name": ".png",
+      "count": 95
+    },
+    {
+      "name": ".docx",
+      "count": 37
+    },
+    {
+      "name": ".jpg",
+      "count": 18
+    },
+    {
+      "name": ".txt",
+      "count": 8
+    },
+    {
+      "name": ".html",
+      "count": 5
+    },
+    {
+      "name": ".pptx",
+      "count": 4
+    },
+    {
+      "name": ".zip",
+      "count": 4
+    },
+    {
+      "name": ".csv",
+      "count": 2
+    },
+    {
+      "name": "(no extension)",
+      "count": 2
+    },
+    {
+      "name": ". cag_accountability_audit_",
+      "count": 1
+    },
+    {
+      "name": ".m4a",
+      "count": 1
+    },
+    {
+      "name": ".md",
+      "count": 1
+    },
+    {
+      "name": ".mp3",
+      "count": 1
+    },
+    {
+      "name": ".mp4",
+      "count": 1
+    },
+    {
+      "name": ".p",
+      "count": 1
+    }
+  ],
+  "unsupportedByExtension": [
+    {
+      "name": ".sw",
+      "count": 129
+    },
+    {
+      "name": ".png",
+      "count": 95
+    },
+    {
+      "name": ".jpg",
+      "count": 18
+    },
+    {
+      "name": ".pptx",
+      "count": 4
+    },
+    {
+      "name": ".zip",
+      "count": 4
+    },
+    {
+      "name": "(no extension)",
+      "count": 2
+    },
+    {
+      "name": ". cag_accountability_audit_",
+      "count": 1
+    },
+    {
+      "name": ".m4a",
+      "count": 1
+    },
+    {
+      "name": ".mp3",
+      "count": 1
+    },
+    {
+      "name": ".mp4",
+      "count": 1
+    },
+    {
+      "name": ".p",
+      "count": 1
+    }
+  ],
+  "byTopLevelFolder": [
+    {
+      "name": "prelims",
+      "totalFiles": 925,
+      "supportedDocuments": 834,
+      "totalBytes": 8567227482,
+      "latestModifiedAt": "2026-04-23T17:21:07.916Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 797
+        },
+        {
+          "name": ".png",
+          "count": 73
+        },
+        {
+          "name": ".docx",
+          "count": 30
+        },
+        {
+          "name": ".jpg",
+          "count": 7
+        },
+        {
+          "name": ".txt",
+          "count": 5
+        },
+        {
+          "name": ".zip",
+          "count": 4
+        },
+        {
+          "name": ".pptx",
+          "count": 3
+        },
+        {
+          "name": ".csv",
+          "count": 2
+        },
+        {
+          "name": ". cag_accountability_audit_",
+          "count": 1
+        },
+        {
+          "name": ".mp4",
+          "count": 1
+        },
+        {
+          "name": ".p",
+          "count": 1
+        },
+        {
+          "name": "(no extension)",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "GS 3",
+      "totalFiles": 175,
+      "supportedDocuments": 155,
+      "totalBytes": 425142259,
+      "latestModifiedAt": "2025-11-05T13:01:36.287Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 155
+        },
+        {
+          "name": ".png",
+          "count": 20
+        }
+      ]
+    },
+    {
+      "name": "GS 4 Ethics",
+      "totalFiles": 153,
+      "supportedDocuments": 66,
+      "totalBytes": 179340022,
+      "latestModifiedAt": "2025-10-31T02:38:44.713Z",
+      "byExtension": [
+        {
+          "name": ".sw",
+          "count": 87
+        },
+        {
+          "name": ".pdf",
+          "count": 66
+        }
+      ]
+    },
+    {
+      "name": "GS 1 Mains",
+      "totalFiles": 89,
+      "supportedDocuments": 47,
+      "totalBytes": 126720643,
+      "latestModifiedAt": "2025-11-15T06:21:39.026Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 47
+        },
+        {
+          "name": ".sw",
+          "count": 42
+        }
+      ]
+    },
+    {
+      "name": "30 day Plan",
+      "totalFiles": 84,
+      "supportedDocuments": 80,
+      "totalBytes": 43587956,
+      "latestModifiedAt": "2026-05-18T03:57:36.747Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 70
+        },
+        {
+          "name": ".docx",
+          "count": 7
+        },
+        {
+          "name": ".png",
+          "count": 2
+        },
+        {
+          "name": ".txt",
+          "count": 2
+        },
+        {
+          "name": ".m4a",
+          "count": 1
+        },
+        {
+          "name": ".md",
+          "count": 1
+        },
+        {
+          "name": "(no extension)",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "GS 2 Mains",
+      "totalFiles": 54,
+      "supportedDocuments": 48,
+      "totalBytes": 145548403,
+      "latestModifiedAt": "2025-12-12T04:58:54.090Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 48
+        },
+        {
+          "name": ".jpg",
+          "count": 5
+        },
+        {
+          "name": ".pptx",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "CSAT",
+      "totalFiles": 23,
+      "supportedDocuments": 16,
+      "totalBytes": 454173398,
+      "latestModifiedAt": "2025-10-31T05:44:44.677Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 11
+        },
+        {
+          "name": ".jpg",
+          "count": 6
+        },
+        {
+          "name": ".html",
+          "count": 5
+        },
+        {
+          "name": ".mp3",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Status of Project.txt",
+      "totalFiles": 1,
+      "supportedDocuments": 1,
+      "totalBytes": 200579,
+      "latestModifiedAt": "2026-04-13T04:44:00.749Z",
+      "byExtension": [
+        {
+          "name": ".txt",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "byPrelimsBucket": [
+    {
+      "name": "Polity",
+      "totalFiles": 671,
+      "supportedDocuments": 667,
+      "totalBytes": 6337321400,
+      "latestModifiedAt": "2026-04-04T07:23:14.691Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 663
+        },
+        {
+          "name": ".docx",
+          "count": 2
+        },
+        {
+          "name": ". cag_accountability_audit_",
+          "count": 1
+        },
+        {
+          "name": ".csv",
+          "count": 1
+        },
+        {
+          "name": ".p",
+          "count": 1
+        },
+        {
+          "name": ".pptx",
+          "count": 1
+        },
+        {
+          "name": ".txt",
+          "count": 1
+        },
+        {
+          "name": "(no extension)",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "CSAT",
+      "totalFiles": 75,
+      "supportedDocuments": 2,
+      "totalBytes": 89501098,
+      "latestModifiedAt": "2026-01-20T13:59:41.427Z",
+      "byExtension": [
+        {
+          "name": ".png",
+          "count": 73
+        },
+        {
+          "name": ".pdf",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "Current Affairs Magazines",
+      "totalFiles": 62,
+      "supportedDocuments": 62,
+      "totalBytes": 1800318907,
+      "latestModifiedAt": "2025-12-23T04:35:10.643Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 62
+        }
+      ]
+    },
+    {
+      "name": "Environment",
+      "totalFiles": 48,
+      "supportedDocuments": 48,
+      "totalBytes": 107083491,
+      "latestModifiedAt": "2026-04-09T10:59:51.695Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 28
+        },
+        {
+          "name": ".docx",
+          "count": 20
+        }
+      ]
+    },
+    {
+      "name": "Geography",
+      "totalFiles": 44,
+      "supportedDocuments": 40,
+      "totalBytes": 99236446,
+      "latestModifiedAt": "2026-04-23T17:21:07.916Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 33
+        },
+        {
+          "name": ".docx",
+          "count": 6
+        },
+        {
+          "name": ".pptx",
+          "count": 2
+        },
+        {
+          "name": ".zip",
+          "count": 2
+        },
+        {
+          "name": ".txt",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "History",
+      "totalFiles": 12,
+      "supportedDocuments": 12,
+      "totalBytes": 64803692,
+      "latestModifiedAt": "2026-04-04T14:33:18.746Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 6
+        },
+        {
+          "name": ".txt",
+          "count": 3
+        },
+        {
+          "name": ".docx",
+          "count": 2
+        },
+        {
+          "name": ".csv",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Testing content",
+      "totalFiles": 12,
+      "supportedDocuments": 2,
+      "totalBytes": 64472274,
+      "latestModifiedAt": "2025-12-15T07:36:58.626Z",
+      "byExtension": [
+        {
+          "name": ".jpg",
+          "count": 7
+        },
+        {
+          "name": ".pdf",
+          "count": 2
+        },
+        {
+          "name": ".zip",
+          "count": 2
+        },
+        {
+          "name": ".mp4",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Sci & Tech",
+      "totalFiles": 1,
+      "supportedDocuments": 1,
+      "totalBytes": 4490174,
+      "latestModifiedAt": "2026-03-17T15:43:44.401Z",
+      "byExtension": [
+        {
+          "name": ".pdf",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "uploadMonths": [
+    {
+      "name": "2025-08",
+      "count": 68
+    },
+    {
+      "name": "2025-09",
+      "count": 121
+    },
+    {
+      "name": "2025-10",
+      "count": 161
+    },
+    {
+      "name": "2025-11",
+      "count": 90
+    },
+    {
+      "name": "2025-12",
+      "count": 142
+    },
+    {
+      "name": "2026-01",
+      "count": 668
+    },
+    {
+      "name": "2026-02",
+      "count": 68
+    },
+    {
+      "name": "2026-03",
+      "count": 51
+    },
+    {
+      "name": "2026-04",
+      "count": 76
+    },
+    {
+      "name": "2026-05",
+      "count": 59
+    }
+  ],
+  "largestSupportedDocuments": [
+    {
+      "code": "MBV2-DOC-01",
+      "topLevel": "prelims",
+      "prelimsBucket": "Polity",
+      "extension": ".pdf",
+      "size": 590932420,
+      "modifiedAt": "2026-01-04T04:28:50.913Z"
+    },
+    {
+      "code": "MBV2-DOC-02",
+      "topLevel": "prelims",
+      "prelimsBucket": "Polity",
+      "extension": ".pdf",
+      "size": 423124412,
+      "modifiedAt": "2026-01-04T04:20:09.091Z"
+    },
+    {
+      "code": "MBV2-DOC-03",
+      "topLevel": "prelims",
+      "prelimsBucket": "Polity",
+      "extension": ".pdf",
+      "size": 279352063,
+      "modifiedAt": "2026-01-04T04:20:12.917Z"
+    },
+    {
+      "code": "MBV2-DOC-04",
+      "topLevel": "CSAT",
+      "prelimsBucket": null,
+      "extension": ".pdf",
+      "size": 232619344,
+      "modifiedAt": "2025-10-31T04:26:28.238Z"
+    },
+    {
+      "code": "MBV2-DOC-05",
+      "topLevel": "CSAT",
+      "prelimsBucket": null,
+      "extension": ".pdf",
+      "size": 130471501,
+      "modifiedAt": "2025-10-31T04:32:33.679Z"
+    },
+    {
+      "code": "MBV2-DOC-06",
+      "topLevel": "prelims",
+      "prelimsBucket": "Polity",
+      "extension": ".pdf",
+      "size": 126152756,
+      "modifiedAt": "2025-12-31T04:21:08.068Z"
+    },
+    {
+      "code": "MBV2-DOC-07",
+      "topLevel": "prelims",
+      "prelimsBucket": "Current Affairs Magazines",
+      "extension": ".pdf",
+      "size": 96897004,
+      "modifiedAt": "2025-12-23T04:07:50.269Z"
+    },
+    {
+      "code": "MBV2-DOC-08",
+      "topLevel": "prelims",
+      "prelimsBucket": "Current Affairs Magazines",
+      "extension": ".pdf",
+      "size": 90555809,
+      "modifiedAt": "2025-12-23T04:10:27.421Z"
+    },
+    {
+      "code": "MBV2-DOC-09",
+      "topLevel": "prelims",
+      "prelimsBucket": "Current Affairs Magazines",
+      "extension": ".pdf",
+      "size": 87253390,
+      "modifiedAt": "2025-12-23T04:07:46.186Z"
+    },
+    {
+      "code": "MBV2-DOC-10",
+      "topLevel": "prelims",
+      "prelimsBucket": "Current Affairs Magazines",
+      "extension": ".pdf",
+      "size": 71548861,
+      "modifiedAt": "2025-12-23T04:07:37.230Z"
+    },
+    {
+      "code": "MBV2-DOC-11",
+      "topLevel": "prelims",
+      "prelimsBucket": "Polity",
+      "extension": ".pdf",
+      "size": 59393149,
+      "modifiedAt": "2025-12-31T04:16:47.068Z"
+    },
+    {
+      "code": "MBV2-DOC-12",
+      "topLevel": "GS 4 Ethics",
+      "prelimsBucket": null,
+      "extension": ".pdf",
+      "size": 56351756,
+      "modifiedAt": "2025-10-13T08:02:40.242Z"
+    }
+  ]
+}

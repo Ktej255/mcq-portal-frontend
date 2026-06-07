@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -22,8 +22,14 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { getGeographyLoopState, hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
-import { labSlugForGeographySession } from "@/lib/upsc/geographyLearning";
+import { GEOGRAPHY_RECALL_TARGET, getCurrentGeographyTopic, getGuidedStudySteps } from "@/lib/upsc/guidedStudy";
+import {
+  getGeographyGsCompatibility,
+  getGeographySubtopics,
+  labSlugForGeographySession,
+} from "@/lib/upsc/geographyLearning";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
+import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
 
@@ -54,116 +60,115 @@ function resolveSession(day?: number): GeographySession {
   return geographySessions.find((session) => session.day === day) ?? geographySessions[0];
 }
 
-function getDayStatus(progress?: GeographyDayProgress) {
+function getDayStatus(progress: GeographyDayProgress | undefined, learnerLevel: StudentLevel) {
   if (progress?.mcqCompleted) return "Practice done";
   if (progress?.mcqAttempted) return "Practice active";
-  if (progress?.labCompleted) return "MCQ next";
-  if (hasGeographyTalkClearance(progress)) return "Visual next";
-  if (progress?.watched) return "Talk next";
-  return "Watch next";
+  if (hasGeographyTalkClearance(progress)) return "MCQ next";
+  if (progress?.revisitQueued || progress?.talkBand === "Revisit") return "Revisit next";
+  if (
+    learnerLevel !== "beginner" &&
+    typeof progress?.talkScore === "number" &&
+    progress.talkScore < GEOGRAPHY_RECALL_TARGET &&
+    !progress?.watched
+  ) return "Repair next";
+  if (progress?.watched) return "Talk pending";
+  return learnerLevel === "beginner" ? "Lesson next" : "Talk first";
 }
 
-function buildFunnelSteps(session: GeographySession, progress: GeographyDayProgress | undefined, currentRoom: string): FunnelStep[] {
-  const labSlug = progress?.labMode ?? labSlugForGeographySession(session.lab);
+function buildFunnelSteps(
+  session: GeographySession,
+  progress: GeographyDayProgress | undefined,
+  currentRoom: string,
+  learnerLevel: StudentLevel
+): FunnelStep[] {
   const talkDone = hasGeographyTalkClearance(progress);
   const watchDone = Boolean(progress?.watched);
-  const labDone = Boolean(progress?.labCompleted);
   const mcqDone = Boolean(progress?.mcqCompleted);
-  const revisitActive = progress?.revisitQueued || currentRoom === "revisit";
+  const guidedSteps = getGuidedStudySteps(learnerLevel);
 
-  const currentByRoom: Record<string, string> = {
-    loading: "watch",
-    watch: "watch",
-    talk: "talk",
-    revisit: "revisit",
-    lab: "lab",
-    mcq: "mcq",
-  };
-  const currentStep = currentByRoom[currentRoom] ?? "watch";
+  return guidedSteps.map((step) => {
+    const isLearn = step.id === "learn";
+    const isDiscuss = step.id === "discuss";
+    const isPractice = step.id === "practice";
+    const done = isLearn ? watchDone : isDiscuss ? talkDone : mcqDone;
+    const repairDiagnosed =
+      learnerLevel !== "beginner" &&
+      typeof progress?.talkScore === "number" &&
+      !talkDone;
+    const unlocked =
+      learnerLevel === "beginner"
+        ? isLearn || (isDiscuss && watchDone) || (isPractice && talkDone)
+        : isDiscuss || (isLearn && repairDiagnosed) || (isPractice && talkDone);
+    const roomMatches =
+      (isLearn && currentRoom === "watch") ||
+      (isDiscuss && currentRoom === "talk") ||
+      (isPractice && currentRoom === "mcq");
 
-  const stepDone = {
-    watch: watchDone,
-    talk: talkDone,
-    lab: labDone,
-    mcq: mcqDone,
-    revisit: !revisitActive && mcqDone,
-  };
-
-  const stepUnlocked = {
-    watch: true,
-    talk: watchDone,
-    lab: talkDone,
-    mcq: labDone,
-    revisit: revisitActive || mcqDone,
-  };
-
-  const statusFor = (id: keyof typeof stepDone): FunnelStatus => {
-    if (stepDone[id]) return "done";
-    if (currentStep === id || (id === "revisit" && revisitActive)) return "current";
-    return stepUnlocked[id] ? "current" : "locked";
-  };
-
-  return [
-    {
-      id: "watch",
-      label: "Watch",
-      helper: "Learn the topic",
-      href: `/upsc/geography/watch?day=${session.day}`,
-      status: statusFor("watch"),
-      icon: PlayCircle,
-    },
-    {
-      id: "talk",
-      label: "Explain",
-      helper: "AI teacher check",
-      href: `/upsc/geography/talk?day=${session.day}`,
-      status: statusFor("talk"),
-      icon: BrainCircuit,
-    },
-    {
-      id: "lab",
-      label: "Visual",
-      helper: "Map or mechanism proof",
-      href: `/upsc/geography/lab?mode=${labSlug}&day=${session.day}`,
-      status: statusFor("lab"),
-      icon: MapPinned,
-    },
-    {
-      id: "mcq",
-      label: "MCQ",
-      helper: "Fresh practice",
-      href: `/upsc/geography/mcq-readiness?day=${session.day}`,
-      status: statusFor("mcq"),
-      icon: ClipboardCheck,
-    },
-    {
-      id: "revisit",
-      label: "Revise",
-      helper: "Only weak points",
-      href: `/upsc/geography/revisit?day=${session.day}`,
-      status: statusFor("revisit"),
-      icon: RefreshCcw,
-    },
-  ];
+    return {
+      id: step.id,
+      label: step.label,
+      helper: step.detail,
+      href: isLearn
+        ? `/upsc/geography/watch?day=${session.day}`
+        : isDiscuss
+          ? `/upsc/geography/talk?day=${session.day}`
+          : `/upsc/geography/mcq-readiness?day=${session.day}`,
+      status: done ? "done" : roomMatches || unlocked ? "current" : "locked",
+      icon: isLearn ? PlayCircle : isDiscuss ? BrainCircuit : ClipboardCheck,
+    };
+  });
 }
 
 export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
-  const { getDayProgress, isLoaded } = useGeographyProgress();
+  const { getDayProgress, isLoaded, progress } = useGeographyProgress();
   const [activeDay, setActiveDay] = useState(resolveSession(initialDay).day);
+  const [learnerLevel, setLearnerLevel] = useState<"Beginner" | "Intermediate" | "Advanced">("Beginner");
+  const [studyWindow, setStudyWindow] = useState("90 min");
   const activeSession = resolveSession(activeDay);
   const activeProgress = getDayProgress(activeSession.day);
   const labSlug = activeProgress?.labMode ?? labSlugForGeographySession(activeSession.lab);
-  const nextAction = getGeographyLoopState(activeSession, activeProgress, { isLoaded, labSlug });
-  const funnelSteps = buildFunnelSteps(activeSession, activeProgress, nextAction.room);
+  const profileLevel = learnerLevel.toLowerCase() as StudentLevel;
+  const nextAction = getGeographyLoopState(activeSession, activeProgress, { isLoaded, labSlug, learnerLevel: profileLevel });
+  const funnelSteps = buildFunnelSteps(activeSession, activeProgress, nextAction.room, profileLevel);
   const completedStepCount = funnelSteps.filter((step) => step.status === "done").length;
   const monthPercent = Math.round((activeSession.day / geographySessions.length) * 100);
-  const currentWeekDays = useMemo(
-    () => geographySessions.filter((session) => session.week === activeSession.week),
-    [activeSession.week]
-  );
+  const currentWeekDays = geographySessions.filter((session) => session.week === activeSession.week);
+  const generatedCurrentDay = getCurrentGeographyTopic(progress).day;
+  const syllabusAnchor = getGeographyGsCompatibility(activeSession);
+  const syllabusChips = getGeographySubtopics(activeSession).slice(0, 4);
 
+  const canSelectDay = (day: number) => day <= generatedCurrentDay || Boolean(getDayProgress(day));
   const previousDay = activeSession.day > 1 ? activeSession.day - 1 : null;
-  const nextDay = activeSession.day < geographySessions.length ? activeSession.day + 1 : null;
+  const nextDay =
+    activeSession.day < geographySessions.length && canSelectDay(activeSession.day + 1)
+      ? activeSession.day + 1
+      : null;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const timer = window.setTimeout(() => {
+      const saved = getDayProgress(activeSession.day);
+      const studentProfile = readStudentProfile();
+      setLearnerLevel(
+        saved?.learnerLevel ??
+          (studentProfile?.level === "advanced"
+            ? "Advanced"
+            : studentProfile?.level === "intermediate"
+              ? "Intermediate"
+              : "Beginner")
+      );
+      setStudyWindow(saved?.studyWindow ?? (studentProfile ? `${studentProfile.studyWindow} min` : "90 min"));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSession.day, getDayProgress, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || activeSession.day <= generatedCurrentDay || getDayProgress(activeSession.day)) return;
+
+    setActiveDay(generatedCurrentDay);
+    window.history.replaceState(null, "", `/upsc/geography?day=${generatedCurrentDay}`);
+  }, [activeSession.day, generatedCurrentDay, getDayProgress, isLoaded]);
 
   const selectDay = (day: number) => {
     const boundedDay = Math.min(Math.max(day, 1), geographySessions.length);
@@ -173,8 +178,11 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8 md:py-8">
+        <section
+          data-testid="geography-today-simple-entry"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
@@ -186,6 +194,29 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
                 {activeSession.anchor}
               </p>
+              <details
+                data-testid="geography-command-syllabus-anchor"
+                className="group mt-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee]"
+              >
+                <summary className="cursor-pointer list-none p-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  See syllabus coverage
+                </summary>
+                <div className="border-t border-[#dcd5c7] p-4">
+                  <p className="max-w-3xl text-sm font-black leading-6 text-[#13251d]">
+                    {syllabusAnchor}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {syllabusChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-md border border-[#cfe5dc] bg-white px-2.5 py-1 text-xs font-bold text-[#085041]"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </div>
 
             <div className="w-full rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 md:w-56">
@@ -202,7 +233,7 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
         </section>
 
         <section data-testid="geography-next-action" className={cn("rounded-lg border p-5 shadow-sm", nextAction.tone)}>
-          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+          <div data-testid="command-next-action" className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
             <div className="flex min-w-0 gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white/70">
                 <Route className="h-5 w-5" />
@@ -222,14 +253,23 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
           </div>
         </section>
 
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <details
+          data-testid="geography-command-funnel-details"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+        >
+          <summary className="cursor-pointer list-none text-sm font-black text-[#13251d]">
+            Today&apos;s full flow
+            <span className="ml-2 text-xs font-semibold text-[#746f66]">
+              Optional context. The next action above is already selected.
+            </span>
+          </summary>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Today&apos;s funnel</p>
-              <h2 className="text-xl font-black tracking-tight">The app decides the next room</h2>
+              <h2 className="text-xl font-black tracking-tight">Follow one step at a time</h2>
             </div>
             <span className="rounded-md bg-[#f7f4ee] px-3 py-2 text-xs font-black text-[#5d675f]">
-              {completedStepCount}/5 steps complete
+              {completedStepCount}/{funnelSteps.length} steps complete
             </span>
           </div>
 
@@ -258,125 +298,215 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               );
             })}
           </div>
-        </section>
+        </details>
 
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff4df] text-[#6f4a12]">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">AI routing rule</p>
-                <h2 className="text-lg font-black tracking-tight">No student confusion</h2>
-              </div>
-            </div>
-            <div className="space-y-3 text-sm font-semibold leading-6 text-[#5d675f]">
-              <p>After Watch, the student moves to Explain.</p>
-              <p>If explanation is weak, the app sends them to Revise.</p>
-              <p>If explanation is clear, Visual opens before MCQ.</p>
-              <p>After MCQ, only weak areas come back into revision.</p>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">This week</p>
-                <h2 className="text-lg font-black tracking-tight">Simple day switcher</h2>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={!previousDay}
-                  onClick={() => previousDay && selectDay(previousDay)}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!nextDay}
-                  onClick={() => nextDay && selectDay(nextDay)}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {currentWeekDays.map((session) => {
-                const isActive = session.day === activeSession.day;
-                const status = getDayStatus(getDayProgress(session.day));
-                return (
-                  <button
-                    key={session.day}
-                    type="button"
-                    data-testid={`geography-week-day-${session.day}`}
-                    onClick={() => selectDay(session.day)}
-                    className={cn(
-                      "rounded-md border p-3 text-left transition",
-                      isActive
-                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                    )}
-                  >
-                    <p className="text-xs font-black uppercase tracking-[0.16em]">Day {session.day}</p>
-                    <p className="mt-1 text-sm font-black leading-5">{session.title}</p>
-                    <p className={cn("mt-2 inline-flex rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]", isActive ? "bg-white/15" : "bg-[#e7f5ee] text-[#085041]")}>
-                      {status}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <details
+          data-testid="geography-command-advanced-controls"
+          className="group overflow-hidden rounded-lg border border-[#dcd5c7] bg-[#fffdf8] shadow-sm"
+        >
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">30-day map</p>
-              <h2 className="text-lg font-black tracking-tight">Pick a day only when needed</h2>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional controls</p>
+              <h2 className="text-lg font-black tracking-tight">Profile, week switcher, and 30-day map</h2>
             </div>
-            <Link
-              href="/dashboard"
-              className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Today
-            </Link>
-          </div>
+            <span className="rounded-md border border-[#cfc6b6] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] transition group-open:bg-[#1a3a2a] group-open:text-white">
+              Open controls
+            </span>
+          </summary>
 
-          <div data-testid="geography-30-day-map" className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
-            {geographySessions.map((session) => {
-              const isActive = session.day === activeSession.day;
-              const progress = getDayProgress(session.day);
-              const isDone = Boolean(progress?.mcqCompleted);
-              return (
-                <button
-                  key={session.day}
-                  type="button"
-                  data-testid={`geography-day-${session.day}`}
-                  onClick={() => selectDay(session.day)}
-                  className={cn(
-                    "min-h-20 rounded-md border p-2 text-left transition",
-                    isActive
-                      ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                      : isDone
-                        ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                  )}
+          <div className="grid gap-5 border-t border-[#eee7dc] p-5">
+            <section
+              data-testid="geography-baseline-intake"
+              className="grid gap-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 lg:grid-cols-[220px_1fr_auto]"
+            >
+              <div className="rounded-lg border border-[#dcd5c7] bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Saved profile</p>
+                <p className="mt-2 text-lg font-black text-[#13251d]">{learnerLevel}</p>
+                <p className="mt-1 text-sm font-bold text-[#5d675f]">{studyWindow} daily sitting</p>
+                <Link
+                  href="/upsc#upsc-intake"
+                  className="mt-4 inline-flex min-h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-[#fdfaf3] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black">Day {session.day}</span>
-                    {isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 opacity-45" />}
+                  Edit profile
+                </Link>
+              </div>
+
+              <div className="rounded-lg border border-[#dcd5c7] bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  Student input rule
+                </p>
+                <h3 className="mt-2 text-sm font-black text-[#13251d]">
+                  {profileLevel === "beginner" ? "Lesson first, then Talk" : "Speak first inside Talk"}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                  {profileLevel === "beginner"
+                    ? "This page only selects the route. The beginner writes or speaks after the short lesson opens the Talk room."
+                    : "The command page does not collect another baseline. The learner explains the topic in Talk, then the AI opens only the missing repair."}
+                </p>
+                {activeProgress?.baselineKnowledge?.trim() ? (
+                  <div
+                    data-testid="geography-command-baseline-preview"
+                    className="mt-3 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      Saved Talk baseline
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-[#315447]">
+                      {activeProgress.baselineKnowledge}
+                    </p>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-xs font-bold leading-4">{session.title}</p>
-                </button>
-              );
-            })}
+                ) : null}
+              </div>
+
+              <div className="flex flex-col justify-end gap-3 rounded-lg border border-[#dcd5c7] bg-white p-3">
+                <Link
+                  href={nextAction.href}
+                  data-testid="geography-command-diagnosis-action"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-4 text-sm font-black text-white transition hover:bg-[#168864]"
+                >
+                  {nextAction.cta}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </section>
+
+            <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff4df] text-[#6f4a12]">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">AI routing rule</p>
+                    <h2 className="text-lg font-black tracking-tight">No student confusion</h2>
+                  </div>
+                </div>
+                <div className="space-y-3 text-sm font-semibold leading-6 text-[#5d675f]">
+                  <p>First the student explains what they already know.</p>
+                  <p>If recall is weak, the app opens a repair class instead of new overload.</p>
+                  <p>If explanation is clear after repair, MCQ opens. Visual Lab stays available as optional support.</p>
+                  <p>After MCQ, only weak areas come back into revision.</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">This week</p>
+                    <h2 className="text-lg font-black tracking-tight">Simple day switcher</h2>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={!previousDay}
+                      onClick={() => previousDay && selectDay(previousDay)}
+                      className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!nextDay}
+                      onClick={() => nextDay && selectDay(nextDay)}
+                      className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {currentWeekDays.map((session) => {
+                    const isActive = session.day === activeSession.day;
+                    const canOpen = canSelectDay(session.day);
+                    const status = getDayStatus(getDayProgress(session.day), profileLevel);
+                    return (
+                      <button
+                        key={session.day}
+                        type="button"
+                        data-testid={`geography-week-day-${session.day}`}
+                        data-day-state={isActive ? "active" : canOpen ? "review" : "locked"}
+                        disabled={!canOpen}
+                        onClick={() => canOpen && selectDay(session.day)}
+                        className={cn(
+                          "rounded-md border p-3 text-left transition",
+                          isActive
+                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                            : canOpen
+                              ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                              : "cursor-not-allowed border-[#e7e2d9] bg-[#f7f4ee] text-[#9a9489] opacity-65"
+                        )}
+                      >
+                        <p data-testid={`command-day-${session.day}`} className="text-xs font-black uppercase tracking-[0.16em]">
+                          Day {session.day}
+                        </p>
+                        <p className="mt-1 text-sm font-black leading-5">{session.title}</p>
+                        <p
+                          data-testid={`command-day-state-${session.day}`}
+                          className={cn(
+                            "mt-2 inline-flex rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
+                            isActive ? "bg-white/15" : "bg-[#e7f5ee] text-[#085041]"
+                          )}
+                        >
+                          {status}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">30-day map</p>
+                  <h2 className="text-lg font-black tracking-tight">Pick a day only when needed</h2>
+                </div>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Today
+                </Link>
+              </div>
+
+              <div data-testid="geography-30-day-map" className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
+                {geographySessions.map((session) => {
+                  const isActive = session.day === activeSession.day;
+                  const progress = getDayProgress(session.day);
+                  const isDone = Boolean(progress?.mcqCompleted);
+                  const canOpen = canSelectDay(session.day);
+                  return (
+                    <button
+                      key={session.day}
+                      type="button"
+                      data-testid={`geography-day-${session.day}`}
+                      data-day-state={isActive ? "active" : canOpen ? "review" : "locked"}
+                      disabled={!canOpen}
+                      onClick={() => canOpen && selectDay(session.day)}
+                      className={cn(
+                        "min-h-20 rounded-md border p-2 text-left transition",
+                        isActive
+                          ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                          : isDone
+                            ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
+                            : canOpen
+                              ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                              : "cursor-not-allowed border-[#e7e2d9] bg-[#f7f4ee] text-[#9a9489] opacity-65"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black">Day {session.day}</span>
+                        {isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 opacity-45" />}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-xs font-bold leading-4">{session.title}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-        </section>
+        </details>
       </div>
     </main>
   );

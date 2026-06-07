@@ -43,6 +43,26 @@ async function run() {
   });
   await page.addInitScript(() => {
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_local_admin-bulk-upload-e2e");
+    window.localStorage.setItem("sarit-upsc-student-profile-v1", JSON.stringify({
+      level: "advanced",
+      studyWindow: "120",
+      learningStyle: "mixed",
+      weakSignal: "mcq-traps",
+      studyTime: "morning",
+      attemptHistory: "one-attempt",
+      learningPattern: "deep-work",
+      mindState: "calm",
+      updatedAt: new Date().toISOString(),
+    }));
+    window.localStorage.setItem("sarit-upsc-geography-progress-v1", JSON.stringify({
+      3: {
+        day: 3,
+        talkScore: 82,
+        talkBand: "Command",
+        labCompleted: true,
+        labProofCompletedIds: ["concept", "map", "example", "trap", "answer"],
+      },
+    }));
   });
   await page.route("**/api/v1/admin/tests", (route) => route.abort("connectionrefused"));
   await page.route("**/api/v1/admin/topics", (route) => route.abort("connectionrefused"));
@@ -61,12 +81,13 @@ async function run() {
       { cause: error }
     );
   }
+  await page.getByText("Local Draft Mode", { exact: true }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "bulk-upload-empty-desktop", checks);
 
   await page.locator('input[type="file"]').setInputFiles(templatePath);
   await page.getByText("UPSC MCQ Command", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Fresh MCQ stem for Plate Tectonics", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Consider the following statements about divergent plate boundaries", { exact: false }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "bulk-upload-upsc-preview-desktop", checks);
 
   const importButton = page.getByRole("button", { name: /Start Ingestion/i });
@@ -99,18 +120,24 @@ async function run() {
       { cause: error }
     );
   }
+  await page.getByText("Legacy API disabled for UPSC pilot", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Plate Tectonics", { exact: false }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "admin-questions-local-draft-desktop", checks);
   await page.getByRole("link", { name: /Day room/i }).first().click();
   await page.waitForURL(/\/upsc\/geography\/mcq-readiness\?day=3/, { timeout: 15000 });
-  await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
-  const readinessInputs = page.locator('input[type="number"]');
-  const plannedValue = await readinessInputs.nth(0).inputValue();
-  const draftedValue = await readinessInputs.nth(1).inputValue();
-  if (plannedValue !== "25" || draftedValue !== "1") {
-    throw new Error(`Daily MCQ readiness did not hydrate imported draft count: planned=${plannedValue} drafted=${draftedValue}`);
+  try {
+    await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
+  } catch (error) {
+    const bodyText = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "<body unavailable>");
+    await page.screenshot({ path: path.join(__dirname, "geography-mcq-readiness-debug.png"), fullPage: true });
+    throw new Error(
+      `Geography MCQ room did not hydrate the imported draft. url=${page.url()} body=${bodyText}`,
+      { cause: error }
+    );
   }
+  await page.getByText("Fresh set waiting", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("Questions are attached, but this set is still DRAFT", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "draft-bank-day-room-route-desktop", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -118,6 +145,11 @@ async function run() {
   await page.locator('input[type="file"]').setInputFiles(templatePath);
   await page.getByText("UPSC MCQ Command", { exact: true }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "bulk-upload-upsc-preview-mobile", checks);
+
+  const legacyApiRequestFailures = requestFailures.filter(({ url }) => url.includes("/api/v1/"));
+  if (legacyApiRequestFailures.length !== 0) {
+    throw new Error(`Local draft mode still made failed legacy API requests: ${JSON.stringify(legacyApiRequestFailures)}`);
+  }
 
   const unexpectedConsoleErrors = consoleErrors.filter((error) => !error.includes("Failed to load resource: net::ERR_"));
   const evidence = {
@@ -130,6 +162,7 @@ async function run() {
     unexpectedConsoleErrors,
     pageErrors,
     requestFailures,
+    legacyApiRequestFailures,
     passed: unexpectedConsoleErrors.length === 0 && pageErrors.length === 0,
   };
 

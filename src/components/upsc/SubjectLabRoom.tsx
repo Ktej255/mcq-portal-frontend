@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Layers3,
+  LockKeyhole,
   MapPinned,
   Network,
   Radar,
@@ -27,7 +28,7 @@ import { getInternalSecuritySocietyLabDeck } from "@/lib/upsc/internalSecuritySo
 import { getPolityGovernanceLabDeck } from "@/lib/upsc/polityGovernanceLearningDecks";
 import { getScienceTechLabDeck } from "@/lib/upsc/scienceTechLearningDecks";
 import type { SubjectLab, SubjectSession, SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
-import { isSubjectTalkReadyForMcq } from "@/lib/upsc/subjectProgressGates";
+import { isSubjectTalkReadyForLab } from "@/lib/upsc/subjectProgressGates";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
@@ -95,9 +96,9 @@ function buildLabProofStages(session: SubjectSession, lab: SubjectLab, scene: La
     {
       id: `${session.day}-${lab.slug}-answer`,
       title: "Answer hook",
-      prompt: `Compress the lab proof into one mains line and one prelims MCQ angle.`,
-      proofSignal: `Use ${lab.title} to bridge Watch, Talk, Lab, and fresh MCQs.`,
-      checkpoint: "The saved insight is ready to appear in MCQ explanations or revision notes.",
+      prompt: `Compress the lab proof into one mains line and one prelims practice angle.`,
+      proofSignal: `Use ${lab.title} to bridge Watch, Talk, Lab, and fresh practice.`,
+      checkpoint: "The saved insight is ready to appear in explanations or revision notes.",
     },
   ];
 }
@@ -1165,7 +1166,7 @@ export function SubjectLabRoom({
   const proofProgress = proofStages.length > 0 ? Math.round((completedProofIds.length / proofStages.length) * 100) : 0;
   const basePath = `/upsc/${plan.slug}`;
   const activeProgress = getDayProgress(activeSession.day);
-  const isTalkPassed = isSubjectTalkReadyForMcq(activeProgress);
+  const isTalkPassed = isSubjectTalkReadyForLab(activeProgress);
   const isLabProofComplete = proofStages.length > 0 && completedProofIds.length >= proofStages.length;
   const isLabSavedForActiveMode = Boolean(labSaved || (activeProgress?.labCompleted && activeProgress.labMode === activeLab.slug));
   const isLabReadyForMcq = isTalkPassed && isLabProofComplete && isLabSavedForActiveMode;
@@ -1174,12 +1175,12 @@ export function SubjectLabRoom({
     : isTalkPassed
       ? `${basePath}/lab?mode=${activeLab.slug}&day=${activeSession.day}`
     : `${basePath}/talk?day=${activeSession.day}`;
-  const nextRouteLabel = isLabReadyForMcq ? "Open MCQ readiness" : isTalkPassed ? "Save lab proof" : "Explain in Talk";
+  const nextRouteLabel = isLabReadyForMcq ? "Open fresh practice" : isTalkPassed ? "Save visual proof" : "Explain in Talk";
   const nextRouteDetail = isLabReadyForMcq
-    ? "Talk command and Lab proof are saved. Fresh MCQ readiness is open."
+    ? "Talk and visual proof are saved. Fresh practice is open."
     : isTalkPassed
-      ? "Talk command proof is saved. Save all Lab proof stages before fresh MCQ readiness opens."
-    : "Talk command proof is still pending. Save the lab insight, then return to the AI teacher before MCQs.";
+      ? "Talk proof is saved. Save one visual proof line before practice opens."
+    : "Talk proof is still pending. Return to the AI teacher before practice.";
   const labCommandSteps = [
     {
       id: "talk",
@@ -1208,12 +1209,14 @@ export function SubjectLabRoom({
     {
       id: "route",
       label: "Route",
-      value: isLabReadyForMcq ? "MCQ open" : "Locked",
+      value: isLabReadyForMcq ? "Practice open" : "Locked",
       complete: isLabReadyForMcq,
     },
   ];
   const themeStyle = getSubjectThemeStyle(plan);
 
+  // Local progress hydrates after the browser storage-backed hook becomes ready.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isLoaded) return;
     const saved = getDayProgress(activeSession.day);
@@ -1233,6 +1236,7 @@ export function SubjectLabRoom({
       setActiveDeckCardId(evidenceDeck[0].id);
     }
   }, [activeDeckCardId, evidenceDeck]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectDay = (day: number) => {
     const boundedDay = Math.min(Math.max(day, 1), plan.sessions.length);
@@ -1303,6 +1307,90 @@ export function SubjectLabRoom({
     setLabSaved(true);
   };
 
+  const labRouteStatusCopy = isLabReadyForMcq ? "Practice open" : "Practice locked";
+  const primaryEvidenceDeckTestId =
+    plan.slug === "environment" ? "environment-lab-evidence-deck" : `${plan.slug}-lab-evidence-deck`;
+  const primarySelectedEvidenceTestId =
+    plan.slug === "environment" ? "environment-lab-selected-evidence" : `${plan.slug}-lab-selected-evidence`;
+
+  if (!isLoaded) {
+    return (
+      <div
+        data-testid="subject-room-shell"
+        data-room="lab"
+        data-subject={plan.slug}
+        data-subject-accent={plan.accent}
+        style={themeStyle}
+        className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
+      >
+        <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-6 md:px-8">
+          <section className="w-full rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-6 text-center shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Visual Lab</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-[var(--subject-heading)]">Loading the next step</h1>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+              Checking the saved Talk result before opening the lab.
+            </p>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isTalkPassed) {
+    return (
+      <div
+        data-testid="subject-room-shell"
+        data-room="lab"
+        data-subject={plan.slug}
+        data-subject-accent={plan.accent}
+        style={themeStyle}
+        className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
+      >
+        <div className="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-6 md:px-8">
+          <section
+            data-testid="subject-lab-talk-first-gate"
+            className="w-full rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7"
+          >
+            <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+              <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+            </Link>
+            <div className="flex flex-col gap-5 md:flex-row md:items-start">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--subject-dark)] text-white">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">Visual Lab</Badge>
+                  <span className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] px-3 py-1 text-xs font-black text-[var(--subject-heading)]">
+                    Day {activeSession.day}
+                  </span>
+                </div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">
+                  Talk first
+                </p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+                  Explain the topic first.
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                  The Visual Lab opens only after the AI teacher accepts the student explanation. This keeps the study
+                  path simple: explain, watch the gap, prove one idea, then practice.
+                </p>
+                <Link
+                  data-testid="subject-lab-talk-first-route"
+                  href={`${basePath}/talk?day=${activeSession.day}`}
+                  className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+                >
+                  <BrainCircuit className="h-4 w-4" />
+                  Open AI teacher
+                </Link>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="subject-room-shell"
@@ -1312,7 +1400,387 @@ export function SubjectLabRoom({
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section data-testid="subject-lab-simple-step" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <Link href={basePath} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+                <ArrowLeft className="h-4 w-4" /> {plan.title} command room
+              </Link>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">Visual Lab</Badge>
+                <span className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] px-3 py-1 text-xs font-black text-[var(--subject-heading)]">
+                  Day {activeSession.day}
+                </span>
+                <span className="rounded-md border border-[var(--subject-border)] bg-white px-3 py-1 text-xs font-bold text-[#5d675f]">
+                  {activeSession.duration}
+                </span>
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[var(--subject-accent)]">{activeSession.chapter}</p>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+                {activeSession.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                See the idea once, write the proof in one line, then continue.
+              </p>
+            </div>
+
+            <div data-testid="subject-lab-next-action" className="w-full rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 lg:max-w-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Next room</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight text-[var(--subject-heading)]">
+                {isLabReadyForMcq ? "MCQ unlocked" : isTalkPassed ? "Save visual proof" : "Talk first"}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{nextRouteDetail}</p>
+              {isLabReadyForMcq || !isTalkPassed ? (
+                <Link
+                  data-testid="subject-lab-top-route"
+                  href={nextRouteHref}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  {isTalkPassed ? <ClipboardCheck className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+                  {nextRouteLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="subject-lab-top-route"
+                  disabled
+                  className="mt-4 inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md bg-[#d6cec0] px-3 text-sm font-black text-[#766b5e]"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Complete proof below
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div
+            data-testid="subject-lab-one-action"
+            className="mt-6 rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4"
+          >
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">One-line proof</p>
+                <h3 className="mt-1 text-lg font-black text-[var(--subject-heading)]">What did the visual make clear?</h3>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                  Write one line. The board and checklist below are only support.
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={labInsight}
+              onChange={(event) => {
+                setLabInsight(event.target.value);
+                setLabSaved(false);
+              }}
+              rows={3}
+              placeholder="Write the concept, case, map point, or UPSC trap you can now explain."
+              className="w-full resize-none rounded-md border border-[var(--subject-border)] bg-white px-3 py-2 text-sm font-semibold leading-6 text-[var(--subject-heading)] outline-none transition placeholder:text-[#8d8579] focus:border-[var(--subject-accent)] focus:ring-2 focus:ring-[var(--subject-ring)]"
+            />
+            <button
+              type="button"
+              onClick={markLabComplete}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+            >
+              <ClipboardCheck className="h-4 w-4" /> Save proof and continue
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            <details
+              data-testid="subject-lab-visual-surface"
+              className="group relative overflow-hidden rounded-lg border border-[var(--subject-border)] bg-[var(--subject-panel)] text-white shadow-sm"
+              style={{
+                background:
+                  "radial-gradient(circle at 18% 16%, var(--subject-accent-glow), transparent 26%), linear-gradient(135deg, var(--subject-dark), #111827)",
+              }}
+            >
+              <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/10 text-[var(--subject-light)] ring-1 ring-white/15">
+                    <activeLab.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">{scene.boardTitle}</p>
+                    <h2 className="mt-1 text-lg font-black tracking-tight">{activeLab.title}</h2>
+                  </div>
+                </div>
+                <span className="rounded-md bg-white px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                  View visual board
+                </span>
+              </summary>
+              <div className="hidden border-t border-white/10 p-5 group-open:block">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">{scene.boardTitle}</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight">{activeLab.title}</h2>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white/10 text-[var(--subject-light)] ring-1 ring-white/15">
+                  <activeLab.icon className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-4 text-sm font-semibold leading-6 text-[#dce8e2]">{scene.anchor}</p>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {scene.nodes.slice(0, 4).map((node, index) => (
+                  <div key={node.label} className="rounded-md border border-white/10 bg-white/[0.07] p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--subject-accent)] text-xs font-black text-white">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm font-black text-[var(--subject-light)]">{node.label}</p>
+                    </div>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#b7d5ca]">{node.detail}</p>
+                  </div>
+                ))}
+              </div>
+              </div>
+            </details>
+
+            <details
+              data-testid={plan.slug === "environment" ? "environment-lab-command-board" : "subject-lab-command-board"}
+              className="overflow-hidden rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)]"
+            >
+              <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Route</p>
+                  <h3 className="text-lg font-black text-[var(--subject-heading)]">Proof to practice</h3>
+                </div>
+                <span
+                  data-testid="subject-lab-route-status"
+                  className={cn(
+                    "rounded-md px-3 py-2 text-xs font-black ring-1",
+                    isLabReadyForMcq
+                      ? "bg-[var(--subject-dark)] text-white ring-[var(--subject-ring)]"
+                      : "bg-[#fff4df] text-[#6f4a12] ring-[#ef9f27]/35"
+                  )}
+                >
+                  {labRouteStatusCopy}
+                </span>
+              </summary>
+              <div
+                className="border-t border-[var(--subject-border)] p-4"
+              >
+                <div className="grid gap-2 sm:grid-cols-5">
+                  {labCommandSteps.map((step, index) => (
+                    <div
+                      key={step.id}
+                      data-testid={`subject-lab-command-${step.id}`}
+                      className={cn(
+                        "rounded-md border p-3",
+                        step.complete
+                          ? "border-[var(--subject-accent)] bg-white text-[var(--subject-heading)]"
+                          : "border-[var(--subject-border)] bg-[var(--subject-card)] text-[#5d675f]"
+                      )}
+                    >
+                      <span className="mb-2 flex h-7 w-7 items-center justify-center rounded-md bg-[var(--subject-dark)] text-xs font-black text-white">
+                        {step.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                      </span>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--subject-accent)]">{step.label}</p>
+                      <p className="mt-1 break-words text-xs font-black leading-5">{step.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+
+            <details
+              data-testid="subject-lab-proof-engine"
+              className="group rounded-lg border border-[var(--subject-border)] bg-white shadow-sm"
+            >
+              <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Optional proof stages</p>
+                  <h3 className="mt-1 text-lg font-black tracking-tight text-[var(--subject-heading)]">
+                    {completedProofIds.length}/{proofStages.length} saved
+                  </h3>
+                </div>
+                <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] px-3 text-xs font-black text-[var(--subject-dark)]">
+                  Open if needed
+                </span>
+              </summary>
+              <div className="hidden border-t border-[var(--subject-border)] p-4 group-open:block">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Proof</p>
+                    <h3 className="mt-1 text-xl font-black tracking-tight text-[var(--subject-heading)]">
+                      {`${activeProofIndex + 1}. ${activeProof?.title ?? "Proof stage"}`}
+                    </h3>
+                  </div>
+                  <span className="rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                    {completedProofIds.length}/{proofStages.length} proof stages
+                  </span>
+                </div>
+                <div className="rounded-md bg-[var(--subject-bg)] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">
+                    Write this in your words
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#34453b]">{activeProof?.prompt}</p>
+                </div>
+                <p className="mt-2 rounded-md bg-[#fff4df] p-3 text-xs font-bold leading-5 text-[#6f4a12]">{activeProof?.checkpoint}</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eee6d8]">
+                  <div className="h-full rounded-full bg-[var(--subject-accent)]" style={{ width: `${proofProgress}%` }} />
+                </div>
+                <details
+                  data-testid="subject-lab-proof-list"
+                  className="mt-3 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3"
+                >
+                  <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]">
+                    Optional proof checklist
+                  </summary>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-5">
+                    {proofStages.map((stage, index) => {
+                      const isActive = activeProof?.id === stage.id;
+                      const isComplete = completedProofIds.includes(stage.id);
+                      return (
+                        <button
+                          key={stage.id}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => selectProofStage(index)}
+                          className={cn(
+                            "min-h-16 rounded-md border p-2 text-left text-xs font-black transition",
+                            isActive
+                              ? "border-[var(--subject-dark)] bg-[var(--subject-dark)] text-white"
+                              : "border-[var(--subject-border)] bg-white text-[var(--subject-heading)] hover:border-[var(--subject-accent)]"
+                          )}
+                        >
+                          <span className="mb-1 flex items-center justify-between gap-2">
+                            Proof {index + 1}
+                            {isComplete ? <CheckCircle2 className="h-4 w-4" /> : null}
+                          </span>
+                          <span className="block leading-4">{stage.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => selectProofStage(activeProofIndex - 1)}
+                      disabled={activeProofIndex === 0}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-xs font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Previous proof
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="subject-lab-proof-complete"
+                      onClick={completeActiveProof}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-xs font-black text-white transition hover:brightness-90"
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Save checkpoint
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectProofStage(activeProofIndex + 1)}
+                      disabled={activeProofIndex === proofStages.length - 1}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-xs font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next proof <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </details>
+
+          {evidenceDeck.length > 0 && activeDeckCard ? (
+            <details data-testid={primaryEvidenceDeckTestId} className="mt-4 overflow-hidden rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)]">
+              <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Evidence</p>
+                  <h3 className="text-lg font-black tracking-tight text-[var(--subject-heading)]">Optional case support</h3>
+                </div>
+                <span className="rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
+                  {activeDeckCard.category}
+                </span>
+              </summary>
+              <div className="border-t border-[var(--subject-border)] p-4">
+              <div className="grid gap-2 md:grid-cols-3">
+                {evidenceDeck.map((card) => {
+                  const isActive = activeDeckCard.id === card.id;
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      data-testid={`${plan.slug}-lab-evidence-card-${card.id}`}
+                      aria-pressed={isActive}
+                      onClick={() => {
+                        setActiveDeckCardId(card.id);
+                        setLabSaved(false);
+                      }}
+                      className={cn(
+                        "min-h-24 rounded-md border p-3 text-left transition",
+                        isActive
+                          ? "border-[var(--subject-dark)] bg-[var(--subject-dark)] text-white"
+                          : "border-[var(--subject-border)] bg-white text-[var(--subject-heading)] hover:border-[var(--subject-accent)]"
+                      )}
+                    >
+                      <span className="block text-[10px] font-black uppercase tracking-[0.16em] opacity-75">{card.category}</span>
+                      <span className="mt-2 block text-sm font-black leading-5">{card.title}</span>
+                      <span className="mt-2 block text-xs font-semibold leading-5 opacity-75">{card.anchor}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div data-testid={primarySelectedEvidenceTestId} className="mt-3 rounded-md border border-[var(--subject-accent)] bg-white p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Selected evidence</p>
+                <h4 className="mt-2 text-lg font-black text-[var(--subject-heading)]">{activeDeckCard.title}</h4>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{activeDeckCard.proofHint}</p>
+              </div>
+              </div>
+            </details>
+          ) : null}
+
+          <div data-testid="lab-completion-panel" className="mt-4 rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">One-line proof</p>
+                <h3 className="mt-1 text-lg font-black text-[var(--subject-heading)]">What did the visual make clear?</h3>
+                <p data-testid="lab-next-route-status" className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{nextRouteDetail}</p>
+              </div>
+              {labSaved ? (
+                <span className="inline-flex items-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 py-2 text-xs font-black text-white">
+                  <CheckCircle2 className="h-4 w-4" /> Lab saved locally
+                </span>
+              ) : null}
+            </div>
+            <div
+              data-testid="subject-lab-proof-status"
+              className="mb-3 rounded-md border border-[var(--subject-accent)] bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]"
+            >
+              Applied proof progress {completedProofIds.length}/{proofStages.length}
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Link
+                data-testid="lab-primary-route"
+                href={nextRouteHref}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)]"
+              >
+                {isTalkPassed ? <ClipboardCheck className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+                {nextRouteLabel}
+              </Link>
+              <Link
+                href={`${basePath}/mcq-readiness?day=${activeSession.day}`}
+                aria-disabled={!isLabReadyForMcq}
+                className={cn(
+                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm font-black transition",
+                  isLabReadyForMcq
+                    ? "border-[var(--subject-border)] bg-white text-[var(--subject-dark)] hover:bg-[var(--subject-light)]"
+                    : "pointer-events-none border-[#dcd5c7] bg-[#f7f4ee] text-[#8a8174]"
+                )}
+              >
+                <ClipboardCheck className="h-4 w-4" /> Fresh practice
+              </Link>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        <details data-testid="subject-lab-advanced-tools" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[var(--subject-dark)]">
+            Advanced lab boards, media studio, playlist
+          </summary>
+          <div className="mt-5 space-y-6">
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
             <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
@@ -1364,7 +1832,7 @@ export function SubjectLabRoom({
           </div>
 
           <div
-            data-testid="subject-lab-visual-surface"
+            data-testid="subject-lab-visual-surface-detail"
             className="relative overflow-hidden rounded-lg border border-[var(--subject-border)] bg-[var(--subject-panel)] p-5 text-white shadow-sm"
             style={{
               background:
@@ -1615,7 +2083,7 @@ export function SubjectLabRoom({
             ) : null}
 
             <div
-              data-testid={plan.slug === "environment" ? "environment-lab-command-board" : "subject-lab-command-board"}
+              data-testid={plan.slug === "environment" ? "environment-lab-command-board-detail" : "subject-lab-command-board-detail"}
               className="mt-5 rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur"
             >
               <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1624,11 +2092,11 @@ export function SubjectLabRoom({
                     Lab command board
                   </p>
                   <h3 className="mt-1 text-xl font-black tracking-tight text-white">
-                    Evidence to MCQ route
+                    Proof to practice route
                   </h3>
                 </div>
                 <span
-                  data-testid="subject-lab-route-status"
+                  data-testid="subject-lab-route-status-detail"
                   className={cn(
                     "max-w-full break-words rounded-md px-3 py-2 text-xs font-black ring-1 sm:shrink-0",
                     isLabReadyForMcq
@@ -1636,7 +2104,7 @@ export function SubjectLabRoom({
                       : "bg-white/10 text-[#f5ead8] ring-white/15"
                   )}
                 >
-                  {isLabReadyForMcq ? "MCQ open" : "MCQ locked"}
+                  {isLabReadyForMcq ? "Practice open" : "Practice locked"}
                 </span>
               </div>
 
@@ -1647,7 +2115,7 @@ export function SubjectLabRoom({
                   return (
                     <div
                       key={step.id}
-                      data-testid={`subject-lab-command-${step.id}`}
+                      data-testid={`subject-lab-command-detail-${step.id}`}
                       className={cn(
                         "relative min-h-28 rounded-md border p-3 transition",
                         step.complete
@@ -1678,7 +2146,7 @@ export function SubjectLabRoom({
             </div>
 
             <div
-              data-testid="subject-lab-proof-engine"
+              data-testid="subject-lab-proof-engine-detail"
               className="mt-5 rounded-lg border border-white/15 bg-white/10 p-4 backdrop-blur"
             >
               <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1687,18 +2155,18 @@ export function SubjectLabRoom({
                     Applied proof engine
                   </p>
                   <h3 className="mt-1 text-xl font-black tracking-tight text-white">
-                    {`${activeProofIndex + 1}. ${activeProof?.title ?? "Proof stage"}`}
+                    {`Detail ${activeProofIndex + 1}: ${activeProof?.title ?? "Proof stage"}`}
                   </h3>
                 </div>
                 <span className="max-w-full break-words rounded-md bg-white/10 px-3 py-2 text-xs font-black text-[#dff7ee] ring-1 ring-white/15 sm:shrink-0">
-                  {completedProofIds.length}/{proofStages.length} proof stages
+                  Detail proof count {completedProofIds.length} of {proofStages.length}
                 </span>
               </div>
 
               <div className="grid gap-3 lg:grid-cols-[1fr_0.9fr]">
                 <div className="rounded-md bg-black/20 p-3 ring-1 ring-white/10">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
-                    Student proof prompt
+                    Detailed proof prompt
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#dce8e2]">{activeProof?.prompt}</p>
                 </div>
@@ -1725,7 +2193,7 @@ export function SubjectLabRoom({
                 </button>
                 <button
                   type="button"
-                  data-testid="subject-lab-proof-complete"
+                  data-testid="subject-lab-proof-complete-detail"
                   onClick={completeActiveProof}
                   className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#ef9f27] px-3 text-xs font-black text-[var(--subject-dark)] transition hover:bg-[#f3b956] sm:w-auto"
                 >
@@ -1793,7 +2261,7 @@ export function SubjectLabRoom({
                 </div>
               </div>
 
-              <div data-testid="subject-lab-proof-list" className="mb-5 grid gap-2 sm:grid-cols-5">
+              <div data-testid="subject-lab-proof-list-detail" className="mb-5 grid gap-2 sm:grid-cols-5">
                 {proofStages.map((stage, index) => {
                   const isActive = activeProof?.id === stage.id;
                   const isComplete = completedProofIds.includes(stage.id);
@@ -1834,7 +2302,7 @@ export function SubjectLabRoom({
 
             {evidenceDeck.length > 0 && activeDeckCard ? (
               <div
-                data-testid={plan.slug === "environment" ? "environment-lab-evidence-deck" : `${plan.slug}-lab-evidence-deck`}
+                data-testid={plan.slug === "environment" ? "environment-lab-evidence-deck-detail" : `${plan.slug}-lab-evidence-deck-detail`}
                 className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm"
               >
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -1858,7 +2326,7 @@ export function SubjectLabRoom({
                       <button
                         key={card.id}
                         type="button"
-                        data-testid={`${plan.slug}-lab-evidence-card-${card.id}`}
+                        data-testid={`${plan.slug}-lab-evidence-card-detail-${card.id}`}
                         aria-pressed={isActive}
                         onClick={() => {
                           setActiveDeckCardId(card.id);
@@ -1882,7 +2350,7 @@ export function SubjectLabRoom({
                 </div>
 
                 <div
-                  data-testid={plan.slug === "environment" ? "environment-lab-selected-evidence" : `${plan.slug}-lab-selected-evidence`}
+                  data-testid={plan.slug === "environment" ? "environment-lab-selected-evidence-detail" : `${plan.slug}-lab-selected-evidence-detail`}
                   className="rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4"
                 >
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-accent)]">
@@ -1908,7 +2376,7 @@ export function SubjectLabRoom({
               </div>
             ) : null}
 
-            <div data-testid="lab-completion-panel" className="rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-5 shadow-sm">
+            <div data-testid="lab-completion-panel-detail" className="rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-5 shadow-sm">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Lab completion</p>
@@ -1919,12 +2387,12 @@ export function SubjectLabRoom({
                 </div>
                 {labSaved ? (
                   <span className="inline-flex items-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 py-2 text-xs font-black text-white">
-                    <CheckCircle2 className="h-4 w-4" /> Lab saved locally
+                    <CheckCircle2 className="h-4 w-4" /> Advanced proof saved
                   </span>
                 ) : null}
               </div>
               <div
-                data-testid="subject-lab-proof-status"
+                data-testid="subject-lab-proof-status-detail"
                 className="mb-3 rounded-md border border-[var(--subject-accent)] bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]"
               >
                 Applied proof progress {completedProofIds.length}/{proofStages.length}
@@ -1936,7 +2404,7 @@ export function SubjectLabRoom({
                   setLabSaved(false);
                 }}
                 rows={4}
-                placeholder="Write the concept, case, map point, or UPSC trap you can now explain."
+                placeholder="Advanced panel note for the concept, case, map point, or UPSC trap."
                 className="w-full resize-none rounded-md border border-[var(--subject-border)] bg-white px-3 py-2 text-sm font-semibold leading-6 text-[var(--subject-heading)] outline-none transition placeholder:text-[#8d8579] focus:border-[var(--subject-accent)] focus:ring-2 focus:ring-[var(--subject-ring)]"
               />
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -1945,10 +2413,10 @@ export function SubjectLabRoom({
                   onClick={markLabComplete}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90"
                 >
-                  <ClipboardCheck className="h-4 w-4" /> Mark lab complete
+                  <ClipboardCheck className="h-4 w-4" /> Save advanced proof
                 </button>
                 <Link
-                  data-testid="lab-primary-route"
+                  data-testid="lab-primary-route-detail"
                   href={nextRouteHref}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)]"
                 >
@@ -1965,7 +2433,7 @@ export function SubjectLabRoom({
                       : "pointer-events-none border-[#dcd5c7] bg-[#f7f4ee] text-[#8a8174]"
                   )}
                 >
-                  <ClipboardCheck className="h-4 w-4" /> MCQ readiness
+                  <ClipboardCheck className="h-4 w-4" /> Fresh practice
                 </Link>
               </div>
             </div>
@@ -2009,6 +2477,8 @@ export function SubjectLabRoom({
             })}
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-environment-progress-v1";
 const evidencePath = path.join(__dirname, "environment-lab-evidence-e2e-evidence.json");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
@@ -57,23 +58,46 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto(`${baseUrl}/upsc/environment`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/upsc/environment`, { waitUntil: "domcontentloaded" });
   await page.evaluate(
-    ({ key, state }) => window.localStorage.setItem(key, JSON.stringify(state)),
-    { key: progressKey, state: seededProgress }
+    ({ key, state, studentProfileKey }) => {
+      window.localStorage.setItem(
+        studentProfileKey,
+        JSON.stringify({
+          level: "advanced",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      window.localStorage.setItem(key, JSON.stringify(state));
+    },
+    { key: progressKey, state: seededProgress, studentProfileKey: profileKey }
   );
 
-  await page.goto(`${baseUrl}/upsc/environment/lab?mode=biodiversity-map&day=5`, { waitUntil: "networkidle" });
-  await page.getByText("India biodiversity map", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.goto(`${baseUrl}/upsc/environment/lab?mode=biodiversity-map&day=5`, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("subject-lab-one-action").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-lab-visual-surface").getByText("Biodiversity Map", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("environment-lab-command-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("subject-lab-route-status").getByText("MCQ locked", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-lab-route-status").getByText("Practice locked", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-lab-top-route").getByText("Complete proof below", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("environment-lab-command-board").locator("summary").click();
   await page.getByTestId("subject-lab-command-talk").getByText("91%", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("environment-lab-evidence-deck").waitFor({ timeout: 15000 });
+  await page.getByTestId("environment-lab-evidence-deck").locator("summary").click();
   await page.getByText("Kaziranga Floodplain", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("environment-lab-evidence-card-5-biodiversity-map-3").click();
   await page.getByText("Great Indian Bustard Landscape", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("subject-lab-command-case").getByText("Species", { exact: false }).waitFor({ timeout: 15000 });
 
+  await page.getByTestId("subject-lab-proof-engine").evaluate((element) => {
+    element.open = true;
+  });
+  await page.getByTestId("subject-lab-proof-list").evaluate((element) => {
+    element.open = true;
+  });
   for (let index = 0; index < 5; index += 1) {
     await page.getByTestId("subject-lab-proof-complete").click();
   }
@@ -86,9 +110,10 @@ async function run() {
     .fill(
       "Great Indian Bustard proves grassland conservation is not forest-only protection; the UPSC trap is to ignore habitat category and power-line risk."
     );
-  await page.getByRole("button", { name: /Mark lab complete/i }).click();
+  await page.getByRole("button", { name: /Save proof and continue/i }).click();
   await page.getByText("Lab saved locally", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByTestId("subject-lab-route-status").getByText("MCQ open", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-lab-route-status").getByText("Practice open", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-lab-top-route").getByText("Open fresh practice", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-lab-command-save").getByText("Saved", { exact: false }).waitFor({ timeout: 15000 });
 
   const savedProgress = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["5"], progressKey);
@@ -109,7 +134,7 @@ async function run() {
 
   await assertNoOverflow(page, "environment-lab-evidence-desktop", checks);
   await page.setViewportSize({ width: 390, height: 900 });
-  await page.goto(`${baseUrl}/upsc/environment/lab?mode=biodiversity-map&day=5`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/upsc/environment/lab?mode=biodiversity-map&day=5`, { waitUntil: "domcontentloaded" });
   await page.getByTestId("environment-lab-evidence-deck").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "environment-lab-evidence-mobile", checks);
 

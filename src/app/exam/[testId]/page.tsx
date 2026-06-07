@@ -25,8 +25,9 @@ import { normalizeOptionId, normalizeConfidence } from '@/services/api/contracts
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { FeedbackModal } from '@/components/exam/FeedbackModal';
+import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 
-export default function ExamInterface() {
+function ExamInterface() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -594,6 +595,14 @@ export default function ExamInterface() {
         testId={testId as string}
       />
     </div>
+  );
+}
+
+export default function LegacyExamPage() {
+  return (
+    <ProtectedRoute requiredRole="ADMIN">
+      <ExamInterface />
+    </ProtectedRoute>
   );
 }
 

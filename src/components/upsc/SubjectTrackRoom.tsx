@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -19,17 +20,25 @@ import { SubjectLoopActions } from "@/components/upsc/SubjectLoopActions";
 import { buildHistoryRevisionCommandDeck } from "@/lib/upsc/historyLearningDecks";
 import { buildSubjectReadinessSnapshot } from "@/lib/upsc/subjectReadiness";
 import type { SubjectDayReadiness } from "@/lib/upsc/subjectReadiness";
+import { getSubjectGuidedStudyEntry } from "@/lib/upsc/subjectGuidedStudy";
 import type { SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
+import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
 
 export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const { progress, getDayProgress, isLoaded, stats } = useSubjectProgress(plan.slug, plan.sessions);
+  const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
   const basePath = `/upsc/${plan.slug}`;
   const focusedDay =
     initialDay && Number.isFinite(initialDay) ? Math.min(Math.max(initialDay, 1), plan.sessions.length) : undefined;
-  const readinessSnapshot = buildSubjectReadinessSnapshot(plan, progress);
+  useEffect(() => {
+    if (!isLoaded) return;
+    setLearnerLevel(readStudentProfile()?.level ?? "beginner");
+  }, [isLoaded]);
+
+  const readinessSnapshot = buildSubjectReadinessSnapshot(plan, progress, learnerLevel);
   const focusedReadiness =
     readinessSnapshot.days.find(({ session }) => session.day === focusedDay) ??
     readinessSnapshot.nextActions[0] ??
@@ -112,10 +121,10 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             label: "Practice route",
             value: focusedProgress?.mcqOutcome ?? focusedProgress?.mcqReadinessStatus ?? "Pending",
             detail: focusedProgress?.mcqRecoveryCompleted
-              ? focusedProgress.mcqRecoverySummary ?? "Recovery completed. Retest fresh MCQs from MCQ readiness."
+              ? focusedProgress.mcqRecoverySummary ?? "Recovery completed. Retest fresh practice."
               : focusedProgress?.mcqReviewSummary ??
                 focusedProgress?.mcqPreflightSummary ??
-                "Run local practice only after Watch, Talk, Lab, and quality gate are clear.",
+                "Run local practice after Watch, 95% Talk recall, fresh MCQ quality, and optional visual support.",
             complete: focusedReadiness.mcqPracticeCommand || focusedProgress?.mcqReadinessStatus === "practice-ready",
             icon: CheckCircle2,
           },
@@ -143,13 +152,36 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             : []),
         ]
       : [];
+  const focusedNextSession =
+    focusedReadiness?.isCommandReady && focusedReadiness.session.day < plan.sessions.length
+      ? plan.sessions.find((session) => session.day === focusedReadiness.session.day + 1)
+      : undefined;
+  const focusedNextEntry = focusedNextSession
+    ? getSubjectGuidedStudyEntry(plan, focusedNextSession, learnerLevel, progress[String(focusedNextSession.day)])
+    : null;
+  const focusedStudentHref = focusedNextEntry
+    ? focusedNextEntry.href
+    : focusedReadiness?.href ?? basePath;
+  const focusedStudentActionLabel = focusedNextEntry && focusedNextSession
+    ? focusedNextEntry.gateId === "watch"
+      ? `Start Day ${focusedNextSession.day} lesson`
+      : focusedNextEntry.gateId === "talk"
+        ? `Start Day ${focusedNextSession.day} diagnosis`
+        : `Day ${focusedNextSession.day}: ${focusedNextEntry.actionLabel}`
+    : focusedReadiness?.actionLabel ?? "Continue";
+  const focusedStudentDetail =
+    focusedNextEntry && focusedNextSession && focusedReadiness
+      ? `Day ${focusedReadiness.session.day} is cleared. Continue with ${focusedNextSession.title}. ${focusedNextEntry.label}: ${focusedNextEntry.detail}`
+      : focusedReadiness?.detail ?? "Open the first learning room and continue from there.";
   const historyCommandAuditScore = historyCommandAuditItems.length
     ? Math.round((historyCommandAuditItems.filter((item) => item.complete).length / historyCommandAuditItems.length) * 100)
     : 0;
   const historyCommandAuditNextHref =
-    focusedProgress?.mcqNextRoute ?? focusedProgress?.talkNextRoute ?? focusedReadiness?.href ?? basePath;
+    focusedNextSession ? focusedStudentHref : focusedProgress?.mcqNextRoute ?? focusedProgress?.talkNextRoute ?? focusedReadiness?.href ?? basePath;
   const historyCommandAuditNextLabel =
-    focusedProgress?.mcqNextActionLabel ?? focusedProgress?.talkNextActionLabel ?? focusedReadiness?.actionLabel ?? "Continue";
+    focusedNextSession
+      ? focusedStudentActionLabel
+      : focusedProgress?.mcqNextActionLabel ?? focusedProgress?.talkNextActionLabel ?? focusedReadiness?.actionLabel ?? "Continue";
   const historyDayReportStatus = !focusedReadiness
     ? "No focused day"
     : focusedProgress?.mcqRecoveryResolved
@@ -165,7 +197,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
               : focusedReadiness.learningGateId === "talk"
                 ? "AI teacher pending"
                 : focusedReadiness.learningGateId === "lab"
-                  ? "Visual proof pending"
+                  ? "Recall support pending"
                   : focusedReadiness.learningGateId === "mcq" && focusedProgress?.mcqQualityPassed
                     ? "Practice ready"
                     : focusedReadiness.learningGateId === "mcq"
@@ -176,7 +208,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     : focusedProgress?.mcqRecoveryResolved
       ? `Day ${focusedReadiness.session.day} recovered successfully. ${focusedProgress.mcqRecoveryRetestSummary ?? "Recovery retest cleared and the loop is closed."}`
       : focusedReadiness.isCommandReady
-        ? `Day ${focusedReadiness.session.day} is cleared because Watch, AI classroom, Visual Lab, fresh MCQ quality, and MCQ command are complete.`
+        ? `Day ${focusedReadiness.session.day} is cleared because Watch, 95% AI classroom recall, fresh MCQ quality, and MCQ command are complete.`
         : focusedProgress?.mcqRecoveryCompleted
           ? `Day ${focusedReadiness.session.day} has repair proof saved. Retest the fresh MCQ batch before marking final command.`
           : focusedProgress?.mcqOutcome === "Revisit" || focusedProgress?.mcqReadinessStatus === "revisit"
@@ -186,7 +218,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
               : focusedReadiness.learningGateId === "talk"
                 ? `Day ${focusedReadiness.session.day} is blocked at AI classroom: command-level oral proof is not complete.`
                 : focusedReadiness.learningGateId === "lab"
-                  ? `Day ${focusedReadiness.session.day} is blocked at Visual Lab: source-map proof is ${historyLabProofCount}/5.`
+                  ? `Day ${focusedReadiness.session.day} needs recall support: visual proof is optional and currently ${historyLabProofCount}/5.`
                   : focusedReadiness.learningGateId === "mcq" && focusedProgress?.mcqQualityPassed
                     ? `Day ${focusedReadiness.session.day} has learning gates and MCQ quality ready. Start local practice to finish command.`
                     : `Day ${focusedReadiness.session.day} is waiting for fresh History MCQs and quality checks.`;
@@ -247,6 +279,62 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     stats.shakyDays[0] ??
     plan.sessions.find((session) => !getDayProgress(session.day)?.reflection?.trim()) ??
     plan.sessions[0];
+  const focusedDayNumber = focusedReadiness?.session.day ?? nextFocusSession.day;
+  const spacedRevisionDayNumber = Math.min(focusedDayNumber + 2, plan.sessions.length);
+  const spacedRevisionItem = stats.revisitDays[0]
+    ? {
+        source: stats.revisitDays[0],
+        due: plan.sessions.find((session) => session.day === Math.min(stats.revisitDays[0].day + 2, plan.sessions.length)) ?? stats.revisitDays[0],
+      }
+    : stats.spacedRevisionItems[0];
+  const spacedRevisionSession =
+    spacedRevisionItem?.source ??
+    plan.sessions.find((session) => session.day === spacedRevisionDayNumber) ??
+    nextFocusSession;
+  const spacedRevisionDueSession =
+    spacedRevisionItem?.due ?? spacedRevisionSession;
+  const spacedRevisionHref =
+    stats.revisitDays[0] || stats.spacedRevisionItems.length > 0
+      ? `${basePath}/revisit?day=${spacedRevisionSession.day}`
+      : `${basePath}/track?day=${spacedRevisionDueSession.day}`;
+  const spacedRevisionCopy =
+    stats.revisitDays[0]
+      ? `Day ${spacedRevisionSession.day} is already in revisit. Repair it before new work.`
+      : stats.spacedRevisionItems.length > 0
+        ? `Day ${spacedRevisionSession.day} is due on study Day ${spacedRevisionDueSession.day}. Re-explain it before new content.`
+        : `Revise Day ${spacedRevisionSession.day} on the Feynman + Day 3 recall cycle.`;
+  const simpleTrendLabel =
+    readinessSnapshot.score >= 75
+      ? "Stable"
+      : readinessSnapshot.score >= 45
+        ? "Building"
+        : "Needs support";
+  const simpleTrackSignals = [
+    {
+      id: "gap",
+      label: "Learning gap",
+      value: focusedReadiness?.label ?? "Start class",
+      detail: focusedReadiness?.detail ?? "Begin with the first watch room.",
+      icon: Gauge,
+      testId: "subject-track-learning-gap",
+    },
+    {
+      id: "revision",
+      label: "Next revision",
+      value: stats.revisitDays[0] || stats.spacedRevisionItems.length > 0 ? `Day ${spacedRevisionSession.day}` : `Day ${spacedRevisionDueSession.day}`,
+      detail: spacedRevisionCopy,
+      icon: TimerReset,
+      testId: "subject-track-next-revision",
+    },
+    {
+      id: "trend",
+      label: "Trend",
+      value: simpleTrendLabel,
+      detail: `${readinessSnapshot.score}% subject readiness, ${readinessSnapshot.commandReadyCount}/${readinessSnapshot.totalDays} command days.`,
+      icon: BarChart3,
+      testId: "subject-track-trend",
+    },
+  ];
 
   const stageStatusTone = (status: SubjectDayReadiness["stages"][number]["status"]) => {
     if (status === "complete") return "border-[#1d9e75]/40 bg-[#e7f5ee] text-[#085041]";
@@ -275,7 +363,107 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <section
+          data-testid="subject-track-simple-dashboard"
+          className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm md:p-6"
+        >
+          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            <div
+              data-testid="track-focused-day"
+              className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-5"
+            >
+              <Link href={basePath} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+                <ArrowLeft className="h-4 w-4" /> {plan.title}
+              </Link>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-accent)]">
+                Today&apos;s task
+              </p>
+              <h1 className="mt-2 text-2xl font-black leading-tight text-[var(--subject-heading)] md:text-4xl">
+                Day {focusedDayNumber}: {focusedReadiness?.session.title ?? nextFocusSession.title}
+              </h1>
+              <p className="mt-3 text-sm font-bold leading-6 text-[#5d675f]">
+                {focusedReadiness?.label ?? "Start class"}: {focusedStudentDetail}
+              </p>
+              {focusedNextSession ? (
+                <div
+                  data-testid="track-next-topic-handoff"
+                  className="mt-4 rounded-md border border-[var(--subject-ring)] bg-white/80 px-3 py-2 text-sm font-black text-[var(--subject-dark)]"
+                >
+                  Next topic: Day {focusedNextSession.day} / {focusedNextSession.chapter}
+                </div>
+              ) : null}
+              <Link
+                data-testid="track-focused-route"
+                href={focusedStudentHref}
+                className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+              >
+                {focusedStudentActionLabel} <ArrowLeft className="h-4 w-4 rotate-180" />
+              </Link>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {simpleTrackSignals.map((signal) => (
+                <Link
+                  key={signal.id}
+                  href={signal.id === "revision" ? spacedRevisionHref : focusedStudentHref}
+                  data-testid={signal.testId}
+                  className="rounded-lg border border-[var(--subject-border)] bg-white/75 p-4 transition hover:-translate-y-0.5 hover:border-[var(--subject-accent)]"
+                >
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-md bg-[var(--subject-dark)] text-white">
+                    <signal.icon className="h-4 w-4" />
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+                    {signal.label}
+                  </p>
+                  <p className="mt-2 text-xl font-black leading-6 text-[var(--subject-heading)]">{signal.value}</p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#657066]">{signal.detail}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <details
+            data-testid="subject-track-day-flow"
+            className="group mt-5 rounded-lg border border-[var(--subject-border)] bg-white/60 p-3"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md px-2 py-1 text-sm font-black text-[var(--subject-heading)] marker:text-[var(--subject-accent)]">
+              <span>View 30-day path</span>
+              <span className="text-xs font-bold text-[#746f66]">
+                Optional map. Today&apos;s action is already selected above.
+              </span>
+            </summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              {readinessSnapshot.days.map((dayReadiness) => (
+                <Link
+                  key={dayReadiness.session.day}
+                  href={dayReadiness.href}
+                  data-testid={`track-day-${dayReadiness.session.day}`}
+                  className={cn(
+                    "min-h-20 rounded-md border p-3 transition hover:-translate-y-0.5",
+                    dayReadiness.tone,
+                    focusedDayNumber === dayReadiness.session.day ? "ring-2 ring-[var(--subject-dark)]/25" : ""
+                  )}
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.14em]">Day {dayReadiness.session.day}</p>
+                  <p className="mt-1 line-clamp-2 text-sm font-black leading-5">{dayReadiness.session.title}</p>
+                  <p className="mt-2 text-[11px] font-black uppercase tracking-[0.12em] opacity-75">
+                    {dayReadiness.label}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </details>
+        </section>
+
+        <details
+          data-testid="subject-track-advanced-tools"
+          className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm"
+        >
+          <summary className="cursor-pointer text-sm font-black text-[var(--subject-heading)]">
+            Optional progress details
+          </summary>
+          <div className="mt-5 flex flex-col gap-6">
         <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
           <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
             <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
@@ -304,8 +492,8 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               { label: "Watched classes", value: stats.watchedCount, icon: PlayCircle },
-              { label: "Talk command", value: talkPassedCount, icon: BrainCircuit },
-              { label: "Lab proof done", value: labProofCount, icon: Layers3 },
+              { label: "95% recall", value: talkPassedCount, icon: BrainCircuit },
+              { label: "Visual support saved", value: labProofCount, icon: Layers3 },
               { label: "MCQ command", value: mcqCommandCount, icon: ClipboardCheck },
               { label: "Revisit queue", value: stats.revisitCount, icon: RefreshCcw },
               { label: "Blocked days", value: blockedCount, icon: Gauge },
@@ -395,7 +583,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                   Day {focusedReadiness.session.day}: {focusedReadiness.session.title}
                 </h2>
                 <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#657066]">
-                  One live control board for lecture proof, media readiness, AI classroom verdict, Visual Lab proof,
+                  One live control board for lecture proof, media readiness, 95% AI classroom recall, optional visual support,
                   fresh MCQ quality, and the next practice route.
                 </p>
               </div>
@@ -692,7 +880,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                         <Link
                           key={session.day}
                           href={dayReadiness.href}
-                          data-testid={`track-day-${session.day}`}
+                          data-testid={`track-day-detail-${session.day}`}
                           className={cn(
                             "min-h-24 rounded-md border p-3 transition hover:-translate-y-0.5",
                             dayReadiness.tone,
@@ -731,7 +919,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
           <div className="grid gap-5">
             {focusedReadiness ? (
               <div
-                data-testid="track-focused-day"
+                data-testid="track-focused-day-detail"
                 className={cn("rounded-lg border p-5 shadow-sm", focusedReadiness.tone)}
               >
                 <p className="text-xs font-black uppercase tracking-[0.22em] opacity-75">Focused day</p>
@@ -772,11 +960,11 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                   </div>
                 )}
                 <Link
-                  data-testid="track-focused-route"
-                  href={focusedReadiness.href}
+                  data-testid="track-focused-route-detail"
+                  href={focusedStudentHref}
                   className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
                 >
-                  {focusedReadiness.actionLabel} <ArrowLeft className="h-4 w-4 rotate-180" />
+                  {focusedStudentActionLabel} <ArrowLeft className="h-4 w-4 rotate-180" />
                 </Link>
               </div>
             ) : null}
@@ -823,6 +1011,8 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             <SubjectLoopActions plan={plan} activeDay={nextFocusSession.day} current="track" />
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </div>
   );

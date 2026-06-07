@@ -9,6 +9,8 @@ const weakCsvPath = path.join(__dirname, "geography-day1-intake-weak.csv");
 const strongCsvPath = path.join(__dirname, "geography-day1-intake-strong.csv");
 const localDraftKey = "sarit-admin-bulk-question-drafts-v1";
 const commandStateKey = "sarit-upsc-mcq-command-v1";
+const progressKey = "sarit-upsc-geography-progress-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 
 const header = [
   "subject",
@@ -104,11 +106,38 @@ async function run() {
     requestFailures.push({ url: request.url(), failure: request.failure()?.errorText || "unknown" });
   });
 
-  await page.addInitScript(({ draftKey, stateKey }) => {
+  await page.addInitScript(({ draftKey, stateKey, learnerProgressKey, studentProfileKey }) => {
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_day1_mcq_intake");
     window.localStorage.removeItem(draftKey);
     window.localStorage.removeItem(stateKey);
-  }, { draftKey: localDraftKey, stateKey: commandStateKey });
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    window.localStorage.setItem(
+      learnerProgressKey,
+      JSON.stringify({
+        "1": {
+          day: 1,
+          watched: true,
+          watchState: "Watched",
+          watchSceneCompletedIds: ["1-briefing", "1-mechanism", "1-map", "1-trap", "1-recap"],
+          talkScore: 96,
+          talkBand: "Command",
+          talkUnlockStage: "mcq",
+          reflection: "Geographic thinking connects what, where, why, map relationships and one UPSC trap.",
+          confidence: "Command",
+        },
+      })
+    );
+  }, { draftKey: localDraftKey, stateKey: commandStateKey, learnerProgressKey: progressKey, studentProfileKey: profileKey });
 
   await page.route("**/api/v1/admin/tests", (route) => route.abort("connectionrefused"));
   await page.route("**/api/v1/admin/topics", (route) => route.abort("connectionrefused"));
@@ -153,8 +182,17 @@ async function run() {
 
   await page.getByTestId("bulk-return-to-mcq").click();
   await page.waitForURL(/\/upsc\/geography\/mcq-readiness\?day=1/, { timeout: 15000 });
-  await page.getByTestId("mcq-batch-gate").getByText("Fresh batch ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-mcq-quality-score").getByText("Passed 100%", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByRole("heading", { name: "Start practice", exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-start-local-practice").waitFor({ timeout: 15000 });
+  const learnerText = await page.locator("body").innerText();
+  const leakedOperatorTerms = ["GEO-D01", "DRAFT", "batch", "uploaded", "local draft bank", "UPSC MCQ Command"].filter((term) =>
+    learnerText.toLowerCase().includes(term.toLowerCase())
+  );
+  if (leakedOperatorTerms.length > 0) {
+    throw new Error(`Learner Day 1 practice leaked operator language: ${JSON.stringify(leakedOperatorTerms)}`);
+  }
+  await page.getByTestId("mcq-start-local-practice").click();
+  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 25", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "day1-intake-return-ready", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -171,6 +209,7 @@ async function run() {
     finalUrl: page.url(),
     localDraftQuestionCount: latestDraft.questions.length,
     commandState: commandState["GEO-D01"],
+    leakedOperatorTerms,
     consoleErrors,
     unexpectedConsoleErrors,
     pageErrors,

@@ -3,12 +3,30 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-environment-progress-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const localDraftKey = "sarit-admin-bulk-question-drafts-v1";
 const evidencePath = path.join(__dirname, "environment-mcq-readiness-preflight-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "environment-mcq-readiness-preflight-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
+
+async function seedProfile(page) {
+  await page.addInitScript((studentProfileKey) => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_environment_mcq_preflight");
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, profileKey);
+}
 
 function readyProgress() {
   return {
@@ -20,7 +38,7 @@ function readyProgress() {
     confidence: "Command",
     reflection: "Protected areas are linked through category, map, species, threat, and institution.",
     revisitQueued: false,
-    talkScore: 92,
+    talkScore: 96,
     talkBand: "Command",
     talkUnlockStage: "mcq",
     labCompleted: true,
@@ -92,6 +110,15 @@ async function getProgress(page) {
   return page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["5"], progressKey);
 }
 
+async function openCommandBoard(page) {
+  const board = page.getByTestId("mcq-readiness-command-board");
+  await board.waitFor({ timeout: 15000 });
+  const isOpen = await board.evaluate((element) => element.open);
+  if (!isOpen) {
+    await board.locator("summary").click();
+  }
+}
+
 async function seed(page, { planned, drafted, questions }) {
   const progress = readyProgress();
   await page.evaluate(
@@ -140,6 +167,7 @@ async function seed(page, { planned, drafted, questions }) {
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+  await seedProfile(page);
   const consoleErrors = [];
   const pageErrors = [];
   const checks = [];
@@ -152,10 +180,10 @@ async function run() {
   await page.goto(`${baseUrl}/upsc/environment/mcq-readiness?day=5`, { waitUntil: "networkidle", timeout: 45000 });
   await seed(page, { planned: 2, drafted: 2, questions: [] });
   await page.reload({ waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("mcq-readiness-command-board").waitFor({ timeout: 15000 });
+  await openCommandBoard(page);
   await page.getByTestId("mcq-preflight-status").getByText("Content pending", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-next-decision").getByText("Upload fresh CSV", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-batch-gate").getByText("Fresh content pending", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-fresh-content-pending").getByText("Fresh MCQs not attached yet", { exact: false }).waitFor({ timeout: 15000 });
   await page.waitForFunction((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["5"]?.mcqReadinessStatus === "content-pending", progressKey, {
     timeout: 15000,
   });
@@ -171,9 +199,9 @@ async function run() {
     ],
   });
   await page.reload({ waitUntil: "networkidle", timeout: 45000 });
+  await openCommandBoard(page);
   await page.getByTestId("mcq-preflight-status").getByText("Quality review", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-next-decision").getByText("Fix MCQ quality", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("environment-mcq-quality-score").getByText("79%", { exact: false }).waitFor({ timeout: 15000 });
   await page.waitForFunction((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["5"]?.mcqReadinessStatus === "quality-review", progressKey, {
     timeout: 15000,
   });
@@ -181,14 +209,19 @@ async function run() {
 
   await seed(page, { planned: 3, drafted: 3, questions: [makeQuestion(1), makeQuestion(2), makeQuestion(3)] });
   await page.reload({ waitUntil: "networkidle", timeout: 45000 });
+  await openCommandBoard(page);
   await page.getByTestId("mcq-preflight-status").getByText("Practice ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-next-decision").getByText("Start local practice", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-next-decision").getByText("Start fresh MCQs", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-student-flow").getByText("95% recall", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-student-flow").getByText("Fresh MCQ", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-student-flow").getByText("Command score", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-primary-action").getByTestId("mcq-start-local-practice").getByText("Start fresh MCQs", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-start-local-practice").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-local-practice-runner").getByText("1 of 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-practice-option-A").click();
-  await page.getByRole("button", { name: /Next question/i }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
   await page.getByTestId("mcq-practice-option-A").click();
-  await page.getByRole("button", { name: /Next question/i }).click();
+  await page.getByRole("button", { name: /^Next$/i }).click();
   await page.getByTestId("mcq-practice-option-A").click();
   await page.getByTestId("mcq-practice-outcome-gate").getByText("Command retained", { exact: false }).waitFor({ timeout: 15000 });
 
@@ -207,7 +240,7 @@ async function run() {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/environment/mcq-readiness?day=5`, { waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("mcq-readiness-command-board").waitFor({ timeout: 15000 });
+  await openCommandBoard(page);
   await assertNoOverflow(page, "environment-preflight-mobile", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

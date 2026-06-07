@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -14,7 +14,8 @@ import {
   Gauge,
   Lightbulb,
   LockKeyhole,
-  MessageCircle,
+  Mic,
+  MicOff,
   RefreshCcw,
   Save,
   UnlockKeyhole,
@@ -22,6 +23,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { SubjectLoopActions } from "@/components/upsc/SubjectLoopActions";
+import type { AdaptiveTeacherCoach } from "@/lib/upsc/adaptiveTeacher";
 import { getDisasterManagementLearningPack } from "@/lib/upsc/disasterManagementLearningDecks";
 import { getEconomyLearningPack } from "@/lib/upsc/economyLearningDecks";
 import { getEnvironmentLearningPack } from "@/lib/upsc/environmentLearningDecks";
@@ -36,10 +38,11 @@ import {
   getCompressedSubjectRecap,
   getSubjectSubtopics,
   getSubjectTalkUnlockStage,
+  SUBJECT_RECALL_TARGET,
   SubjectAssessment,
   SubjectMaicDiscussion,
 } from "@/lib/upsc/subjectLearning";
-import { getSubjectLabProofCompletion } from "@/lib/upsc/subjectProgressGates";
+import { getSubjectLabProofCompletion, getSubjectWatchCompletion } from "@/lib/upsc/subjectProgressGates";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import {
   type SubjectConfidence,
@@ -48,6 +51,8 @@ import {
   type SubjectTalkDiscussionStep,
   useSubjectProgress,
 } from "@/lib/upsc/useSubjectProgress";
+import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
+import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
 import { cn } from "@/lib/utils";
 
 const confidenceOptions: SubjectConfidence[] = ["Shaky", "Working", "Command"];
@@ -96,6 +101,32 @@ function buildPromptLadder(session: SubjectSession, mode: SubjectMentorMode) {
   ];
 }
 
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<{ 0: { transcript: string } }>;
+};
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionConstructor() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
 export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const router = useRouter();
   const { getDayProgress, isLoaded, saveDayProgress } = useSubjectProgress(plan.slug, plan.sessions);
@@ -111,6 +142,13 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const [savedReflection, setSavedReflection] = useState(false);
   const [revisionQueued, setRevisionQueued] = useState(false);
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
+  const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
+  const [submittedInCurrentVisit, setSubmittedInCurrentVisit] = useState(false);
+  const [speechRecognition, setSpeechRecognition] = useState<SpeechRecognitionLike | null>(null);
+  const [speechState, setSpeechState] = useState<"idle" | "listening" | "unsupported">("idle");
+  const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
+  const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
+  const teacherRequestId = useRef(0);
 
   const activeSession = plan.sessions.find((session) => session.day === activeDay) ?? plan.sessions[0];
   const environmentPack = useMemo(
@@ -159,25 +197,29 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const basePath = `/upsc/${plan.slug}`;
   const revisitHref = `${basePath}/revisit?day=${activeSession.day}`;
   const activeLab = plan.labs.find((lab) => lab.title === activeSession.lab) ?? plan.labs[0];
-  const labHref = `${basePath}/lab?mode=${getDayProgress(activeSession.day)?.labMode ?? activeLab?.slug ?? ""}&day=${activeSession.day}`;
+  const activeProgress = getDayProgress(activeSession.day);
+  const labHref = `${basePath}/lab?mode=${activeProgress?.labMode ?? activeLab?.slug ?? ""}&day=${activeSession.day}`;
   const mcqHref = `${basePath}/mcq-readiness?day=${activeSession.day}`;
-  const labProofCompletion = getSubjectLabProofCompletion(getDayProgress(activeSession.day));
-  const isLabCompleted = labProofCompletion.complete;
+  const watchCompletion = getSubjectWatchCompletion(activeProgress);
+  const labProofCompletion = getSubjectLabProofCompletion(activeProgress);
+  const isWatchComplete = watchCompletion.complete;
   const unlockStage = assessment ? getSubjectTalkUnlockStage(assessment) : null;
   const isChallengePending = Boolean(assessment && maicDiscussion && discussionStep === "challenge");
   const isLabUnlocked = unlockStage === "lab" || unlockStage === "mcq";
   const isMcqScoreReady = unlockStage === "mcq";
-  const isMcqUnlocked = isMcqScoreReady && isLabCompleted;
+  const isMcqUnlocked = isMcqScoreReady;
+  const watchHref = `${basePath}/watch?day=${activeSession.day}`;
+  const shouldOpenWatchAfterTalk = Boolean(assessment && !isChallengePending && !isWatchComplete);
   const routeGateTitle = !assessment
     ? "Awaiting MAIC oral check"
     : isChallengePending
       ? "Peer challenge pending"
+    : shouldOpenWatchAfterTalk
+      ? "Watch the exact gap"
     : unlockStage === "mcq"
-      ? isLabCompleted
-        ? "MCQ gate unlocked"
-        : "Visual Lab required"
+      ? "Practice open"
       : unlockStage === "lab"
-        ? "Visual Lab required"
+        ? "Recall support"
         : unlockStage === "retry"
           ? "Retry talk after compressed recap"
           : "Revisit required";
@@ -185,18 +227,41 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     ? "The student must explain the topic in their own words before the next room opens."
     : isChallengePending
       ? "The AI teacher has created the counter-question. The student must answer the peer challenge before the final examiner verdict opens the next room."
+    : shouldOpenWatchAfterTalk
+      ? `Your recall is saved at ${assessment?.score ?? 0}%. Now use the class only to repair the missing concepts before returning to Talk.`
     : unlockStage === "mcq"
-      ? isLabCompleted
-        ? "Teacher, peer challenger, and examiner checks are strong enough for fresh MCQ readiness. Old low-quality MCQs stay out of this loop."
-        : `The explanation is strong, but the Visual Lab proof engine is still required before MCQ readiness opens: ${labProofCompletion.completed}/${labProofCompletion.target} proofs saved.`
+      ? `Teacher, peer challenger, and examiner checks reached the ${SUBJECT_RECALL_TARGET}% recall target. Fresh practice can open now; Visual Lab stays optional support.`
       : unlockStage === "lab"
-        ? "The explanation crossed the 70 percent floor. Complete the Visual Lab and save one applied insight before MCQ readiness."
+        ? `The explanation crossed the 70 percent floor but is below ${SUBJECT_RECALL_TARGET}%. Use the Visual Lab as support or retry Talk until MCQ opens. Current lab support: ${labProofCompletion.completed}/${labProofCompletion.target} proofs.`
         : unlockStage === "retry"
-          ? "The answer has partial logic, but it needs a compressed recap and another oral attempt before the lab opens."
+          ? "The answer has partial logic, but it needs a compressed recap and another oral attempt before forward movement."
           : "The explanation is below the required floor. Send the student to compressed recap, then bring them back for another oral check.";
-  const routeGateTone = !assessment ? "neutral" : isChallengePending ? "locked" : isLabUnlocked ? "unlocked" : "locked";
-  const primaryRouteHref = isLabUnlocked ? (isMcqUnlocked ? mcqHref : labHref) : revisitHref;
-  const primaryRouteLabel = isLabUnlocked ? (isMcqUnlocked ? "Open MCQ readiness" : "Open visual lab") : "Open compressed recap";
+  const routeGateStudentLine = !assessment
+    ? "Write your explanation, then assess it."
+    : isChallengePending
+      ? "Answer the counter-question."
+    : shouldOpenWatchAfterTalk
+      ? "Open the class for the missing pieces."
+    : unlockStage === "mcq"
+        ? "Practice is open."
+        : unlockStage === "lab"
+          ? "Use support, then explain again."
+          : "Revise, then try again.";
+  const routeGateTone = !assessment ? "neutral" : isChallengePending ? "locked" : shouldOpenWatchAfterTalk || isLabUnlocked ? "unlocked" : "locked";
+  const primaryRouteHref = shouldOpenWatchAfterTalk
+    ? watchHref
+    : isMcqUnlocked
+      ? mcqHref
+      : isLabUnlocked
+        ? labHref
+        : revisitHref;
+  const primaryRouteLabel = shouldOpenWatchAfterTalk
+    ? "Open class"
+    : isMcqUnlocked
+      ? "Open practice"
+      : isLabUnlocked
+        ? "Use visual support"
+        : "Open compressed recap";
   const talkClassroomStage: SubjectTalkClassroomStage = assessment
     ? isChallengePending
       ? "peer-challenge"
@@ -210,7 +275,68 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     : isChallengePending
       ? "Answer peer challenge"
       : primaryRouteLabel;
+  const teacherPromptLabel = isChallengePending ? "Repair check" : "AI teacher question";
+  const teacherPromptTitle = isChallengePending
+    ? "Answer one counter-question"
+    : learnerLevel === "beginner"
+      ? "Explain what you learned"
+      : learnerLevel === "advanced"
+        ? "Explain the attempt gap"
+        : "Explain what you already know";
+  const teacherPromptQuestion =
+    isChallengePending ? peerChallenge?.message ?? "Add one applied example and one UPSC trap." : activePrompt.question;
+  const learnerModeCopy =
+    learnerLevel === "beginner"
+      ? {
+          label: "Beginner discussion after lesson",
+          detail: `Explain the lesson, repair gaps, and clear ${SUBJECT_RECALL_TARGET}% recall before MCQs.`,
+        }
+      : learnerLevel === "advanced"
+        ? {
+            label: "Advanced attempt diagnosis",
+            detail: "Speak first. The AI teacher finds the attempt-level gap before any class.",
+          }
+        : {
+            label: "Intermediate gap diagnosis",
+            detail: "Speak what coaching covered. The AI teacher finds missing UPSC links before repair.",
+          };
   const themeStyle = getSubjectThemeStyle(plan);
+  const isHydratedForActiveDay = hydratedDay === activeDay;
+  const isPreRepairTalkAssessment = Boolean(activeProgress?.talkNextRoute?.includes("/watch"));
+  const talkFlowGate =
+    !isHydratedForActiveDay
+      ? null
+      : (activeProgress?.revisitQueued || (!isPreRepairTalkAssessment && activeProgress?.talkBand === "Revisit")) &&
+          !isChallengePending &&
+          !submittedInCurrentVisit
+        ? {
+            eyebrow: "Revision required",
+            title: "Repair the weak point first",
+            detail: "The previous explanation identified a weak point. Complete the short revision, then explain again.",
+            href: revisitHref,
+            cta: "Open short revision",
+          }
+        : learnerLevel === "beginner" && !isWatchComplete
+          ? {
+              eyebrow: "Lesson required",
+              title: "Finish the lesson first",
+              detail: "The beginner path starts with one short lesson. Discussion opens immediately after the lesson handoff.",
+              href: watchHref,
+              cta: "Open lesson",
+            }
+          : learnerLevel !== "beginner" &&
+              typeof activeProgress?.talkScore === "number" &&
+              activeProgress.talkScore < SUBJECT_RECALL_TARGET &&
+              !isWatchComplete &&
+              !submittedInCurrentVisit
+            ? {
+                eyebrow: "Repair required",
+                title: "Complete the diagnosed repair",
+                detail: "Your first explanation is saved. Use the short lesson selected for the missing concepts, then return here.",
+                href: watchHref,
+                cta: "Open repair lesson",
+              }
+            : null;
 
   useEffect(() => {
     if (!isLoaded || hydratedDay === activeDay) return;
@@ -222,11 +348,16 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         ? buildPromptLadder(activeSession, savedMode).findIndex((prompt) => prompt.label === saved.activePromptLabel)
         : 0;
 
+      setLearnerLevel(readStudentProfile()?.level ?? "beginner");
       setMentorMode(savedMode);
       setConfidence(saved?.confidence ?? "Working");
       setAnswerDraft(saved?.reflection ?? "");
       setChallengeDraft(saved?.talkChallengeResponse ?? "");
-      setDiscussionStep(saved?.talkDiscussionStep ?? (typeof saved?.talkScore === "number" ? "verdict" : "explain"));
+      setDiscussionStep(
+        saved?.talkDiscussionStep === "challenge"
+          ? "verdict"
+          : saved?.talkDiscussionStep ?? (typeof saved?.talkScore === "number" ? "verdict" : "explain")
+      );
       const savedAssessment =
         typeof saved?.talkScore === "number"
           ? {
@@ -240,7 +371,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   ? "Rewatch compressed recap"
                   : saved.talkUnlockStage === "mcq"
                     ? "Proceed to MCQs"
-                    : "Open visual lab",
+                    : "Repair toward 95%",
             }
           : null;
 
@@ -255,6 +386,17 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
             }
           : null
       );
+      setTeacherCoach(
+        saved?.teacherCoachSummary || saved?.teacherCoachNextPrompt
+          ? {
+              summary: saved.teacherCoachSummary ?? savedAssessment?.summary ?? "Saved teacher guidance.",
+              nextPrompt: saved.teacherCoachNextPrompt ?? saved.talkTeacherFollowUpPrompt ?? savedAssessment?.nextAction ?? "Continue with the recommended step.",
+              focusConcepts: [],
+              providerScore: saved.teacherProviderScore,
+            }
+          : null
+      );
+      setTeacherConnection(saved?.teacherMode === "gemini" ? "ready" : saved?.teacherMode === "local-fallback" ? "local" : "idle");
       setRevisionQueued(saved?.revisitQueued ?? false);
       setActivePromptIndex(savedPromptIndex >= 0 ? savedPromptIndex : 0);
       setSavedReflection(false);
@@ -264,8 +406,19 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     return () => window.clearTimeout(timer);
   }, [activeDay, activeSession, getDayProgress, hydratedDay, isLoaded]);
 
+  useEffect(() => {
+    return () => speechRecognition?.stop();
+  }, [speechRecognition]);
+
+  useEffect(() => {
+    return () => {
+      teacherRequestId.current += 1;
+    };
+  }, []);
+
   const selectDay = (day: number) => {
     const boundedDay = Math.min(Math.max(day, 1), plan.sessions.length);
+    speechRecognition?.stop();
     setActiveDay(boundedDay);
     setHydratedDay(null);
     setActivePromptIndex(0);
@@ -274,8 +427,14 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     setDiscussionStep("explain");
     setAssessment(null);
     setMaicDiscussion(null);
+    setTeacherCoach(null);
+    setTeacherConnection("idle");
+    teacherRequestId.current += 1;
     setSavedReflection(false);
     setRevisionQueued(false);
+    setSubmittedInCurrentVisit(false);
+    setSpeechRecognition(null);
+    setSpeechState("idle");
     router.replace(`${basePath}/talk?day=${boundedDay}`, { scroll: false });
   };
 
@@ -372,29 +531,28 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         }
       : baseDiscussion;
     const nextUnlockStage = getSubjectTalkUnlockStage(nextAssessment);
-    const nextDiscussionStep: SubjectTalkDiscussionStep =
-      includeChallenge || nextUnlockStage === "revisit" ? "verdict" : "challenge";
-    const nextClassroomStage: SubjectTalkClassroomStage =
-      nextDiscussionStep === "challenge" ? "peer-challenge" : "examiner-verdict";
+    const nextDiscussionStep: SubjectTalkDiscussionStep = "verdict";
+    const nextClassroomStage: SubjectTalkClassroomStage = "examiner-verdict";
     const nextIsLabUnlocked = nextUnlockStage === "lab" || nextUnlockStage === "mcq";
-    const nextIsMcqUnlocked = nextUnlockStage === "mcq" && isLabCompleted;
-    const nextRoute = nextDiscussionStep === "challenge"
-      ? `${basePath}/talk?day=${activeSession.day}`
-      : nextIsLabUnlocked
-        ? nextIsMcqUnlocked
-          ? mcqHref
-          : labHref
+    const nextIsMcqUnlocked = nextUnlockStage === "mcq";
+    const nextShouldOpenWatch = !isWatchComplete;
+    const nextRoute = nextShouldOpenWatch
+      ? watchHref
+      : nextIsMcqUnlocked
+        ? mcqHref
+        : nextIsLabUnlocked
+          ? labHref
         : revisitHref;
-    const nextActionLabel = nextDiscussionStep === "challenge"
-      ? "Answer peer challenge"
-      : nextIsLabUnlocked
-        ? nextIsMcqUnlocked
-          ? "Open MCQ readiness"
-          : "Open visual lab"
+    const nextActionLabel = nextShouldOpenWatch
+      ? "Open class"
+      : nextIsMcqUnlocked
+        ? "Open practice"
+        : nextIsLabUnlocked
+          ? "Use visual support"
         : "Open compressed recap";
     const nextConfidence: SubjectConfidence =
       nextUnlockStage === "mcq" ? "Command" : nextUnlockStage === "revisit" ? "Shaky" : "Working";
-    const nextRevisionQueued = nextUnlockStage === "revisit" || nextUnlockStage === "retry";
+    const nextRevisionQueued = isWatchComplete && (nextUnlockStage === "revisit" || nextUnlockStage === "retry");
 
     setAssessment(nextAssessment);
     setMaicDiscussion(nextDiscussion);
@@ -402,6 +560,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     setRevisionQueued(nextRevisionQueued);
     setDiscussionStep(nextDiscussionStep);
     setSavedReflection(true);
+    setSubmittedInCurrentVisit(true);
     persistCurrentState({
       confidence: nextConfidence,
       challengeResponse: challengeDraft,
@@ -412,16 +571,137 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       classroomStage: nextClassroomStage,
       nextRoute,
       nextActionLabel,
-      preliminaryScore: nextDiscussionStep === "challenge" ? nextAssessment.score : undefined,
+      preliminaryScore: undefined,
       incrementSavedCount: true,
     });
+    setTeacherCoach(null);
+    setTeacherConnection("checking");
+    const requestId = teacherRequestId.current + 1;
+    teacherRequestId.current = requestId;
+    void requestAdaptiveTeacherDiscussion({
+      subjectSlug: plan.slug,
+      day: activeSession.day,
+      answer: answerDraft,
+      challengeAnswer: includeChallenge ? challengeDraft : undefined,
+      learnerLevel,
+    })
+      .then((response) => {
+        if (teacherRequestId.current !== requestId) return;
+        setTeacherCoach(response.coach);
+        setTeacherConnection(response.mode === "gemini" ? "ready" : "local");
+        saveDayProgress(activeSession.day, {
+          teacherMode: response.mode,
+          teacherPromptVersion: response.trace.promptVersion,
+          teacherRubricVersion: response.trace.rubricVersion,
+          teacherRecallTarget: response.trace.recallTarget,
+          teacherCoachSummary: response.coach.summary,
+          teacherCoachNextPrompt: response.coach.nextPrompt,
+          teacherProviderScore: response.coach.providerScore,
+          talkTeacherFollowUpPrompt: response.coach.nextPrompt,
+        });
+      })
+      .catch(() => {
+        if (teacherRequestId.current !== requestId) return;
+        setTeacherCoach(null);
+        setTeacherConnection("unavailable");
+      });
   };
 
-  if (!isLoaded) {
+  const toggleSpeechCapture = () => {
+    if (speechState === "listening" && speechRecognition) {
+      speechRecognition.stop();
+      setSpeechRecognition(null);
+      setSpeechState("idle");
+      return;
+    }
+
+    const Recognition = getSpeechRecognitionConstructor();
+    if (!Recognition) {
+      setSpeechState("unsupported");
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-IN";
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      if (!transcript) return;
+      setAnswerDraft((current) => `${current}${current.trim() ? " " : ""}${transcript}`.trim());
+      setChallengeDraft("");
+      setDiscussionStep("explain");
+      setAssessment(null);
+      setMaicDiscussion(null);
+      setTeacherCoach(null);
+      setTeacherConnection("idle");
+      teacherRequestId.current += 1;
+      setSavedReflection(false);
+      setSubmittedInCurrentVisit(false);
+    };
+    recognition.onend = () => {
+      setSpeechRecognition(null);
+      setSpeechState("idle");
+    };
+    recognition.onerror = () => {
+      setSpeechRecognition(null);
+      setSpeechState("idle");
+    };
+    recognition.start();
+    setSpeechRecognition(recognition);
+    setSpeechState("listening");
+  };
+
+  if (!isLoaded || !isHydratedForActiveDay) {
     return (
       <div style={themeStyle} className="flex min-h-screen items-center justify-center bg-[var(--subject-bg)] text-[var(--subject-text)]">
         <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-6 text-sm font-black">
           Loading {plan.title} Talk room...
+        </div>
+      </div>
+    );
+  }
+
+  if (talkFlowGate) {
+    return (
+      <div
+        data-testid="subject-room-shell"
+        data-room="talk-gate"
+        data-subject={plan.slug}
+        data-subject-accent={plan.accent}
+        style={themeStyle}
+        className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
+      >
+        <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+          <Link href={basePath} className="inline-flex min-h-10 items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Link>
+          <section
+            data-testid="subject-talk-flow-gate"
+            className="rounded-lg border border-[#ef9f27]/55 bg-[#fff4df] p-6 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#9a6a16] text-white">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#9a6a16]">{talkFlowGate.eyebrow}</p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--subject-heading)]">{talkFlowGate.title}</h1>
+                <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#6f4a12]">{talkFlowGate.detail}</p>
+                <Link
+                  data-testid="subject-talk-flow-gate-action"
+                  href={talkFlowGate.href}
+                  className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90"
+                >
+                  {talkFlowGate.cta}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -436,519 +716,212 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       style={themeStyle}
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-        <section className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr]">
-          <div className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
-            <Link href={basePath} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
-              <ArrowLeft className="h-4 w-4" /> {plan.title} command room
-            </Link>
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">Socratic Talk</Badge>
-              <span className="text-sm font-bold text-[#776f64]">Day {activeSession.day} conversation</span>
-            </div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--subject-accent)]">{activeSession.chapter}</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href={basePath} className="inline-flex min-h-10 items-center gap-2 text-sm font-black text-[var(--subject-dark)]">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-md bg-[var(--subject-accent)] px-3 py-1 text-white">Talk</Badge>
+            <span className="text-sm font-black text-[var(--subject-accent)]">Day {activeSession.day}</span>
+            <span className="text-sm font-semibold text-[#746f66]">{activeSession.chapter}</span>
+          </div>
+        </div>
+
+        <section
+          data-testid="subject-talk-simple-step"
+          data-student-flow="single-answer"
+          className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-5">
+            <h1 className="text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
               {activeSession.title}
             </h1>
-            <p className="mt-4 text-base font-medium leading-7 text-[#5d675f]">{activeSession.anchor}</p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {[
-                ["Day", `${activeSession.day}/${plan.sessions.length}`],
-                ["Mode", mentorMode],
-                ["Confidence", confidence],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">{label}</p>
-                  <p className="mt-2 text-sm font-black leading-5 text-[var(--subject-heading)]">{value}</p>
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+              {learnerLevel === "beginner"
+                ? `Explain the lesson in your own words. The AI teacher keeps the discussion focused until recall reaches ${SUBJECT_RECALL_TARGET}%.`
+                : learnerLevel === "advanced"
+                  ? `Speak your attempt-level gap first. The AI teacher diagnoses what is blocking command and repairs it toward ${SUBJECT_RECALL_TARGET}% recall.`
+                  : `Speak what coaching already covered. The AI teacher identifies the missing UPSC links and repairs them toward ${SUBJECT_RECALL_TARGET}% recall.`}
+            </p>
+            <div
+              data-testid="subject-talk-learner-mode"
+              className="mt-4 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+                {learnerModeCopy.label}
+              </p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{learnerModeCopy.detail}</p>
+            </div>
+            <div
+              data-testid="subject-talk-simple-loop"
+              className="mt-4 grid gap-2 text-xs font-black uppercase tracking-[0.1em] text-[var(--subject-dark)] sm:grid-cols-4"
+            >
+              {["Speak", "AI teacher check", `${SUBJECT_RECALL_TARGET}% recall`, "Next room"].map((step, index) => (
+                <div
+                  key={step}
+                  className="flex min-h-11 items-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--subject-accent)] text-[11px] text-white">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
                 </div>
               ))}
             </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <button
-                type="button"
-                onClick={() => selectDay(activeSession.day - 1)}
-                disabled={activeSession.day === 1}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                <ChevronLeft className="h-4 w-4" /> Previous day
-              </button>
-              <button
-                type="button"
-                onClick={() => selectDay(activeSession.day + 1)}
-                disabled={activeSession.day === plan.sessions.length}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-bold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                Next day <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
           </div>
 
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Prompt ladder</p>
-                <h2 className="text-2xl font-black tracking-tight text-[#13251d]">{activePrompt.label}</h2>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[#ef9f27] text-[#13251d]">
+          <div data-testid="talk-discussion-window" className="rounded-lg border border-[var(--subject-ring)] bg-[var(--subject-light)] p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--subject-accent)] text-white">
                 <BrainCircuit className="h-5 w-5" />
               </div>
-            </div>
-            <div className="mb-5 h-2 overflow-hidden rounded-full bg-[#f2eadc]">
-              <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-5">
-              {promptLadder.map((prompt, index) => {
-                const isActive = activePromptIndex === index;
-                return (
-                  <button
-                    key={prompt.label}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => {
-                      setActivePromptIndex(index);
-                      setSavedReflection(false);
-                    }}
-                    className={cn(
-                      "min-h-14 rounded-md border px-3 text-left text-xs font-black transition",
-                      isActive
-                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                    )}
-                  >
-                    {index + 1}. {prompt.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-5">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#1d9e75] text-white">
-                  <MessageCircle className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-black text-[#085041]">Question</p>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">{teacherPromptLabel}</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--subject-heading)]">
+                  {teacherPromptTitle}
+                </h2>
+                <p className="mt-3 text-lg font-black leading-8 text-[var(--subject-heading)]">{teacherPromptQuestion}</p>
               </div>
-              <p className="text-lg font-black leading-8 text-[#13251d]">{activePrompt.question}</p>
-              <div className="mt-4 flex items-start gap-3 rounded-md bg-white/75 p-3">
-                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-[#ef9f27]" />
-                <p className="text-sm font-semibold leading-6 text-[#49675e]">{activePrompt.nudge}</p>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">AI teacher</p>
-                <p className="mt-3 text-sm font-bold leading-6 text-[#34453b]">
-                  Explain the topic back with concept, mechanism, example, and one UPSC trap. I will decide whether MCQs open or revision starts.
-                </p>
-              </div>
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Student must cover</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {subtopics.map((topic) => (
-                    <span key={topic} className="rounded-md border border-[#cfc6b6] bg-white px-2 py-1 text-xs font-black text-[#1a3a2a]">
-                      {topic}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {learningPack ? (
-              <div
-                data-testid={`${plan.slug}-talk-teacher-pack`}
-                className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4"
-              >
-                <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">
-                      {plan.title} oral rubric
-                    </p>
-                    <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">
-                      {learningPack.lens}
-                    </h3>
-                  </div>
-                  <span className="max-w-full break-words rounded-md bg-[#e7f5ee] px-3 py-2 text-xs font-black text-[#085041] ring-1 ring-[#1d9e75]/20 sm:shrink-0">
-                    AI teacher focus
-                  </span>
-                </div>
-                <p className="text-sm font-bold leading-6 text-[#49675e]">{learningPack.teacherFocus}</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md bg-[#f7f4ee] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                      Student must speak
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {learningPack.oralChecklist.map((item) => (
-                        <span
-                          key={item}
-                          className="rounded-md bg-white px-2 py-1 text-xs font-black text-[#1a3a2a] ring-1 ring-[#dcd5c7]"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-md bg-[#fff4df] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9a6a16]">
-                      Peer challenge bank
-                    </p>
-                    <p className="mt-2 text-xs font-bold leading-5 text-[#6f4a12]">
-                      {learningPack.trapBank[0]}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {historyPack ? (
-              <div
-                data-testid="history-talk-classroom-protocol"
-                className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#f6fbf8] p-4"
-              >
-                <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">
-                      Interactive History classroom protocol
-                    </p>
-                    <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">
-                      Teacher, peer, examiner, memory loop
-                    </h3>
-                  </div>
-                  <span
-                    data-testid="history-talk-stage"
-                    className="max-w-full break-words rounded-md bg-white px-3 py-2 text-xs font-black text-[#085041] ring-1 ring-[#1d9e75]/20 sm:shrink-0"
-                  >
-                    {classroomStageLabels[talkClassroomStage]}
-                  </span>
-                </div>
-                <div className="grid gap-3 md:grid-cols-4">
-                  {[
-                    ["AI Teacher", "Ask chronology, source/map, actor, consequence, trap."],
-                    ["Peer Challenger", "Force one missing proof or counter-example."],
-                    ["UPSC Examiner", "Score only after the challenge response."],
-                    ["Memory Loop", "Send weak answers to compressed revisit."],
-                  ].map(([title, detail]) => (
-                    <div key={title} className="rounded-md border border-[#dcd5c7] bg-white p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{title}</p>
-                      <p className="mt-2 text-xs font-bold leading-5 text-[#34453b]">{detail}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_0.9fr]">
-                  <div className="rounded-md bg-[#f7f4ee] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                      Source-map proof gate
-                    </p>
-                    <div className="mt-2 grid gap-2">
-                      {historyPack.caseAnchors.slice(0, 4).map((anchor) => (
-                        <p key={anchor} className="rounded-md bg-white px-3 py-2 text-xs font-black leading-5 text-[#1a3a2a] ring-1 ring-[#dcd5c7]">
-                          {anchor}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-md bg-[#fff4df] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9a6a16]">
-                      Trap clinic
-                    </p>
-                    <div className="mt-2 grid gap-2">
-                      {historyPack.trapBank.slice(0, 3).map((trap) => (
-                        <p key={trap} className="rounded-md bg-white/80 p-2 text-xs font-bold leading-5 text-[#6f4a12]">
-                          {trap}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              {mentorModes.map((mode) => {
-                const isActive = mentorMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => {
-                      setMentorMode(mode);
-                      persistCurrentState({ mentorMode: mode });
-                    }}
-                    className={cn(
-                      "min-h-12 rounded-md border px-3 text-left text-sm font-black transition",
-                      isActive
-                        ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#5f665f] hover:border-[#1d9e75]"
-                    )}
-                  >
-                    {mode}
-                  </button>
-                );
-              })}
             </div>
           </div>
-        </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-5">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Discussion gate</p>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">AI teacher oral check</h2>
-            </div>
-
-            <div data-testid="talk-discussion-window" className="mb-5 grid gap-3">
-              <div className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#1d9e75] text-white">
-                    <BrainCircuit className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#085041]">AI teacher</p>
-                    <p className="mt-1 text-sm font-bold leading-6 text-[#254438]">
-                      First explain the mechanism. Then attach an example. End with one UPSC statement trap.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#1a3a2a] ring-1 ring-[#dcd5c7]">
-                    <MessageCircle className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#776f64]">Student response</p>
-                    <p className="mt-1 break-words text-sm font-bold leading-6 text-[#34453b]">
-                      {answerDraft.trim()
-                        ? `${answerDraft.trim().slice(0, 180)}${answerDraft.trim().length > 180 ? "..." : ""}`
-                        : "Write the response below. The gate will stay closed until an explanation is assessed."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              {maicDiscussion && (
-                <div data-testid="subject-maic-discussion-turns" className="grid gap-3 md:grid-cols-2">
-                  {maicDiscussion.turns.map((turn) => (
-                    <div
-                      key={`${turn.role}-${turn.title}`}
-                      className={cn(
-                        "rounded-lg border p-4",
-                        turn.tone === "teacher" && "border-[#cfe5dc] bg-[#e7f5ee]",
-                        turn.tone === "peer" && "border-[#d9d4f0] bg-[#f1efff]",
-                        turn.tone === "examiner" && "border-[#f0d5a8] bg-[#fff4df]",
-                        turn.tone === "summarizer" && "border-[#dcd5c7] bg-white"
-                      )}
-                    >
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{turn.role}</p>
-                      <h3 className="mt-2 text-sm font-black text-[#13251d]">{turn.title}</h3>
-                      <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{turn.message}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {maicDiscussion && (
-                <div data-testid="subject-talk-peer-challenge" className="rounded-lg border border-[#d9d4f0] bg-[#f8f6ff] p-4">
-                  <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#5b4ba8]">Peer challenge round</p>
-                      <h3 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
-                        Answer the counter-question
-                      </h3>
-                    </div>
-                    <span className="max-w-full break-words rounded-md bg-white px-3 py-2 text-xs font-black text-[#5b4ba8] ring-1 ring-[#d9d4f0] sm:shrink-0">
-                      {discussionStep === "verdict" ? "Examiner verdict saved" : "Challenge pending"}
-                    </span>
-                  </div>
-                  <p className="rounded-md bg-white/80 p-3 text-sm font-bold leading-6 text-[#34453b]">
-                    {peerChallenge?.message ?? "Connect the weak concept to one applied example and one UPSC trap."}
-                  </p>
-                  <textarea
-                    data-testid="subject-talk-challenge-response"
-                    value={challengeDraft}
-                    onChange={(event) => {
-                      setChallengeDraft(event.target.value);
-                      setDiscussionStep("challenge");
-                      setSavedReflection(false);
-                    }}
-                    placeholder="Answer the peer challenge. Add the missing applied example, institution, map, report, or trap, then ask the examiner to reassess."
-                    className="mt-4 min-h-28 w-full resize-y rounded-lg border border-[#d9d4f0] bg-white p-3 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#5b4ba8] focus:ring-2 focus:ring-[#5b4ba8]/20"
-                  />
-                  <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="max-w-xl text-xs font-bold leading-5 text-[#5f5b73]">
-                      {examinerTurn?.message ?? "The examiner will combine the first answer and this challenge response for the final local score."}
-                    </p>
-                    <button
-                      type="button"
-                      data-testid="subject-talk-reassess-challenge"
-                      onClick={() => assessCurrentAnswer(true)}
-                      disabled={challengeDraft.trim().length < 20}
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#5b4ba8] px-3 text-sm font-bold text-white transition hover:bg-[#46398b] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-                    >
-                      <Gauge className="h-4 w-4" /> Reassess with challenge
-                    </button>
-                  </div>
-                </div>
-              )}
-              {assessment && (
-                <div data-testid="talk-teacher-verdict" className="rounded-lg border border-[#dcd5c7] bg-white p-4">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white",
-                        isLabUnlocked ? "bg-[#1d9e75]" : "bg-[#9a6a16]"
-                      )}
-                    >
-                      {isLabUnlocked ? <UnlockKeyhole className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
-                    </div>
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1d9e75]">AI teacher verdict</p>
-                      <p className="mt-1 text-sm font-bold leading-6 text-[#34453b]">
-                        {isMcqUnlocked
-                          ? "Good. You may move to fresh MCQ readiness for this topic."
-                          : isLabUnlocked
-                            ? "Good. Move to the Visual Lab and prove the idea through an applied example."
-                            : "Pause. Revisit the compressed recap, then return and explain again."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <textarea
-              data-testid="talk-answer-draft"
-              value={answerDraft}
-              onChange={(event) => {
-                setAnswerDraft(event.target.value);
-                setChallengeDraft("");
-                setDiscussionStep("explain");
-                setAssessment(null);
-                setMaicDiscussion(null);
-                setSavedReflection(false);
-              }}
-              placeholder="Write the explanation in your own words. Start with concept, then mechanism, then example."
-              className="min-h-48 w-full resize-y rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
-            />
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <button
-                type="button"
-                onClick={() => {
-                  persistCurrentState({ incrementSavedCount: true });
-                  setSavedReflection(true);
+          {!isChallengePending && (
+            <>
+              <textarea
+                data-testid="talk-answer-draft"
+                value={answerDraft}
+                onChange={(event) => {
+                  setAnswerDraft(event.target.value);
+                  setChallengeDraft("");
+                  setDiscussionStep("explain");
+                  setAssessment(null);
+                  setMaicDiscussion(null);
+                  setTeacherCoach(null);
+                  setTeacherConnection("idle");
+                  teacherRequestId.current += 1;
+                  setSavedReflection(false);
+                  setSubmittedInCurrentVisit(false);
                 }}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d] sm:w-auto"
-              >
-                <Save className="h-4 w-4" /> Save reflection
-              </button>
-              <button
-                type="button"
-                onClick={() => assessCurrentAnswer(false)}
-                disabled={answerDraft.trim().length < 20}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-3 text-sm font-bold text-white transition hover:bg-[#087a59] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                <Gauge className="h-4 w-4" /> Assess explanation
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePromptIndex((current) => Math.max(current - 1, 0))}
-                disabled={activePromptIndex === 0}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                <ChevronLeft className="h-4 w-4" /> Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePromptIndex((current) => Math.min(current + 1, promptLadder.length - 1))}
-                disabled={activePromptIndex === promptLadder.length - 1}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                Next prompt <ChevronRight className="h-4 w-4" />
-              </button>
+                placeholder="Write the explanation in your own words: concept, mechanism, example, and one UPSC trap."
+                className="mt-5 min-h-40 w-full resize-y rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[var(--subject-accent)] focus:ring-2 focus:ring-[var(--subject-accent)]/20"
+              />
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  data-testid="talk-speak-answer"
+                  onClick={toggleSpeechCapture}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-4 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] sm:w-auto"
+                >
+                  {speechState === "listening" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {speechState === "listening" ? "Stop speaking" : "Speak answer"}
+                </button>
+                <button
+                  type="button"
+                  data-testid="talk-assess-answer"
+                  aria-label="Assess explanation"
+                  onClick={() => assessCurrentAnswer(false)}
+                  disabled={answerDraft.trim().length < 20 || teacherConnection === "checking"}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                >
+                  <Gauge className="h-4 w-4" /> {teacherConnection === "checking" ? "Checking answer..." : "Check answer"}
+                </button>
+                {speechState === "unsupported" ? (
+                  <span className="flex min-h-11 items-center text-xs font-bold text-[#756f64]">
+                    Voice capture is unavailable in this browser. Type your answer here.
+                  </span>
+                ) : null}
+              </div>
+            </>
+          )}
+
+          {savedReflection && (
+            <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+              <p className="text-sm font-bold leading-6 text-[#085041]">Saved for this day.</p>
             </div>
-            {savedReflection && (
-              <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                <p className="text-sm font-bold leading-6 text-[#085041]">Reflection saved locally for this {plan.title} day.</p>
-              </div>
-            )}
-            {assessment && (
-              <div className="mt-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
-                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">AI teacher assessment</p>
-                    <h3 className="mt-2 text-2xl font-black text-[#13251d]">{assessment.score}% / {assessment.band}</h3>
-                  </div>
-                  <div className="max-w-full break-words rounded-md bg-[#1a3a2a] px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-white sm:shrink-0">
-                    {assessment.nextAction}
-                  </div>
+          )}
+
+          {assessment && !isChallengePending && (
+            <div data-testid="talk-score-card" className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">AI teacher score</p>
+                  <h3 className="mt-2 text-3xl font-black text-[#13251d]">{assessment.score}%</h3>
+                  <p className="mt-1 text-sm font-black text-[#085041]">{assessment.band}</p>
                 </div>
-                <p className="mt-3 text-sm font-bold leading-6 text-[#49675e]">{assessment.summary}</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md bg-white/75 p-3">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Matched logic</p>
-                    <p className="mt-2 break-words text-sm font-bold leading-6 text-[#34453b]">
-                      {assessment.matchedKeywords.length > 0 ? assessment.matchedKeywords.join(", ") : "Not enough core keywords yet."}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-white/75 p-3">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ef9f27]">Repair next</p>
-                    <p className="mt-2 break-words text-sm font-bold leading-6 text-[#34453b]">
-                      {assessment.missingKeywords.length > 0 ? assessment.missingKeywords.join(", ") : "No major keyword gaps detected."}
-                    </p>
-                  </div>
-                </div>
+                <span className="rounded-md bg-[#1a3a2a] px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
+                  {assessment.nextAction}
+                </span>
               </div>
-            )}
-            {historyPack && assessment ? (
-              <div
-                data-testid="history-talk-score-gate"
-                className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4"
-              >
-                <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">
-                      History examiner score gate
-                    </p>
-                    <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">
-                      Chronology plus proof before movement
-                    </h3>
-                  </div>
-                  <span className="max-w-full break-words rounded-md bg-[#1a3a2a] px-3 py-2 text-xs font-black text-white sm:shrink-0">
-                    {discussionStep === "challenge" ? "Peer challenge active" : "Final verdict saved"}
+              <p className="mt-3 text-sm font-bold leading-6 text-[#49675e]">{assessment.summary}</p>
+
+              <div data-testid="talk-recall-target" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/80 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">
+                    Target {SUBJECT_RECALL_TARGET}% recall
+                  </p>
+                  <span className="rounded-md bg-[#eef8f3] px-3 py-1 text-xs font-black text-[#085041]">
+                    {assessment.score >= SUBJECT_RECALL_TARGET
+                      ? `${SUBJECT_RECALL_TARGET}% recall cleared`
+                      : `${Math.max(SUBJECT_RECALL_TARGET - assessment.score, 0)}% gap remains`}
                   </span>
                 </div>
-                <div className="grid gap-2 md:grid-cols-5">
-                  {["Chronology", "Source/map", "Actor/institution", "Consequence", "UPSC trap"].map((gate) => (
-                    <div key={gate} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{gate}</p>
-                      <p className="mt-2 text-xs font-bold leading-5 text-[#34453b]">
-                        {assessment.matchedKeywords.some((keyword) => gate.toLowerCase().includes(keyword) || keyword.includes(gate.toLowerCase().split("/")[0]))
-                          ? "Detected in response"
-                          : "Check explicitly"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-3 rounded-md bg-[#fff4df] p-3 text-xs font-bold leading-5 text-[#6f4a12]">
-                  {discussionStep === "challenge"
-                    ? "The route is intentionally paused. Answer the peer challenge, then ask the examiner to reassess."
-                    : "The examiner verdict is now saved locally and the route decision can move forward."}
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                  {assessment.score >= SUBJECT_RECALL_TARGET
+                    ? "Practice opens because the explanation is strong enough for fresh MCQs."
+                    : assessment.missingKeywords.length
+                      ? `Repair these missing anchors before MCQ: ${assessment.missingKeywords.slice(0, 3).join(", ")}.`
+                      : "Explain one clearer cause-effect chain, one example, and one UPSC trap before MCQ."}
                 </p>
               </div>
-            ) : null}
 
-            <div
-              data-testid="talk-route-gate"
-              className={cn(
-                "mt-4 rounded-lg border p-4",
-                routeGateTone === "unlocked" && "border-[#1d9e75]/45 bg-[#e7f5ee]",
-                routeGateTone === "locked" && "border-[#ef9f27]/45 bg-[#fff4df]",
-                routeGateTone === "neutral" && "border-[#dcd5c7] bg-[#fdfaf3]"
-              )}
-            >
-              <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3">
+              <div data-testid="subject-talk-teacher-coach" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Your mastery plan</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                  {teacherCoach?.nextPrompt ??
+                    (assessment.score >= SUBJECT_RECALL_TARGET
+                      ? "Recall target cleared. Apply the concept in fresh MCQs."
+                      : assessment.missingKeywords.length
+                        ? `Repair ${assessment.missingKeywords.slice(0, 3).join(", ")} through one cause-effect chain, one applied example, and one UPSC trap.`
+                        : "Repair the weakest concept, then explain once more.")}
+                </p>
+                {(teacherCoach?.focusConcepts.length ? teacherCoach.focusConcepts : assessment.missingKeywords).length ? (
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#657066]">
+                    Focus concepts: {(teacherCoach?.focusConcepts.length ? teacherCoach.focusConcepts : assessment.missingKeywords).slice(0, 4).join(", ")}
+                  </p>
+                ) : null}
+                {teacherConnection !== "idle" ? (
+                  <p
+                    data-testid="subject-talk-teacher-connection"
+                    aria-live="polite"
+                    className="mt-2 text-[11px] font-black uppercase tracking-[0.12em] text-[#1d9e75]"
+                  >
+                    {teacherConnection === "checking"
+                      ? "Teacher is refining the next question..."
+                      : teacherConnection === "ready"
+                        ? "Gemini teacher guidance active."
+                        : teacherConnection === "local"
+                          ? "Local teacher guidance active."
+                          : "Local score is active. Teacher service will retry later."}
+                  </p>
+                ) : null}
+              </div>
+
+              <div
+                data-testid="talk-route-gate"
+                className={cn(
+                  "mt-4 rounded-lg border p-4",
+                  routeGateTone === "unlocked" && "border-[#1d9e75]/45 bg-white/70",
+                  routeGateTone === "locked" && "border-[#ef9f27]/45 bg-[#fff4df]",
+                  routeGateTone === "neutral" && "border-[#dcd5c7] bg-[#fdfaf3]"
+                )}
+              >
+                <div className="flex items-start gap-3">
                   <div
                     className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-white",
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white",
                       routeGateTone === "unlocked" && "bg-[#1d9e75]",
                       routeGateTone === "locked" && "bg-[#9a6a16]",
                       routeGateTone === "neutral" && "bg-[#1a3a2a]"
@@ -962,68 +935,308 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                       <BookOpenCheck className="h-4 w-4" />
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1d9e75]">Route decision</p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">{routeGateTitle}</h3>
-                    <p className="mt-2 break-words text-sm font-bold leading-6 text-[#49675e]">{routeGateDetail}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">Next</p>
+                    <h2 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">{routeGateTitle}</h2>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{routeGateStudentLine}</p>
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {assessment && !isChallengePending ? (
-                    <Link
-                      data-testid="talk-primary-route"
-                      href={primaryRouteHref}
-                      className={cn(
-                        "inline-flex h-10 w-full items-center justify-center gap-2 rounded-md px-3 text-sm font-black text-white transition sm:w-auto",
-                        isMcqUnlocked && isLabCompleted ? "bg-[#1a3a2a] hover:bg-[#10291d]" : "bg-[#9a6a16] hover:bg-[#7f5410]"
-                      )}
-                    >
-                      {primaryRouteLabel}
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md bg-[#d6cec0] px-3 text-sm font-black text-[#7b7164] sm:w-auto"
-                    >
-                      {!assessment ? "Route locked" : talkNextActionLabel}
-                    </button>
-                  )}
+                <details className="mt-3 rounded-md bg-white/60 p-2">
+                  <summary className="cursor-pointer text-xs font-black text-[#1a3a2a]">Why this gate?</summary>
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{routeGateDetail}</p>
+                </details>
+                <Link
+                  data-testid="talk-primary-route"
+                  href={primaryRouteHref}
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
+                >
+                  {primaryRouteLabel}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {isChallengePending && (
+            <div data-testid="subject-talk-peer-challenge" className="mt-5 rounded-lg border border-[#d9d4f0] bg-[#f8f6ff] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#5b4ba8]">Peer Challenger</p>
+              <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">One repair answer</h3>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#5f5b73]">
+                Write only the missing link. The final route opens after this check.
+              </p>
+              <textarea
+                data-testid="subject-talk-challenge-response"
+                value={challengeDraft}
+                onChange={(event) => {
+                  setChallengeDraft(event.target.value);
+                  setDiscussionStep("challenge");
+                  setTeacherCoach(null);
+                  setTeacherConnection("idle");
+                  teacherRequestId.current += 1;
+                  setSavedReflection(false);
+                }}
+                placeholder="Answer the challenge in 2-3 precise lines."
+                className="mt-4 min-h-28 w-full resize-y rounded-lg border border-[#d9d4f0] bg-white p-3 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#5b4ba8] focus:ring-2 focus:ring-[#5b4ba8]/20"
+              />
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-xl text-xs font-bold leading-5 text-[#5f5b73]">
+                  {examinerTurn?.message ?? "The examiner will combine both answers before opening the next room."}
+                </p>
+                <button
+                  type="button"
+                  data-testid="subject-talk-reassess-challenge"
+                  onClick={() => assessCurrentAnswer(true)}
+                  disabled={challengeDraft.trim().length < 20 || teacherConnection === "checking"}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#5b4ba8] px-3 text-sm font-bold text-white transition hover:bg-[#46398b] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                >
+                  <Gauge className="h-4 w-4" /> {teacherConnection === "checking" ? "Checking answer..." : "Recheck"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <details data-testid="subject-talk-details" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
+            Optional learning details
+          </summary>
+          <div className="mt-5 grid gap-5">
+            <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+              <div className="flex items-start gap-3">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-[#ef9f27]" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Hint</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{activePrompt.nudge}</p>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="grid gap-5">
-            <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Confidence check</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">How solid is this concept?</h2>
-              <div className="mt-5 grid gap-2">
-                {confidenceOptions.map((option) => {
-                  const isActive = confidence === option;
-                  return (
+            {maicDiscussion && (
+              <details data-testid="subject-maic-discussion-turns" className="rounded-lg border border-[#dcd5c7] bg-white p-4">
+                <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
+                  AI teacher, peer, and examiner transcript
+                </summary>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Discussion record</p>
+                    <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">
+                      {isChallengePending ? "Challenge in progress" : "Verdict saved"}
+                    </h3>
+                  </div>
+                  <span className="rounded-md bg-[#f2eadc] px-3 py-2 text-xs font-black text-[#1a3a2a]">
+                    {maicDiscussion.score}%
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {maicDiscussion.turns.map((turn) => (
+                    <div key={`details-${turn.role}-${turn.title}`} className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{turn.role}</p>
+                      <p className="mt-1 text-sm font-black text-[#13251d]">{turn.title}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+            <div
+              data-testid="subject-talk-single-answer-rule"
+              className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">
+                Single answer rule
+              </p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-[var(--subject-heading)]">
+                Explain once in the main answer box
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                The AI teacher uses the main explanation above as the diagnosis. Beginner students explain after the lesson;
+                intermediate and advanced students explain before any repair class opens.
+              </p>
+              {answerDraft.trim() ? (
+                <p className="mt-3 line-clamp-3 rounded-md bg-white p-3 text-sm font-bold leading-6 text-[#34453b]">
+                  {answerDraft}
+                </p>
+              ) : null}
+            </div>
+            <details
+              data-testid="subject-talk-teacher-controls"
+              className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3"
+            >
+              <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]">
+                Teacher tools
+              </summary>
+              <div className="mt-3 grid gap-4">
+            <details data-testid="subject-talk-more-controls" className="rounded-md border border-[var(--subject-border)] bg-white p-3">
+              <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]">More controls</summary>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    persistCurrentState({ incrementSavedCount: true });
+                    setSavedReflection(true);
+                  }}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] sm:w-auto"
+                >
+                  <Save className="h-4 w-4" /> Save draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePromptIndex((current) => Math.min(current + 1, promptLadder.length - 1))}
+                  disabled={activePromptIndex === promptLadder.length - 1}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                >
+                  Next question <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </details>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {promptLadder.map((prompt, index) => {
+                const isActive = activePromptIndex === index;
+                return (
+                  <button
+                    key={prompt.label}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => {
+                      setActivePromptIndex(index);
+                      setSavedReflection(false);
+                    }}
+                    className={cn(
+                      "min-h-12 rounded-md border px-3 text-left text-xs font-black transition",
+                      isActive
+                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                    )}
+                  >
+                    {index + 1}. {prompt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[#f2eadc]">
+              <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Must cover</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {subtopics.map((topic) => (
+                    <span key={topic} className="rounded-md border border-[#cfc6b6] bg-white px-2 py-1 text-xs font-black text-[#1a3a2a]">
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Mentor lens</p>
+                <div className="mt-3 grid gap-2">
+                  {mentorModes.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={mentorMode === mode}
+                      onClick={() => {
+                        setMentorMode(mode);
+                        persistCurrentState({ mentorMode: mode });
+                      }}
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-left text-xs font-black transition",
+                        mentorMode === mode
+                          ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
+                          : "border-[#dcd5c7] bg-white text-[#5f665f] hover:border-[#1d9e75]"
+                      )}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Confidence</p>
+                <div className="mt-3 grid gap-2">
+                  {confidenceOptions.map((option) => (
                     <button
                       key={option}
                       type="button"
-                      aria-pressed={isActive}
+                      aria-pressed={confidence === option}
                       onClick={() => {
                         setConfidence(option);
                         persistCurrentState({ confidence: option });
                       }}
                       className={cn(
-                        "flex min-h-12 items-center justify-between rounded-md border px-3 text-left transition",
-                        isActive
+                        "flex min-h-10 items-center justify-between rounded-md border px-3 text-left text-xs font-black transition",
+                        confidence === option
                           ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                          : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                          : "border-[#dcd5c7] bg-white text-[#34453b] hover:border-[#1d9e75]"
                       )}
                     >
-                      <span className="text-sm font-black">{option}</span>
-                      {isActive && <CheckCircle2 className="h-4 w-4" />}
+                      {option}
+                      {confidence === option && <CheckCircle2 className="h-4 w-4" />}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+            </div>
+            {learningPack ? (
+              <div data-testid={`${plan.slug}-talk-teacher-pack`} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{plan.title} oral rubric</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">{learningPack.lens}</h3>
+                <p className="mt-3 text-sm font-bold leading-6 text-[#49675e]">{learningPack.teacherFocus}</p>
+              </div>
+            ) : null}
+            {historyPack ? (
+              <div data-testid="history-talk-classroom-protocol" className="rounded-lg border border-[#cfe5dc] bg-[#f6fbf8] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">History classroom protocol</p>
+                    <h3 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">Teacher, peer, examiner, memory loop</h3>
+                  </div>
+                  <span data-testid="history-talk-stage" className="rounded-md bg-white px-3 py-2 text-xs font-black text-[#085041] ring-1 ring-[#1d9e75]/20">
+                    {classroomStageLabels[talkClassroomStage]}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+              </div>
+            </details>
+            {maicDiscussion && (
+              <div data-testid="subject-maic-discussion-turns-detail" className="grid gap-3 md:grid-cols-2">
+                {maicDiscussion.turns.map((turn) => (
+                  <div key={`${turn.role}-${turn.title}`} className="rounded-lg border border-[#dcd5c7] bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{turn.role}</p>
+                    <h3 className="mt-2 text-sm font-black text-[#13251d]">{turn.title}</h3>
+                    <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{turn.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {assessment?.band === "Revisit" && (
+              <div className="rounded-lg border border-[#ef9f27]/40 bg-[#fff4df] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#9a6a16]">Compressed revisit</p>
+                <div className="mt-3 grid gap-2">
+                  {compressedRecap.slice(0, 3).map((line) => (
+                    <p key={line} className="rounded-md bg-white/70 p-3 text-xs font-bold leading-5 text-[#6f4a12]">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <button
+                type="button"
+                onClick={() => selectDay(activeSession.day - 1)}
+                disabled={activeSession.day === 1}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous day
+              </button>
+              <button
+                type="button"
+                onClick={() => selectDay(activeSession.day + 1)}
+                disabled={activeSession.day === plan.sessions.length}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              >
+                Next day <ChevronRight className="h-4 w-4" />
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1032,30 +1245,17 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   persistCurrentState({ revisitQueued: nextValue });
                 }}
                 className={cn(
-                  "mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-bold transition",
+                  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-md px-3 text-sm font-bold transition sm:w-auto",
                   revisionQueued ? "bg-[#e7f5ee] text-[#085041] ring-1 ring-[#1d9e75]/30" : "bg-[#1a3a2a] text-white hover:bg-[#10291d]"
                 )}
               >
                 <RefreshCcw className="h-4 w-4" />
-                {revisionQueued ? "Queued for revisit" : "Queue for revisit"}
+                {revisionQueued ? "Queued for revisit" : "Queue revisit"}
               </button>
-              {assessment?.band === "Revisit" && (
-                <div className="mt-5 rounded-lg border border-[#ef9f27]/40 bg-[#fff4df] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#9a6a16]">Compressed revisit</p>
-                  <div className="mt-3 grid gap-2">
-                    {compressedRecap.slice(0, 3).map((line) => (
-                      <p key={line} className="rounded-md bg-white/70 p-3 text-xs font-bold leading-5 text-[#6f4a12]">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-
             <SubjectLoopActions plan={plan} activeDay={activeSession.day} current="talk" />
           </div>
-        </section>
+        </details>
       </div>
     </div>
   );

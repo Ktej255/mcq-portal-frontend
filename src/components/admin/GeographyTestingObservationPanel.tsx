@@ -545,8 +545,8 @@ export function GeographyTestingObservationPanel() {
             },
             {
               label: "Start instruction",
-              value: "Start Watch room",
-              detail: "Open the link and begin with the visible Start Watch room action.",
+              value: "Start lesson",
+              detail: "Open the link and begin with the visible Start lesson action.",
             },
             {
               label: "Stop rule",

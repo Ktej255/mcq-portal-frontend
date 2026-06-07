@@ -70,7 +70,7 @@ async function seedFailedMcqRevisit(page) {
             confidence: "Shaky",
             reflection: "Protected areas are linked through category, map, species, threat, and institution.",
             revisitQueued: true,
-            talkScore: 92,
+            talkScore: 96,
             talkBand: "Command",
             talkUnlockStage: "mcq",
             labCompleted: true,

@@ -237,7 +237,7 @@ export function UpscContentCommandCenter({
 
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Content Command</Badge>
-              <span className="text-sm font-bold text-[#776f64]">Lecture and note readiness</span>
+              <span className="text-sm font-bold text-[#776f64]">Local rehearsal pack status</span>
             </div>
 
             <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">Class content control room</p>
@@ -245,22 +245,29 @@ export function UpscContentCommandCenter({
               Prepare every Watch room before testing.
             </h1>
             <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#5d675f]">
-              This local command center tracks whether each class day has video, notes, transcript, source type, and a content
-              note. It connects directly to Watch, Talk, and MCQ rooms for the selected day.
+              This local command center tracks whether each class day has a staged video state, notes, transcript or recap,
+              source type, and a content note. It connects directly to Watch, Talk, and MCQ rooms for the selected day.
             </p>
+
+            <div
+              data-testid="content-rehearsal-boundary"
+              className="mt-5 rounded-lg border border-[#ef9f27]/45 bg-[#fff4df] p-4 text-sm font-bold leading-6 text-[#6f4a12]"
+            >
+              Local rehearsal state only. Staged locally never means founder-approved live lecture media or student-release approval.
+            </div>
 
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#f2eadc]">
               <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${totals.completionPercent}%` }} />
             </div>
             <p className="mt-3 text-sm font-black text-[#085041]">
-              {totals.readyClasses} of {totals.totalClasses} class days content-ready
+              {totals.readyClasses} of {totals.totalClasses} class days staged locally
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               { label: "Class days", value: totals.totalClasses, icon: Layers3 },
-              { label: "Ready", value: totals.readyClasses, icon: CheckCircle2 },
+              { label: "Staged", value: totals.readyClasses, icon: CheckCircle2 },
               { label: "Drafted", value: totals.draftedClasses, icon: FileText },
               { label: "Pending", value: totals.pendingClasses, icon: Gauge },
               { label: "Active score", value: `${readyScore}%`, icon: Video },
@@ -282,12 +289,12 @@ export function UpscContentCommandCenter({
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Subject pack readiness</p>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Local rehearsal pack</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
-                {activeSubject.title}: {summaries.find((item) => item.subject.slug === activeSubject.slug)?.readyCount ?? 0}/{activeSubject.sessions.length} classes ready
+                {activeSubject.title}: {summaries.find((item) => item.subject.slug === activeSubject.slug)?.readyCount ?? 0}/{activeSubject.sessions.length} classes staged locally
               </h2>
               <p className="mt-2 break-words text-sm font-bold leading-6 text-[#657066]">
-                Mark the selected subject pack ready when every class has a local lesson, notes, and transcript/recap handoff for the student loop.
+                Stage the selected subject locally when every class has a rehearsal lesson, notes, and transcript or recap handoff for the student loop.
               </p>
             </div>
             <button
@@ -296,7 +303,7 @@ export function UpscContentCommandCenter({
               onClick={markActiveSubjectReady}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
-              <CheckCircle2 className="h-4 w-4" /> Mark {activeSubject.title} pack ready
+              <CheckCircle2 className="h-4 w-4" /> Stage {activeSubject.title} rehearsal pack
             </button>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -342,7 +349,7 @@ export function UpscContentCommandCenter({
                     <span className="block text-xs font-black uppercase tracking-[0.14em]">{item.subject.window}</span>
                     <span className="mt-2 block text-sm font-black leading-5">{item.subject.title}</span>
                     <span className="mt-2 block text-xs font-semibold opacity-75">
-                      {item.readyCount}/{item.total} ready
+                      {item.readyCount}/{item.total} staged
                     </span>
                   </button>
                 );
@@ -376,7 +383,7 @@ export function UpscContentCommandCenter({
                     </span>
                     <span className="mt-2 block break-words text-sm font-bold leading-5">{session.title}</span>
                     <span className="mt-2 block text-xs font-semibold opacity-75">
-                      {sessionReady ? "Content ready" : state.videoStatus}
+                      {sessionReady ? "Locally staged" : state.videoStatus}
                     </span>
                   </button>
                 );
@@ -389,7 +396,7 @@ export function UpscContentCommandCenter({
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">{activeBatchCode}</p>
-                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Class readiness</h2>
+                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Local rehearsal state</h2>
                 </div>
                 <Badge
                   variant="outline"
@@ -398,7 +405,7 @@ export function UpscContentCommandCenter({
                     isContentReady(activeState) ? "border-[#1d9e75]/40 text-[#085041]" : "border-[#ef9f27]/50 text-[#6f4a12]"
                   )}
                 >
-                  {isContentReady(activeState) ? "READY" : "IN PROGRESS"}
+                  {isContentReady(activeState) ? "STAGED LOCAL" : "IN PROGRESS"}
                 </Badge>
               </div>
 
@@ -461,7 +468,7 @@ export function UpscContentCommandCenter({
                                 : "border-[#dcd5c7] bg-white text-[#34453b] hover:border-[#1d9e75]"
                             )}
                           >
-                            {status}
+                            {status === "Ready" ? "Ready locally" : status}
                           </button>
                         );
                       })}
@@ -511,7 +518,7 @@ export function UpscContentCommandCenter({
                   onClick={markReady}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
                 >
-                  <CheckCircle2 className="h-4 w-4" /> Mark content ready
+                  <CheckCircle2 className="h-4 w-4" /> Stage content locally
                 </button>
                 <button
                   type="button"

@@ -4,16 +4,15 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService, Question } from '@/services/api/adminService';
+import { legacyApiEnabled } from '@/env';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
   Search, 
-  Filter, 
   CheckCircle2, 
   AlertCircle, 
   Clock, 
-  FileText, 
   Database,
   MoreVertical,
   ChevronLeft,
@@ -102,9 +101,11 @@ export default function QuestionsControlRoom() {
   const [localDrafts, setLocalDrafts] = useState<LocalBulkQuestionDraft[]>([]);
   const queryClient = useQueryClient();
 
-  const { data: response, isLoading } = useQuery({
+  const { data: response, isLoading, isError } = useQuery({
     queryKey: ['admin-questions', page, limit],
     queryFn: () => adminService.getQuestions(undefined, page * limit, limit),
+    enabled: legacyApiEnabled,
+    retry: false,
   });
 
   const updateStatusMutation = useMutation({
@@ -146,19 +147,17 @@ export default function QuestionsControlRoom() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Editorial Control Room</h1>
           <p className="text-muted-foreground mt-1">Manage content governance and authoring workflow.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
-            <Filter className="w-4 h-4" /> Filter
+        <Link href="/admin/questions/bulk">
+          <Button className="gap-2 bg-emerald-800 hover:bg-emerald-900">
+            <UploadCloud className="h-4 w-4" />
+            Bulk upload
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <FileText className="w-4 h-4 mr-2" /> New Question
-          </Button>
-        </div>
+        </Link>
       </div>
 
       <section className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
@@ -215,7 +214,7 @@ export default function QuestionsControlRoom() {
                       </div>
                       <h3 className="truncate text-lg font-black text-zinc-950 dark:text-zinc-50">{summary.topic}</h3>
                       <p className="mt-1 text-sm font-medium text-muted-foreground">
-                        {summary.subject} Day {summary.day} · {summary.difficulty} · {new Date(draft.createdAt).toLocaleString()}
+                        {summary.subject} Day {summary.day} | {summary.difficulty} | {new Date(draft.createdAt).toLocaleString()}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
@@ -258,6 +257,15 @@ export default function QuestionsControlRoom() {
           </div>
         </div>
 
+        {!legacyApiEnabled && (
+          <div
+            data-testid="legacy-api-disabled-notice"
+            className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100"
+          >
+            Legacy API disabled for UPSC pilot. Review locally saved drafts above; live publishing remains isolated until the replacement backend is approved.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -272,12 +280,26 @@ export default function QuestionsControlRoom() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {isLoading ? (
+              {!legacyApiEnabled ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <Database className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                    Live question-bank sync is intentionally paused for the UPSC pilot.
+                  </td>
+                </tr>
+              ) : isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td colSpan={7} className="p-8 text-center text-muted-foreground">Loading questions...</td>
                   </tr>
                 ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <AlertCircle className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                    Legacy API unavailable. Local drafts above remain available for review.
+                  </td>
+                </tr>
               ) : questions.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-12 text-center text-muted-foreground">
@@ -369,7 +391,7 @@ export default function QuestionsControlRoom() {
 
         <div className="p-4 border-t bg-zinc-50/30 dark:bg-zinc-900/30 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium">{(page * limit) + 1}</span> to <span className="font-medium">{Math.min((page + 1) * limit, total)}</span> of <span className="font-medium">{total}</span> questions
+            Showing <span className="font-medium">{total === 0 ? 0 : (page * limit) + 1}</span> to <span className="font-medium">{Math.min((page + 1) * limit, total)}</span> of <span className="font-medium">{total}</span> live questions
           </p>
           <div className="flex items-center gap-2">
             <Button 

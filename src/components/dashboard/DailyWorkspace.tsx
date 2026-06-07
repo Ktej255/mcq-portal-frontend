@@ -1,150 +1,893 @@
 "use client";
 
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, BookOpenCheck, CalendarClock, RefreshCcw, Target } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  BarChart3,
+  BrainCircuit,
+  Clock3,
+  RefreshCcw,
+  Save,
+  Target,
+  UserRound,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { geographySessions } from "@/lib/upsc/plan";
+import { getGeographyLoopState } from "@/lib/upsc/geographyLoopState";
+import { buildGeographyReadinessSnapshot } from "@/lib/upsc/geographyReadiness";
+import {
+  buildGeographyDailyPath,
+  getCurrentGeographyTopic,
+  getGuidedStudyEntryRoute,
+  getGuidedStudySteps,
+  getGuidedStudyStrategy,
+} from "@/lib/upsc/guidedStudy";
+import { geographySessions, upscCalendar } from "@/lib/upsc/plan";
+import {
+  buildStudentPlan,
+  defaultStudentProfile,
+  studentLevelForPreparationStage,
+  profilePlanLine,
+  readStudentProfile,
+  readSyncedStudentProfile,
+  saveStudentProfile,
+  type LearningStyle,
+  type LearningPattern,
+  type MindState,
+  type PreparationStage,
+  type StudentProfile,
+  type StudyTime,
+  type StudyWindow,
+  type WeakSignal,
+} from "@/lib/upsc/studentProfile";
+import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 
-const today = geographySessions[0];
+const subjectRoadmap = upscCalendar.filter(({ href }) =>
+  [
+    "/upsc/geography",
+    "/upsc/environment",
+    "/upsc/disaster-management",
+    "/upsc/economy",
+    "/upsc/science-tech",
+    "/upsc/polity-governance",
+    "/upsc/internal-security-society",
+    "/upsc/history",
+  ].includes(href)
+);
 
-const quickCards = [
+const optionClass = (active: boolean) =>
+  active
+    ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+    : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]";
+
+const preparationOptions: Array<{
+  value: PreparationStage;
+  level: "Beginner" | "Intermediate" | "Advanced";
+  label: string;
+  detail: string;
+}> = [
   {
-    label: "Learning Gap",
-    title: "No weak area recorded yet",
-    detail: "Complete today's practice once. Your real weak topics will appear here.",
-    href: "/reports",
-    icon: Target,
+    value: "not-started",
+    level: "Beginner",
+    label: "I am starting my UPSC preparation now",
+    detail: "No preparation yet. The portal starts with one 10-15 minute topic, then Talk to 95%, then MCQ.",
   },
   {
-    label: "Next Revision",
-    title: "Revise after practice",
-    detail: "The first revision will focus on latitude, longitude, Earth movement, and time zones.",
-    href: "/revision",
-    icon: RefreshCcw,
+    value: "coaching-complete",
+    level: "Intermediate",
+    label: "I completed coaching and want a self-study path",
+    detail: "Coaching is done. You explain first; the AI opens only the missing UPSC repair.",
   },
   {
-    label: "Progress",
-    title: "Geography sprint started",
-    detail: "Day 1 of 30 is active. The path will stay simple: learn, explain, practice, revise.",
-    href: "/history",
-    icon: BarChart3,
+    value: "multiple-attempts",
+    level: "Advanced",
+    label: "I attempted UPSC Prelims two or more times and need a recovery path",
+    detail: "Two or more attempts. You speak first; the AI diagnoses attempt-level traps and moves to command.",
   },
 ];
 
-const pathSteps = [
-  { label: "Learn", href: "/upsc/geography/watch?day=1" },
-  { label: "Explain", href: "/upsc/geography/talk?day=1" },
-  { label: "Practice", href: "/upsc/geography/mcq-readiness?day=1" },
-  { label: "Revise", href: "/upsc/geography/revisit?day=1" },
-];
+const classificationProof: Record<
+  PreparationStage,
+  { title: string; route: string; detail: string }
+> = {
+  "not-started": {
+    title: "Identified as Beginner",
+    route: "Lesson -> Talk 95% -> MCQ -> next topic",
+    detail: "You have not started preparation, so the portal teaches one short topic before asking you to explain.",
+  },
+  "coaching-complete": {
+    title: "Identified as Intermediate",
+    route: "Diagnosis -> repair only if needed -> MCQ",
+    detail: "You completed coaching, so the portal checks what you already know before opening any lesson.",
+  },
+  "multiple-attempts": {
+    title: "Identified as Advanced",
+    route: "Attempt-gap diagnosis -> precision repair -> MCQ",
+    detail: "You have two or more attempts, so the portal hunts for traps, exceptions, and weak recall patterns first.",
+  },
+};
+
+function getClassificationProof(profile: Pick<StudentProfile, "preparationStage">) {
+  return classificationProof[profile.preparationStage];
+}
+
+function firstWeakRubricLabel(progress?: GeographyDayProgress) {
+  return progress?.talkRubric?.find((item) => item.status !== "Ready")?.label;
+}
+
+function resolveLearningGapSignal(progress: GeographyDayProgress | undefined, loopLabel: string, loopDetail: string) {
+  const weakSkill = progress?.recoveryWeakSkill ?? firstWeakRubricLabel(progress);
+
+  if (progress?.revisitQueued || progress?.talkBand === "Revisit") {
+    return {
+      title: weakSkill ?? "Repair weak point",
+      detail: progress?.recoveryDiagnosisSummary ?? progress?.talkRepairHints?.[0] ?? "A short revision is queued before new work.",
+    };
+  }
+
+  if (progress?.mcqOutcome === "Revisit" && progress?.recoveryStatus !== "talk-ready") {
+    return {
+      title: "MCQ trap repair",
+      detail: progress.mcqReviewSummary ?? "Practice exposed a weak area. Open short revision before moving ahead.",
+    };
+  }
+
+  if (progress?.mcqOutcome === "Revisit" && progress?.recoveryStatus === "talk-ready") {
+    return {
+      title: "Explain corrected answer",
+      detail: progress.recoverySummary ?? "Repair is saved. Explain the corrected idea once more before MCQ opens again.",
+    };
+  }
+
+  if (typeof progress?.talkScore === "number" && progress.talkScore < 95) {
+    return {
+      title: weakSkill ?? "Recall below 95%",
+      detail: `${progress.talkScore}/100. ${progress.talkRepairHints?.[0] ?? "Use the repair lesson or discussion to close the gap."}`,
+    };
+  }
+
+  if (loopLabel === "Talk pending") {
+    return {
+      title: "Not measured yet",
+      detail: "Explain once so the AI teacher can find the exact gap.",
+    };
+  }
+
+  if (loopLabel === "Lesson pending") {
+    return {
+      title: "Foundation not started",
+      detail: "Watch one focused topic, then explain it in Talk.",
+    };
+  }
+
+  if (progress?.mcqOutcome === "Command" || progress?.talkBand === "Command") {
+    return {
+      title: "No active gap",
+      detail: loopDetail,
+    };
+  }
+
+  return {
+    title: loopLabel,
+    detail: loopDetail,
+  };
+}
 
 export const DailyWorkspace = () => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
+  const { getDayProgress, isLoaded: progressLoaded, progress, stats } = useGeographyProgress();
+  const today = getCurrentGeographyTopic(progress);
+  const dailyPath = useMemo(() => (profile ? buildGeographyDailyPath(profile, progress) : []), [profile, progress]);
+  const readinessSnapshot = useMemo(
+    () => buildGeographyReadinessSnapshot(progress, { isLoaded: progressLoaded, learnerLevel: profile?.level }),
+    [profile?.level, progress, progressLoaded]
+  );
+  const todayProgress = getDayProgress(today.day);
+  const todayLoop = getGeographyLoopState(today, todayProgress, {
+    isLoaded: progressLoaded,
+    learnerLevel: profile?.level,
+  });
+  const pathSteps = getGuidedStudySteps(profile?.level ?? "beginner");
+  const nextRevisionItem = stats.revisitDays[0]
+    ? {
+        source: stats.revisitDays[0],
+        due: geographySessions.find((session) => session.day === Math.min(stats.revisitDays[0].day + 2, geographySessions.length)) ?? stats.revisitDays[0],
+      }
+    : stats.spacedRevisionItems[0] ?? {
+        source: today,
+        due: geographySessions.find((session) => session.day === Math.min(today.day + 2, geographySessions.length)) ?? today,
+      };
+  const nextRevisionHref = `/upsc/geography/revisit?day=${nextRevisionItem.source.day}`;
+  const nextRevisionTitle = stats.revisitCount > 0 ? `${stats.revisitCount} recovery item` : `Day ${nextRevisionItem.source.day} recall`;
+  const nextRevisionDetail =
+    stats.revisitCount > 0
+      ? "Repair the queued weak area before starting new work."
+      : `Revise ${nextRevisionItem.source.title} on study Day ${nextRevisionItem.due.day}.`;
+  const talkScoreLine =
+    readinessSnapshot.commandCount > 0
+      ? `${readinessSnapshot.commandCount}/30 command days`
+      : typeof todayProgress?.talkScore === "number"
+        ? `${todayProgress.talkScore}/100 ${todayProgress.talkBand ?? "Talk"}`
+        : "Baseline not measured";
+  const learningGapSignal = resolveLearningGapSignal(todayProgress, todayLoop.label, todayLoop.shortDetail);
+  const trendDetail =
+    readinessSnapshot.commandCount > 0
+      ? `${readinessSnapshot.score}% Geography readiness. ${stats.revisitCount} recovery item${stats.revisitCount === 1 ? "" : "s"} active.`
+      : profile
+        ? profilePlanLine(profile)
+        : "Save profile to open your personal path.";
+  const personalPlan = useMemo(() => (profile ? buildStudentPlan(profile) : null), [profile]);
+  const activeClassificationProof = profile ? getClassificationProof(profile) : null;
+  const dashboardPathSteps = [
+    ...pathSteps,
+    {
+      id: "next",
+      label: "Next",
+      detail: "The system opens the next topic after MCQ.",
+    },
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    const restoreProfile = window.setTimeout(() => {
+      const saved = readStudentProfile();
+      if (saved) {
+        setProfile(saved);
+        setDraft(saved);
+      }
+      setIsLoaded(true);
+
+      void readSyncedStudentProfile().then((syncedProfile) => {
+        if (!syncedProfile || cancelled) return;
+        setProfile(syncedProfile);
+        setDraft(syncedProfile);
+      });
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(restoreProfile);
+    };
+  }, []);
+
+  const signalCards = useMemo(
+    () => [
+      {
+        label: "Learning Gap",
+        title: learningGapSignal.title,
+        detail: learningGapSignal.detail,
+        href: todayLoop.href,
+        icon: Target,
+      },
+      {
+        label: "Next Revision",
+        title: nextRevisionTitle,
+        detail: nextRevisionDetail,
+        href: nextRevisionHref,
+        icon: RefreshCcw,
+      },
+      {
+        label: "Trend",
+        title: talkScoreLine,
+        detail: trendDetail,
+        href: `/upsc/geography/track?day=${today.day}`,
+        icon: BarChart3,
+      },
+    ],
+    [
+      nextRevisionDetail,
+      nextRevisionHref,
+      nextRevisionTitle,
+      profile,
+      learningGapSignal.detail,
+      learningGapSignal.title,
+      talkScoreLine,
+      todayLoop.href,
+      trendDetail,
+    ]
+  );
+
+  const saveProfile = (nextDraft: StudentProfile = draft) => {
+    const nextProfile = { ...nextDraft, updatedAt: new Date().toISOString() };
+    const normalizedProfile = saveStudentProfile(nextProfile);
+    setProfile(normalizedProfile);
+    setDraft(normalizedProfile);
+  };
+
+  if (!isLoaded) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-[#f7f4ee] text-[#13251d]">
+        <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 text-sm font-black shadow-sm">
+          Opening UPSC workspace...
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-2">
-              <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-[#f7f4ee]">Today</Badge>
-              <h1 className="text-3xl font-black tracking-tight text-[#13251d] md:text-4xl">
-                {today.title}
-              </h1>
-              <p className="max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                {today.anchor}
-              </p>
-            </div>
-            <Link
-              href="/upsc/geography/watch?day=1"
-              className="inline-flex h-12 items-center justify-center rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
-            >
-              Start Today <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="mt-6 grid gap-3 md:grid-cols-4">
-            {pathSteps.map((step, index) => (
-              <Link
-                key={step.label}
-                href={step.href}
-                className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 transition hover:border-[#1d9e75]/60 hover:bg-[#eef8f2]"
-              >
-                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-white text-sm font-black text-[#1a3a2a] shadow-sm">
-                  {index + 1}
-                </div>
-                <p className="text-base font-black text-[#13251d]">{step.label}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-3">
-          {quickCards.map((card) => (
-            <Link
-              key={card.label}
-              href={card.href}
-              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm transition hover:border-[#1d9e75]/60 hover:bg-[#fdfaf3]"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                  <card.icon className="h-5 w-5" />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{card.label}</span>
-              </div>
-              <h2 className="text-lg font-black tracking-tight text-[#13251d]">{card.title}</h2>
-              <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">{card.detail}</p>
-            </Link>
-          ))}
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff4df] text-[#6f4a12]">
-                <BookOpenCheck className="h-5 w-5" />
-              </div>
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 md:px-8">
+        {profile ? (
+          <section
+            data-testid="upsc-simple-dashboard"
+            data-student-level={profile.level}
+            data-preparation-stage={profile.preparationStage}
+            data-next-action-room={todayLoop.room}
+            data-next-action-href={todayLoop.href}
+            data-visible-mode="four-signal-one-action"
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+          >
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-black tracking-tight">Today&apos;s Task</h2>
-                <p className="text-sm font-medium text-[#756f64]">{today.duration}</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                  Student dashboard
+                </p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                  Today&apos;s study
+                </h1>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{profilePlanLine(profile)}</p>
+                {activeClassificationProof ? (
+                  <p
+                    data-testid="upsc-classification-proof"
+                    className="mt-2 max-w-2xl text-xs font-black uppercase tracking-[0.11em] text-[#085041]"
+                  >
+                    {activeClassificationProof.title}: {activeClassificationProof.route}
+                  </p>
+                ) : null}
               </div>
+              <Badge data-testid="upsc-profile-level-badge" className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">
+                {profile.level}
+              </Badge>
             </div>
-            <p className="text-sm font-semibold leading-6 text-[#4f5e55]">
-              Watch the concept, explain it once in your own words, then solve the fresh practice set. Do not open the full portal map first.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href="/upsc/geography/lab?day=1"
-                className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-              >
-                Open Visual
-              </Link>
-              <Link
-                href="/upsc/geography"
-                className="inline-flex h-9 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-              >
-                Subject Plan
-              </Link>
-            </div>
-          </div>
 
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                <CalendarClock className="h-5 w-5" />
+            <div data-testid="upsc-four-signal-grid" className="space-y-3">
+              <article
+                data-testid="upsc-signal-todays-task"
+                data-signal-priority="primary"
+                className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
+              >
+                <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+                  <div>
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                        <BrainCircuit className="h-5 w-5" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                        Today&apos;s task
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-black tracking-tight text-[#13251d]">{today.title}</h2>
+                    <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-[#49675e]">
+                      {todayLoop.shortDetail}
+                    </p>
+                    <p data-testid="upsc-generated-daily-path-summary" className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                      Day {today.day} of {geographySessions.length} / {dailyPath.length} topic{dailyPath.length === 1 ? "" : "s"} today / 10-15 min each
+                    </p>
+                    <details
+                      data-testid="upsc-main-path-strip"
+                      className="mt-4 rounded-lg border border-[#cfe5dc] bg-white/70 p-3 text-xs font-black text-[#31443a]"
+                    >
+                      <summary className="cursor-pointer list-none text-[11px] uppercase tracking-[0.16em] text-[#085041]">
+                        How today will flow
+                      </summary>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {dashboardPathSteps.map((step, index) => (
+                          <div key={step.id} className="rounded-md bg-white px-3 py-2">
+                            <span className="text-[#1d9e75]">{index + 1}.</span> {step.label}
+                            <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-[#746f66]">
+                              {step.detail}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                    <p
+                      data-testid="upsc-one-action-rule"
+                      className="mt-3 text-xs font-bold leading-5 text-[#49675e]"
+                    >
+                      Use the main button only. The portal decides the next step after each result.
+                    </p>
+                  </div>
+                  <Link
+                    href={todayLoop.href}
+                    data-testid="upsc-start-today"
+                    data-student-level={profile.level}
+                    data-next-action-room={todayLoop.room}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] md:w-auto"
+                  >
+                    {todayLoop.cta} <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </div>
+              </article>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {signalCards.map((card) => (
+                  <Link
+                    key={card.label}
+                    href={card.href}
+                    data-testid={`upsc-signal-${card.label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "")}`}
+                    className="rounded-lg border border-[#dcd5c7] bg-white p-4 shadow-sm transition hover:border-[#1d9e75]/60 hover:bg-[#fdfaf3]"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                        <card.icon className="h-4 w-4" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {card.label}
+                      </span>
+                    </div>
+                    <h2 className="text-base font-black tracking-tight text-[#13251d]">{card.title}</h2>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{card.detail}</p>
+                  </Link>
+                ))}
               </div>
+            </div>
+          </section>
+        ) : null}
+
+        {!profile ? (
+          <ProfileForm
+            draft={draft}
+            setDraft={setDraft}
+            saveProfile={saveProfile}
+            variant="initial"
+          />
+        ) : null}
+
+        {profile ? (
+          <details
+            data-testid="upsc-planning-drawer"
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+          >
+            <summary className="cursor-pointer list-none text-sm font-black text-[#13251d]">
+              Optional planning drawer
+              <span className="ml-2 text-xs font-semibold text-[#756f64]">
+                Profile edit, day flow, and 12-month path stay here to keep the main screen light.
+              </span>
+            </summary>
+
+            <ProfileForm
+              draft={draft}
+              setDraft={setDraft}
+              saveProfile={saveProfile}
+              profile={profile}
+              variant="drawer"
+            />
+
+            <section data-testid="upsc-today-task" className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+              {personalPlan ? (
+                <div
+                  data-testid="upsc-personal-plan-rules"
+                  className="mb-4 grid gap-2 rounded-lg border border-[#cfe5dc] bg-white p-3 md:grid-cols-2"
+                >
+                  {[
+                    ["Daily loop", personalPlan.dailyLoop],
+                    ["First action", personalPlan.firstAction],
+                    ["Repair rule", personalPlan.repairRule],
+                    ["Revision rule", personalPlan.revisionRule],
+                    ["Attempt rule", personalPlan.attemptRule],
+                    ["Pattern rule", personalPlan.patternRule],
+                    ["Mind rule", personalPlan.psychologyRule],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#31443a]">{value}</p>
+                    </div>
+                  ))}
+                  <div className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 md:col-span-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      Personal path
+                    </p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-[#31443a]">
+                      {personalPlan.levelStrategy}. {personalPlan.timeRule}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <div>
-                <h2 className="text-lg font-black tracking-tight">Next Revision</h2>
-                <p className="text-sm font-medium text-[#756f64]">After today&apos;s practice</p>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Current study flow</p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">{today.title}</h2>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">{today.anchor}</p>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2 text-sm font-semibold text-[#4f5e55]">
-              <p>1. Redraw latitude and longitude.</p>
-              <p>2. Explain rotation and revolution.</p>
-              <p>3. Reattempt only wrong MCQs.</p>
-            </div>
-          </div>
-        </section>
+
+              <div className="mt-4 grid gap-2 md:grid-cols-5">
+                {pathSteps.map((step, index) => (
+                  <article
+                    key={step.label}
+                    data-testid={`upsc-day-step-${step.id}`}
+                    className="rounded-lg border border-[#dcd5c7] bg-white p-3"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#e7f5ee] text-xs font-black text-[#085041]">
+                      {index + 1}
+                    </span>
+                    <span className="mt-3 block text-sm font-black text-[#13251d]">{step.label}</span>
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-[#657066]">{step.detail}</span>
+                  </article>
+                ))}
+              </div>
+
+              <div data-testid="upsc-generated-daily-path" className="mt-4 rounded-lg border border-[#cfe5dc] bg-white p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Generated daily path</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  {dailyPath.map((topic, index) => (
+                    <article
+                      key={topic.day}
+                      data-testid="upsc-generated-daily-topic"
+                      data-topic-state={index === 0 ? "current" : "queued"}
+                      className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                    >
+                      <span className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                        <span>Topic {index + 1} / Day {topic.day}</span>
+                        <span className="rounded bg-white px-2 py-1 text-[#085041]">
+                          {index === 0 ? "Current" : "Queued"}
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-sm font-black text-[#13251d]">{topic.title}</span>
+                      <span className="mt-1 block text-xs font-bold text-[#657066]">{topic.durationMinutes} min</span>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section data-testid="upsc-year-plan" className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    12-month subject path
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">One subject at a time</h2>
+                </div>
+                <Link
+                  href="/upsc/geography"
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                >
+                  Open Geography
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {subjectRoadmap.map((item, index) => {
+                  const cardBody = (
+                    <>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#e7f5ee] text-xs font-black text-[#085041]">
+                        {index + 1}
+                      </span>
+                      <span>
+                        <span className="block text-xs font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                          {item.window}
+                        </span>
+                        <span className="mt-1 block text-sm font-black text-[#13251d]">{item.title}</span>
+                        <span className="mt-1 block text-xs font-semibold leading-5 text-[#756f64]">
+                          {item.href === "/upsc/geography" ? "Current learner pilot" : "Planned after Geography pilot"}
+                        </span>
+                      </span>
+                    </>
+                  );
+
+                  return item.href === "/upsc/geography" ? (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      data-testid="upsc-roadmap-active-subject"
+                      className="grid grid-cols-[34px_1fr] gap-3 rounded-md border border-[#b9d9cd] bg-white p-3 transition hover:border-[#1d9e75]"
+                    >
+                      {cardBody}
+                    </Link>
+                  ) : (
+                    <article
+                      key={item.href}
+                      data-testid="upsc-roadmap-future-subject"
+                      data-subject-href={item.href}
+                      className="grid grid-cols-[34px_1fr] gap-3 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                    >
+                      {cardBody}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          </details>
+        ) : null}
       </div>
     </main>
   );
 };
+
+function ProfileForm({
+  draft,
+  setDraft,
+  saveProfile,
+  profile,
+  variant,
+}: {
+  draft: StudentProfile;
+  setDraft: Dispatch<SetStateAction<StudentProfile>>;
+  saveProfile: (nextDraft?: StudentProfile) => void;
+  profile?: StudentProfile | null;
+  variant: "initial" | "drawer";
+}) {
+  const router = useRouter();
+  const isDrawer = variant === "drawer";
+  const [classificationConfirmed, setClassificationConfirmed] = useState(Boolean(profile));
+  const classification = getGuidedStudyStrategy(draft.level);
+  const draftClassificationProof = getClassificationProof(draft);
+  const shouldAutoGeneratePath = !profile && !isDrawer;
+
+  const choosePreparationStage = (value: PreparationStage) => {
+    const nextDraft: StudentProfile = {
+      ...draft,
+      level: studentLevelForPreparationStage(value),
+      preparationStage: value,
+      attemptHistory: value === "multiple-attempts" ? "two-plus-attempts" : "no-attempt",
+    };
+    setDraft(nextDraft);
+    setClassificationConfirmed(true);
+    if (shouldAutoGeneratePath) {
+      saveProfile(nextDraft);
+      window.setTimeout(() => {
+        router.push(getGuidedStudyEntryRoute(nextDraft.level, 1));
+      }, 0);
+    }
+  };
+
+  return (
+    <details
+      open={!isDrawer}
+      id="upsc-intake"
+      data-testid="upsc-profile-intake"
+      className={
+        isDrawer
+          ? "mt-5 rounded-lg border border-[#dcd5c7] bg-white p-4"
+          : "rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+      }
+    >
+      <summary className="cursor-pointer list-none text-sm font-black text-[#13251d]">
+        <span className="block text-[11px] uppercase tracking-[0.18em] text-[#1d9e75]">
+          {isDrawer ? "Profile" : "Start here"}
+        </span>
+        <span className="mt-1 block text-xl tracking-tight">
+          {isDrawer ? "Edit study profile" : "UPSC self-study profile"}
+        </span>
+        <span className="mt-1 block text-xs font-semibold leading-5 text-[#5d675f]">
+          {profile ? profilePlanLine(profile) : "One preparation-history answer opens your guided study path."}
+        </span>
+      </summary>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div>
+          <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-[#f7f4ee]">
+            {profile ? "Saved" : "Beginner / Intermediate / Advanced"}
+          </Badge>
+          <h1 className="mt-4 text-3xl font-black tracking-tight text-[#13251d] md:text-4xl">
+            Let the system identify your level
+          </h1>
+          <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-[#5d675f]">
+            Choose one preparation-history statement. The portal classifies you and opens the correct next action
+            immediately.
+          </p>
+          {profile ? (
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              {[
+                ["Level", profile.level],
+                ["Preparation", profile.preparationStage.replaceAll("-", " ")],
+                ["Daily sitting", `${profile.studyWindow} min`],
+                ["Attempt", profile.attemptHistory.replaceAll("-", " ")],
+                ["Style", profile.learningStyle.replace("-", " ")],
+                ["Weak signal", profile.weakSignal.replace("-", " ")],
+                ["Pattern", profile.learningPattern.replace("-", " ")],
+                ["Mind", profile.mindState.replace("-", " ")],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                  <p className="mt-1 text-sm font-black capitalize text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-4">
+          <div data-testid="upsc-intake-step-core" className="grid gap-4">
+              <div>
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">Where are you today?</p>
+                <div className="grid gap-2">
+                  {preparationOptions.map(({ value, level, label, detail }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={classificationConfirmed && draft.preparationStage === value}
+                      data-testid={`upsc-intake-${value}`}
+                      onClick={() => choosePreparationStage(value)}
+                      className={`min-h-20 rounded-md border px-3 py-3 text-left transition ${optionClass(
+                        classificationConfirmed && draft.preparationStage === value
+                      )}`}
+                    >
+                      <span className="block text-[10px] font-black uppercase tracking-[0.14em] opacity-80">
+                        {level}
+                      </span>
+                      <span className="mt-1 block text-sm font-black leading-5">{label}</span>
+                      <span className="mt-1 block text-xs font-semibold leading-5 opacity-80">{detail}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {classificationConfirmed ? (
+                <div data-testid="upsc-classification-preview" className="rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                    Identified path
+                  </p>
+                <p className="mt-1 text-base font-black capitalize text-[#13251d]">{draft.level}</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-[#49675e]">
+                  {classification.firstAction}. {classification.detail}
+                </p>
+                <p
+                  data-testid="upsc-classification-route-proof"
+                  className="mt-2 rounded-md border border-[#b9d9cd] bg-white/75 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
+                >
+                  {draftClassificationProof.title}: {draftClassificationProof.route}
+                </p>
+              </div>
+              ) : null}
+
+              {shouldAutoGeneratePath ? (
+                <div
+                  data-testid="upsc-auto-classification-flow"
+                  className="rounded-md border border-[#dcd5c7] bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]"
+                >
+                  One answer generates your path
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="upsc-save-profile"
+                  onClick={() => saveProfile()}
+                  disabled={!classificationConfirmed}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:bg-[#dcd5c7] disabled:text-[#756f64] sm:w-auto"
+                >
+                  <Save className="h-4 w-4" /> Update guided path
+                </button>
+              )}
+            </div>
+
+          <details data-testid="upsc-intake-optional-preferences" className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+            <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
+              Optional study preferences
+            </summary>
+            <div data-testid="upsc-intake-step-pattern" className="mt-4 grid gap-4">
+              <SelectBlock
+                label="Daily sitting"
+                icon={Clock3}
+                value={draft.studyWindow}
+                options={[
+                  ["60", "60 min"],
+                  ["90", "90 min"],
+                  ["120", "120 min"],
+                  ["180", "180 min"],
+                ]}
+                onChange={(value) => setDraft((current) => ({ ...current, studyWindow: value as StudyWindow }))}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <SelectBlock
+                  label="Learning style"
+                  icon={BrainCircuit}
+                  value={draft.learningStyle}
+                  options={[
+                    ["watch-first", "Watch"],
+                    ["talk-first", "Talk"],
+                    ["practice-first", "Practice"],
+                    ["mixed", "Mixed"],
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, learningStyle: value as LearningStyle }))}
+                />
+                <SelectBlock
+                  label="Weakest signal"
+                  icon={Target}
+                  value={draft.weakSignal}
+                  options={[
+                    ["retention", "Retention"],
+                    ["concept-clarity", "Concept"],
+                    ["mcq-traps", "MCQ traps"],
+                    ["answer-writing", "Mains"],
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, weakSignal: value as WeakSignal }))}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <SelectBlock
+                  label="Best time"
+                  icon={UserRound}
+                  value={draft.studyTime}
+                  options={[
+                    ["morning", "Morning"],
+                    ["afternoon", "Afternoon"],
+                    ["evening", "Evening"],
+                    ["late-night", "Night"],
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, studyTime: value as StudyTime }))}
+                />
+                <SelectBlock
+                  label="Study pattern"
+                  icon={Clock3}
+                  value={draft.learningPattern}
+                  options={[
+                    ["deep-work", "Deep work"],
+                    ["split-sessions", "Split sessions"],
+                    ["revision-first", "Revision first"],
+                    ["irregular", "Irregular"],
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, learningPattern: value as LearningPattern }))}
+                />
+              </div>
+
+              <SelectBlock
+                label="Mind state"
+                icon={BrainCircuit}
+                value={draft.mindState}
+                options={[
+                  ["calm", "Calm"],
+                  ["overloaded", "Overloaded"],
+                  ["low-confidence", "Low confidence"],
+                  ["exam-stress", "Exam stress"],
+                ]}
+                onChange={(value) => setDraft((current) => ({ ...current, mindState: value as MindState }))}
+              />
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  data-testid="upsc-save-profile-preferences"
+                  onClick={() => saveProfile()}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] sm:w-auto"
+                >
+                  <Save className="h-4 w-4" /> {profile ? "Update preferences" : "Save preferences and continue"}
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function SelectBlock({
+  label,
+  icon: Icon,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  icon: typeof Clock3;
+  value: string;
+  options: Array<[string, string]>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+        <Icon className="h-4 w-4" /> {label}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map(([optionValue, optionLabel]) => (
+          <button
+            key={optionValue}
+            type="button"
+            onClick={() => onChange(optionValue)}
+            className={`min-h-10 rounded-md border px-3 text-left text-sm font-black transition ${optionClass(value === optionValue)}`}
+          >
+            {optionLabel}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

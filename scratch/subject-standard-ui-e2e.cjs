@@ -3,16 +3,24 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "subject-standard-ui-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "subject-standard-ui-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
 const subjects = [
-  { slug: "environment", title: "Environment", accent: "#1d9e75", dark: "#123c31", light: "#e7f5ee" },
-  { slug: "economy", title: "Economy", accent: "#2563eb", dark: "#172554", light: "#eff6ff" },
-  { slug: "disaster-management", title: "Disaster Management", accent: "#d97706", dark: "#3a2515", light: "#fff4df" },
-  { slug: "polity-governance", title: "Polity and Governance", accent: "#7c3aed", dark: "#312e81", light: "#f5f3ff" },
+  { slug: "environment", title: "Environment", accent: "#1d9e75", dark: "#123c31", light: "#e7f5ee", expectedGs: "GS Paper III" },
+  { slug: "economy", title: "Economy", accent: "#2563eb", dark: "#172554", light: "#eff6ff", expectedGs: "GS Paper III" },
+  { slug: "disaster-management", title: "Disaster Management", accent: "#d97706", dark: "#3a2515", light: "#fff4df", expectedGs: "GS Paper III" },
+  { slug: "polity-governance", title: "Polity and Governance", accent: "#7c3aed", dark: "#312e81", light: "#f5f3ff", expectedGs: "GS Paper II" },
+  { slug: "science-tech", title: "Science and Technology", accent: "#0891b2", dark: "#164e63", light: "#ecfeff", expectedGs: "GS Paper III" },
+  { slug: "internal-security-society", title: "Internal Security and Society", accent: "#b45309", dark: "#451a03", light: "#fff7ed", expectedGs: "GS Paper I/III" },
+  { slug: "history", title: "History", accent: "#be123c", dark: "#4c0519", light: "#fff1f2", expectedGs: "GS Paper I" },
 ];
+
+function storageKey(subjectSlug) {
+  return `sarit-upsc-${subjectSlug}-progress-v1`;
+}
 
 async function assertNoOverflow(page, label, checks) {
   const metrics = await page.evaluate(() => {
@@ -38,13 +46,88 @@ async function assertNoOverflow(page, label, checks) {
 }
 
 async function inspectSubject(page, subject, checks) {
+  await page.addInitScript((studentProfileKey) => {
+    localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_subject_standard_ui");
+    localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "advanced",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, profileKey);
   await page.goto(`${baseUrl}/upsc/${subject.slug}`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.evaluate((key) => window.localStorage.removeItem(key), storageKey(subject.slug));
+  await page.reload({ waitUntil: "networkidle", timeout: 45000 });
   const shell = page.getByTestId("subject-standard-shell");
-  const loop = page.getByTestId("subject-loop-actions").first();
   await shell.waitFor({ timeout: 15000 });
-  await loop.waitFor({ timeout: 15000 });
-  await page.getByRole("heading", { name: new RegExp(subject.title, "i") }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-simple-student-flow").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-command-student-instruction").getByText("First action", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-command-action-route").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-four-signal-grid").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-signal-learning-gap").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-signal-next-revision").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-signal-trend").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-command-context-details").waitFor({ timeout: 15000 });
+
+  const contextOpenBefore = await page.getByTestId("subject-command-context-details").evaluate((element) => element.open);
+  const syllabusVisibleBefore = await page.getByTestId("subject-command-syllabus-anchor").isVisible();
+  if (contextOpenBefore || syllabusVisibleBefore) {
+    throw new Error(
+      `${subject.slug} should keep syllabus and context folded on first load: ${JSON.stringify({
+        contextOpenBefore,
+        syllabusVisibleBefore,
+      })}`
+    );
+  }
+
+  await page.getByTestId("subject-command-context-details").locator(":scope > summary").click();
+  await page.getByTestId("subject-command-syllabus-anchor").waitFor({ state: "visible", timeout: 15000 });
+  await page.getByTestId("subject-command-input-rule").waitFor({ state: "visible", timeout: 15000 });
+  const syllabusText = (await page.getByTestId("subject-command-syllabus-anchor").innerText()).trim();
+  if (!syllabusText.includes(subject.expectedGs) || !syllabusText.includes("Daily focus")) {
+    throw new Error(`Subject syllabus anchor mismatch for ${subject.slug}: ${syllabusText}`);
+  }
+
+  const plannerOpenBefore = await page.getByTestId("subject-planner-details").evaluate((element) => element.open);
+  const baselineTextareaCount = await page.getByTestId("subject-command-baseline-draft").count();
+  const baselineSaveCount = await page.getByTestId("subject-command-save-baseline").count();
+  const inputRuleText = (await page.getByTestId("subject-command-input-rule").innerText()).trim();
+  const profileSummary = (await page.getByTestId("subject-command-profile-summary").innerText()).trim();
+  const loopVisibleBeforeOpen = await page.getByTestId("subject-loop-actions").first().isVisible();
+  if (
+    plannerOpenBefore ||
+    contextOpenBefore ||
+    baselineTextareaCount !== 0 ||
+    baselineSaveCount !== 0 ||
+    !inputRuleText.includes("Speak first inside Talk") ||
+    !/Advanced/i.test(profileSummary) ||
+    !/120 min/i.test(profileSummary) ||
+    loopVisibleBeforeOpen
+  ) {
+    throw new Error(
+      `${subject.slug} should keep optional areas folded while using the saved profile summary: ${JSON.stringify({
+        plannerOpenBefore,
+        baselineTextareaCount,
+        baselineSaveCount,
+        inputRuleText,
+        profileSummary,
+        loopVisibleBeforeOpen,
+      })}`
+    );
+  }
+
+  await page.getByTestId("subject-planner-details").locator(":scope > summary").click();
+  const loop = page.getByTestId("subject-loop-actions").first();
+  await loop.waitFor({ state: "visible", timeout: 15000 });
+  await loop.getByTestId("subject-loop-one-action").waitFor({ timeout: 15000 });
+  const roomSwitcherOpenBefore = await loop
+    .getByTestId("subject-loop-room-switcher")
+    .evaluate((element) => element.open);
 
   const theme = await shell.evaluate((node) => {
     const styles = window.getComputedStyle(node);
@@ -85,13 +168,18 @@ async function inspectSubject(page, subject, checks) {
     throw new Error(`Subject loop theme mismatch for ${subject.slug}: ${JSON.stringify(loopTheme)}`);
   }
 
+  if (roomSwitcherOpenBefore) {
+    throw new Error(`Subject loop room switcher should start folded for ${subject.slug}.`);
+  }
+
   const actionHref = await page.getByTestId("subject-command-action-route").getAttribute("href");
-  if (!actionHref?.startsWith(`/upsc/${subject.slug}/`)) {
-    throw new Error(`Next action route is not scoped to ${subject.slug}: ${actionHref}`);
+  const actionLabel = (await page.getByTestId("subject-command-action-route").innerText()).trim();
+  if (actionHref !== `/upsc/${subject.slug}/talk?day=1` || !/Start recall/i.test(actionLabel)) {
+    throw new Error(`Fresh student should start with recall for ${subject.slug}: ${JSON.stringify({ actionHref, actionLabel })}`);
   }
 
   await assertNoOverflow(page, `${subject.slug}-desktop`, checks);
-  return { theme, loopTheme, actionHref };
+  return { theme, loopTheme, actionHref, actionLabel, syllabusText };
 }
 
 async function run() {

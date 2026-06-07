@@ -74,7 +74,7 @@ async function verifyTalkLabMcqRevisitFlow(page) {
       throw new Error(`/upsc/geography/lab did not contain expected text: ${expected}`);
     }
   }
-  await page.getByTestId("lab-complete-and-mcq").click();
+  await page.getByTestId("lab-continue-without-visual").click();
   await page.waitForURL(/\/upsc\/geography\/mcq-readiness\?day=1/, { timeout: 45000 });
   await page.waitForTimeout(1500);
   text = await page.locator("body").innerText();

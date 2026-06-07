@@ -45,7 +45,7 @@ async function run() {
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate((key) => {
-    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_geography_content_pack");
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_geography_content_pack");
     window.localStorage.removeItem(key);
   }, contentKey);
 
@@ -53,18 +53,17 @@ async function run() {
     waitUntil: "domcontentloaded",
     timeout: 45000,
   });
-  await page.getByTestId("content-pack-preview").getByText("Earth as a System: Origin", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("content-pack-preview").getByText("latitude, longitude, time", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByText("READY", { exact: true }).waitFor({ timeout: 15000 });
+  await page
+    .getByTestId("content-pack-preview")
+    .getByText("Geographic Thinking and Map Relationships", { exact: true })
+    .waitFor({ timeout: 15000 });
+  await page.getByTestId("content-pack-preview").getByText("what and where to why", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("IN PROGRESS", { exact: true }).waitFor({ timeout: 15000 });
+  const dayOneNote = await page.locator("textarea").inputValue();
+  if (!dayOneNote.includes("portal-native foundation draft") || !dayOneNote.includes("Final recorded lecture media")) {
+    throw new Error(`Day 1 rehearsal note did not preserve the honest media boundary: ${dayOneNote}`);
+  }
   await assertNoOverflow(page, "content-command-day1-pack", checks);
-
-  await page.getByTestId("content-watch-route").click();
-  await page.waitForURL("**/upsc/geography/watch?day=1", { timeout: 15000 });
-  await page.getByTestId("watch-content-asset-gate").getByText("Institutional content ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-content-asset-gate").getByText("3/3 assets ready", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-content-pack-preview").getByText("Earth as a System: Origin", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-content-pack-preview").getByText("UPSC trap", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "watch-day1-content-pack", checks);
 
   await page.goto(`${baseUrl}/upsc/content-command?subject=geography&day=2`, {
     waitUntil: "domcontentloaded",
@@ -72,15 +71,15 @@ async function run() {
   });
   await page.getByText("IN PROGRESS", { exact: true }).waitFor({ timeout: 15000 });
   const dayTwoNote = await page.locator("textarea").inputValue();
-  if (!dayTwoNote.includes("Planned placeholder: content is not broken")) {
-    throw new Error(`Day 2 did not expose the planned placeholder note: ${dayTwoNote}`);
+  if (!dayTwoNote.includes("Day 2 portal-native visual lesson is source-backed") || !dayTwoNote.includes("Final recorded media")) {
+    throw new Error(`Day 2 did not expose the honest portal-native visual boundary: ${dayTwoNote}`);
   }
-  await assertNoOverflow(page, "content-command-day2-placeholder", checks);
+  await assertNoOverflow(page, "content-command-day2-source-backed-draft", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${baseUrl}/upsc/geography/watch?day=1`, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.getByTestId("watch-content-pack-preview").getByText("Earth as a System: Origin", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "watch-day1-content-pack-mobile", checks);
+  await page.goto(`${baseUrl}/upsc/content-command?subject=geography&day=1`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.getByText("IN PROGRESS", { exact: true }).waitFor({ timeout: 15000 });
+  await assertNoOverflow(page, "content-command-day1-pack-mobile", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   const blockingConsoleErrors = consoleErrors.filter(
