@@ -200,8 +200,8 @@ export const productEngineFeatures: ProductEngineFeature[] = [
   },
   {
     title: "Question bank and custom MCQ builder",
-    status: "building",
-    ownerSurface: "/admin/questions",
+    status: "ready",
+    ownerSurface: "/upsc/question-bank",
     studentOutcome: "Easy, moderate, and tough practice is selected by level, recall, marks, and consistency.",
   },
   {

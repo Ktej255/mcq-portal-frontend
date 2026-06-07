@@ -188,6 +188,13 @@ export const upscCalendar = [
     href: "/upsc/mcq-command",
   },
   {
+    window: "Practice",
+    title: "Custom MCQ Question Bank",
+    detail: "Student practice builder selects easy, medium, hard, or PYQ-style questions from recall, consistency, and marks.",
+    status: "Structure ready",
+    href: "/upsc/question-bank",
+  },
+  {
     window: "Content Engine",
     title: "UPSC Content Command Center",
     detail: "Video, notes, transcript, source type, and Watch-room readiness across all class days.",

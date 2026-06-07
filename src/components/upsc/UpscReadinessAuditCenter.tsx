@@ -99,6 +99,7 @@ const globalModules = [
   { title: "Student Weekly and Monthly Reports", href: "/reports", status: "Ready" },
   { title: "Content Command Center", href: "/upsc/content-command", status: "Ready" },
   { title: "MCQ Command Center", href: "/upsc/mcq-command", status: "Ready" },
+  { title: "Custom MCQ Question Bank", href: "/upsc/question-bank", status: "Ready" },
   { title: "Revision Command Center", href: "/upsc/revision-command", status: "Ready" },
   { title: "Readiness Audit Center", href: "/upsc/readiness-audit", status: "Ready" },
 ];

@@ -92,6 +92,24 @@ export default function HistoryPage() {
             ))}
           </div>
         </section>
+
+        <section data-testid="student-question-bank-entry" className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Custom practice</p>
+              <h2 className="mt-1 text-xl font-black tracking-tight">Build an MCQ set from your evidence</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#49675e]">
+                Difficulty is recommended from recall, MCQ marks, recovery queue, consistency, and command days.
+              </p>
+            </div>
+            <Link
+              href="/upsc/question-bank"
+              className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              Open question bank <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
   );
