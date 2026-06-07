@@ -134,6 +134,8 @@ export type GeographyDayProgress = {
   mcqQualityWarnings?: string[];
   mcqQualityPassed?: boolean;
   mcqQualityGateLabel?: string;
+  meTimeCompletedAt?: string;
+  meTimeMood?: "calm" | "focused" | "tired";
   savedCount?: number;
   updatedAt?: string;
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BarChart3, CheckCircle2, Route } from "lucide-react";
+import { ArrowRight, BarChart3, BrainCircuit, CheckCircle2, Route } from "lucide-react";
 
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
 
@@ -32,6 +32,12 @@ export default function HistoryPage() {
       detail: `${overview.metrics.mcqCompletedCount} practice set completed`,
       icon: CheckCircle2,
     },
+    {
+      label: "Session Readiness",
+      value: overview.metrics.latestMeTimeMood ? overview.metrics.latestMeTimeMood : "Not checked",
+      detail: `${overview.metrics.meTimeCount} start check${overview.metrics.meTimeCount === 1 ? "" : "s"} saved`,
+      icon: BrainCircuit,
+    },
   ];
 
   return (
@@ -58,7 +64,7 @@ export default function HistoryPage() {
           </div>
         </section>
 
-        <section className="mt-5 grid gap-4 md:grid-cols-3">
+        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => (
             <div key={card.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <card.icon className="h-5 w-5 text-[#085041]" />
@@ -77,6 +83,7 @@ export default function HistoryPage() {
               ["Watched", overview.metrics.watchedCount],
               ["Command", overview.metrics.commandCount],
               ["Recovery", overview.metrics.revisitCount],
+              ["Start checks", overview.metrics.meTimeCount],
             ].map(([label, value]) => (
               <div key={label} className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] p-4">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>

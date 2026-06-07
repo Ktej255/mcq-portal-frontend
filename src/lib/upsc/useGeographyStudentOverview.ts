@@ -83,6 +83,11 @@ export function useGeographyStudentOverview() {
     const measuredSessions = geographySessions.filter((session) => hasStarted(progress[String(session.day)]));
     const mcqSessions = geographySessions.filter((session) => progress[String(session.day)]?.mcqCompleted);
     const commandSessions = geographySessions.filter((session) => hasCommand(progress[String(session.day)]));
+    const meTimeSessions = geographySessions.filter((session) => progress[String(session.day)]?.meTimeCompletedAt);
+    const latestMeTimeMood = meTimeSessions
+      .map((session) => progress[String(session.day)]?.meTimeMood)
+      .filter((mood): mood is NonNullable<GeographyDayProgress["meTimeMood"]> => Boolean(mood))
+      .at(-1);
     const averageMcqScore = mcqSessions.length
       ? Math.round(
           mcqSessions.reduce((sum, session) => sum + (progress[String(session.day)]?.mcqScorePercent ?? 0), 0) /
@@ -129,6 +134,8 @@ export function useGeographyStudentOverview() {
         mcqCompletedCount: mcqSessions.length,
         averageMcqScore,
         latestTalkScore,
+        meTimeCount: meTimeSessions.length,
+        latestMeTimeMood,
       },
     };
   }, [isLoaded, progress, stats]);

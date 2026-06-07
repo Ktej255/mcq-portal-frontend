@@ -49,6 +49,7 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   const planningDrawerOpen = await page.getByTestId("upsc-planning-drawer").evaluate((node) =>
     node instanceof HTMLDetailsElement ? node.open : false
   );
+  const meTimeStatus = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-status");
 
   checks.push({
     label,
@@ -61,6 +62,7 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     oneActionRuleText,
     dashboardVisibleMode,
     planningDrawerOpen,
+    meTimeStatus,
   });
 
   if (signalCount !== 4) {
@@ -89,6 +91,9 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   }
   if (planningDrawerOpen) {
     throw new Error(`${label}: optional planning drawer should start closed`);
+  }
+  if (!["pending", "ready"].includes(meTimeStatus)) {
+    throw new Error(`${label}: me-time start check should expose a pending/ready status, got ${meTimeStatus}`);
   }
 }
 
@@ -150,6 +155,26 @@ async function run() {
   await page.getByText("Day 1 recall", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByText("Revise Geographic Thinking and Map Relationships on study Day 3.", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("balanced recall and repair", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-me-time-check").getByRole("button", { name: "focused" }).click();
+  await page.waitForFunction(
+    (progressStorageKey) => {
+      const raw = window.localStorage.getItem(progressStorageKey);
+      if (!raw) return false;
+      const progress = JSON.parse(raw);
+      return Boolean(progress?.["1"]?.meTimeCompletedAt && progress?.["1"]?.meTimeMood === "focused");
+    },
+    progressKey,
+    { timeout: 15000 }
+  );
+  await page.getByTestId("upsc-me-time-check").evaluate((node) => {
+    if (node.getAttribute("data-me-time-status") !== "ready") {
+      throw new Error("me-time check did not switch to ready after mood save");
+    }
+  });
+  await page.goto(`${baseUrl}/history`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByText("focused", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("1 start check saved", { exact: true }).waitFor({ timeout: 15000 });
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-planning-drawer").locator("summary").first().click();
   await page.getByTestId("upsc-personal-plan-rules").getByText("Recall -> repair class -> fresh MCQ.", {
     exact: true,

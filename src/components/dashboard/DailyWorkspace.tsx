@@ -7,6 +7,7 @@ import {
   ArrowRight,
   BarChart3,
   BrainCircuit,
+  CheckCircle2,
   Clock3,
   RefreshCcw,
   Save,
@@ -179,7 +180,7 @@ export const DailyWorkspace = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
-  const { getDayProgress, isLoaded: progressLoaded, progress, stats } = useGeographyProgress();
+  const { getDayProgress, isLoaded: progressLoaded, progress, saveDayProgress, stats } = useGeographyProgress();
   const today = getCurrentGeographyTopic(progress);
   const dailyPath = useMemo(() => (profile ? buildGeographyDailyPath(profile, progress) : []), [profile, progress]);
   const readinessSnapshot = useMemo(
@@ -230,6 +231,7 @@ export const DailyWorkspace = () => {
       detail: "The system opens the next topic after MCQ.",
     },
   ];
+  const meTimeDone = Boolean(todayProgress?.meTimeCompletedAt);
 
   useEffect(() => {
     let cancelled = false;
@@ -285,10 +287,18 @@ export const DailyWorkspace = () => {
       learningGapSignal.detail,
       learningGapSignal.title,
       talkScoreLine,
+      today.day,
       todayLoop.href,
       trendDetail,
     ]
   );
+
+  const saveMeTimeCheck = (mood: NonNullable<GeographyDayProgress["meTimeMood"]>) => {
+    saveDayProgress(today.day, {
+      meTimeCompletedAt: new Date().toISOString(),
+      meTimeMood: mood,
+    });
+  };
 
   const saveProfile = (nextDraft: StudentProfile = draft) => {
     const nextProfile = { ...nextDraft, updatedAt: new Date().toISOString() };
@@ -366,6 +376,39 @@ export const DailyWorkspace = () => {
                     <p data-testid="upsc-generated-daily-path-summary" className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[#1d9e75]">
                       Day {today.day} of {geographySessions.length} / {dailyPath.length} topic{dailyPath.length === 1 ? "" : "s"} today / 10-15 min each
                     </p>
+                    <div
+                      data-testid="upsc-me-time-check"
+                      data-me-time-status={meTimeDone ? "ready" : "pending"}
+                      className="mt-3 rounded-lg border border-[#cfe5dc] bg-white/70 p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                            60-sec start check
+                          </p>
+                          <p className="mt-1 text-xs font-bold leading-5 text-[#49675e]">
+                            Breathe once, recall yesterday in one line, then start the main action.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(["calm", "focused", "tired"] as const).map((mood) => (
+                            <button
+                              key={mood}
+                              type="button"
+                              onClick={() => saveMeTimeCheck(mood)}
+                              className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-xs font-black capitalize transition ${
+                                todayProgress?.meTimeMood === mood
+                                  ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                                  : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]"
+                              }`}
+                            >
+                              {todayProgress?.meTimeMood === mood ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                              {mood}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                     <details
                       data-testid="upsc-main-path-strip"
                       className="mt-4 rounded-lg border border-[#cfe5dc] bg-white/70 p-3 text-xs font-black text-[#31443a]"
