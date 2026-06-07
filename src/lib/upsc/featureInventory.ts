@@ -74,7 +74,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Student dashboard",
         status: "verified",
-        behavior: "Exactly four visible decisions: Today, Gaps, Revise, and Progress. Today advances from the first incomplete MCQ-command topic. The folded planning drawer is read-only: its Learn, Discuss, and MCQ cards are orientation only, and its time-aware syllabus queue uses Current and Queued labels without skip-ahead links.",
+        behavior: "Exactly four visible decisions: Today, Gaps, Revise, and Progress. Today advances from the first incomplete MCQ-command topic. The 60-second start check now saves the learner state plus a reset plan, and the main action exposes check-pending or ready session status. The folded planning drawer is read-only: its Learn, Discuss, and MCQ cards are orientation only, and its time-aware syllabus queue uses Current and Queued labels without skip-ahead links.",
         evidence: "verify-student-signal-pages.cjs and verify-generated-daily-path.cjs",
       },
       {
@@ -82,6 +82,36 @@ export const featureInventoryGroups: InventoryGroup[] = [
         status: "verified",
         behavior: "Settings expose study preferences without technical controls.",
         evidence: "verify-student-signal-pages.cjs",
+      },
+      {
+        feature: "Pricing and yearly planner",
+        status: "verified",
+        behavior: "Monthly is Rs 399, with yearly, 18-month, and three-year launch plans carrying deterministic list price, discount, savings, effective monthly price, and local checkout handoff. The yearly planner exposes nine windows, eight GS coverage blocks, source-library entry, and optional-subject catalog proof.",
+        evidence: "verify-pricing-planner.cjs",
+      },
+      {
+        feature: "Syllabus, PYQ, and optional library",
+        status: "verified",
+        behavior: "GS source rows, official anchors, trend boards, and optional-subject pages are available locally. Every UPSC optional subject has a route with Paper I and Paper II year-wise source rows; PDF text extraction and final topic tagging remain a later depth pass.",
+        evidence: "verify-syllabus-pyq-trend-library.cjs and verify-optional-subject-pages.cjs",
+      },
+      {
+        feature: "Covered-topic current affairs",
+        status: "verified",
+        behavior: "Current-affairs hooks are hidden until the linked static topic has local evidence. Geography and later GS subjects use the same subject/day gate so beginners do not see an open-ended news feed.",
+        evidence: "verify-current-affairs-bridge.cjs",
+      },
+      {
+        feature: "Reports and growth signal",
+        status: "verified",
+        behavior: "Weekly windows, monthly summary, growth percentage, current-affairs unlocks, AI gap count, MCQ evidence, recall evidence, and me-time checks are generated from local subject progress.",
+        evidence: "verify-student-report-system.cjs",
+      },
+      {
+        feature: "Adaptive question bank builder",
+        status: "verified",
+        behavior: "The learner-facing question bank prioritizes unresolved AI gaps, weak days, requested difficulty, and repair-first practice instead of showing a generic question dump.",
+        evidence: "verify-question-bank-builder.cjs",
       },
     ],
   },
@@ -385,7 +415,7 @@ export const releaseGates: ReleaseGate[] = [
   {
     title: "Local production build",
     complete: true,
-    detail: "Rebuilt successfully with 90 routes, including this operator inventory.",
+    detail: "Rebuilt successfully with 146 generated app routes, including pricing checkout, optional subject pages, source library, reports, and this operator inventory.",
   },
   {
     title: "Student navigation and route isolation",

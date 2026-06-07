@@ -53,8 +53,20 @@ async function run() {
   await masterPage.getByTestId("admin-feature-inventory-page").waitFor({ timeout: 15000 });
   await masterPage.getByRole("heading", { name: "UPSC Portal Feature Inventory" }).waitFor({ timeout: 15000 });
   await masterPage.getByTestId("admin-release-gates").getByText("Stabilize before sharing", { exact: true }).waitFor();
+  await masterPage.getByTestId("admin-release-gates").getByText("146 generated app routes", { exact: false }).waitFor();
   await masterPage.getByText("Verified local", { exact: true }).first().waitFor();
   await masterPage.getByText("External apply", { exact: true }).first().waitFor();
+  await masterPage.getByText("Pricing and yearly planner", { exact: true }).waitFor();
+  await masterPage.getByText("verify-pricing-planner.cjs", { exact: true }).waitFor();
+  await masterPage.getByText("Syllabus, PYQ, and optional library", { exact: true }).waitFor();
+  await masterPage.getByText("verify-syllabus-pyq-trend-library.cjs and verify-optional-subject-pages.cjs", { exact: true }).waitFor();
+  await masterPage.getByText("Covered-topic current affairs", { exact: true }).waitFor();
+  await masterPage.getByText("verify-current-affairs-bridge.cjs", { exact: true }).waitFor();
+  await masterPage.getByText("Reports and growth signal", { exact: true }).waitFor();
+  await masterPage.getByText("verify-student-report-system.cjs", { exact: true }).waitFor();
+  await masterPage.getByText("Adaptive question bank builder", { exact: true }).waitFor();
+  await masterPage.getByText("verify-question-bank-builder.cjs", { exact: true }).waitFor();
+  await masterPage.getByText("60-second start check now saves the learner state plus a reset plan", { exact: false }).waitFor();
   await masterPage.getByText("Real Geography Day 1 pack", { exact: true }).first().waitFor();
   await masterPage.getByTestId("admin-corpus-summary").getByText("24,131", { exact: true }).waitFor();
   await masterPage.getByTestId("admin-corpus-summary").getByText("Verified public claims", { exact: true }).waitFor();
@@ -87,9 +99,10 @@ async function run() {
   await masterPage.getByTestId("admin-feature-inventory-page").waitFor({ timeout: 15000 });
   checks.push(await assertNoOverflow(masterPage, "feature-inventory-mobile"));
 
-  const learnerPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const learnerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const learnerPage = await learnerContext.newPage();
   await learnerPage.addInitScript(() => {
-    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_STUDENT_feature_inventory");
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_sim_student_feature_inventory");
   });
   await learnerPage.goto(`${baseUrl}/admin/feature-inventory`, {
     waitUntil: "domcontentloaded",

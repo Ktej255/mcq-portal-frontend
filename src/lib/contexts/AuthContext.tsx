@@ -101,7 +101,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (authDebug) console.info("AUTH | AuthProvider Mount | Auth Initialized:", !!auth);
 
     if (typeof window !== "undefined") {
-      if (mockAuthEnabled && isLocalTestingHost()) {
+      const existingMockToken = readLocalMockToken();
+      if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
         const params = new URLSearchParams(window.location.search);
         const redirectPath = params.get("redirect") || "/dashboard";
         devLogin("validator@upsc.local", "local-dev-validator", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
