@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  FileSearch,
   Layers3,
   LineChart,
   Microscope,
@@ -24,6 +25,7 @@ import { getSubjectGsCompatibility, getSubjectSyllabusChips } from "@/lib/upsc/s
 import { buildSubjectDailyPath } from "@/lib/upsc/subjectGuidedStudy";
 import { getSubjectBatchCode } from "@/lib/upsc/subjectPlans";
 import type { SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
+import { getSubjectSourcePack } from "@/lib/upsc/syllabusPyqRegistry";
 import { readStudentProfile, type StudentLevel, type StudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
@@ -90,6 +92,8 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
   const themeStyle = getSubjectThemeStyle(plan);
   const syllabusAnchor = getSubjectGsCompatibility(plan, activeSession);
   const syllabusChips = getSubjectSyllabusChips(activeSession);
+  const sourcePack = getSubjectSourcePack(plan.slug);
+  const leadTrendInsight = sourcePack?.trendInsights[0];
   const learnerLevelLabel = learnerLevelLabels[learnerLevel];
   const firstActionCopy =
     learnerLevel === "beginner"
@@ -360,6 +364,67 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
                   ))}
                 </div>
               </div>
+
+              {sourcePack ? (
+                <div
+                  data-testid="subject-command-source-path"
+                  data-subject-slug={plan.slug}
+                  data-pyq-row-count={sourcePack.pyqRows.length}
+                  data-trend-insight-count={sourcePack.trendInsights.length}
+                  data-readiness-score={sourcePack.readinessScore}
+                  className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4"
+                >
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+                        Systematic source path
+                      </p>
+                      <h3 className="mt-1 text-lg font-black tracking-tight text-[var(--subject-heading)]">
+                        Syllabus + PYQ + trend + current affairs
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href="/upsc/source-library"
+                        className="inline-flex min-h-9 items-center rounded-md border border-[var(--subject-ring)] bg-white px-3 text-xs font-black text-[var(--subject-dark)]"
+                      >
+                        Source library <FileSearch className="ml-2 h-3.5 w-3.5" />
+                      </Link>
+                      <Link
+                        href={`/upsc/current-affairs?subject=${plan.slug}`}
+                        className="inline-flex min-h-9 items-center rounded-md bg-[var(--subject-dark)] px-3 text-xs font-black text-white"
+                      >
+                        Covered news <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {[
+                      ["NCERT basics", sourcePack.systematicPath.basicsStart],
+                      ["Reference depth", sourcePack.systematicPath.advancedBridge],
+                      [
+                        "PYQ trend",
+                        leadTrendInsight
+                          ? `${leadTrendInsight.label}: ${leadTrendInsight.pyqSignal}`
+                          : "Trend board is indexed in the source library.",
+                      ],
+                      ["Current affairs gate", sourcePack.systematicPath.currentAffairsRule],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--subject-accent)]">
+                          {label}
+                        </p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#49675e]">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--subject-dark)]">
+                    <span className="rounded-md bg-[var(--subject-light)] px-2.5 py-1">{sourcePack.pyqRows.length} GS PYQ rows</span>
+                    <span className="rounded-md bg-[var(--subject-light)] px-2.5 py-1">{sourcePack.trendInsights.length} trend boards</span>
+                    <span className="rounded-md bg-[var(--subject-light)] px-2.5 py-1">{sourcePack.readinessScore}% source readiness</span>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-lg border border-[var(--subject-ring)] bg-[var(--subject-light)] p-4">
                 <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">

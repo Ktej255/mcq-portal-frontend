@@ -76,6 +76,37 @@ async function snapshot(page, label, checks) {
   return result;
 }
 
+async function assertSubjectSourcePath(page, checks) {
+  const sourceVisibleBeforeOpen = await page.getByTestId("subject-command-source-path").isVisible().catch(() => false);
+  if (sourceVisibleBeforeOpen) {
+    throw new Error("Subject source path should stay folded inside the context drawer on first load.");
+  }
+  await page.getByTestId("subject-command-context-details").locator("summary").click();
+  await page.getByTestId("subject-command-source-path").waitFor({ timeout: 15000 });
+  const sourcePath = await page.getByTestId("subject-command-source-path").evaluate((node) => ({
+    subjectSlug: node.getAttribute("data-subject-slug"),
+    pyqRows: node.getAttribute("data-pyq-row-count"),
+    trendInsights: node.getAttribute("data-trend-insight-count"),
+    readinessScore: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+    links: [...node.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")),
+  }));
+  checks.push({ label: "subject-command-source-path", sourceVisibleBeforeOpen, sourcePath });
+  if (
+    sourcePath.subjectSlug !== "environment" ||
+    Number(sourcePath.pyqRows) < 20 ||
+    Number(sourcePath.trendInsights) < 2 ||
+    !sourcePath.text.includes("NCERT basics") ||
+    !sourcePath.text.includes("Reference depth") ||
+    !sourcePath.text.includes("PYQ trend") ||
+    !sourcePath.text.includes("Current affairs gate") ||
+    !sourcePath.links.includes("/upsc/source-library") ||
+    !sourcePath.links.includes("/upsc/current-affairs?subject=environment")
+  ) {
+    throw new Error(`Subject source path proof failed: ${JSON.stringify(sourcePath, null, 2)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -90,6 +121,7 @@ async function run() {
 
   await seed(page, profile("beginner", "not-started", "120"));
   const beginner = await snapshot(page, "beginner-environment-path", checks);
+  await assertSubjectSourcePath(page, checks);
   if (
     beginner.actionHref !== "/upsc/environment/watch?day=5" ||
     !beginner.normalizedLevelText.includes("beginner path identified") ||

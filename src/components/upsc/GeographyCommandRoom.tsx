@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Eye,
+  FileSearch,
   Lock,
   MapPinned,
   PlayCircle,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/upsc/geographyLearning";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
+import { getSubjectSourcePack } from "@/lib/upsc/syllabusPyqRegistry";
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +138,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const generatedCurrentDay = getCurrentGeographyTopic(progress).day;
   const syllabusAnchor = getGeographyGsCompatibility(activeSession);
   const syllabusChips = getGeographySubtopics(activeSession).slice(0, 4);
+  const sourcePack = getSubjectSourcePack("geography");
+  const leadTrendInsight = sourcePack?.trendInsights[0];
 
   const canSelectDay = (day: number) => day <= generatedCurrentDay || Boolean(getDayProgress(day));
   const previousDay = activeSession.day > 1 ? activeSession.day - 1 : null;
@@ -215,6 +219,65 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                       </span>
                     ))}
                   </div>
+                  {sourcePack ? (
+                    <div
+                      data-testid="geography-command-source-path"
+                      data-pyq-row-count={sourcePack.pyqRows.length}
+                      data-trend-insight-count={sourcePack.trendInsights.length}
+                      data-readiness-score={sourcePack.readinessScore}
+                      className="mt-4 rounded-lg border border-[#dcd5c7] bg-white p-4"
+                    >
+                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                            Systematic source path
+                          </p>
+                          <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">
+                            NCERT, reference depth, PYQ trend, covered news
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href="/upsc/source-library"
+                            className="inline-flex min-h-9 items-center rounded-md border border-[#cfe5dc] bg-[#f7f4ee] px-3 text-xs font-black text-[#085041]"
+                          >
+                            Source library <FileSearch className="ml-2 h-3.5 w-3.5" />
+                          </Link>
+                          <Link
+                            href="/upsc/current-affairs?subject=geography"
+                            className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white"
+                          >
+                            Covered news <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ["NCERT basics", sourcePack.systematicPath.basicsStart],
+                          ["Reference depth", sourcePack.systematicPath.advancedBridge],
+                          [
+                            "PYQ trend",
+                            leadTrendInsight
+                              ? `${leadTrendInsight.label}: ${leadTrendInsight.pyqSignal}`
+                              : "Trend board is indexed in the source library.",
+                          ],
+                          ["Current affairs gate", sourcePack.systematicPath.currentAffairsRule],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                              {label}
+                            </p>
+                            <p className="mt-1 text-xs font-bold leading-5 text-[#49675e]">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                        <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1">{sourcePack.pyqRows.length} GS PYQ rows</span>
+                        <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1">{sourcePack.trendInsights.length} trend boards</span>
+                        <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1">{sourcePack.readinessScore}% source readiness</span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </details>
             </div>

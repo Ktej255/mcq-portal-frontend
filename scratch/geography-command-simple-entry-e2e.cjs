@@ -70,9 +70,35 @@ async function run() {
   const syllabusAnchor = page.getByTestId("geography-command-syllabus-anchor");
   const syllabusText = ((await syllabusAnchor.textContent()) ?? "").trim();
   const syllabusOpenBeforeClick = await syllabusAnchor.evaluate((element) => element.hasAttribute("open"));
-  checks.push({ label: "geography-syllabus-anchor", syllabusText, syllabusOpenBeforeClick });
+  const sourcePathVisibleBeforeOpen = await page.getByTestId("geography-command-source-path").isVisible().catch(() => false);
+  checks.push({ label: "geography-syllabus-anchor", syllabusText, syllabusOpenBeforeClick, sourcePathVisibleBeforeOpen });
   if (!syllabusText.includes("GS Paper I") || !/Geography foundation/i.test(syllabusText) || syllabusOpenBeforeClick) {
     throw new Error(`Geography syllabus anchor mismatch: ${syllabusText}`);
+  }
+  if (sourcePathVisibleBeforeOpen) {
+    throw new Error("Geography source path should stay folded until syllabus coverage is opened.");
+  }
+  await syllabusAnchor.locator("summary").click();
+  await page.getByTestId("geography-command-source-path").waitFor({ timeout: 15000 });
+  const geographySourcePath = await page.getByTestId("geography-command-source-path").evaluate((node) => ({
+    pyqRows: node.getAttribute("data-pyq-row-count"),
+    trendInsights: node.getAttribute("data-trend-insight-count"),
+    readinessScore: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+    links: [...node.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")),
+  }));
+  checks.push({ label: "geography-command-source-path", geographySourcePath });
+  if (
+    Number(geographySourcePath.pyqRows) < 20 ||
+    Number(geographySourcePath.trendInsights) < 2 ||
+    !geographySourcePath.text.includes("NCERT basics") ||
+    !geographySourcePath.text.includes("Reference depth") ||
+    !geographySourcePath.text.includes("PYQ trend") ||
+    !geographySourcePath.text.includes("Current affairs gate") ||
+    !geographySourcePath.links.includes("/upsc/source-library") ||
+    !geographySourcePath.links.includes("/upsc/current-affairs?subject=geography")
+  ) {
+    throw new Error(`Geography source path proof failed: ${JSON.stringify(geographySourcePath, null, 2)}`);
   }
   await assertNextAction(page, "/upsc/geography/talk?day=1", checks);
   await page.getByText("Open controls", { exact: false }).waitFor({ timeout: 15000 });
@@ -103,16 +129,23 @@ async function run() {
   await page.getByText("Saved profile", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByText("Advanced", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("120 min daily sitting", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-command-baseline-draft").fill("I know basic Earth system logic, but I confuse map scale and UPSC traps.");
-  await page.getByTestId("geography-command-save-baseline").click();
-  await page.waitForFunction(
-    (key) => {
-      const saved = JSON.parse(window.localStorage.getItem(key) || "{}")["1"];
-      return saved?.learnerLevel === "Advanced" && saved?.studyWindow === "120 min" && saved?.baselineSavedAt;
-    },
-    progressKey,
-    { timeout: 15000 }
-  );
+  const baselineIntake = await page.getByTestId("geography-baseline-intake").textContent();
+  const baselineDraftCount = await page.getByTestId("geography-command-baseline-draft").count();
+  const baselineSaveCount = await page.getByTestId("geography-command-save-baseline").count();
+  checks.push({
+    label: "geography-command-no-baseline-editor",
+    baselineText: baselineIntake?.trim(),
+    baselineDraftCount,
+    baselineSaveCount,
+  });
+  if (
+    !baselineIntake?.includes("Student input rule") ||
+    !baselineIntake.includes("The command page does not collect another baseline") ||
+    baselineDraftCount !== 0 ||
+    baselineSaveCount !== 0
+  ) {
+    throw new Error(`Simplified baseline rule failed: ${JSON.stringify({ baselineIntake, baselineDraftCount, baselineSaveCount })}`);
+  }
 
   const futureWeekDay = page.getByTestId("geography-week-day-5");
   const futureMapDay = page.getByTestId("geography-day-10");
