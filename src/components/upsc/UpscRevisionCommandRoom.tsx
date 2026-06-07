@@ -8,6 +8,7 @@ import {
   BarChart3,
   BrainCircuit,
   CheckCircle2,
+  CircleAlert,
   Compass,
   Gauge,
   PlayCircle,
@@ -35,6 +36,7 @@ type SubjectSummary = RevisionSubject & {
   watchedCount: number;
   reflectedCount: number;
   commandCount: number;
+  aiGapCount: number;
   shakyCount: number;
   revisitCount: number;
   completionPercent: number;
@@ -93,7 +95,44 @@ function getSessionProgress(progress: Record<string, SubjectDayProgress>, sessio
   return progress[String(session.day)];
 }
 
+function hasTeacherDoubtSignal(progress?: SubjectDayProgress) {
+  return Boolean(
+    progress?.teacherDoubtCategory?.trim() ||
+      progress?.teacherDoubtReason?.trim() ||
+      progress?.teacherDoubtRepairAction?.trim() ||
+      progress?.teacherDoubtMasteryCheck?.trim()
+  );
+}
+
+function hasActiveTeacherDoubt(progress?: SubjectDayProgress) {
+  if (!hasTeacherDoubtSignal(progress)) return false;
+  return !(
+    progress?.confidence === "Command" ||
+    progress?.talkBand === "Command" ||
+    progress?.mcqOutcome === "Command" ||
+    (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75)
+  );
+}
+
+function teacherDoubtCategory(progress?: SubjectDayProgress) {
+  return progress?.teacherDoubtCategory?.trim() || "Concept";
+}
+
+function teacherDoubtHref(subject: RevisionSubject, session: SubjectSession, progress?: SubjectDayProgress) {
+  return progress?.talkNextRoute || `${subject.href}/talk?day=${session.day}`;
+}
+
 function getNextFocus(subject: RevisionSubject, progress: Record<string, SubjectDayProgress>) {
+  const teacherDoubt = subject.sessions.find((session) => hasActiveTeacherDoubt(getSessionProgress(progress, session)));
+  if (teacherDoubt) {
+    const item = getSessionProgress(progress, teacherDoubt);
+    return {
+      session: teacherDoubt,
+      href: teacherDoubtHref(subject, teacherDoubt, item),
+      label: `AI ${teacherDoubtCategory(item)} repair`,
+    };
+  }
+
   const revisit = subject.sessions.find((session) => getSessionProgress(progress, session)?.revisitQueued);
   if (revisit) {
     return {
@@ -136,6 +175,7 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
     Boolean(getSessionProgress(progress, session)?.reflection?.trim())
   );
   const commandDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.confidence === "Command");
+  const aiGapDays = subject.sessions.filter((session) => hasActiveTeacherDoubt(getSessionProgress(progress, session)));
   const shakyDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.confidence === "Shaky");
   const revisitDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.revisitQueued);
   const nextFocus = getNextFocus(subject, progress);
@@ -145,6 +185,7 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
     watchedCount: watchedDays.length,
     reflectedCount: reflectedDays.length,
     commandCount: commandDays.length,
+    aiGapCount: aiGapDays.length,
     shakyCount: shakyDays.length,
     revisitCount: revisitDays.length,
     completionPercent: Math.round((reflectedDays.length / subject.sessions.length) * 100),
@@ -157,6 +198,7 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
 }
 
 function subjectTone(summary: SubjectSummary) {
+  if (summary.aiGapCount > 0) return "border-[#ef9f27] bg-[#fff7ed]";
   if (summary.revisitCount > 0) return "border-[#ef9f27] bg-[#fff7ed]";
   if (summary.completionPercent >= 80) return "border-[#1d9e75] bg-[#e7f5ee]";
   if (summary.reflectedCount > 0 || summary.watchedCount > 0) return "border-[#dcd5c7] bg-[#fdfaf3]";
@@ -187,6 +229,7 @@ export function UpscRevisionCommandRoom({
     const watched = summaries.reduce((sum, subject) => sum + subject.watchedCount, 0);
     const reflected = summaries.reduce((sum, subject) => sum + subject.reflectedCount, 0);
     const command = summaries.reduce((sum, subject) => sum + subject.commandCount, 0);
+    const aiGap = summaries.reduce((sum, subject) => sum + subject.aiGapCount, 0);
     const shaky = summaries.reduce((sum, subject) => sum + subject.shakyCount, 0);
     const revisit = summaries.reduce((sum, subject) => sum + subject.revisitCount, 0);
 
@@ -195,6 +238,7 @@ export function UpscRevisionCommandRoom({
       watched,
       reflected,
       command,
+      aiGap,
       shaky,
       revisit,
       completionPercent: totalDays ? Math.round((reflected / totalDays) * 100) : 0,
@@ -209,12 +253,24 @@ export function UpscRevisionCommandRoom({
           subject.sessions
             .map((session) => {
               const item = getSessionProgress(subject.progress, session);
-              if (!item?.revisitQueued && item?.confidence !== "Shaky") return null;
+              const isAiGap = hasActiveTeacherDoubt(item);
+              if (!isAiGap && !item?.revisitQueued && item?.confidence !== "Shaky") return null;
               return {
                 subject,
                 session,
                 progress: item,
-                href: item?.revisitQueued ? `${subject.href}/revisit?day=${session.day}` : `${subject.href}/talk?day=${session.day}`,
+                status: isAiGap ? "AI teacher gap" : item?.revisitQueued ? "Revisit queued" : "Shaky confidence",
+                detail: isAiGap
+                  ? item?.teacherDoubtRepairAction?.trim() || "Repair the AI-identified gap before new testing."
+                  : item?.revisitQueued
+                    ? "Revisit queued from local progress."
+                    : "Shaky confidence from local progress.",
+                category: isAiGap ? teacherDoubtCategory(item) : null,
+                href: isAiGap
+                  ? teacherDoubtHref(subject, session, item)
+                  : item?.revisitQueued
+                    ? `${subject.href}/revisit?day=${session.day}`
+                    : `${subject.href}/talk?day=${session.day}`,
               };
             })
             .filter((item): item is NonNullable<typeof item> => Boolean(item))
@@ -230,17 +286,21 @@ export function UpscRevisionCommandRoom({
     targetSummary && targetSession ? getSessionProgress(targetSummary.progress, targetSession) : undefined;
   const targetHref =
     targetSummary && targetSession
-      ? targetProgress?.revisitQueued
+      ? hasActiveTeacherDoubt(targetProgress)
+        ? teacherDoubtHref(targetSummary, targetSession, targetProgress)
+        : targetProgress?.revisitQueued
         ? `${targetSummary.href}/revisit?day=${targetSession.day}`
         : targetProgress?.confidence === "Shaky"
           ? `${targetSummary.href}/talk?day=${targetSession.day}`
           : `${targetSummary.trackHref}?day=${targetSession.day}`
       : null;
-  const targetStatus = targetProgress?.revisitQueued
-    ? "Revisit queued"
-    : targetProgress?.confidence === "Shaky"
-      ? "Shaky talk repair"
-      : "Track focused day";
+  const targetStatus = hasActiveTeacherDoubt(targetProgress)
+      ? `AI teacher gap: ${teacherDoubtCategory(targetProgress)}`
+    : targetProgress?.revisitQueued
+      ? "Revisit queued"
+      : targetProgress?.confidence === "Shaky"
+        ? "Shaky talk repair"
+        : "Track focused day";
 
   if (!isLoaded) {
     return (
@@ -283,12 +343,13 @@ export function UpscRevisionCommandRoom({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             {[
               { label: "Total days", value: totals.totalDays, icon: Compass },
               { label: "Watched", value: totals.watched, icon: PlayCircle },
               { label: "Reflections", value: totals.reflected, icon: BrainCircuit },
               { label: "Command", value: totals.command, icon: CheckCircle2 },
+              { label: "AI gaps", value: totals.aiGap, icon: CircleAlert },
               { label: "Revisit", value: totals.revisit, icon: RefreshCcw },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
@@ -325,11 +386,12 @@ export function UpscRevisionCommandRoom({
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="grid grid-cols-5 gap-2 text-center">
                     {[
                       ["Watch", summary.watchedCount],
                       ["Talk", summary.reflectedCount],
                       ["Cmd", summary.commandCount],
+                      ["AI", summary.aiGapCount],
                       ["Fix", summary.revisitCount],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-md bg-white/75 px-2 py-3">
@@ -419,7 +481,9 @@ export function UpscRevisionCommandRoom({
                         <p className="text-xs font-black uppercase tracking-[0.16em] text-[#9a6a16]">
                           {item.subject.title} / Day {item.session.day}
                         </p>
-                        {item.progress?.revisitQueued ? (
+                        {item.status === "AI teacher gap" ? (
+                          <CircleAlert className="h-4 w-4 text-[#9a6a16]" />
+                        ) : item.progress?.revisitQueued ? (
                           <RefreshCcw className="h-4 w-4 text-[#9a6a16]" />
                         ) : (
                           <Gauge className="h-4 w-4 text-[#9a6a16]" />
@@ -427,7 +491,8 @@ export function UpscRevisionCommandRoom({
                       </div>
                       <p className="text-sm font-black text-[#332514]">{item.session.title}</p>
                       <p className="mt-1 text-xs font-semibold leading-5 text-[#6f4a12]">
-                        {item.progress?.revisitQueued ? "Revisit queued" : "Shaky confidence"} from local progress.
+                        {item.category ? `${item.status}: ${item.category}. ` : ""}
+                        {item.detail}
                       </p>
                     </Link>
                   ))}
@@ -442,8 +507,8 @@ export function UpscRevisionCommandRoom({
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Revision rule</p>
               <h2 className="mt-2 text-xl font-black text-[#085041]">Repair before new testing.</h2>
               <p className="mt-3 text-sm font-semibold leading-6 text-[#41645a]">
-                The command phase should cycle through queued revisits first, then shaky explanations, then unfinished
-                classes, and finally mixed MCQ drills.
+                The command phase should cycle through AI teacher gaps first, then queued revisits, then shaky explanations,
+                then unfinished classes, and finally mixed MCQ drills.
               </p>
             </div>
           </div>
