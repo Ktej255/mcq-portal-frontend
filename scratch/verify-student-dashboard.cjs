@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
+const dailyCommandKey = "sarit-upsc-daily-command-v1";
 const authUserKey = "sarit-upsc-auth-user-v1";
 const evidencePath = path.join(__dirname, "verify-student-dashboard-evidence.json");
 const screenshotPath = path.join(__dirname, "verify-student-dashboard-final.png");
@@ -52,6 +53,14 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   const meTimeStatus = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-status");
   const meTimeResetPlan = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-reset-plan");
   const startSessionReadiness = await page.getByTestId("upsc-start-today").getAttribute("data-session-readiness");
+  const activeMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+  }));
+  const activeMissionHref = await page.getByTestId("upsc-active-mission-action").getAttribute("href");
 
   checks.push({
     label,
@@ -67,6 +76,8 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     meTimeStatus,
     meTimeResetPlan,
     startSessionReadiness,
+    activeMission,
+    activeMissionHref,
   });
 
   if (signalCount !== 4) {
@@ -105,20 +116,27 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   if (meTimeStatus === "ready" && !meTimeResetPlan) {
     throw new Error(`${label}: ready me-time check should expose a saved reset plan`);
   }
+  if (!activeMission.subject || !activeMission.day || !activeMission.status || !activeMission.score || !activeMissionHref) {
+    throw new Error(`${label}: active mission readiness support strip is incomplete: ${JSON.stringify({ activeMission, activeMissionHref })}`);
+  }
+  if (!activeMission.text.includes("Active mission readiness")) {
+    throw new Error(`${label}: active mission support strip copy missing: ${activeMission.text}`);
+  }
 }
 
 async function seedSession(page, progress = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileKey: profileStorageKey, progressKey: progressStorageKey, seededProgress }) => {
+    ({ profileKey: profileStorageKey, progressKey: progressStorageKey, dailyKey, seededProgress }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_dashboard");
       window.localStorage.removeItem(profileStorageKey);
       window.localStorage.removeItem(progressStorageKey);
+      window.localStorage.removeItem(dailyKey);
       if (seededProgress) {
         window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
       }
     },
-    { profileKey, progressKey, seededProgress: progress }
+    { profileKey, progressKey, dailyKey: dailyCommandKey, seededProgress: progress }
   );
 }
 
@@ -147,6 +165,23 @@ async function run() {
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle", timeout: 45000 });
   await saveProfile(page);
   await assertDashboardSurfaceIsSimple(page, checks, "fresh-simple-surface");
+  const freshActiveMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+  }));
+  const freshActiveMissionHref = await page.getByTestId("upsc-active-mission-action").getAttribute("href");
+  checks.push({ label: "fresh-active-mission-readiness", freshActiveMission, freshActiveMissionHref });
+  if (
+    freshActiveMission.subject !== "geography" ||
+    freshActiveMission.day !== "1" ||
+    freshActiveMission.status !== "Mind-state first" ||
+    freshActiveMission.score !== "0" ||
+    freshActiveMissionHref !== "/upsc/daily-command#daily-me-time-checkin"
+  ) {
+    throw new Error(`fresh-active-mission-readiness: unexpected state ${JSON.stringify({ freshActiveMission, freshActiveMissionHref })}`);
+  }
 
   await assertHref(page.getByTestId("upsc-start-today"), "/upsc/geography/talk?day=1", checks, "fresh-start-action");
   await assertHref(
@@ -188,6 +223,15 @@ async function run() {
       throw new Error("me-time check did not expose the focused reset plan");
     }
   });
+  await page.getByTestId("upsc-active-mission-readiness").getByText("Recall baseline is pending", { exact: false }).waitFor({ timeout: 15000 });
+  const focusedActiveMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+  }));
+  checks.push({ label: "focused-active-mission-readiness", focusedActiveMission });
+  if (focusedActiveMission.status !== "Recall first" || focusedActiveMission.score !== "20") {
+    throw new Error(`focused-active-mission-readiness: unexpected state ${JSON.stringify(focusedActiveMission)}`);
+  }
   await page.getByTestId("upsc-me-time-reset-plan").getByText("main action now", { exact: false }).waitFor({ timeout: 15000 });
   await page.goto(`${baseUrl}/history`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByText("focused", { exact: true }).waitFor({ timeout: 15000 });

@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   CheckCircle2,
   Clock3,
+  ClipboardCheck,
   RefreshCcw,
   Save,
   Target,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
 import { getGeographyLoopState } from "@/lib/upsc/geographyLoopState";
 import { buildGeographyReadinessSnapshot } from "@/lib/upsc/geographyReadiness";
 import {
@@ -43,6 +45,11 @@ import {
   type StudyWindow,
   type WeakSignal,
 } from "@/lib/upsc/studentProfile";
+import {
+  readLocalStudentReportProgress,
+  studentReportSubjects,
+  type StudentReportProgressMap,
+} from "@/lib/upsc/studentReportEngine";
 import {
   useGeographyProgress,
   type GeographyDayProgress,
@@ -132,6 +139,28 @@ const meTimeMoodOptions: Array<{ value: GeographyMeTimeMood; label: string }> = 
   { value: "exam-stress", label: "exam stress" },
 ];
 
+type DailyMissionState = {
+  subjectSlug: string;
+  day: number;
+  note?: string;
+  updatedAt?: string;
+};
+
+const dailyMissionStorageKey = "sarit-upsc-daily-command-v1";
+
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function getClassificationProof(profile: Pick<StudentProfile, "preparationStage">) {
   return classificationProof[profile.preparationStage];
 }
@@ -202,6 +231,8 @@ export const DailyWorkspace = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
+  const [dailyMissionState, setDailyMissionState] = useState<DailyMissionState>({ subjectSlug: "geography", day: 1 });
+  const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
   const { getDayProgress, isLoaded: progressLoaded, progress, saveDayProgress, stats } = useGeographyProgress();
   const today = getCurrentGeographyTopic(progress);
   const dailyPath = useMemo(() => (profile ? buildGeographyDailyPath(profile, progress) : []), [profile, progress]);
@@ -254,11 +285,37 @@ export const DailyWorkspace = () => {
     },
   ];
   const meTimeDone = Boolean(todayProgress?.meTimeCompletedAt);
+  const activeMissionSubject =
+    studentReportSubjects.find((subject) => subject.slug === dailyMissionState.subjectSlug) ?? studentReportSubjects[0];
+  const activeMissionDay = Math.min(Math.max(dailyMissionState.day || 1, 1), activeMissionSubject.sessions.length);
+  const activeMissionProgressMap = (
+    activeMissionSubject.slug === "geography" ? progress : progressBySubject[activeMissionSubject.slug] ?? {}
+  ) as Record<string, DailyPlannerProgress | undefined>;
+  const activeMissionReadiness = useMemo(
+    () =>
+      buildDailyPlannerDecision({
+        subjectSlug: activeMissionSubject.slug,
+        sessions: activeMissionSubject.sessions,
+        selectedDay: activeMissionDay,
+        progress: activeMissionProgressMap,
+        profile,
+      }).sessionReadiness,
+    [activeMissionDay, activeMissionProgressMap, activeMissionSubject.sessions, activeMissionSubject.slug, profile]
+  );
+  const activeMissionHref = activeMissionReadiness.href.startsWith("#")
+    ? `/upsc/daily-command${activeMissionReadiness.href}`
+    : activeMissionReadiness.href;
 
   useEffect(() => {
     let cancelled = false;
     const restoreProfile = window.setTimeout(() => {
       const saved = readStudentProfile();
+      setDailyMissionState(readJson<DailyMissionState>(dailyMissionStorageKey, { subjectSlug: "geography", day: 1 }));
+      setProgressBySubject(
+        Object.fromEntries(
+          studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
+        )
+      );
       if (saved) {
         setProfile(saved);
         setDraft(saved);
@@ -377,6 +434,39 @@ export const DailyWorkspace = () => {
             </div>
 
             <div data-testid="upsc-four-signal-grid" className="space-y-3">
+              <div
+                data-testid="upsc-active-mission-readiness"
+                data-active-subject={activeMissionSubject.slug}
+                data-active-day={activeMissionDay}
+                data-readiness-status={activeMissionReadiness.statusLabel}
+                data-readiness-score={activeMissionReadiness.scorePercent}
+                className="rounded-lg border border-[#dcd5c7] bg-white p-4 shadow-sm"
+              >
+                <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <ClipboardCheck className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      Active mission readiness
+                    </p>
+                    <h2 className="mt-1 break-words text-base font-black leading-5 text-[#13251d]">
+                      {activeMissionSubject.title} Day {activeMissionDay}: {activeMissionReadiness.statusLabel}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#657066]">
+                      {activeMissionReadiness.title}. {activeMissionReadiness.detail}
+                    </p>
+                  </div>
+                  <Link
+                    href={activeMissionHref}
+                    data-testid="upsc-active-mission-action"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
+                  >
+                    {activeMissionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+
               <article
                 data-testid="upsc-signal-todays-task"
                 data-signal-priority="primary"
