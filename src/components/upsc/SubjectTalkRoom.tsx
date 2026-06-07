@@ -384,6 +384,28 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     : mcqReady
       ? "mcq-ready"
       : "repair-required";
+  const teacherGapCategory =
+    teacherDoubtDiagnosis?.category ??
+    (assessment?.score && assessment.score >= SUBJECT_RECALL_TARGET ? "Mastery" : "Pending");
+  const teacherGapReason =
+    teacherDoubtDiagnosis?.reason ??
+    (assessment
+      ? assessment.score >= SUBJECT_RECALL_TARGET
+        ? "Recall target is clear enough for fresh MCQs."
+        : assessment.summary
+      : "Submit one explanation to let the teacher diagnose the gap.");
+  const teacherRepairAction =
+    teacherDoubtDiagnosis?.repairAction ??
+    (assessment
+      ? assessment.score >= SUBJECT_RECALL_TARGET
+        ? "Move into fresh MCQs and watch for statement traps."
+        : teacherCoach?.nextPrompt ?? assessment.nextAction
+      : "Write the explanation in your own words.");
+  const teacherMasteryCheck =
+    teacherDoubtDiagnosis?.masteryCheck ??
+    (assessment?.score && assessment.score >= SUBJECT_RECALL_TARGET
+      ? "Can the learner create one almost-correct UPSC statement and reject it?"
+      : "Can the learner repeat the concept with cause, example, and trap?");
 
   useEffect(() => {
     if (!isLoaded || hydratedDay === activeDay) return;
@@ -961,6 +983,35 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                       ? `Repair these missing anchors before MCQ: ${assessment.missingKeywords.slice(0, 3).join(", ")}.`
                       : "Explain one clearer cause-effect chain, one example, and one UPSC trap before MCQ."}
                 </p>
+              </div>
+
+              <div
+                data-testid="subject-talk-command-summary"
+                data-proof-rule="ai-teacher-gap-repair-mastery-next"
+                data-gap-category={teacherGapCategory}
+                data-teacher-status={teacherStatus}
+                data-score={assessment.score}
+                data-recall-target={SUBJECT_RECALL_TARGET}
+                data-next-action-route={primaryRouteHref}
+                data-next-action-label={primaryRouteLabel}
+                data-mcq-ready={mcqReady ? "true" : "false"}
+                className="mt-4 rounded-md border border-[#cfe5dc] bg-white/85 p-3"
+              >
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Teacher command</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-4">
+                  {[
+                    ["Gap", teacherGapCategory],
+                    ["Repair", teacherRepairAction],
+                    ["Check", teacherMasteryCheck],
+                    ["Next", primaryRouteLabel],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md bg-[#f7f4ee] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">{label}</p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#34453b]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs font-bold leading-5 text-[#49675e]">{teacherGapReason}</p>
               </div>
 
               {teacherDoubtDiagnosis ? (

@@ -110,6 +110,9 @@ async function run() {
     await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Repair action", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Teacher command", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Repair", { exact: true }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Check", { exact: true }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-teacher-coach").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const text = document.querySelector('[data-testid="subject-talk-teacher-connection"]')?.textContent || "";
@@ -169,6 +172,17 @@ async function run() {
       watchComplete: element.getAttribute("data-watch-complete"),
       teacherStatus: element.getAttribute("data-teacher-status"),
     }));
+    const commandSummaryContract = await page.getByTestId("subject-talk-command-summary").evaluate((element) => ({
+      proofRule: element.getAttribute("data-proof-rule"),
+      gapCategory: element.getAttribute("data-gap-category"),
+      teacherStatus: element.getAttribute("data-teacher-status"),
+      score: Number(element.getAttribute("data-score")),
+      recallTarget: Number(element.getAttribute("data-recall-target")),
+      nextActionRoute: element.getAttribute("data-next-action-route"),
+      nextActionLabel: element.getAttribute("data-next-action-label"),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+      text: element.textContent || "",
+    }));
     const primaryRouteContract = await page.getByTestId("talk-primary-route").evaluate((element) => ({
       nextActionRoute: element.getAttribute("data-next-action-route"),
       nextActionLabel: element.getAttribute("data-next-action-label"),
@@ -198,6 +212,17 @@ async function run() {
       routeGateContract.mcqReady !== "false" ||
       routeGateContract.watchComplete !== "false" ||
       routeGateContract.teacherStatus !== "repair-required" ||
+      commandSummaryContract.proofRule !== "ai-teacher-gap-repair-mastery-next" ||
+      !commandSummaryContract.gapCategory ||
+      commandSummaryContract.teacherStatus !== "repair-required" ||
+      commandSummaryContract.score !== routeGateContract.score ||
+      commandSummaryContract.recallTarget !== 95 ||
+      commandSummaryContract.nextActionRoute !== "/upsc/environment/watch?day=5" ||
+      commandSummaryContract.nextActionLabel !== "Open class" ||
+      commandSummaryContract.mcqReady !== "false" ||
+      !/teacher command/i.test(commandSummaryContract.text) ||
+      !/repair/i.test(commandSummaryContract.text) ||
+      !/check/i.test(commandSummaryContract.text) ||
       primaryRouteContract.nextActionRoute !== "/upsc/environment/watch?day=5" ||
       primaryRouteContract.nextActionLabel !== "Open class" ||
       primaryRouteContract.recallTarget !== 95 ||
@@ -207,6 +232,7 @@ async function run() {
         `${viewportName} subject Talk production contract mismatch: ${JSON.stringify({
           simplePanelContract,
           routeGateContract,
+          commandSummaryContract,
           primaryRouteContract,
         }, null, 2)}`
       );
@@ -238,6 +264,7 @@ async function run() {
       primaryRouteHref,
       simplePanelContract,
       routeGateContract,
+      commandSummaryContract,
       primaryRouteContract,
       routeInsideScoreCard,
       teacherConnectionText,
@@ -312,6 +339,9 @@ async function run() {
     await page.getByTestId("talk-recall-target").getByText("Target 95% recall", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Teacher command", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Repair", { exact: true }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-command-summary").getByText("Check", { exact: true }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-teacher-coach").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const text = document.querySelector('[data-testid="subject-talk-teacher-connection"]')?.textContent || "";
@@ -350,6 +380,17 @@ async function run() {
       mcqReady: element.getAttribute("data-mcq-ready"),
       teacherStatus: element.getAttribute("data-teacher-status"),
     }));
+    const economyCommandSummaryContract = await page.getByTestId("subject-talk-command-summary").evaluate((element) => ({
+      proofRule: element.getAttribute("data-proof-rule"),
+      gapCategory: element.getAttribute("data-gap-category"),
+      teacherStatus: element.getAttribute("data-teacher-status"),
+      score: Number(element.getAttribute("data-score")),
+      recallTarget: Number(element.getAttribute("data-recall-target")),
+      nextActionRoute: element.getAttribute("data-next-action-route"),
+      nextActionLabel: element.getAttribute("data-next-action-label"),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+      text: element.textContent || "",
+    }));
     const economyProgress = await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
       return raw ? JSON.parse(raw)["3"] : null;
@@ -363,6 +404,16 @@ async function run() {
       economyRouteGateContract.nextActionLabel !== "Open class" ||
       economyRouteGateContract.mcqReady !== "false" ||
       economyRouteGateContract.teacherStatus !== "repair-required" ||
+      economyCommandSummaryContract.proofRule !== "ai-teacher-gap-repair-mastery-next" ||
+      !economyCommandSummaryContract.gapCategory ||
+      economyCommandSummaryContract.teacherStatus !== "repair-required" ||
+      economyCommandSummaryContract.recallTarget !== 95 ||
+      economyCommandSummaryContract.nextActionRoute !== "/upsc/economy/watch?day=3" ||
+      economyCommandSummaryContract.nextActionLabel !== "Open class" ||
+      economyCommandSummaryContract.mcqReady !== "false" ||
+      !/teacher command/i.test(economyCommandSummaryContract.text) ||
+      !/repair/i.test(economyCommandSummaryContract.text) ||
+      !/check/i.test(economyCommandSummaryContract.text) ||
       !economyProgress?.teacherDoubtCategory ||
       !economyProgress?.teacherDoubtRepairAction ||
       !economyProgress?.teacherDoubtMasteryCheck ||
@@ -377,6 +428,7 @@ async function run() {
       route: "economy-talk",
       routeInsideScoreCard: economyRouteInsideScoreCard,
       economyRouteGateContract,
+      economyCommandSummaryContract,
       teacherConnectionText: economyTeacherConnectionText,
       doubtDiagnosis: {
         category: economyProgress.teacherDoubtCategory,

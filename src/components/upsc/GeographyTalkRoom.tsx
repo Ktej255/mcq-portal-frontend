@@ -260,6 +260,30 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const primaryActionLabel = route?.label ?? (teacherConnection === "checking" ? "Checking answer" : "Send to AI teacher");
   const primaryActionHref = route?.href ?? "";
   const mcqReady = Boolean(route?.href.includes("/mcq-readiness") && visibleRecallScore >= GEOGRAPHY_RECALL_TARGET);
+  const teacherStatus =
+    !assessment || challengeOpen ? "answer-required" : mcqReady ? "mcq-ready" : "repair-required";
+  const teacherGapCategory =
+    teacherDoubtDiagnosis?.category ??
+    (assessment?.score && assessment.score >= GEOGRAPHY_RECALL_TARGET ? "Mastery" : "Pending");
+  const teacherGapReason =
+    teacherDoubtDiagnosis?.reason ??
+    (assessment
+      ? assessment.score >= GEOGRAPHY_RECALL_TARGET
+        ? "Recall target is clear enough for fresh MCQs."
+        : assessment.summary
+      : "Submit one explanation to let the teacher diagnose the gap.");
+  const teacherRepairAction =
+    teacherDoubtDiagnosis?.repairAction ??
+    (assessment
+      ? assessment.score >= GEOGRAPHY_RECALL_TARGET
+        ? "Move into fresh MCQs and watch for statement traps."
+        : teacherCoach?.nextPrompt ?? assessment.nextAction
+      : "Write the explanation in your own words.");
+  const teacherMasteryCheck =
+    teacherDoubtDiagnosis?.masteryCheck ??
+    (assessment?.score && assessment.score >= GEOGRAPHY_RECALL_TARGET
+      ? "Can the learner create one almost-correct UPSC statement and reject it?"
+      : "Can the learner repeat the concept with cause, map example, and trap?");
 
   useEffect(() => {
     if (!isLoaded || hydrated) return;
@@ -708,6 +732,34 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                     </div>
                   </div>
                 ) : null}
+                <div
+                  data-testid="geography-talk-command-summary"
+                  data-proof-rule="ai-teacher-gap-repair-mastery-next"
+                  data-gap-category={teacherGapCategory}
+                  data-teacher-status={teacherStatus}
+                  data-score={assessment.score}
+                  data-recall-target={GEOGRAPHY_RECALL_TARGET}
+                  data-next-action-route={primaryActionHref}
+                  data-next-action-label={primaryActionLabel}
+                  data-mcq-ready={mcqReady ? "true" : "false"}
+                  className="mt-4 rounded-md border border-[#cfe5dc] bg-white/85 p-3"
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Teacher command</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-4">
+                    {[
+                      ["Gap", teacherGapCategory],
+                      ["Repair", teacherRepairAction],
+                      ["Check", teacherMasteryCheck],
+                      ["Next", primaryActionLabel],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md bg-[#f7f4ee] p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">{label}</p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#34453b]">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs font-bold leading-5 text-[#49675e]">{teacherGapReason}</p>
+                </div>
                 {assessment.score < GEOGRAPHY_RECALL_TARGET && !route ? (
                 <div data-testid="talk-mastery-plan" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Repair to {GEOGRAPHY_RECALL_TARGET}%</p>

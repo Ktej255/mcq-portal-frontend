@@ -61,6 +61,9 @@ async function run() {
   await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Repair action", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-command-summary").getByText("Teacher command", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-command-summary").getByText("Repair", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-command-summary").getByText("Check", { exact: true }).waitFor({ timeout: 15000 });
   await page.waitForFunction(
     (key) => JSON.parse(localStorage.getItem(key) || "{}")["1"]?.teacherMode === "local-fallback",
     progressKey,
@@ -74,6 +77,17 @@ async function run() {
     href: element.getAttribute("data-next-action-route"),
     label: element.getAttribute("data-next-action-label"),
     mcqReady: element.getAttribute("data-mcq-ready"),
+  }));
+  const commandSummary = await page.getByTestId("geography-talk-command-summary").evaluate((element) => ({
+    proofRule: element.getAttribute("data-proof-rule"),
+    gapCategory: element.getAttribute("data-gap-category"),
+    teacherStatus: element.getAttribute("data-teacher-status"),
+    score: Number(element.getAttribute("data-score")),
+    target: Number(element.getAttribute("data-recall-target")),
+    href: element.getAttribute("data-next-action-route"),
+    label: element.getAttribute("data-next-action-label"),
+    mcqReady: element.getAttribute("data-mcq-ready"),
+    text: element.textContent || "",
   }));
   const masteryPlanVisible = await page.getByTestId("talk-mastery-plan").isVisible().catch(() => false);
   const repeatTo95Visible = await page.getByTestId("talk-repeat-to-95").isVisible().catch(() => false);
@@ -98,6 +112,7 @@ async function run() {
     baseUrl,
     checks: {
       routeGate,
+      commandSummary,
       masteryPlanVisible,
       repeatTo95Visible,
       doubtDiagnosisText,
@@ -114,6 +129,17 @@ async function run() {
       routeGate.href === "/upsc/geography/watch?day=1" &&
       routeGate.label === "Open repair lesson" &&
       routeGate.mcqReady === "false" &&
+      commandSummary.proofRule === "ai-teacher-gap-repair-mastery-next" &&
+      Boolean(commandSummary.gapCategory) &&
+      commandSummary.teacherStatus === "repair-required" &&
+      commandSummary.score === routeGate.score &&
+      commandSummary.target === 95 &&
+      commandSummary.href === "/upsc/geography/watch?day=1" &&
+      commandSummary.label === "Open repair lesson" &&
+      commandSummary.mcqReady === "false" &&
+      /teacher command/i.test(commandSummary.text) &&
+      /repair/i.test(commandSummary.text) &&
+      /check/i.test(commandSummary.text) &&
       !masteryPlanVisible &&
       !repeatTo95Visible &&
       persistedTeacherTrace.teacherMode === "local-fallback" &&
