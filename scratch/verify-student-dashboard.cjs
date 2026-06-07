@@ -37,8 +37,22 @@ async function assertHref(locator, expectedHref, checks, label) {
 
 async function assertDashboardSurfaceIsSimple(page, checks, label) {
   const signalCount = await page.locator('[data-testid^="upsc-signal-"]').count();
+  const essentialContract = await page.getByTestId("upsc-simple-dashboard").evaluate((node) => ({
+    mode: node.getAttribute("data-visible-mode"),
+    count: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    nextActionHref: node.getAttribute("data-next-action-href"),
+  }));
   const todaysTaskVisible = await page.getByTestId("upsc-signal-todays-task").isVisible().catch(() => false);
   const todaysTaskPriority = await page.getByTestId("upsc-signal-todays-task").getAttribute("data-signal-priority");
+  const taskReadiness = await page.getByTestId("upsc-task-readiness-proof").evaluate((node) => ({
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+  }));
+  const activeMissionPanelCount = await page.locator('[data-testid="upsc-active-mission-readiness"]').count();
   const monthlyPathCount = await page.locator('[data-testid="upsc-signal-monthly-path"]').count();
   const profileIntakeVisible = await page.getByTestId("upsc-profile-intake").isVisible().catch(() => false);
   const mainPathStrip = await page.getByTestId("upsc-main-path-strip").evaluate((node) => ({
@@ -53,20 +67,15 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   const meTimeStatus = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-status");
   const meTimeResetPlan = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-reset-plan");
   const startSessionReadiness = await page.getByTestId("upsc-start-today").getAttribute("data-session-readiness");
-  const activeMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
-    subject: node.getAttribute("data-active-subject"),
-    day: node.getAttribute("data-active-day"),
-    status: node.getAttribute("data-readiness-status"),
-    score: node.getAttribute("data-readiness-score"),
-    text: node.textContent || "",
-  }));
-  const activeMissionHref = await page.getByTestId("upsc-active-mission-action").getAttribute("href");
 
   checks.push({
     label,
     signalCount,
+    essentialContract,
     todaysTaskVisible,
     todaysTaskPriority,
+    taskReadiness,
+    activeMissionPanelCount,
     monthlyPathCount,
     profileIntakeVisible,
     mainPathStrip,
@@ -76,18 +85,30 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     meTimeStatus,
     meTimeResetPlan,
     startSessionReadiness,
-    activeMission,
-    activeMissionHref,
   });
 
   if (signalCount !== 4) {
     throw new Error(`${label}: expected 4 signal cards, got ${signalCount}`);
+  }
+  if (
+    essentialContract.mode !== "four-signal-one-action" ||
+    essentialContract.count !== "4" ||
+    essentialContract.signals !== "todays-task|learning-gap|next-revision|current-path" ||
+    !essentialContract.nextActionHref
+  ) {
+    throw new Error(`${label}: dashboard essential contract failed: ${JSON.stringify(essentialContract)}`);
   }
   if (!todaysTaskVisible) {
     throw new Error(`${label}: Today's Task signal should be visible on the main dashboard`);
   }
   if (todaysTaskPriority !== "primary") {
     throw new Error(`${label}: Today's Task should be the dominant dashboard action`);
+  }
+  if (activeMissionPanelCount !== 0) {
+    throw new Error(`${label}: active mission readiness should be folded into Today's task`);
+  }
+  if (!taskReadiness.subject || !taskReadiness.day || !taskReadiness.status || !taskReadiness.score) {
+    throw new Error(`${label}: Today's task readiness proof is incomplete: ${JSON.stringify(taskReadiness)}`);
   }
   if (monthlyPathCount !== 0) {
     throw new Error(`${label}: monthly path signal should not be visible on the main dashboard`);
@@ -115,12 +136,6 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   }
   if (meTimeStatus === "ready" && !meTimeResetPlan) {
     throw new Error(`${label}: ready me-time check should expose a saved reset plan`);
-  }
-  if (!activeMission.subject || !activeMission.day || !activeMission.status || !activeMission.score || !activeMissionHref) {
-    throw new Error(`${label}: active mission readiness support strip is incomplete: ${JSON.stringify({ activeMission, activeMissionHref })}`);
-  }
-  if (!activeMission.text.includes("Active mission readiness")) {
-    throw new Error(`${label}: active mission support strip copy missing: ${activeMission.text}`);
   }
 }
 
@@ -165,40 +180,40 @@ async function run() {
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle", timeout: 45000 });
   await saveProfile(page);
   await assertDashboardSurfaceIsSimple(page, checks, "fresh-simple-surface");
-  const freshActiveMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
+  const freshTaskReadiness = await page.getByTestId("upsc-task-readiness-proof").evaluate((node) => ({
     subject: node.getAttribute("data-active-subject"),
     day: node.getAttribute("data-active-day"),
     status: node.getAttribute("data-readiness-status"),
     score: node.getAttribute("data-readiness-score"),
   }));
-  const freshActiveMissionHref = await page.getByTestId("upsc-active-mission-action").getAttribute("href");
-  checks.push({ label: "fresh-active-mission-readiness", freshActiveMission, freshActiveMissionHref });
+  const freshStartHref = await page.getByTestId("upsc-start-today").getAttribute("href");
+  checks.push({ label: "fresh-task-readiness", freshTaskReadiness, freshStartHref });
   if (
-    freshActiveMission.subject !== "geography" ||
-    freshActiveMission.day !== "1" ||
-    freshActiveMission.status !== "Mind-state first" ||
-    freshActiveMission.score !== "0" ||
-    freshActiveMissionHref !== "/upsc/daily-command#daily-me-time-checkin"
+    freshTaskReadiness.subject !== "geography" ||
+    freshTaskReadiness.day !== "1" ||
+    freshTaskReadiness.status !== "Mind-state first" ||
+    freshTaskReadiness.score !== "0" ||
+    freshStartHref !== "/upsc/daily-command#daily-me-time-checkin"
   ) {
-    throw new Error(`fresh-active-mission-readiness: unexpected state ${JSON.stringify({ freshActiveMission, freshActiveMissionHref })}`);
+    throw new Error(`fresh-task-readiness: unexpected state ${JSON.stringify({ freshTaskReadiness, freshStartHref })}`);
   }
 
-  await assertHref(page.getByTestId("upsc-start-today"), "/upsc/geography/talk?day=1", checks, "fresh-start-action");
+  await assertHref(page.getByTestId("upsc-start-today"), "/upsc/daily-command#daily-me-time-checkin", checks, "fresh-start-action");
   await assertHref(
     page.getByTestId("upsc-signal-learning-gap"),
-    "/upsc/geography/talk?day=1",
+    "/upsc/daily-command#daily-me-time-checkin",
     checks,
     "fresh-learning-gap"
   );
   await assertHref(
     page.getByTestId("upsc-signal-next-revision"),
-    "/upsc/geography/revisit?day=1",
+    "/upsc/geography/revisit?day=3",
     checks,
     "fresh-next-revision"
   );
-  await page.getByText("Not measured yet", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByText("Day 1 recall", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByText("Revise Geographic Thinking and Map Relationships on study Day 3.", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("Recall baseline pending", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("Next revision Day 3", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("Interior of Earth and Plate Movement", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("balanced recall and repair", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-me-time-check").getByRole("button", { name: "focused" }).click();
   await page.waitForFunction(
@@ -223,14 +238,14 @@ async function run() {
       throw new Error("me-time check did not expose the focused reset plan");
     }
   });
-  await page.getByTestId("upsc-active-mission-readiness").getByText("Recall baseline is pending", { exact: false }).waitFor({ timeout: 15000 });
-  const focusedActiveMission = await page.getByTestId("upsc-active-mission-readiness").evaluate((node) => ({
+  await page.getByTestId("upsc-signal-todays-task").getByText("Recall baseline is pending", { exact: false }).waitFor({ timeout: 15000 });
+  const focusedTaskReadiness = await page.getByTestId("upsc-task-readiness-proof").evaluate((node) => ({
     status: node.getAttribute("data-readiness-status"),
     score: node.getAttribute("data-readiness-score"),
   }));
-  checks.push({ label: "focused-active-mission-readiness", focusedActiveMission });
-  if (focusedActiveMission.status !== "Recall first" || focusedActiveMission.score !== "20") {
-    throw new Error(`focused-active-mission-readiness: unexpected state ${JSON.stringify(focusedActiveMission)}`);
+  checks.push({ label: "focused-task-readiness", focusedTaskReadiness });
+  if (focusedTaskReadiness.status !== "Recall first" || focusedTaskReadiness.score !== "20") {
+    throw new Error(`focused-task-readiness: unexpected state ${JSON.stringify(focusedTaskReadiness)}`);
   }
   await page.getByTestId("upsc-me-time-reset-plan").getByText("main action now", { exact: false }).waitFor({ timeout: 15000 });
   await page.goto(`${baseUrl}/history`, { waitUntil: "networkidle", timeout: 45000 });
@@ -280,10 +295,10 @@ async function run() {
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
   await assertDashboardSurfaceIsSimple(page, checks, "talk-clear-simple-surface");
-  await assertHref(page.getByTestId("upsc-start-today"), "/upsc/geography/watch?day=1", checks, "talk-clear-next-action");
+  await assertHref(page.getByTestId("upsc-start-today"), "/upsc/daily-command#daily-me-time-checkin", checks, "talk-clear-next-action");
   await assertHref(
     page.getByTestId("upsc-signal-next-revision"),
-    "/upsc/geography/revisit?day=1",
+    "/upsc/geography/revisit?day=3",
     checks,
     "talk-clear-day-3-source-topic"
   );

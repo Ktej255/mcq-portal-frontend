@@ -67,8 +67,8 @@ async function run() {
   const beginnerDay1Summary = beginnerDay1.summary.toLowerCase();
   if (
     !beginnerDay1Summary.includes("day 1 of 30") ||
-    !beginnerDay1Summary.includes("2 topics today") ||
-    beginnerDay1.startHref !== "/upsc/geography/watch?day=1" ||
+    !beginnerDay1Summary.includes("geography day 1") ||
+    beginnerDay1.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
     beginnerDay1.pathLinkCount !== 0 ||
     beginnerDay1.pathTopics.map((item) => item.state).join("|") !== "current|queued" ||
     !beginnerDay1.pathTopics[0]?.text.includes("Day 1") ||
@@ -91,7 +91,7 @@ async function run() {
   const beginnerDay2Summary = beginnerDay2.summary.toLowerCase();
   if (
     !beginnerDay2Summary.includes("day 2 of 30") ||
-    beginnerDay2.startHref !== "/upsc/geography/watch?day=2" ||
+    beginnerDay2.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
     beginnerDay2.pathLinkCount !== 0 ||
     beginnerDay2.pathTopics.map((item) => item.state).join("|") !== "current|queued" ||
     !beginnerDay2.pathTopics[0]?.text.includes("Day 2") ||
@@ -114,8 +114,8 @@ async function run() {
   const intermediateDay2Summary = intermediateDay2.summary.toLowerCase();
   if (
     !intermediateDay2Summary.includes("day 2 of 30") ||
-    !intermediateDay2Summary.includes("3 topics today") ||
-    intermediateDay2.startHref !== "/upsc/geography/talk?day=2" ||
+    !intermediateDay2Summary.includes("geography day 2") ||
+    intermediateDay2.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
     intermediateDay2.pathLinkCount !== 0 ||
     intermediateDay2.pathTopics.map((item) => item.state).join("|") !== "current|queued|queued" ||
     !intermediateDay2.pathTopics[0]?.text.includes("Day 2") ||

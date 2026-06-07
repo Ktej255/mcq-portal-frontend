@@ -18,8 +18,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
-import { getGeographyLoopState } from "@/lib/upsc/geographyLoopState";
-import { buildGeographyReadinessSnapshot } from "@/lib/upsc/geographyReadiness";
 import {
   buildGeographyDailyPath,
   getCurrentGeographyTopic,
@@ -52,7 +50,6 @@ import {
 } from "@/lib/upsc/studentReportEngine";
 import {
   useGeographyProgress,
-  type GeographyDayProgress,
   type GeographyMeTimeMood,
 } from "@/lib/upsc/useGeographyProgress";
 
@@ -165,115 +162,16 @@ function getClassificationProof(profile: Pick<StudentProfile, "preparationStage"
   return classificationProof[profile.preparationStage];
 }
 
-function firstWeakRubricLabel(progress?: GeographyDayProgress) {
-  return progress?.talkRubric?.find((item) => item.status !== "Ready")?.label;
-}
-
-function resolveLearningGapSignal(progress: GeographyDayProgress | undefined, loopLabel: string, loopDetail: string) {
-  const weakSkill = progress?.recoveryWeakSkill ?? firstWeakRubricLabel(progress);
-
-  if (progress?.revisitQueued || progress?.talkBand === "Revisit") {
-    return {
-      title: weakSkill ?? "Repair weak point",
-      detail: progress?.recoveryDiagnosisSummary ?? progress?.talkRepairHints?.[0] ?? "A short revision is queued before new work.",
-    };
-  }
-
-  if (progress?.mcqOutcome === "Revisit" && progress?.recoveryStatus !== "talk-ready") {
-    return {
-      title: "MCQ trap repair",
-      detail: progress.mcqReviewSummary ?? "Practice exposed a weak area. Open short revision before moving ahead.",
-    };
-  }
-
-  if (progress?.mcqOutcome === "Revisit" && progress?.recoveryStatus === "talk-ready") {
-    return {
-      title: "Explain corrected answer",
-      detail: progress.recoverySummary ?? "Repair is saved. Explain the corrected idea once more before MCQ opens again.",
-    };
-  }
-
-  if (typeof progress?.talkScore === "number" && progress.talkScore < 95) {
-    return {
-      title: weakSkill ?? "Recall below 95%",
-      detail: `${progress.talkScore}/100. ${progress.talkRepairHints?.[0] ?? "Use the repair lesson or discussion to close the gap."}`,
-    };
-  }
-
-  if (loopLabel === "Talk pending") {
-    return {
-      title: "Not measured yet",
-      detail: "Explain once so the AI teacher can find the exact gap.",
-    };
-  }
-
-  if (loopLabel === "Lesson pending") {
-    return {
-      title: "Foundation not started",
-      detail: "Watch one focused topic, then explain it in Talk.",
-    };
-  }
-
-  if (progress?.mcqOutcome === "Command" || progress?.talkBand === "Command") {
-    return {
-      title: "No active gap",
-      detail: loopDetail,
-    };
-  }
-
-  return {
-    title: loopLabel,
-    detail: loopDetail,
-  };
-}
-
 export const DailyWorkspace = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
-  const [dailyMissionState, setDailyMissionState] = useState<DailyMissionState>({ subjectSlug: "geography", day: 1 });
+  const [dailyMissionState, setDailyMissionState] = useState<DailyMissionState>({ subjectSlug: "geography", day: 0 });
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
-  const { getDayProgress, isLoaded: progressLoaded, progress, saveDayProgress, stats } = useGeographyProgress();
+  const { progress, saveDayProgress } = useGeographyProgress();
   const today = getCurrentGeographyTopic(progress);
   const dailyPath = useMemo(() => (profile ? buildGeographyDailyPath(profile, progress) : []), [profile, progress]);
-  const readinessSnapshot = useMemo(
-    () => buildGeographyReadinessSnapshot(progress, { isLoaded: progressLoaded, learnerLevel: profile?.level }),
-    [profile?.level, progress, progressLoaded]
-  );
-  const todayProgress = getDayProgress(today.day);
-  const todayLoop = getGeographyLoopState(today, todayProgress, {
-    isLoaded: progressLoaded,
-    learnerLevel: profile?.level,
-  });
   const pathSteps = getGuidedStudySteps(profile?.level ?? "beginner");
-  const nextRevisionItem = stats.revisitDays[0]
-    ? {
-        source: stats.revisitDays[0],
-        due: geographySessions.find((session) => session.day === Math.min(stats.revisitDays[0].day + 2, geographySessions.length)) ?? stats.revisitDays[0],
-      }
-    : stats.spacedRevisionItems[0] ?? {
-        source: today,
-        due: geographySessions.find((session) => session.day === Math.min(today.day + 2, geographySessions.length)) ?? today,
-      };
-  const nextRevisionHref = `/upsc/geography/revisit?day=${nextRevisionItem.source.day}`;
-  const nextRevisionTitle = stats.revisitCount > 0 ? `${stats.revisitCount} recovery item` : `Day ${nextRevisionItem.source.day} recall`;
-  const nextRevisionDetail =
-    stats.revisitCount > 0
-      ? "Repair the queued weak area before starting new work."
-      : `Revise ${nextRevisionItem.source.title} on study Day ${nextRevisionItem.due.day}.`;
-  const talkScoreLine =
-    readinessSnapshot.commandCount > 0
-      ? `${readinessSnapshot.commandCount}/30 command days`
-      : typeof todayProgress?.talkScore === "number"
-        ? `${todayProgress.talkScore}/100 ${todayProgress.talkBand ?? "Talk"}`
-        : "Baseline not measured";
-  const learningGapSignal = resolveLearningGapSignal(todayProgress, todayLoop.label, todayLoop.shortDetail);
-  const trendDetail =
-    readinessSnapshot.commandCount > 0
-      ? `${readinessSnapshot.score}% Geography readiness. ${stats.revisitCount} recovery item${stats.revisitCount === 1 ? "" : "s"} active.`
-      : profile
-        ? profilePlanLine(profile)
-        : "Save profile to open your personal path.";
   const personalPlan = useMemo(() => (profile ? buildStudentPlan(profile) : null), [profile]);
   const activeClassificationProof = profile ? getClassificationProof(profile) : null;
   const dashboardPathSteps = [
@@ -284,14 +182,20 @@ export const DailyWorkspace = () => {
       detail: "The system opens the next topic after MCQ.",
     },
   ];
-  const meTimeDone = Boolean(todayProgress?.meTimeCompletedAt);
   const activeMissionSubject =
     studentReportSubjects.find((subject) => subject.slug === dailyMissionState.subjectSlug) ?? studentReportSubjects[0];
-  const activeMissionDay = Math.min(Math.max(dailyMissionState.day || 1, 1), activeMissionSubject.sessions.length);
+  const activeMissionDay = Math.min(
+    Math.max(dailyMissionState.day || (activeMissionSubject.slug === "geography" ? today.day : 1), 1),
+    activeMissionSubject.sessions.length
+  );
+  const activeMissionSession =
+    activeMissionSubject.sessions.find((session) => session.day === activeMissionDay) ?? activeMissionSubject.sessions[0];
   const activeMissionProgressMap = (
     activeMissionSubject.slug === "geography" ? progress : progressBySubject[activeMissionSubject.slug] ?? {}
   ) as Record<string, DailyPlannerProgress | undefined>;
-  const activeMissionReadiness = useMemo(
+  const activeMissionProgress = activeMissionProgressMap[String(activeMissionDay)];
+  const meTimeDone = Boolean(activeMissionProgress?.meTimeCompletedAt);
+  const activeMissionDecision = useMemo(
     () =>
       buildDailyPlannerDecision({
         subjectSlug: activeMissionSubject.slug,
@@ -299,18 +203,20 @@ export const DailyWorkspace = () => {
         selectedDay: activeMissionDay,
         progress: activeMissionProgressMap,
         profile,
-      }).sessionReadiness,
+      }),
     [activeMissionDay, activeMissionProgressMap, activeMissionSubject.sessions, activeMissionSubject.slug, profile]
   );
+  const activeMissionReadiness = activeMissionDecision.sessionReadiness;
   const activeMissionHref = activeMissionReadiness.href.startsWith("#")
     ? `/upsc/daily-command${activeMissionReadiness.href}`
     : activeMissionReadiness.href;
+  const activeMissionTrackHref = `/upsc/${activeMissionSubject.slug}/track?day=${activeMissionDay}`;
 
   useEffect(() => {
     let cancelled = false;
     const restoreProfile = window.setTimeout(() => {
       const saved = readStudentProfile();
-      setDailyMissionState(readJson<DailyMissionState>(dailyMissionStorageKey, { subjectSlug: "geography", day: 1 }));
+      setDailyMissionState(readJson<DailyMissionState>(dailyMissionStorageKey, { subjectSlug: "geography", day: 0 }));
       setProgressBySubject(
         Object.fromEntries(
           studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
@@ -338,45 +244,70 @@ export const DailyWorkspace = () => {
     () => [
       {
         label: "Learning Gap",
-        title: learningGapSignal.title,
-        detail: learningGapSignal.detail,
-        href: todayLoop.href,
+        title: activeMissionDecision.learningGap.title,
+        detail: activeMissionDecision.learningGap.detail,
+        href: activeMissionDecision.teacherDoubt?.href ?? activeMissionHref,
         icon: Target,
       },
       {
         label: "Next Revision",
-        title: nextRevisionTitle,
-        detail: nextRevisionDetail,
-        href: nextRevisionHref,
+        title: activeMissionDecision.revision.title,
+        detail: activeMissionDecision.revision.detail,
+        href: activeMissionDecision.revision.href,
         icon: RefreshCcw,
       },
       {
-        label: "Trend",
-        title: talkScoreLine,
-        detail: trendDetail,
-        href: `/upsc/geography/track?day=${today.day}`,
+        label: "Current Path",
+        title: activeMissionDecision.growth.title,
+        detail: `${activeMissionDecision.growth.metricLabel}. ${activeMissionDecision.growth.detail}`,
+        href: activeMissionTrackHref,
         icon: BarChart3,
       },
     ],
     [
-      nextRevisionDetail,
-      nextRevisionHref,
-      nextRevisionTitle,
-      profile,
-      learningGapSignal.detail,
-      learningGapSignal.title,
-      talkScoreLine,
-      today.day,
-      todayLoop.href,
-      trendDetail,
+      activeMissionDecision.growth.detail,
+      activeMissionDecision.growth.metricLabel,
+      activeMissionDecision.growth.title,
+      activeMissionDecision.learningGap.detail,
+      activeMissionDecision.learningGap.title,
+      activeMissionDecision.revision.detail,
+      activeMissionDecision.revision.href,
+      activeMissionDecision.revision.title,
+      activeMissionDecision.teacherDoubt?.href,
+      activeMissionHref,
+      activeMissionTrackHref,
     ]
   );
 
   const saveMeTimeCheck = (mood: GeographyMeTimeMood) => {
-    saveDayProgress(today.day, {
+    const patch = {
       meTimeCompletedAt: new Date().toISOString(),
       meTimeMood: mood,
       meTimeResetPlan: meTimeResetPlans[mood],
+    };
+
+    if (activeMissionSubject.slug === "geography") {
+      saveDayProgress(activeMissionDay, patch);
+      return;
+    }
+
+    setProgressBySubject((current) => {
+      const key = String(activeMissionDay);
+      const currentSubjectProgress = current[activeMissionSubject.slug] ?? {};
+      const nextSubjectProgress = {
+        ...currentSubjectProgress,
+        [key]: {
+          ...currentSubjectProgress[key],
+          day: activeMissionDay,
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      window.localStorage.setItem(`sarit-upsc-${activeMissionSubject.slug}-progress-v1`, JSON.stringify(nextSubjectProgress));
+      return {
+        ...current,
+        [activeMissionSubject.slug]: nextSubjectProgress,
+      };
     });
   };
 
@@ -405,9 +336,11 @@ export const DailyWorkspace = () => {
             data-testid="upsc-simple-dashboard"
             data-student-level={profile.level}
             data-preparation-stage={profile.preparationStage}
-            data-next-action-room={todayLoop.room}
-            data-next-action-href={todayLoop.href}
+            data-next-action-room={activeMissionReadiness.statusLabel}
+            data-next-action-href={activeMissionHref}
             data-visible-mode="four-signal-one-action"
+            data-essential-signal-count="4"
+            data-essential-signals="todays-task|learning-gap|next-revision|current-path"
             className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
           >
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -434,42 +367,13 @@ export const DailyWorkspace = () => {
             </div>
 
             <div data-testid="upsc-four-signal-grid" className="space-y-3">
-              <div
-                data-testid="upsc-active-mission-readiness"
+              <article
+                data-testid="upsc-signal-todays-task"
+                data-signal-priority="primary"
                 data-active-subject={activeMissionSubject.slug}
                 data-active-day={activeMissionDay}
                 data-readiness-status={activeMissionReadiness.statusLabel}
                 data-readiness-score={activeMissionReadiness.scorePercent}
-                className="rounded-lg border border-[#dcd5c7] bg-white p-4 shadow-sm"
-              >
-                <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                    <ClipboardCheck className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                      Active mission readiness
-                    </p>
-                    <h2 className="mt-1 break-words text-base font-black leading-5 text-[#13251d]">
-                      {activeMissionSubject.title} Day {activeMissionDay}: {activeMissionReadiness.statusLabel}
-                    </h2>
-                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#657066]">
-                      {activeMissionReadiness.title}. {activeMissionReadiness.detail}
-                    </p>
-                  </div>
-                  <Link
-                    href={activeMissionHref}
-                    data-testid="upsc-active-mission-action"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
-                  >
-                    {activeMissionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </div>
-
-              <article
-                data-testid="upsc-signal-todays-task"
-                data-signal-priority="primary"
                 className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
               >
                 <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -482,18 +386,31 @@ export const DailyWorkspace = () => {
                         Today&apos;s task
                       </span>
                     </div>
-                    <h2 className="text-xl font-black tracking-tight text-[#13251d]">{today.title}</h2>
+                    <h2 className="text-xl font-black tracking-tight text-[#13251d]">
+                      {activeMissionSubject.title} Day {activeMissionDay}: {activeMissionReadiness.title}
+                    </h2>
                     <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-[#49675e]">
-                      {todayLoop.shortDetail}
+                      {activeMissionReadiness.detail}
                     </p>
                     <p data-testid="upsc-generated-daily-path-summary" className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[#1d9e75]">
-                      Day {today.day} of {geographySessions.length} / {dailyPath.length} topic{dailyPath.length === 1 ? "" : "s"} today / 10-15 min each
+                      {activeMissionSubject.title} Day {activeMissionDay} of {activeMissionSubject.sessions.length} / {activeMissionSession.title}
                     </p>
+                    <div
+                      data-testid="upsc-task-readiness-proof"
+                      data-active-subject={activeMissionSubject.slug}
+                      data-active-day={activeMissionDay}
+                      data-readiness-status={activeMissionReadiness.statusLabel}
+                      data-readiness-score={activeMissionReadiness.scorePercent}
+                      className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
+                    >
+                      <ClipboardCheck className="h-4 w-4" />
+                      {activeMissionReadiness.statusLabel} / {activeMissionReadiness.scorePercent}% ready
+                    </div>
                     <div
                       data-testid="upsc-me-time-check"
                       data-me-time-status={meTimeDone ? "ready" : "pending"}
-                      data-me-time-mood={todayProgress?.meTimeMood ?? ""}
-                      data-me-time-reset-plan={todayProgress?.meTimeResetPlan ?? ""}
+                      data-me-time-mood={activeMissionProgress?.meTimeMood ?? ""}
+                      data-me-time-reset-plan={activeMissionProgress?.meTimeResetPlan ?? ""}
                       className="mt-3 rounded-lg border border-[#cfe5dc] bg-white/70 p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -512,12 +429,12 @@ export const DailyWorkspace = () => {
                               type="button"
                               onClick={() => saveMeTimeCheck(value)}
                               className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-xs font-black capitalize transition ${
-                                todayProgress?.meTimeMood === value
+                                activeMissionProgress?.meTimeMood === value
                                   ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                                   : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]"
                               }`}
                             >
-                              {todayProgress?.meTimeMood === value ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                              {activeMissionProgress?.meTimeMood === value ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
                               {label}
                             </button>
                           ))}
@@ -527,7 +444,7 @@ export const DailyWorkspace = () => {
                         data-testid="upsc-me-time-reset-plan"
                         className="mt-3 rounded-md border border-[#dcd5c7] bg-white px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
                       >
-                        {todayProgress?.meTimeResetPlan ?? "Pick one state so the portal saves a simple start-readiness plan."}
+                        {activeMissionProgress?.meTimeResetPlan ?? "Pick one state so the portal saves a simple start-readiness plan."}
                       </p>
                     </div>
                     <details
@@ -556,14 +473,14 @@ export const DailyWorkspace = () => {
                     </p>
                   </div>
                   <Link
-                    href={todayLoop.href}
+                    href={activeMissionHref}
                     data-testid="upsc-start-today"
                     data-student-level={profile.level}
-                    data-next-action-room={todayLoop.room}
+                    data-next-action-room={activeMissionReadiness.statusLabel}
                     data-session-readiness={meTimeDone ? "ready" : "check-pending"}
                     className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] md:w-auto"
                   >
-                    {todayLoop.cta} <ArrowRight className="ml-2 h-4 w-4" />
+                    {activeMissionReadiness.actionLabel} <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
               </article>

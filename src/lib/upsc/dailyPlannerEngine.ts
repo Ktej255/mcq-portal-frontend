@@ -120,6 +120,40 @@ function average(values: number[]) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+function weakSkillLabel(progress?: DailyPlannerProgress) {
+  const progressWithRubric = progress as
+    | (DailyPlannerProgress & {
+        recoveryWeakSkill?: string;
+        recoveryDiagnosisSummary?: string;
+        talkRepairHints?: string[];
+        talkRubric?: Array<{ label: string; status?: string }>;
+      })
+    | undefined;
+
+  return (
+    progressWithRubric?.recoveryWeakSkill ??
+    progressWithRubric?.talkRubric?.find((item) => item.status && item.status !== "Ready")?.label ??
+    null
+  );
+}
+
+function repairDetail(progress?: DailyPlannerProgress) {
+  const progressWithRepair = progress as
+    | (DailyPlannerProgress & {
+        recoveryDiagnosisSummary?: string;
+        talkRepairHints?: string[];
+        mcqReviewSummary?: string;
+      })
+    | undefined;
+
+  return (
+    progressWithRepair?.recoveryDiagnosisSummary ??
+    progressWithRepair?.talkRepairHints?.[0] ??
+    progressWithRepair?.mcqReviewSummary ??
+    "The next lesson should wait until the weak recall or MCQ signal is corrected."
+  );
+}
+
 function routeFor(subjectSlug: string, room: "watch" | "talk" | "mcq-readiness" | "track" | "revisit", day: number) {
   if (room === "track") return `/upsc/${subjectSlug}/track?day=${day}`;
   return `/upsc/${subjectSlug}/${room}?day=${day}`;
@@ -221,7 +255,9 @@ function buildGap(
 
   const active = input.progress[String(input.selectedDay)];
   const previous = input.progress[String(input.selectedDay - 1)];
-  const reference = revisionDue?.progress ?? previous ?? active;
+  const activeHasUnfinishedEvidence = Boolean(active && hasStarted(active) && !hasCommand(active));
+  const reference = revisionDue?.progress ?? (activeHasUnfinishedEvidence ? active : previous ?? active);
+  const weakSkill = weakSkillLabel(reference);
 
   if (needsRecovery(reference)) {
     const score =
@@ -229,10 +265,10 @@ function buildGap(
         ? `${reference.talkScore}/100 recall`
         : typeof reference?.mcqScorePercent === "number"
           ? `${reference.mcqScorePercent}% MCQ`
-          : "Recovery active";
+        : "Recovery active";
     return {
-      title: `Repair Day ${revisionDue?.source.day ?? input.selectedDay} before moving ahead`,
-      detail: "The next lesson should wait until the weak recall or MCQ signal is corrected.",
+      title: weakSkill ? `${weakSkill} repair` : `Repair Day ${revisionDue?.source.day ?? input.selectedDay} before moving ahead`,
+      detail: repairDetail(reference),
       scoreLabel: score,
       tone: "repair",
     };
@@ -240,8 +276,8 @@ function buildGap(
 
   if (typeof reference?.talkScore === "number" && reference.talkScore < recallTarget) {
     return {
-      title: `${recallTarget - reference.talkScore} recall points missing`,
-      detail: "The student should explain the same topic again before opening heavy practice.",
+      title: weakSkill ?? `${recallTarget - reference.talkScore} recall points missing`,
+      detail: repairDetail(reference),
       scoreLabel: `${reference.talkScore}/100`,
       tone: "repair",
     };
@@ -256,7 +292,7 @@ function buildGap(
     };
   }
 
-  if (!active?.baselineSavedAt && !active?.reflection?.trim()) {
+  if (!active?.baselineSavedAt && !active?.reflection?.trim() && typeof active?.talkScore !== "number") {
     return {
       title: "Recall baseline pending",
       detail: "Start by writing what is already known, then the system can identify the true gap.",

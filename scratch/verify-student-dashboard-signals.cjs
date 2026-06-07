@@ -54,6 +54,20 @@ async function assertStudentSafeDashboard(page, label, checks) {
   const forbidden = ["GEO-D", "DRAFT", "debug", "operator", "local draft bank", "batch code"];
   const leaked = forbidden.filter((term) => dashboardText.toLowerCase().includes(term.toLowerCase()));
   const signalCount = await page.locator('[data-testid^="upsc-signal-"]').count();
+  const essentialContract = await page.getByTestId("upsc-simple-dashboard").evaluate((node) => ({
+    mode: node.getAttribute("data-visible-mode"),
+    count: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    nextActionHref: node.getAttribute("data-next-action-href"),
+  }));
+  const activeMissionPanelCount = await page.locator('[data-testid="upsc-active-mission-readiness"]').count();
+  const taskReadiness = await page.getByTestId("upsc-task-readiness-proof").evaluate((node) => ({
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+  }));
   const mainPathStrip = await page.getByTestId("upsc-main-path-strip").evaluate((node) => ({
     text: node.textContent || "",
     open: node.open,
@@ -63,8 +77,33 @@ async function assertStudentSafeDashboard(page, label, checks) {
   const planningDrawerOpen = await page.getByTestId("upsc-planning-drawer").evaluate((node) =>
     node instanceof HTMLDetailsElement ? node.open : false
   );
-  checks.push({ label, signalCount, mainPathStrip, oneActionRuleText, dashboardVisibleMode, planningDrawerOpen, leaked });
+  checks.push({
+    label,
+    signalCount,
+    essentialContract,
+    activeMissionPanelCount,
+    taskReadiness,
+    mainPathStrip,
+    oneActionRuleText,
+    dashboardVisibleMode,
+    planningDrawerOpen,
+    leaked,
+  });
   if (signalCount !== 4) throw new Error(`${label}: expected four dashboard signals, got ${signalCount}`);
+  if (
+    essentialContract.mode !== "four-signal-one-action" ||
+    essentialContract.count !== "4" ||
+    essentialContract.signals !== "todays-task|learning-gap|next-revision|current-path" ||
+    !essentialContract.nextActionHref
+  ) {
+    throw new Error(`${label}: dashboard essential contract failed: ${JSON.stringify(essentialContract)}`);
+  }
+  if (activeMissionPanelCount !== 0) {
+    throw new Error(`${label}: active mission panel should be folded into Today's task`);
+  }
+  if (!taskReadiness.subject || !taskReadiness.day || !taskReadiness.status || !taskReadiness.score) {
+    throw new Error(`${label}: Today's task readiness proof missing: ${JSON.stringify(taskReadiness)}`);
+  }
   if (!mainPathStrip.text.includes("MCQ") || !mainPathStrip.text.includes("Next")) {
     throw new Error(`${label}: main path support detail should retain MCQ and automatic next topic: ${mainPathStrip.text}`);
   }
@@ -106,11 +145,11 @@ async function run() {
   });
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-learning-gap").getByText("Map proof", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-signal-learning-gap").getByText("Map proof", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-signal-learning-gap").getByText("India map example", { exact: false }).waitFor({ timeout: 15000 });
   const revisitHref = await page.getByTestId("upsc-start-today").getAttribute("href");
-  const revisitTrendText = await page.getByTestId("upsc-signal-trend").innerText();
-  checks.push({ label: "dashboard-revisit-signal", revisitHref, revisitTrendText });
+  const revisitPathText = await page.getByTestId("upsc-signal-current-path").innerText();
+  checks.push({ label: "dashboard-revisit-signal", revisitHref, revisitPathText });
   if (revisitHref !== "/upsc/geography/revisit?day=1") throw new Error(`Expected revisit route, got ${revisitHref}`);
   await assertStudentSafeDashboard(page, "dashboard-revisit-copy", checks);
   await assertNoOverflow(page, "dashboard-revisit-desktop", checks);
@@ -147,18 +186,20 @@ async function run() {
   await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-signal-todays-task").getByText("Origin and Evolution of Earth", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-signal-learning-gap").getByText("Mechanism", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-trend").getByText("1/30 command days", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-trend").getByText("Geography readiness", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-signal-current-path").getByText("1/30 command days", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-signal-current-path").getByText("started", { exact: false }).waitFor({ timeout: 15000 });
   const repairHref = await page.getByTestId("upsc-start-today").getAttribute("href");
-  checks.push({ label: "dashboard-command-trend", repairHref });
-  if (repairHref !== "/upsc/geography/watch?day=2") throw new Error(`Expected repair lesson route, got ${repairHref}`);
+  checks.push({ label: "dashboard-current-path", repairHref });
+  if (repairHref !== "/upsc/daily-command#daily-me-time-checkin") {
+    throw new Error(`Expected readiness gate route before new day, got ${repairHref}`);
+  }
   await assertStudentSafeDashboard(page, "dashboard-command-trend-copy", checks);
   await assertNoOverflow(page, "dashboard-command-trend-desktop", checks);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload({ waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-trend").getByText("1/30 command days", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-signal-current-path").getByText("1/30 command days", { exact: true }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "dashboard-signals-mobile", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

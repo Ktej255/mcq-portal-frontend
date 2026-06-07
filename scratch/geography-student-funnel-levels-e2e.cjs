@@ -137,7 +137,7 @@ async function assertDashboardNext(page, expected, checks, label) {
   await page.getByTestId("upsc-signal-todays-task").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-signal-learning-gap").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-signal-next-revision").waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-trend").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-signal-current-path").waitFor({ timeout: 15000 });
 
   const dashboard = await page.getByTestId("upsc-simple-dashboard").evaluate((element) => ({
     studentLevel: element.getAttribute("data-student-level"),
