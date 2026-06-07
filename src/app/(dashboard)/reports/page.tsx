@@ -1,16 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, FileText, Focus, Target, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
 
 import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
+import {
+  buildUpscStudentReportSnapshot,
+  readLocalStudentReportProgress,
+  studentReportSubjects,
+  type StudentReportProgressMap,
+} from "@/lib/upsc/studentReportEngine";
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 
 export default function ReportsPage() {
   const overview = useGeographyStudentOverview();
   const { progress } = useGeographyProgress();
+  const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setProgressBySubject(
+        Object.fromEntries(
+          studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
+        )
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const report = buildGeographyReportSnapshot(progress);
+  const allSubjectReport = useMemo(
+    () => buildUpscStudentReportSnapshot(progressBySubject),
+    [progressBySubject]
+  );
   const headline = overview.hasUrgentRecovery
     ? `${overview.metrics.revisitCount} recovery item${overview.metrics.revisitCount === 1 ? "" : "s"} need attention`
     : overview.metrics.startedCount
@@ -36,6 +61,74 @@ export default function ReportsPage() {
             >
               {overview.loopState.cta} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
+          </div>
+        </section>
+
+        <section data-testid="upsc-all-subject-report" className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <LibraryBig className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                  UPSC all-subject report
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">
+                {allSubjectReport.totals.growthPercent}% movement across the full plan
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                Started from: {allSubjectReport.growth.startedFrom}. Current position: {allSubjectReport.growth.currentPosition}.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Started", `${allSubjectReport.totals.startedDays}/${allSubjectReport.totals.totalDays}`],
+                ["Weekly reports", allSubjectReport.totals.weeklyWindowsGenerated],
+                ["Recovery", allSubjectReport.totals.recoveryItems],
+                ["Recall", allSubjectReport.totals.averageRecall === null ? "Not measured" : `${allSubjectReport.totals.averageRecall}/100`],
+                ["MCQ", allSubjectReport.totals.averageMcq === null ? "No score" : `${allSubjectReport.totals.averageMcq}%`],
+                ["Me-time", allSubjectReport.totals.meTimeChecks],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">{label}</p>
+                  <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {allSubjectReport.subjects.map((subject) => (
+              <Link
+                key={subject.slug}
+                href={subject.route}
+                data-testid="upsc-subject-report-card"
+                data-subject-slug={subject.slug}
+                className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4 transition hover:border-[#1d9e75]"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">{subject.window}</p>
+                    <h3 className="mt-1 text-base font-black tracking-tight text-[#13251d]">{subject.title}</h3>
+                  </div>
+                  <span className="rounded-md bg-[#e7f5ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                    {subject.monthlyVerdict}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ["Start", `${subject.startedDays}/${subject.totalDays}`],
+                    ["Cmd", subject.commandDays],
+                    ["Fix", subject.recoveryItems],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md bg-[#f7f4ee] p-2">
+                      <p className="text-sm font-black text-[#13251d]">{value}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs font-semibold leading-5 text-[#49675e]">{subject.nextAction}</p>
+              </Link>
+            ))}
           </div>
         </section>
 

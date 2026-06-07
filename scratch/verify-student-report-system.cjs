@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
+const environmentProgressKey = "sarit-upsc-environment-progress-v1";
 const evidencePath = path.join(__dirname, "verify-student-report-system-evidence.json");
 
 async function assertNoOverflow(page, label, checks) {
@@ -26,7 +27,7 @@ async function assertNoOverflow(page, label, checks) {
 async function seedProfileAndProgress(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey }) => {
+    ({ profileStorageKey, progressStorageKey, envProgressStorageKey }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_report_system");
       window.localStorage.setItem(
         profileStorageKey,
@@ -78,8 +79,24 @@ async function seedProfileAndProgress(page) {
           },
         })
       );
+      window.localStorage.setItem(
+        envProgressStorageKey,
+        JSON.stringify({
+          1: {
+            day: 1,
+            watched: true,
+            reflection: "Ecology foundation is connected with habitat and niche.",
+            talkScore: 97,
+            talkBand: "Command",
+            confidence: "Command",
+            mcqCompleted: true,
+            mcqScorePercent: 84,
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      );
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey }
+    { profileStorageKey: profileKey, progressStorageKey: progressKey, envProgressStorageKey: environmentProgressKey }
   );
 }
 
@@ -98,23 +115,30 @@ async function run() {
   await seedProfileAndProgress(page);
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-growth-scale").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-monthly-report").waitFor({ timeout: 15000 });
 
   const href = await page.getByTestId("student-gap-primary-action").getAttribute("href");
+  const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
+  const subjectCardCount = await page.getByTestId("upsc-subject-report-card").count();
   const weeklyCount = await page.getByTestId("upsc-weekly-report").count();
   const evidenceText = await page.getByTestId("upsc-report-evidence-streams").innerText();
   const monthlyText = await page.getByTestId("upsc-monthly-report").innerText();
   const growthText = await page.getByTestId("upsc-growth-scale").innerText();
 
-  checks.push({ label: "report-system-content", href, weeklyCount, evidenceText, monthlyText, growthText });
+  checks.push({ label: "report-system-content", href, subjectCardCount, weeklyCount, allSubjectText, evidenceText, monthlyText, growthText });
 
   if (href !== "/upsc/geography/revisit?day=1") {
     throw new Error(`Gap CTA should still open recovery day 1, got ${href}`);
   }
   if (weeklyCount !== 4) {
     throw new Error(`Expected 4 weekly report cards, got ${weeklyCount}`);
+  }
+  const normalizedAllSubjectText = allSubjectText.toLowerCase();
+  if (subjectCardCount !== 8 || !normalizedAllSubjectText.includes("environment") || !normalizedAllSubjectText.includes("weekly reports")) {
+    throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
   }
   const normalizedEvidence = `${evidenceText}\n${monthlyText}`.toLowerCase();
   for (const expectedText of ["recall", "mcq", "revision", "me-time", "current affairs", "2 unlocked"]) {
@@ -129,6 +153,7 @@ async function run() {
   await assertNoOverflow(page, "reports-desktop", checks);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "reports-mobile", checks);
 
