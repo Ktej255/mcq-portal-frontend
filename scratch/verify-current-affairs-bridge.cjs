@@ -70,11 +70,30 @@ async function run() {
   await page.goto(`${baseUrl}/upsc/current-affairs`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-current-affairs-hero").waitFor({ timeout: 15000 });
   const activeSubject = await page.getByTestId("upsc-current-affairs-hero").getAttribute("data-active-subject");
+  const initialProof = await page.getByTestId("upsc-current-affairs-coverage-proof").evaluate((proof) => ({
+    rule: proof.getAttribute("data-rule"),
+    activeSubject: proof.getAttribute("data-active-subject"),
+    totalHooks: proof.getAttribute("data-total-hooks"),
+    unlockedCount: proof.getAttribute("data-unlocked-count"),
+    lockedCount: proof.getAttribute("data-locked-count"),
+    coveredDays: proof.getAttribute("data-covered-days"),
+  }));
   const initialUnlockedCards = await page.getByTestId("upsc-current-affairs-card").count();
   const initialNextUnlockText = await page.getByTestId("upsc-current-affairs-next-unlock").innerText();
-  checks.push({ label: "initial-locked-state", activeSubject, initialUnlockedCards, initialNextUnlockText });
-  if (activeSubject !== "geography" || initialUnlockedCards !== 0 || !initialNextUnlockText.includes("Day 2")) {
-    throw new Error(`initial-locked-state failed: ${JSON.stringify({ activeSubject, initialUnlockedCards, initialNextUnlockText })}`);
+  const initialLeakedHookCount = await page.getByText("Monsoon variability", { exact: false }).count();
+  checks.push({ label: "initial-locked-state", activeSubject, initialProof, initialUnlockedCards, initialNextUnlockText, initialLeakedHookCount });
+  if (
+    activeSubject !== "geography" ||
+    initialProof.rule !== "covered-static-topic-only" ||
+    initialProof.activeSubject !== "geography" ||
+    initialProof.unlockedCount !== "0" ||
+    initialProof.lockedCount !== initialProof.totalHooks ||
+    initialProof.coveredDays !== "" ||
+    initialUnlockedCards !== 0 ||
+    initialLeakedHookCount !== 0 ||
+    !initialNextUnlockText.includes("Day 2")
+  ) {
+    throw new Error(`initial-locked-state failed: ${JSON.stringify({ activeSubject, initialProof, initialUnlockedCards, initialNextUnlockText, initialLeakedHookCount })}`);
   }
   await assertNoOverflow(page, "current-affairs-initial-desktop", checks);
 
@@ -93,6 +112,19 @@ async function run() {
   });
   await page.goto(`${baseUrl}/upsc/current-affairs`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-current-affairs-hero").waitFor({ timeout: 15000 });
+  const seededProof = await page.getByTestId("upsc-current-affairs-coverage-proof").evaluate((proof) => ({
+    rule: proof.getAttribute("data-rule"),
+    activeSubject: proof.getAttribute("data-active-subject"),
+    totalHooks: proof.getAttribute("data-total-hooks"),
+    unlockedCount: proof.getAttribute("data-unlocked-count"),
+    lockedCount: proof.getAttribute("data-locked-count"),
+    coveredDays: proof.getAttribute("data-covered-days"),
+    rows: [...document.querySelectorAll('[data-testid="upsc-current-affairs-proof-row"]')].map((row) => ({
+      day: row.getAttribute("data-linked-day"),
+      status: row.getAttribute("data-gate-status"),
+      signals: row.getAttribute("data-signals"),
+    })),
+  }));
   await page.getByText("Monsoon variability", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByText("Marine heatwaves", { exact: false }).waitFor({ timeout: 15000 });
   const unlockedCards = await page.getByTestId("upsc-current-affairs-card").evaluateAll((cards) =>
@@ -103,9 +135,17 @@ async function run() {
     }))
   );
   const hasWrongUnlock = unlockedCards.some((card) => card.unlocked !== "true" || !["5", "6"].includes(card.linkedDay));
-  checks.push({ label: "covered-topic-unlocks-only-linked-hooks", unlockedCards });
-  if (unlockedCards.length !== 2 || hasWrongUnlock) {
-    throw new Error(`covered-topic-unlocks-only-linked-hooks failed: ${JSON.stringify(unlockedCards)}`);
+  checks.push({ label: "covered-topic-unlocks-only-linked-hooks", seededProof, unlockedCards });
+  if (
+    seededProof.rule !== "covered-static-topic-only" ||
+    seededProof.unlockedCount !== "2" ||
+    seededProof.coveredDays !== "5,6" ||
+    !seededProof.rows.some((row) => row.day === "5" && row.status === "unlocked" && row.signals.includes("Watch evidence")) ||
+    !seededProof.rows.some((row) => row.day === "6" && row.status === "unlocked" && row.signals.includes("Talk reflection")) ||
+    unlockedCards.length !== 2 ||
+    hasWrongUnlock
+  ) {
+    throw new Error(`covered-topic-unlocks-only-linked-hooks failed: ${JSON.stringify({ seededProof, unlockedCards })}`);
   }
   await assertNoOverflow(page, "current-affairs-unlocked-desktop", checks);
 
@@ -131,12 +171,22 @@ async function run() {
 
     return {
       activeSubject: hero?.getAttribute("data-active-subject"),
+      proof: {
+        rule: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-rule"),
+        activeSubject: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-active-subject"),
+        unlockedCount: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-unlocked-count"),
+        coveredDays: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-covered-days"),
+      },
       cards,
     };
   });
   checks.push({ label: "environment-covered-topic-unlocks-only-environment-hook", environmentState });
   if (
     environmentState.activeSubject !== "environment" ||
+    environmentState.proof.rule !== "covered-static-topic-only" ||
+    environmentState.proof.activeSubject !== "environment" ||
+    environmentState.proof.unlockedCount !== "1" ||
+    environmentState.proof.coveredDays !== "1" ||
     environmentState.cards.length !== 1 ||
     environmentState.cards.some((card) => card.subjectSlug !== "environment" || card.linkedDay !== "1" || card.unlocked !== "true")
   ) {

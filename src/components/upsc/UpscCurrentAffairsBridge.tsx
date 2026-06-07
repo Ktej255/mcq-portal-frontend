@@ -16,16 +16,22 @@ import {
 import { useSubjectProgress, type SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
 
+function staticCoverageSignals(progress?: SubjectDayProgress) {
+  const signals: string[] = [];
+
+  if (progress?.watched) signals.push("Watch evidence");
+  if (progress?.reflection?.trim()) signals.push("Talk reflection");
+  if (typeof progress?.talkScore === "number") signals.push(`Talk score ${progress.talkScore}%`);
+  if (progress?.labCompleted) signals.push("Visual lab");
+  if (progress?.mcqAttempted) signals.push("MCQ attempted");
+  if (progress?.mcqCompleted) signals.push("MCQ completed");
+  if (progress?.confidence === "Command") signals.push("Command confidence");
+
+  return signals;
+}
+
 function hasCoveredStaticTopic(progress?: SubjectDayProgress) {
-  return Boolean(
-    progress?.watched ||
-      progress?.reflection?.trim() ||
-      typeof progress?.talkScore === "number" ||
-      progress?.labCompleted ||
-      progress?.mcqAttempted ||
-      progress?.mcqCompleted ||
-      progress?.confidence === "Command"
-  );
+  return staticCoverageSignals(progress).length > 0;
 }
 
 function sourceLabel(status: CurrentAffairsBridgeItem["sourceStatus"]) {
@@ -46,6 +52,19 @@ export function UpscCurrentAffairsBridge() {
   const subjectItems = useMemo(() => getCurrentAffairsForSubject(selectedSubject.slug), [selectedSubject.slug]);
   const unlockedItems = subjectItems.filter((item) => hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
   const lockedItems = subjectItems.filter((item) => !hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
+  const coverageEvidence = subjectItems.map((item) => {
+    const signals = staticCoverageSignals(getDayProgress(item.linkedDay));
+
+    return {
+      ...item,
+      signals,
+      gateStatus: signals.length ? "unlocked" : "locked",
+    };
+  });
+  const coveredDayList = coverageEvidence
+    .filter((item) => item.gateStatus === "unlocked")
+    .map((item) => String(item.linkedDay))
+    .join(",");
   const nextLocked = lockedItems[0];
   const nextLockedSession = nextLocked
     ? selectedSubject.sessions.find((session) => session.day === nextLocked.linkedDay)
@@ -112,6 +131,65 @@ export function UpscCurrentAffairsBridge() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-current-affairs-coverage-proof"
+          data-rule="covered-static-topic-only"
+          data-active-subject={selectedSubject.slug}
+          data-total-hooks={subjectItems.length}
+          data-unlocked-count={isLoaded ? unlockedItems.length : 0}
+          data-locked-count={isLoaded ? lockedItems.length : subjectItems.length}
+          data-covered-days={coveredDayList}
+          className="rounded-lg border border-[#c8ded6] bg-[#eef8f2] p-4 shadow-sm md:p-5"
+        >
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                Evidence gate
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight">Only covered static topics can open news.</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                The locked queue shows the chapter name only. The actual current-affairs hook opens after Watch, Talk,
+                Lab, MCQ, or Command-confidence evidence is saved for that exact day.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {coverageEvidence.slice(0, 6).map((item) => (
+                <div
+                  key={item.id}
+                  data-testid="upsc-current-affairs-proof-row"
+                  data-linked-day={item.linkedDay}
+                  data-gate-status={item.gateStatus}
+                  data-signals={item.signals.join("|")}
+                  className={cn(
+                    "rounded-md border p-3",
+                    item.gateStatus === "unlocked"
+                      ? "border-[#93cdb6] bg-white"
+                      : "border-[#dcd5c7] bg-[#fffdf8]"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      Day {item.linkedDay}
+                    </p>
+                    <Badge
+                      className={cn(
+                        "rounded-md px-2 py-1",
+                        item.gateStatus === "unlocked" ? "bg-[#1a3a2a] text-white" : "bg-[#fff4df] text-[#6f4a12]"
+                      )}
+                    >
+                      {item.gateStatus}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm font-black tracking-tight">{item.linkedTopic}</p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">
+                    {item.signals.length ? item.signals.join(" + ") : "Waiting for static topic evidence"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
