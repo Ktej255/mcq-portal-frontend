@@ -91,6 +91,8 @@ const auditSubjects: AuditSubject[] = [
 
 const globalModules = [
   { title: "Daily Mission Control", href: "/upsc/daily-command", status: "Ready" },
+  { title: "Yearly Planner", href: "/upsc/yearly-planner", status: "Ready" },
+  { title: "Optional Subject Command", href: "/upsc/optional-subjects", status: "Ready" },
   { title: "Content Command Center", href: "/upsc/content-command", status: "Ready" },
   { title: "MCQ Command Center", href: "/upsc/mcq-command", status: "Ready" },
   { title: "Revision Command Center", href: "/upsc/revision-command", status: "Ready" },

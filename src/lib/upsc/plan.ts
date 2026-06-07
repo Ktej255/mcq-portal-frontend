@@ -83,6 +83,20 @@ export const upscCalendar = [
     href: "/upsc/daily-command",
   },
   {
+    window: "Product",
+    title: "UPSC Yearly Planner",
+    detail: "Pricing, yearly subject sequence, GS coverage layers, PYQ preload target, and three-day launch plan.",
+    status: "Structure ready",
+    href: "/upsc/yearly-planner",
+  },
+  {
+    window: "Optional",
+    title: "Optional Subject Command",
+    detail: "Paper I and Paper II page shell for every UPSC optional subject with syllabus and PYQ preload targets.",
+    status: "Structure ready",
+    href: "/upsc/optional-subjects",
+  },
+  {
     window: "June",
     title: "Geography",
     detail: "First complete subject sprint with map-first learning.",

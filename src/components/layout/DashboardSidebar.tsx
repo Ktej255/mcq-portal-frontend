@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   Database,
   FileSearch,
+  FolderTree,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -30,6 +31,7 @@ const studentNavItems = [
 const adminNavItems = [
   { name: 'Admin Console', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Launch Plan', href: '/admin/launch-plan', icon: CalendarCheck },
+  { name: 'Yearly Planner', href: '/upsc/yearly-planner', icon: FolderTree },
   { name: 'Feature Inventory', href: '/admin/feature-inventory', icon: ListChecks },
   { name: 'Prelims V2', href: '/admin/prelims-audit-v2', icon: FileSearch },
   { name: 'Founder Review', href: '/admin/founder', icon: Activity },
