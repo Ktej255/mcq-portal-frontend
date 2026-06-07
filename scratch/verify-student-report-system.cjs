@@ -6,6 +6,7 @@ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const environmentProgressKey = "sarit-upsc-environment-progress-v1";
+const dailyCommandKey = "sarit-upsc-daily-command-v1";
 const evidencePath = path.join(__dirname, "verify-student-report-system-evidence.json");
 
 async function assertNoOverflow(page, label, checks) {
@@ -27,7 +28,7 @@ async function assertNoOverflow(page, label, checks) {
 async function seedProfileAndProgress(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, envProgressStorageKey }) => {
+    ({ profileStorageKey, progressStorageKey, envProgressStorageKey, dailyStorageKey }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_report_system");
       window.localStorage.setItem(
         profileStorageKey,
@@ -40,6 +41,15 @@ async function seedProfileAndProgress(page) {
           studyTime: "morning",
           learningPattern: "deep-work",
           mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      window.localStorage.setItem(
+        dailyStorageKey,
+        JSON.stringify({
+          subjectSlug: "geography",
+          day: 1,
+          note: "Report should show the same repair lock as Daily Mission.",
           updatedAt: new Date().toISOString(),
         })
       );
@@ -103,7 +113,12 @@ async function seedProfileAndProgress(page) {
         })
       );
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey, envProgressStorageKey: environmentProgressKey }
+    {
+      profileStorageKey: profileKey,
+      progressStorageKey: progressKey,
+      envProgressStorageKey: environmentProgressKey,
+      dailyStorageKey: dailyCommandKey,
+    }
   );
 }
 
@@ -122,6 +137,7 @@ async function run() {
   await seedProfileAndProgress(page);
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
@@ -129,6 +145,14 @@ async function run() {
   await page.getByTestId("upsc-monthly-report").waitFor({ timeout: 15000 });
 
   const href = await page.getByTestId("student-gap-primary-action").getAttribute("href");
+  const readinessReport = await page.getByTestId("upsc-current-readiness-report").evaluate((node) => ({
+    subject: node.getAttribute("data-readiness-subject"),
+    day: node.getAttribute("data-readiness-day"),
+    status: node.getAttribute("data-readiness-status"),
+    score: node.getAttribute("data-readiness-score"),
+    text: node.textContent || "",
+  }));
+  const readinessHref = await page.getByTestId("upsc-current-readiness-action").getAttribute("href");
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
   const allSubjectWindowText = await page.getByTestId("upsc-all-subject-report-windows").innerText();
   const allSubjectWeeklyCount = await page.getByTestId("upsc-all-subject-weekly-report").count();
@@ -148,6 +172,8 @@ async function run() {
   checks.push({
     label: "report-system-content",
     href,
+    readinessReport,
+    readinessHref,
     subjectCardCount,
     weeklyCount,
     allSubjectWeeklyCount,
@@ -163,6 +189,17 @@ async function run() {
 
   if (href !== "/upsc/geography/revisit?day=1") {
     throw new Error(`Gap CTA should still open recovery day 1, got ${href}`);
+  }
+  if (
+    readinessReport.subject !== "geography" ||
+    readinessReport.day !== "1" ||
+    readinessReport.status !== "Repair lock" ||
+    readinessReport.score !== "60" ||
+    readinessHref !== "/upsc/geography/talk?day=1" ||
+    !/current session readiness/i.test(readinessReport.text) ||
+    !/because-chain/i.test(readinessReport.text)
+  ) {
+    throw new Error(`Current readiness report is not synced with Daily Mission: ${JSON.stringify({ readinessReport, readinessHref })}`);
   }
   if (weeklyCount !== 4) {
     throw new Error(`Expected 4 weekly report cards, got ${weeklyCount}`);
@@ -207,6 +244,7 @@ async function run() {
   await assertNoOverflow(page, "reports-desktop", checks);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });

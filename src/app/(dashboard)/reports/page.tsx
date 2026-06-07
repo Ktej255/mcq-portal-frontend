@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
+import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, ClipboardCheck, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
 
 import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
+import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
 import {
   buildUpscStudentReportSnapshot,
   readLocalStudentReportProgress,
@@ -12,13 +13,37 @@ import {
   type StudentReportWindow,
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
+import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
+
+type DailyReportState = {
+  subjectSlug: string;
+  day: number;
+  note?: string;
+  updatedAt?: string;
+};
+
+const dailyStorageKey = "sarit-upsc-daily-command-v1";
+
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function ReportsPage() {
   const overview = useGeographyStudentOverview();
   const { progress } = useGeographyProgress();
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
+  const [dailyState, setDailyState] = useState<DailyReportState>({ subjectSlug: "geography", day: 1 });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -27,6 +52,7 @@ export default function ReportsPage() {
           studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
         )
       );
+      setDailyState(readJson<DailyReportState>(dailyStorageKey, { subjectSlug: "geography", day: 1 }));
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -36,6 +62,20 @@ export default function ReportsPage() {
   const allSubjectReport = useMemo(
     () => buildUpscStudentReportSnapshot(progressBySubject),
     [progressBySubject]
+  );
+  const activeReportSubject =
+    studentReportSubjects.find((subject) => subject.slug === dailyState.subjectSlug) ?? studentReportSubjects[0];
+  const activeReportDay = Math.min(Math.max(dailyState.day || 1, 1), activeReportSubject.sessions.length);
+  const currentReadiness = useMemo(
+    () =>
+      buildDailyPlannerDecision({
+        subjectSlug: activeReportSubject.slug,
+        sessions: activeReportSubject.sessions,
+        selectedDay: activeReportDay,
+        progress: (progressBySubject[activeReportSubject.slug] ?? {}) as Record<string, DailyPlannerProgress | undefined>,
+        profile: readStudentProfile(),
+      }).sessionReadiness,
+    [activeReportDay, activeReportSubject.sessions, activeReportSubject.slug, progressBySubject]
   );
   const headline = overview.hasUrgentRecovery
     ? `${overview.metrics.revisitCount} recovery item${overview.metrics.revisitCount === 1 ? "" : "s"} need attention`
@@ -62,6 +102,60 @@ export default function ReportsPage() {
             >
               {overview.loopState.cta} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-current-readiness-report"
+          data-readiness-subject={activeReportSubject.slug}
+          data-readiness-day={activeReportDay}
+          data-readiness-status={currentReadiness.statusLabel}
+          data-readiness-score={currentReadiness.scorePercent}
+          className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <ClipboardCheck className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                  Current session readiness
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">
+                {activeReportSubject.title} Day {activeReportDay}: {currentReadiness.statusLabel}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                {currentReadiness.title}. {currentReadiness.detail}
+              </p>
+              <Link
+                href={currentReadiness.href}
+                data-testid="upsc-current-readiness-action"
+                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                {currentReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  Same signal as Daily Mission
+                </p>
+                <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1.5 text-xs font-black text-[#085041]">
+                  {currentReadiness.scorePercent}%
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                {currentReadiness.checklist.map((item) => (
+                  <div key={item.label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                      {item.status}
+                    </p>
+                    <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
