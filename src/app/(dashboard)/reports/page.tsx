@@ -82,6 +82,40 @@ export default function ReportsPage() {
     : overview.metrics.startedCount
       ? "No queued gap right now"
       : "No real gap yet";
+  const reportSummaryCards = [
+    {
+      id: "gap-now",
+      label: "Gap now",
+      title:
+        allSubjectReport.totals.teacherDoubtCount > 0
+          ? `${allSubjectReport.totals.teacherDoubtCount} AI gap active`
+          : allSubjectReport.totals.recoveryItems > 0
+            ? `${allSubjectReport.totals.recoveryItems} recovery item active`
+            : "No urgent gap",
+      detail:
+        allSubjectReport.autoReport.growthNow === "Start the first daily loop to create evidence"
+          ? "Start one daily loop to create the first measured gap."
+          : allSubjectReport.autoReport.growthNow,
+    },
+    {
+      id: "revise-next",
+      label: "Revise",
+      title: currentReadiness.statusLabel,
+      detail: currentReadiness.title,
+    },
+    {
+      id: "growth",
+      label: "Growth",
+      title: `${allSubjectReport.totals.growthPercent}% movement`,
+      detail: `${allSubjectReport.totals.startedDays}/${allSubjectReport.totals.totalDays} planned days have evidence.`,
+    },
+    {
+      id: "report-action",
+      label: "Next report",
+      title: allSubjectReport.autoReport.weeklyReportId,
+      detail: allSubjectReport.autoReport.nextWeeklyAction,
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -156,6 +190,60 @@ export default function ReportsPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-student-report-summary"
+          data-proof-rule="student-visible-gap-revision-growth-report-summary"
+          data-active-subject={activeReportSubject.slug}
+          data-active-day={activeReportDay}
+          data-current-readiness={currentReadiness.statusLabel}
+          data-current-action={currentReadiness.actionLabel}
+          data-current-action-href={currentReadiness.href}
+          data-weekly-report-id={allSubjectReport.autoReport.weeklyReportId}
+          data-monthly-report-id={allSubjectReport.autoReport.monthlyReportId}
+          data-growth-percent={allSubjectReport.totals.growthPercent}
+          data-started-days={allSubjectReport.totals.startedDays}
+          data-total-days={allSubjectReport.totals.totalDays}
+          data-ai-gap-count={allSubjectReport.totals.teacherDoubtCount}
+          data-recovery-items={allSubjectReport.totals.recoveryItems}
+          data-me-time-checks={allSubjectReport.totals.meTimeChecks}
+          data-current-affairs-unlocked={allSubjectReport.totals.currentAffairsUnlocked}
+          className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Student report summary
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Four signals decide the next study move.</h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                The report stays simple: what is weak, what to revise, how much growth is visible, and what the next
+                weekly report action says.
+              </p>
+            </div>
+            <Link
+              href={currentReadiness.href}
+              data-testid="upsc-student-report-summary-action"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              {currentReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            {reportSummaryCards.map((card) => (
+              <article
+                key={card.id}
+                data-testid="upsc-student-report-summary-card"
+                data-card-id={card.id}
+                className="min-h-32 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{card.label}</p>
+                <h3 className="mt-2 text-base font-black leading-5 text-[#13251d]">{card.title}</h3>
+                <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{card.detail}</p>
+              </article>
+            ))}
           </div>
         </section>
 

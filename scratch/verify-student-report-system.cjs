@@ -146,6 +146,7 @@ async function run() {
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-student-report-summary").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-auto-report-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
@@ -162,6 +163,31 @@ async function run() {
     text: node.textContent || "",
   }));
   const readinessHref = await page.getByTestId("upsc-current-readiness-action").getAttribute("href");
+  const studentSummaryProof = await page.getByTestId("upsc-student-report-summary").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    activeSubject: node.getAttribute("data-active-subject"),
+    activeDay: node.getAttribute("data-active-day"),
+    currentReadiness: node.getAttribute("data-current-readiness"),
+    currentAction: node.getAttribute("data-current-action"),
+    currentActionHref: node.getAttribute("data-current-action-href"),
+    weeklyReportId: node.getAttribute("data-weekly-report-id"),
+    monthlyReportId: node.getAttribute("data-monthly-report-id"),
+    growthPercent: node.getAttribute("data-growth-percent"),
+    startedDays: node.getAttribute("data-started-days"),
+    totalDays: node.getAttribute("data-total-days"),
+    aiGapCount: node.getAttribute("data-ai-gap-count"),
+    recoveryItems: node.getAttribute("data-recovery-items"),
+    meTimeChecks: node.getAttribute("data-me-time-checks"),
+    currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+    text: node.textContent || "",
+  }));
+  const studentSummaryActionHref = await page.getByTestId("upsc-student-report-summary-action").getAttribute("href");
+  const studentSummaryCards = await page.getByTestId("upsc-student-report-summary-card").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      cardId: node.getAttribute("data-card-id"),
+      text: node.textContent || "",
+    }))
+  );
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
   const allSubjectProof = await page.getByTestId("upsc-all-subject-report").evaluate((node) => ({
     proofRule: node.getAttribute("data-proof-rule"),
@@ -271,6 +297,9 @@ async function run() {
     href,
     readinessReport,
     readinessHref,
+    studentSummaryProof,
+    studentSummaryActionHref,
+    studentSummaryCards,
     allSubjectProof,
     subjectCardCount,
     subjectProofs,
@@ -304,6 +333,34 @@ async function run() {
     !/because-chain/i.test(readinessReport.text)
   ) {
     throw new Error(`Current readiness report is not synced with Daily Mission: ${JSON.stringify({ readinessReport, readinessHref })}`);
+  }
+  if (
+    studentSummaryProof.proofRule !== "student-visible-gap-revision-growth-report-summary" ||
+    studentSummaryProof.activeSubject !== "geography" ||
+    studentSummaryProof.activeDay !== "1" ||
+    studentSummaryProof.currentReadiness !== "Repair lock" ||
+    studentSummaryProof.currentAction !== "Repeat talk" ||
+    studentSummaryProof.currentActionHref !== "/upsc/geography/talk?day=1" ||
+    studentSummaryActionHref !== "/upsc/geography/talk?day=1" ||
+    studentSummaryProof.weeklyReportId !== "all-subject-week-1" ||
+    studentSummaryProof.monthlyReportId !== "all-subject-month" ||
+    studentSummaryProof.startedDays !== "4" ||
+    studentSummaryProof.aiGapCount !== "1" ||
+    studentSummaryProof.recoveryItems !== "1" ||
+    studentSummaryProof.meTimeChecks !== "3" ||
+    studentSummaryProof.currentAffairsUnlocked !== "3" ||
+    readNumber(studentSummaryProof.totalDays, "studentSummaryProof.totalDays") <= 200 ||
+    readNumber(studentSummaryProof.growthPercent, "studentSummaryProof.growthPercent") < 1 ||
+    studentSummaryCards.length !== 4 ||
+    studentSummaryCards.map((card) => card.cardId).join("|") !== "gap-now|revise-next|growth|report-action" ||
+    !/Four signals decide the next study move/i.test(studentSummaryProof.text) ||
+    !/1 AI gap active/i.test(studentSummaryProof.text) ||
+    !/Repair lock/i.test(studentSummaryProof.text) ||
+    !/all-subject-week-1/i.test(studentSummaryProof.text)
+  ) {
+    throw new Error(
+      `Student report summary proof failed: ${JSON.stringify({ studentSummaryProof, studentSummaryActionHref, studentSummaryCards }, null, 2)}`
+    );
   }
   if (weeklyCount !== 4) {
     throw new Error(`Expected 4 weekly report cards, got ${weeklyCount}`);
@@ -459,6 +516,7 @@ async function run() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-student-report-summary").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-auto-report-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
