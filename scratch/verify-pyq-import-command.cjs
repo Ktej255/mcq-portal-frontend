@@ -52,6 +52,8 @@ async function run() {
   await page.getByTestId("admin-pyq-import-command").waitFor({ timeout: 15000 });
   await page.getByRole("heading", { name: "PYQ Import Command" }).waitFor({ timeout: 15000 });
   await page.getByText("Operator-only exact PYQ staging", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("admin-pyq-seed-pack").waitFor({ timeout: 15000 });
+  await page.getByText("Built-in PYQ pattern seed pack", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByRole("link", { name: /PYQ Import/i }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "pyq-import-empty-desktop", checks);
 
@@ -133,6 +135,8 @@ async function run() {
       recordCount: records.length,
       mappedCount: records.filter((record) => record.importStatus === "MAPPED").length,
       optionalCount: records.filter((record) => record.kind === "OPTIONAL_MAINS").length,
+      exactCount: records.filter((record) => record.textStatus === "EXACT_VERIFIED").length,
+      seedPackText: document.querySelector('[data-testid="admin-pyq-seed-pack"]')?.textContent || "",
       geographyCoverageText: geographyRow?.textContent || "",
       recentText: document.querySelector('[data-testid="admin-pyq-recent-records"]')?.textContent || "",
       summaryText: document.querySelector('[data-testid="admin-pyq-import-summary"]')?.textContent || "",
@@ -140,13 +144,34 @@ async function run() {
   }, ledgerKey);
   checks.push({ label: "pyq-import-state", importState });
 
-  if (importState.recordCount !== 2 || importState.mappedCount !== 2 || importState.optionalCount !== 1) {
+  if (
+    importState.recordCount !== 2 ||
+    importState.mappedCount !== 2 ||
+    importState.optionalCount !== 1 ||
+    importState.exactCount !== 2
+  ) {
     throw new Error(`Unexpected staged ledger: ${JSON.stringify(importState)}`);
   }
-  if (!importState.geographyCoverageText.includes("Geography") || !importState.geographyCoverageText.includes("1")) {
+  if (
+    !importState.seedPackText.includes("9") ||
+    !importState.seedPackText.includes("Pattern seeds") ||
+    !importState.seedPackText.includes("not exact question text")
+  ) {
+    throw new Error(`Seed pack evidence missing: ${importState.seedPackText}`);
+  }
+  if (
+    !importState.geographyCoverageText.includes("Geography") ||
+    !importState.geographyCoverageText.includes("2") ||
+    !importState.geographyCoverageText.includes("1")
+  ) {
     throw new Error(`Geography coverage did not update: ${importState.geographyCoverageText}`);
   }
-  if (!importState.recentText.includes("Anthropology") || !importState.summaryText.includes("Optional rows")) {
+  if (
+    !importState.recentText.includes("Anthropology") ||
+    !importState.recentText.includes("EXACT VERIFIED") ||
+    !importState.summaryText.includes("Seed patterns") ||
+    !importState.summaryText.includes("Optional rows")
+  ) {
     throw new Error(`Recent/summary import evidence missing: ${JSON.stringify(importState)}`);
   }
 

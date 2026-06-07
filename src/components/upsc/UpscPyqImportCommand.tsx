@@ -22,6 +22,7 @@ import {
   clearLocalPyqImportRecords,
   pyqImportCsvColumns,
   readLocalPyqImportRecords,
+  seededPyqPatternRecords,
   summarizePyqImportLedger,
   type PyqImportCsvRow,
   type PyqImportParseResult,
@@ -60,6 +61,7 @@ export function UpscPyqImportCommand() {
   const summary = useMemo(() => summarizePyqImportLedger(records), [records]);
   const coverage = useMemo(() => buildPyqImportCoverage(records), [records]);
   const recentRecords = records.slice(0, 8);
+  const seedPreview = seededPyqPatternRecords.slice(0, 6);
 
   function handleTemplateInsert() {
     setCsvInput(buildPyqImportCsvTemplate());
@@ -113,12 +115,42 @@ export function UpscPyqImportCommand() {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5" data-testid="admin-pyq-import-summary">
-        <Metric label="Imported" value={summary.importedQuestions} />
-        <Metric label="Mapped" value={summary.mappedQuestions} />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6" data-testid="admin-pyq-import-summary">
+        <Metric label="Exact rows" value={summary.importedQuestions} />
+        <Metric label="Exact mapped" value={summary.mappedQuestions} />
         <Metric label="Needs review" value={summary.needsReview} />
-        <Metric label="Subjects touched" value={summary.subjectsTouched} />
+        <Metric label="Seed patterns" value={summary.seededPatterns} />
+        <Metric label="Seed subjects" value={summary.seededSubjects} />
         <Metric label="Optional rows" value={summary.optionalQuestions} />
+      </section>
+
+      <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm" data-testid="admin-pyq-seed-pack">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <h2 className="text-xl font-black text-emerald-950">Built-in PYQ pattern seed pack</h2>
+            <p className="mt-2 text-sm leading-6 text-emerald-900">
+              These rows are mapped 2024 UPSC pattern scaffolds, not exact question text. They keep the source library
+              useful while exact verified papers are imported separately.
+            </p>
+          </div>
+          <div className="rounded-md border border-emerald-300 bg-white px-4 py-3 text-right">
+            <p className="text-3xl font-black text-emerald-950">{summary.seededPatterns}</p>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Pattern seeds</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {seedPreview.map((record) => (
+            <article key={record.id} className="rounded-md border border-emerald-200 bg-white p-3">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                <span>{record.year}</span>
+                <span>{record.stage}</span>
+                <span>{record.subjectTitle}</span>
+                <span>Pattern seed</span>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-emerald-950">{record.syllabusArea}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
@@ -241,7 +273,7 @@ export function UpscPyqImportCommand() {
           <div>
             <h2 className="text-xl font-black text-zinc-950">GS PYQ coverage</h2>
             <p className="mt-1 text-sm leading-6 text-zinc-500">
-              Coverage compares mapped exact questions against the source-row ledger. It is intentionally strict.
+              Strict coverage counts exact imported questions only. Pattern seeds are shown separately for planning.
             </p>
           </div>
           <span className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-black text-zinc-700">
@@ -250,16 +282,17 @@ export function UpscPyqImportCommand() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="border-b border-zinc-200 text-xs uppercase tracking-[0.12em] text-zinc-500">
               <tr>
                 <th className="py-3 pr-4">Subject</th>
                 <th className="py-3 pr-4">Source rows</th>
-                <th className="py-3 pr-4">Imported</th>
-                <th className="py-3 pr-4">Mapped</th>
+                <th className="py-3 pr-4">Exact rows</th>
+                <th className="py-3 pr-4">Pattern seeds</th>
+                <th className="py-3 pr-4">Mapped exact</th>
                 <th className="py-3 pr-4">Review</th>
                 <th className="py-3 pr-4">Trend boards</th>
-                <th className="py-3 pr-4">Coverage</th>
+                <th className="py-3 pr-4">Strict coverage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -267,7 +300,8 @@ export function UpscPyqImportCommand() {
                 <tr key={row.slug} data-testid="admin-pyq-coverage-row" data-subject-slug={row.slug}>
                   <td className="py-3 pr-4 font-black text-zinc-950">{row.title}</td>
                   <td className="py-3 pr-4 text-zinc-600">{row.sourceRows}</td>
-                  <td className="py-3 pr-4 text-zinc-600">{row.importedQuestions}</td>
+                  <td className="py-3 pr-4 text-zinc-600">{row.exactVerifiedQuestions}</td>
+                  <td className="py-3 pr-4 text-emerald-700">{row.seededPatterns}</td>
                   <td className="py-3 pr-4 text-emerald-700">{row.mappedQuestions}</td>
                   <td className="py-3 pr-4 text-amber-700">{row.needsReview}</td>
                   <td className="py-3 pr-4 text-zinc-600">{row.trendBoards}</td>
@@ -298,6 +332,9 @@ export function UpscPyqImportCommand() {
                     }`}
                   >
                     {record.importStatus.replace("_", " ")}
+                  </span>
+                  <span className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-zinc-600">
+                    {record.textStatus.replace("_", " ")}
                   </span>
                 </div>
                 <p className="text-sm font-semibold leading-6 text-zinc-700">{record.questionText}</p>

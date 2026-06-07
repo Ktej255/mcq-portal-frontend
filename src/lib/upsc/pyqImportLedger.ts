@@ -8,6 +8,7 @@ export const PYQ_IMPORT_LEDGER_KEY = "sarit-upsc-pyq-import-ledger-v1";
 
 export type PyqQuestionKind = "GS_PRELIMS" | "GS_MAINS" | "OPTIONAL_MAINS";
 export type PyqImportStatus = "MAPPED" | "NEEDS_REVIEW";
+export type PyqTextStatus = "EXACT_VERIFIED" | "PATTERN_SEED";
 
 export type PyqImportCsvRow = {
   year?: string;
@@ -43,6 +44,7 @@ export type PyqImportRecord = {
   officialSourceTitle?: string;
   answerDemand?: string;
   importStatus: PyqImportStatus;
+  textStatus: PyqTextStatus;
   importedAt: string;
 };
 
@@ -63,6 +65,8 @@ export type PyqImportCoverageRow = {
   route: string;
   sourceRows: number;
   importedQuestions: number;
+  exactVerifiedQuestions: number;
+  seededPatterns: number;
   mappedQuestions: number;
   needsReview: number;
   trendBoards: number;
@@ -226,6 +230,187 @@ function isReviewRecord(record: Omit<PyqImportRecord, "importStatus">) {
   );
 }
 
+function buildSeedRecord(input: Omit<PyqImportRecord, "id" | "importStatus" | "importedAt" | "textStatus">): PyqImportRecord {
+  return {
+    ...input,
+    id: stablePyqId({
+      year: input.year,
+      stage: input.stage,
+      subjectSlug: input.subjectSlug,
+      paper: input.paper,
+      questionNumber: input.questionNumber,
+    }),
+    importStatus: "MAPPED",
+    textStatus: "PATTERN_SEED",
+    importedAt: "2026-06-07T00:00:00.000Z",
+  };
+}
+
+export const seededPyqPatternRecords: PyqImportRecord[] = [
+  buildSeedRecord({
+    year: 2024,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "geography",
+    subjectTitle: "Geography",
+    paper: "General Studies Paper I",
+    questionNumber: "CSP-2024-GEO-MAP-SEED",
+    questionText:
+      "Pattern seed for an official prelims geography item: map/location reasoning, nearby physical feature, and elimination logic.",
+    syllabusArea: "Indian geography and mapping",
+    syllabusNodeId: "geo-india",
+    topicTags: ["map", "location", "physical feature", "elimination"],
+    trendInsightId: "geo-map-process",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+    answerDemand: "Prelims map elimination",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Mains",
+    kind: "GS_MAINS",
+    subjectSlug: "geography",
+    subjectTitle: "Geography",
+    paper: "General Studies Paper - I",
+    questionNumber: "CSM-2024-GS1-GEO-PROCESS-SEED",
+    questionText:
+      "Pattern seed for an official mains geography item: explain a physical or human-geography process with spatial examples.",
+    syllabusArea: "Physical and human geography application",
+    syllabusNodeId: "geo-physical",
+    topicTags: ["process", "spatial example", "mains explanation"],
+    trendInsightId: "geo-map-process",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Main Examination 2024 Question Papers",
+    answerDemand: "Explain with examples",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "environment",
+    subjectTitle: "Environment",
+    paper: "General Studies Paper I",
+    questionNumber: "CSP-2024-ENV-SPECIES-SEED",
+    questionText:
+      "Pattern seed for an official prelims environment item: species, habitat, protected-area or convention-based elimination.",
+    syllabusArea: "Ecology and biodiversity",
+    syllabusNodeId: "env-ecology",
+    topicTags: ["species", "habitat", "protected area", "convention"],
+    trendInsightId: "env-convention-species",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+    answerDemand: "Prelims pair matching",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "economy",
+    subjectTitle: "Economy",
+    paper: "General Studies Paper I",
+    questionNumber: "CSP-2024-ECO-MACRO-SEED",
+    questionText:
+      "Pattern seed for an official prelims economy item: concept, institution, data signal, and policy consequence.",
+    syllabusArea: "Macro and public finance",
+    syllabusNodeId: "eco-core",
+    topicTags: ["macro", "institution", "policy", "data"],
+    trendInsightId: "eco-macro-policy",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+    answerDemand: "Prelims concept application",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Mains",
+    kind: "GS_MAINS",
+    subjectSlug: "polity-governance",
+    subjectTitle: "Polity and Governance",
+    paper: "General Studies Paper - II",
+    questionNumber: "CSM-2024-GS2-GOVERNANCE-SEED",
+    questionText:
+      "Pattern seed for an official mains governance item: institution, accountability, implementation gap, and reform direction.",
+    syllabusArea: "Governance delivery and accountability",
+    syllabusNodeId: "polity-governance",
+    topicTags: ["governance", "accountability", "implementation", "reform"],
+    trendInsightId: "governance-delivery",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Main Examination 2024 Question Papers",
+    answerDemand: "Discuss with reform measures",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "science-tech",
+    subjectTitle: "Science and Tech",
+    paper: "General Studies Paper I",
+    questionNumber: "CSP-2024-SNT-APPLICATION-SEED",
+    questionText:
+      "Pattern seed for an official prelims science-tech item: mechanism, application, risk, and governance implication.",
+    syllabusArea: "Applied science and emerging tech",
+    syllabusNodeId: "snt-applied",
+    topicTags: ["mechanism", "application", "risk", "governance"],
+    trendInsightId: "snt-application-risk",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+    answerDemand: "Prelims mechanism application",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Mains",
+    kind: "GS_MAINS",
+    subjectSlug: "disaster-management",
+    subjectTitle: "Disaster Management",
+    paper: "General Studies Paper - III",
+    questionNumber: "CSM-2024-GS3-DM-SEED",
+    questionText:
+      "Pattern seed for an official mains disaster-management item: hazard, vulnerability, response, mitigation and institutional readiness.",
+    syllabusArea: "Risk, hazards, and institutions",
+    syllabusNodeId: "dm-risk",
+    topicTags: ["hazard", "vulnerability", "mitigation", "institution"],
+    trendInsightId: "dm-risk-governance",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Main Examination 2024 Question Papers",
+    answerDemand: "Analyse risk reduction",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Mains",
+    kind: "GS_MAINS",
+    subjectSlug: "internal-security-society",
+    subjectTitle: "Internal Security and Indian Society",
+    paper: "General Studies Paper - I/III",
+    questionNumber: "CSM-2024-SOCIETY-SECURITY-SEED",
+    questionText:
+      "Pattern seed for an official mains society/security item: cause, stakeholder, institution, legal tool and policy response.",
+    syllabusArea: "Security and Indian society",
+    syllabusNodeId: "security-society",
+    topicTags: ["society", "security", "stakeholder", "policy response"],
+    trendInsightId: "security-society-issue-map",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Main Examination 2024 Question Papers",
+    answerDemand: "Analyse with stakeholders",
+  }),
+  buildSeedRecord({
+    year: 2024,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "history",
+    subjectTitle: "History",
+    paper: "General Studies Paper I",
+    questionNumber: "CSP-2024-HIS-CULTURE-SEED",
+    questionText:
+      "Pattern seed for an official prelims history/culture item: source, period, place, art form or chronology-based elimination.",
+    syllabusArea: "Modern, ancient, medieval, art and culture",
+    syllabusNodeId: "history-blocks",
+    topicTags: ["source", "period", "culture", "chronology"],
+    trendInsightId: "history-source-culture",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+    officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+    answerDemand: "Prelims source/culture elimination",
+  }),
+];
+
 export function buildPyqImportCsvTemplate() {
   const headers = pyqImportCsvColumns.map((column) => column.key);
   const rows: PyqImportCsvRow[] = [
@@ -333,6 +518,7 @@ export function buildPyqImportRecordsFromCsvRows(rows: PyqImportCsvRow[]): PyqIm
       sourceHref,
       officialSourceTitle: normalize(row.official_source_title) || undefined,
       answerDemand: normalize(row.answer_demand) || undefined,
+      textStatus: "EXACT_VERIFIED",
       importedAt: new Date().toISOString(),
     };
 
@@ -386,6 +572,9 @@ export function clearLocalPyqImportRecords() {
 export function buildPyqImportCoverage(records: PyqImportRecord[]): PyqImportCoverageRow[] {
   return subjectSourcePacks.map((subject) => {
     const subjectRecords = records.filter((record) => record.subjectSlug === subject.slug);
+    const subjectSeeds = seededPyqPatternRecords.filter((record) => record.subjectSlug === subject.slug);
+    const exactVerifiedQuestions = subjectRecords.filter((record) => record.textStatus === "EXACT_VERIFIED").length;
+    const seededPatterns = subjectSeeds.length;
     const mappedQuestions = subjectRecords.filter((record) => record.importStatus === "MAPPED").length;
     const sourceRows = subject.pyqRows.length;
 
@@ -395,6 +584,8 @@ export function buildPyqImportCoverage(records: PyqImportRecord[]): PyqImportCov
       route: subject.route,
       sourceRows,
       importedQuestions: subjectRecords.length,
+      exactVerifiedQuestions,
+      seededPatterns,
       mappedQuestions,
       needsReview: subjectRecords.length - mappedQuestions,
       trendBoards: subject.trendInsights.length,
@@ -407,9 +598,14 @@ export function summarizePyqImportLedger(records: PyqImportRecord[]) {
   const mappedQuestions = records.filter((record) => record.importStatus === "MAPPED").length;
   const subjectsTouched = new Set(records.map((record) => record.subjectSlug)).size;
   const optionalQuestions = records.filter((record) => record.kind === "OPTIONAL_MAINS").length;
+  const exactVerifiedQuestions = records.filter((record) => record.textStatus === "EXACT_VERIFIED").length;
+  const seededSubjects = new Set(seededPyqPatternRecords.map((record) => record.subjectSlug)).size;
 
   return {
     importedQuestions: records.length,
+    exactVerifiedQuestions,
+    seededPatterns: seededPyqPatternRecords.length,
+    seededSubjects,
     mappedQuestions,
     needsReview: records.length - mappedQuestions,
     subjectsTouched,
