@@ -159,7 +159,24 @@ export default function ReportsPage() {
           </div>
         </section>
 
-        <section data-testid="upsc-all-subject-report" className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
+        <section
+          data-testid="upsc-all-subject-report"
+          data-proof-rule="recall-mcq-recovery-ai-me-time-current-affairs-growth"
+          data-subject-count={allSubjectReport.subjects.length}
+          data-total-days={allSubjectReport.totals.totalDays}
+          data-started-days={allSubjectReport.totals.startedDays}
+          data-watched-days={allSubjectReport.totals.watchedDays}
+          data-command-days={allSubjectReport.totals.commandDays}
+          data-recovery-items={allSubjectReport.totals.recoveryItems}
+          data-ai-gap-count={allSubjectReport.totals.teacherDoubtCount}
+          data-me-time-checks={allSubjectReport.totals.meTimeChecks}
+          data-current-affairs-unlocked={allSubjectReport.totals.currentAffairsUnlocked}
+          data-weekly-windows-generated={allSubjectReport.totals.weeklyWindowsGenerated}
+          data-average-recall={allSubjectReport.totals.averageRecall ?? "not-measured"}
+          data-average-mcq={allSubjectReport.totals.averageMcq ?? "no-score"}
+          data-growth-percent={allSubjectReport.totals.growthPercent}
+          className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
               <div className="mb-3 flex items-center gap-3">
@@ -200,6 +217,19 @@ export default function ReportsPage() {
                 href={subject.route}
                 data-testid="upsc-subject-report-card"
                 data-subject-slug={subject.slug}
+                data-total-days={subject.totalDays}
+                data-started-days={subject.startedDays}
+                data-watched-days={subject.watchedDays}
+                data-recall-attempts={subject.recallAttempts}
+                data-average-recall={subject.averageRecall ?? "not-measured"}
+                data-mcq-sets={subject.mcqSets}
+                data-average-mcq={subject.averageMcq ?? "no-score"}
+                data-recovery-items={subject.recoveryItems}
+                data-command-days={subject.commandDays}
+                data-ai-gap-count={subject.teacherDoubtCount}
+                data-me-time-checks={subject.meTimeChecks}
+                data-current-affairs-unlocked={subject.currentAffairsUnlocked}
+                data-readiness-signal={subject.readinessSignal}
                 className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4 transition hover:border-[#1d9e75]"
               >
                 <div className="mb-3 flex items-start justify-between gap-3">
@@ -250,8 +280,13 @@ export default function ReportsPage() {
 
         <section
           data-testid="upsc-auto-report-proof"
+          data-proof-rule="saved-daily-loop-evidence-regenerates-reports"
           data-weekly-report-id={allSubjectReport.autoReport.weeklyReportId}
           data-monthly-report-id={allSubjectReport.autoReport.monthlyReportId}
+          data-growth-baseline={allSubjectReport.autoReport.growthBaseline}
+          data-growth-now={allSubjectReport.autoReport.growthNow}
+          data-next-weekly-action={allSubjectReport.autoReport.nextWeeklyAction}
+          data-next-monthly-action={allSubjectReport.autoReport.nextMonthlyAction}
           className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
@@ -350,7 +385,16 @@ export default function ReportsPage() {
           </div>
         </section>
 
-        <section data-testid="upsc-growth-scale" className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
+        <section
+          data-testid="upsc-growth-scale"
+          data-subject-slug="geography"
+          data-growth-percent={report.growth.growthPercent}
+          data-started-from={report.growth.startedFrom}
+          data-current-position={report.growth.currentPosition}
+          data-strongest-signal={report.growth.strongestSignal}
+          data-weakest-signal={report.growth.weakestSignal}
+          className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
           <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div>
               <div className="mb-3 flex items-center gap-3">
@@ -441,6 +485,18 @@ function AllSubjectReportWindowCard({
     <article
       data-testid={variant === "monthly" ? "upsc-all-subject-monthly-report" : "upsc-all-subject-weekly-report"}
       data-report-id={report.id}
+      data-report-variant={variant}
+      data-subject-count={report.subjectCount}
+      data-total-days={report.totalDays}
+      data-started-days={report.startedDays}
+      data-recall-attempts={report.recallAttempts}
+      data-average-recall={report.averageRecall ?? "not-measured"}
+      data-mcq-sets={report.mcqSets}
+      data-average-mcq={report.averageMcq ?? "no-score"}
+      data-ai-gap-count={report.teacherDoubtCount}
+      data-me-time-checks={report.meTimeChecks}
+      data-current-affairs-unlocked={report.currentAffairsUnlocked}
+      data-verdict={report.verdict}
       className={`rounded-lg border p-4 shadow-sm ${
         variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#f7f4ee]"
       }`}
@@ -486,6 +542,18 @@ function ReportWindowCard({
   return (
     <article
       data-testid={variant === "weekly" ? "upsc-weekly-report" : "upsc-monthly-report-card"}
+      data-report-variant={variant}
+      data-report-id={report.id}
+      data-total-days={report.totalDays}
+      data-started-days={report.startedDays}
+      data-recall-attempts={report.recallAttempts}
+      data-average-recall={report.averageRecall ?? "not-measured"}
+      data-mcq-sets={report.mcqSets}
+      data-average-mcq={report.averageMcq ?? "no-score"}
+      data-recovery-items={report.recoveryItems}
+      data-me-time-checks={report.meTimeChecks}
+      data-current-affairs-unlocked={report.currentAffairsUnlocked}
+      data-verdict={report.verdict}
       className={`rounded-lg border p-5 shadow-sm ${
         variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#fffdf8]"
       }`}

@@ -25,6 +25,14 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
+function readNumber(value, label) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Expected numeric ${label}, got ${value}`);
+  }
+  return parsed;
+}
+
 async function seedProfileAndProgress(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
@@ -155,19 +163,102 @@ async function run() {
   }));
   const readinessHref = await page.getByTestId("upsc-current-readiness-action").getAttribute("href");
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
+  const allSubjectProof = await page.getByTestId("upsc-all-subject-report").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    subjectCount: node.getAttribute("data-subject-count"),
+    totalDays: node.getAttribute("data-total-days"),
+    startedDays: node.getAttribute("data-started-days"),
+    watchedDays: node.getAttribute("data-watched-days"),
+    commandDays: node.getAttribute("data-command-days"),
+    recoveryItems: node.getAttribute("data-recovery-items"),
+    aiGapCount: node.getAttribute("data-ai-gap-count"),
+    meTimeChecks: node.getAttribute("data-me-time-checks"),
+    currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+    weeklyWindowsGenerated: node.getAttribute("data-weekly-windows-generated"),
+    averageRecall: node.getAttribute("data-average-recall"),
+    averageMcq: node.getAttribute("data-average-mcq"),
+    growthPercent: node.getAttribute("data-growth-percent"),
+  }));
   const autoReportProof = await page.getByTestId("upsc-auto-report-proof").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
     weeklyReportId: node.getAttribute("data-weekly-report-id"),
     monthlyReportId: node.getAttribute("data-monthly-report-id"),
+    growthBaseline: node.getAttribute("data-growth-baseline"),
+    growthNow: node.getAttribute("data-growth-now"),
+    nextWeeklyAction: node.getAttribute("data-next-weekly-action"),
+    nextMonthlyAction: node.getAttribute("data-next-monthly-action"),
     text: node.textContent || "",
   }));
   const allSubjectWindowText = await page.getByTestId("upsc-all-subject-report-windows").innerText();
   const allSubjectWeeklyCount = await page.getByTestId("upsc-all-subject-weekly-report").count();
+  const allSubjectWeeklyProofs = await page.getByTestId("upsc-all-subject-weekly-report").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      reportId: node.getAttribute("data-report-id"),
+      variant: node.getAttribute("data-report-variant"),
+      subjectCount: node.getAttribute("data-subject-count"),
+      startedDays: node.getAttribute("data-started-days"),
+      aiGapCount: node.getAttribute("data-ai-gap-count"),
+      meTimeChecks: node.getAttribute("data-me-time-checks"),
+      currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+      verdict: node.getAttribute("data-verdict"),
+    }))
+  );
   const allSubjectMonthlyText = await page.getByTestId("upsc-all-subject-monthly-report").innerText();
+  const allSubjectMonthlyProof = await page.getByTestId("upsc-all-subject-monthly-report").evaluate((node) => ({
+    reportId: node.getAttribute("data-report-id"),
+    variant: node.getAttribute("data-report-variant"),
+    subjectCount: node.getAttribute("data-subject-count"),
+    startedDays: node.getAttribute("data-started-days"),
+    averageRecall: node.getAttribute("data-average-recall"),
+    averageMcq: node.getAttribute("data-average-mcq"),
+    aiGapCount: node.getAttribute("data-ai-gap-count"),
+    meTimeChecks: node.getAttribute("data-me-time-checks"),
+    currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+    verdict: node.getAttribute("data-verdict"),
+  }));
   const subjectCardCount = await page.getByTestId("upsc-subject-report-card").count();
+  const subjectProofs = await page.getByTestId("upsc-subject-report-card").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      slug: node.getAttribute("data-subject-slug"),
+      totalDays: node.getAttribute("data-total-days"),
+      startedDays: node.getAttribute("data-started-days"),
+      watchedDays: node.getAttribute("data-watched-days"),
+      recallAttempts: node.getAttribute("data-recall-attempts"),
+      averageRecall: node.getAttribute("data-average-recall"),
+      mcqSets: node.getAttribute("data-mcq-sets"),
+      averageMcq: node.getAttribute("data-average-mcq"),
+      recoveryItems: node.getAttribute("data-recovery-items"),
+      commandDays: node.getAttribute("data-command-days"),
+      aiGapCount: node.getAttribute("data-ai-gap-count"),
+      meTimeChecks: node.getAttribute("data-me-time-checks"),
+      currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+      readinessSignal: node.getAttribute("data-readiness-signal"),
+    }))
+  );
   const weeklyCount = await page.getByTestId("upsc-weekly-report").count();
   const evidenceText = await page.getByTestId("upsc-report-evidence-streams").innerText();
   const monthlyText = await page.getByTestId("upsc-monthly-report").innerText();
+  const geographyMonthlyProof = await page.getByTestId("upsc-monthly-report-card").evaluate((node) => ({
+    reportId: node.getAttribute("data-report-id"),
+    startedDays: node.getAttribute("data-started-days"),
+    recallAttempts: node.getAttribute("data-recall-attempts"),
+    averageRecall: node.getAttribute("data-average-recall"),
+    mcqSets: node.getAttribute("data-mcq-sets"),
+    averageMcq: node.getAttribute("data-average-mcq"),
+    recoveryItems: node.getAttribute("data-recovery-items"),
+    meTimeChecks: node.getAttribute("data-me-time-checks"),
+    currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+    verdict: node.getAttribute("data-verdict"),
+  }));
   const growthText = await page.getByTestId("upsc-growth-scale").innerText();
+  const growthProof = await page.getByTestId("upsc-growth-scale").evaluate((node) => ({
+    subjectSlug: node.getAttribute("data-subject-slug"),
+    growthPercent: node.getAttribute("data-growth-percent"),
+    startedFrom: node.getAttribute("data-started-from"),
+    currentPosition: node.getAttribute("data-current-position"),
+    strongestSignal: node.getAttribute("data-strongest-signal"),
+    weakestSignal: node.getAttribute("data-weakest-signal"),
+  }));
   const environmentCardText = await page
     .locator('[data-testid="upsc-subject-report-card"][data-subject-slug="environment"]')
     .innerText();
@@ -180,17 +271,23 @@ async function run() {
     href,
     readinessReport,
     readinessHref,
+    allSubjectProof,
     subjectCardCount,
+    subjectProofs,
     weeklyCount,
     allSubjectWeeklyCount,
+    allSubjectWeeklyProofs,
     allSubjectText,
     autoReportProof,
     allSubjectWindowText,
+    allSubjectMonthlyProof,
     allSubjectMonthlyText,
+    geographyMonthlyProof,
     geographyCardText,
     environmentCardText,
     evidenceText,
     monthlyText,
+    growthProof,
     growthText,
   });
 
@@ -218,6 +315,24 @@ async function run() {
   if (subjectCardCount !== 8 || !normalizedAllSubjectText.includes("environment") || !normalizedAllSubjectText.includes("weekly reports")) {
     throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
   }
+  if (
+    allSubjectProof.proofRule !== "recall-mcq-recovery-ai-me-time-current-affairs-growth" ||
+    allSubjectProof.subjectCount !== "8" ||
+    allSubjectProof.startedDays !== "4" ||
+    allSubjectProof.watchedDays !== "3" ||
+    allSubjectProof.commandDays !== "2" ||
+    allSubjectProof.recoveryItems !== "1" ||
+    allSubjectProof.aiGapCount !== "1" ||
+    allSubjectProof.meTimeChecks !== "3" ||
+    allSubjectProof.currentAffairsUnlocked !== "3" ||
+    allSubjectProof.averageRecall !== "90" ||
+    allSubjectProof.averageMcq !== "77" ||
+    readNumber(allSubjectProof.totalDays, "allSubjectProof.totalDays") <= 200 ||
+    readNumber(allSubjectProof.weeklyWindowsGenerated, "allSubjectProof.weeklyWindowsGenerated") < 25 ||
+    readNumber(allSubjectProof.growthPercent, "allSubjectProof.growthPercent") < 1
+  ) {
+    throw new Error(`All-subject report proof attributes failed: ${JSON.stringify(allSubjectProof)}`);
+  }
   const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
   if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText) || !/ai gaps\s+1/i.test(compactAllSubjectText)) {
     throw new Error(`All-subject report should count Geography and Environment evidence: ${allSubjectText}`);
@@ -232,6 +347,62 @@ async function run() {
   ) {
     throw new Error(`All-subject report windows missing generated evidence: ${allSubjectWindowText}`);
   }
+  if (
+    allSubjectMonthlyProof.reportId !== "all-subject-month" ||
+    allSubjectMonthlyProof.variant !== "monthly" ||
+    allSubjectMonthlyProof.subjectCount !== "8" ||
+    allSubjectMonthlyProof.startedDays !== "4" ||
+    allSubjectMonthlyProof.averageRecall !== "86" ||
+    allSubjectMonthlyProof.averageMcq !== "75" ||
+    allSubjectMonthlyProof.aiGapCount !== "1" ||
+    allSubjectMonthlyProof.meTimeChecks !== "3" ||
+    allSubjectMonthlyProof.currentAffairsUnlocked !== "3" ||
+    allSubjectMonthlyProof.verdict !== "AI repair active"
+  ) {
+    throw new Error(`All-subject monthly proof attributes failed: ${JSON.stringify(allSubjectMonthlyProof)}`);
+  }
+  if (
+    allSubjectWeeklyProofs.length !== 4 ||
+    allSubjectWeeklyProofs[0].reportId !== "all-subject-week-1" ||
+    allSubjectWeeklyProofs[0].variant !== "weekly" ||
+    allSubjectWeeklyProofs[0].subjectCount !== "8" ||
+    allSubjectWeeklyProofs[0].startedDays !== "4" ||
+    allSubjectWeeklyProofs[0].aiGapCount !== "1" ||
+    allSubjectWeeklyProofs[0].meTimeChecks !== "3" ||
+    allSubjectWeeklyProofs[0].currentAffairsUnlocked !== "3" ||
+    allSubjectWeeklyProofs[0].verdict !== "AI repair active"
+  ) {
+    throw new Error(`All-subject weekly proof attributes failed: ${JSON.stringify(allSubjectWeeklyProofs)}`);
+  }
+  const geographyProof = subjectProofs.find((subject) => subject.slug === "geography");
+  const environmentProof = subjectProofs.find((subject) => subject.slug === "environment");
+  if (
+    !geographyProof ||
+    geographyProof.startedDays !== "3" ||
+    geographyProof.recallAttempts !== "3" ||
+    geographyProof.averageRecall !== "82" ||
+    geographyProof.mcqSets !== "2" ||
+    geographyProof.averageMcq !== "70" ||
+    geographyProof.recoveryItems !== "1" ||
+    geographyProof.commandDays !== "1" ||
+    geographyProof.aiGapCount !== "1" ||
+    geographyProof.meTimeChecks !== "2" ||
+    geographyProof.currentAffairsUnlocked !== "2"
+  ) {
+    throw new Error(`Geography subject proof attributes failed: ${JSON.stringify(geographyProof)}`);
+  }
+  if (
+    !environmentProof ||
+    environmentProof.startedDays !== "1" ||
+    environmentProof.averageRecall !== "97" ||
+    environmentProof.averageMcq !== "84" ||
+    environmentProof.commandDays !== "1" ||
+    environmentProof.meTimeChecks !== "1" ||
+    environmentProof.currentAffairsUnlocked !== "1" ||
+    environmentProof.readinessSignal !== "Exam stress: grounding needed"
+  ) {
+    throw new Error(`Environment subject proof attributes failed: ${JSON.stringify(environmentProof)}`);
+  }
   if (!/latest ai gap:\s*mechanism/i.test(geographyCardText) || !/because-chain/i.test(geographyCardText)) {
     throw new Error(`Geography report card missing AI teacher gap evidence: ${geographyCardText}`);
   }
@@ -240,8 +411,13 @@ async function run() {
   }
   const compactAutoReportProof = autoReportProof.text.replace(/\s+/g, " ");
   if (
+    autoReportProof.proofRule !== "saved-daily-loop-evidence-regenerates-reports" ||
     autoReportProof.weeklyReportId !== "all-subject-week-1" ||
     autoReportProof.monthlyReportId !== "all-subject-month" ||
+    autoReportProof.growthBaseline !== "Geography: 3/30 days started" ||
+    autoReportProof.growthNow !== "1 AI teacher gap active" ||
+    !autoReportProof.nextWeeklyAction.includes("Clear the latest AI teacher gap") ||
+    !autoReportProof.nextMonthlyAction.includes("Clear the latest AI teacher gap") ||
     !/Auto-generated report proof/i.test(compactAutoReportProof) ||
     !/Weekly and monthly reports rebuild from evidence/i.test(compactAutoReportProof) ||
     !/No manual spreadsheet/i.test(compactAutoReportProof) ||
@@ -260,6 +436,23 @@ async function run() {
   }
   if (!growthText.includes("Geography movement")) {
     throw new Error(`Growth scale missing movement label: ${growthText}`);
+  }
+  if (
+    growthProof.subjectSlug !== "geography" ||
+    growthProof.growthPercent !== "10" ||
+    growthProof.startedFrom !== "Week 1: 3/7 days started" ||
+    growthProof.currentPosition !== "Week 1: Repair weak points before adding load" ||
+    growthProof.strongestSignal !== "Practice evidence" ||
+    growthProof.weakestSignal !== "Recovery queue" ||
+    geographyMonthlyProof.reportId !== "month-geography" ||
+    geographyMonthlyProof.startedDays !== "3" ||
+    geographyMonthlyProof.averageRecall !== "82" ||
+    geographyMonthlyProof.averageMcq !== "70" ||
+    geographyMonthlyProof.recoveryItems !== "1" ||
+    geographyMonthlyProof.meTimeChecks !== "2" ||
+    geographyMonthlyProof.currentAffairsUnlocked !== "2"
+  ) {
+    throw new Error(`Growth or Geography monthly proof attributes failed: ${JSON.stringify({ growthProof, geographyMonthlyProof })}`);
   }
 
   await assertNoOverflow(page, "reports-desktop", checks);
