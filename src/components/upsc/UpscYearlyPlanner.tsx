@@ -320,7 +320,9 @@ export function OptionalSubjectDetail({
   };
 }) {
   const sourcePack = getOptionalSourcePack(subject.slug);
-  const visibleRows = sourcePack?.paperRows.slice(0, 10) ?? [];
+  const yearRows = sourcePack?.yearRows ?? [];
+  const paperSummaries = sourcePack?.paperSummary ?? [];
+  const syllabusThemes = sourcePack?.syllabusThemes ?? [];
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -332,6 +334,25 @@ export function OptionalSubjectDetail({
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{subject.group} optional</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">{subject.title}</h1>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">{subject.preloadTarget}</p>
+          {sourcePack ? (
+            <div
+              data-testid="upsc-optional-readiness"
+              data-year-count={sourcePack.yearRows.length}
+              data-paper-row-count={sourcePack.paperRows.length}
+              className="mt-5 grid gap-3 sm:grid-cols-3"
+            >
+              {[
+                ["Readiness", `${sourcePack.readinessScore}%`],
+                ["Years", sourcePack.yearRows.length],
+                ["Paper rows", sourcePack.paperRows.length],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                  <p className="mt-1 text-2xl font-black">{value}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {subject.papers.map((paper) => (
               <article key={paper} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
@@ -352,17 +373,47 @@ export function OptionalSubjectDetail({
             <p className="text-sm font-semibold leading-6 text-[#085041]">{subject.firstBuildAction}</p>
           </div>
         </section>
-        <section className="grid gap-3 md:grid-cols-3">
-          {["Syllabus demand", "Year-wise PYQs", "Trend and prediction"].map((item) => (
-            <article key={item} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-              <Route className="mb-3 h-5 w-5 text-[#1a3a2a]" />
-              <h2 className="text-base font-black">{item}</h2>
-              <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">
-                Pending data import. This page is now ready to receive the official paper-wise content.
-              </p>
-            </article>
-          ))}
-        </section>
+        {paperSummaries.length ? (
+          <section data-testid="upsc-optional-paper-summary" className="grid gap-3 md:grid-cols-2">
+            {paperSummaries.map((summary) => (
+              <article key={summary.paper} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+                <Route className="mb-3 h-5 w-5 text-[#1a3a2a]" />
+                <h2 className="text-base font-black">{summary.paper} source status</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                  {summary.indexedRows}/{summary.totalRows} years source-indexed. {summary.pendingRows} years still need text extraction.
+                </p>
+                <p className="mt-3 rounded-md bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#31443a]">
+                  {summary.nextAction}
+                </p>
+              </article>
+            ))}
+          </section>
+        ) : null}
+        {syllabusThemes.length ? (
+          <section data-testid="upsc-optional-syllabus-themes" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+            <div className="mb-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Syllabus demand</p>
+              <h2 className="mt-1 text-xl font-black tracking-tight">Paper-wise theme map</h2>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {syllabusThemes.map((theme) => (
+                <article key={theme.id} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                  <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">{theme.paper}</Badge>
+                  <h3 className="mt-3 text-lg font-black tracking-tight">{theme.title}</h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{theme.syllabusDemand}</p>
+                  <div className="mt-3 grid gap-2">
+                    <p className="rounded-md bg-[#e7f5ee] p-3 text-xs font-bold leading-5 text-[#085041]">
+                      Trend use: {theme.trendUse}
+                    </p>
+                    <p className="rounded-md bg-[#fff4df] p-3 text-xs font-bold leading-5 text-[#6f4a12]">
+                      Answer use: {theme.answerWritingUse}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {sourcePack ? (
           <section data-testid="upsc-optional-year-wise-pyqs" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -371,7 +422,7 @@ export function OptionalSubjectDetail({
                   Year-wise paper rows
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight">
-                  {sourcePack.paperRows.length} Paper I/II source rows seeded
+                  {sourcePack.paperRows.length} Paper I/II source rows seeded across {sourcePack.yearRows.length} years
                 </h2>
               </div>
               <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
@@ -379,18 +430,35 @@ export function OptionalSubjectDetail({
               </Link>
             </div>
             <div className="grid gap-2">
-              {visibleRows.map((row) => (
-                <a
-                  key={`${row.year}-${row.paper}`}
-                  href={row.sourceHref}
-                  className="grid gap-2 rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 sm:grid-cols-[0.3fr_1fr_0.7fr] sm:items-center"
+              {yearRows.map((row) => (
+                <article
+                  key={row.year}
+                  data-testid="upsc-optional-year-row"
+                  data-year={row.year}
+                  data-indexed-count={row.indexedCount}
+                  className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3"
                 >
-                  <span className="text-xs font-black">{row.year}</span>
-                  <span className="text-xs font-semibold leading-5 text-[#31443a]">{row.paper}</span>
-                  <span className="rounded-md border border-[#ef9f27] bg-[#fff4df] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#6f4a12]">
-                    {row.status === "text-import-pending" ? "Import pending" : "Source indexed"}
-                  </span>
-                </a>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-black">{row.year}</span>
+                    <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#31443a]">
+                      {row.indexedCount}/{row.importCount} source-indexed
+                    </span>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {[row.paperI, row.paperII].map((paperRow) => (
+                      <a
+                        key={paperRow.paper}
+                        href={paperRow.sourceHref}
+                        className="rounded-md border border-[#dcd5c7] bg-white p-3"
+                      >
+                        <p className="text-xs font-semibold leading-5 text-[#31443a]">{paperRow.paper}</p>
+                        <span className="mt-2 inline-flex rounded-md border border-[#ef9f27] bg-[#fff4df] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#6f4a12]">
+                          {paperRow.status === "text-import-pending" ? "Text import pending" : "Source indexed"}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </article>
               ))}
             </div>
           </section>

@@ -73,7 +73,35 @@ export type OptionalSourcePack = {
   group: string;
   route: string;
   paperRows: PyqImportRow[];
+  yearRows: OptionalYearPaperRow[];
+  syllabusThemes: OptionalSyllabusTheme[];
+  paperSummary: OptionalPaperSummary[];
   readinessScore: number;
+};
+
+export type OptionalYearPaperRow = {
+  year: number;
+  paperI: PyqImportRow;
+  paperII: PyqImportRow;
+  indexedCount: number;
+  importCount: number;
+};
+
+export type OptionalSyllabusTheme = {
+  id: string;
+  title: string;
+  paper: "Paper I" | "Paper II" | "Both papers";
+  syllabusDemand: string;
+  trendUse: string;
+  answerWritingUse: string;
+};
+
+export type OptionalPaperSummary = {
+  paper: "Paper I" | "Paper II";
+  totalRows: number;
+  indexedRows: number;
+  pendingRows: number;
+  nextAction: string;
 };
 
 export const officialSourceAnchors: OfficialSourceAnchor[] = [
@@ -635,6 +663,158 @@ function optionalRows(title: string): PyqImportRow[] {
   ]);
 }
 
+const optionalThemeProfiles: Record<string, OptionalSyllabusTheme[]> = {
+  anthropology: [
+    {
+      id: "anthro-foundation",
+      title: "Physical and social anthropology",
+      paper: "Paper I",
+      syllabusDemand: "Theory, evolution, biological anthropology, kinship, marriage, religion, and anthropological methods.",
+      trendUse: "Separate concept-definition questions from theory-application questions before writing answers.",
+      answerWritingUse: "Use thinkers, diagrams, tribal examples, and short comparative tables.",
+    },
+    {
+      id: "anthro-india",
+      title: "Indian anthropology and tribal issues",
+      paper: "Paper II",
+      syllabusDemand: "Indian society, tribal communities, constitutional safeguards, development, and contemporary challenges.",
+      trendUse: "Map repeated tribal-development themes, vulnerability, policy, and case-study demand year-wise.",
+      answerWritingUse: "Join syllabus terms with constitutional provisions, committee points, and field examples.",
+    },
+  ],
+  geography: [
+    {
+      id: "geo-optional-physical",
+      title: "Physical geography models and processes",
+      paper: "Paper I",
+      syllabusDemand: "Geomorphology, climatology, oceanography, biogeography, and environmental geography.",
+      trendUse: "Track diagrams, theories, process explanation, and model-criticism questions separately.",
+      answerWritingUse: "Use map, diagram, process chain, scholar/model, and contemporary example.",
+    },
+    {
+      id: "geo-optional-india",
+      title: "Indian geography and regional planning",
+      paper: "Paper II",
+      syllabusDemand: "Resources, agriculture, industry, population, settlements, regional planning, and contemporary India issues.",
+      trendUse: "Tag India-specific location, development, regional inequality, and planning questions year-wise.",
+      answerWritingUse: "Use India maps, data, committee/report hooks, and balanced regional analysis.",
+    },
+  ],
+  "public-administration": [
+    {
+      id: "pubad-theory",
+      title: "Administrative theory",
+      paper: "Paper I",
+      syllabusDemand: "Thinkers, theories, accountability, personnel, financial administration, and comparative administration.",
+      trendUse: "Track theory-versus-application questions and repeated thinker clusters.",
+      answerWritingUse: "Use thinker quote, administrative example, criticism, and reform angle.",
+    },
+    {
+      id: "pubad-india",
+      title: "Indian administration",
+      paper: "Paper II",
+      syllabusDemand: "Constitutional framework, civil services, district administration, local governance, welfare, and reforms.",
+      trendUse: "Map governance issues to committees, ARC, case studies, and current administrative reforms.",
+      answerWritingUse: "Use constitutional anchor, institution, issue, reform, and implementation examples.",
+    },
+  ],
+  sociology: [
+    {
+      id: "sociology-theory",
+      title: "Sociological theory and methods",
+      paper: "Paper I",
+      syllabusDemand: "Thinkers, concepts, stratification, mobility, religion, politics, economy, and research methods.",
+      trendUse: "Separate theoretical comparison, concept application, and contemporary social-change demand.",
+      answerWritingUse: "Use thinker, concept, Indian example, and balanced criticism.",
+    },
+    {
+      id: "sociology-india",
+      title: "Indian society",
+      paper: "Paper II",
+      syllabusDemand: "Caste, tribe, class, family, religion, social movements, population, and development issues.",
+      trendUse: "Map repeated themes around caste, gender, rural change, urbanisation, and movements.",
+      answerWritingUse: "Use sociological vocabulary, committee/data hooks, and grounded Indian examples.",
+    },
+  ],
+};
+
+function defaultOptionalThemes(title: string, group: string): OptionalSyllabusTheme[] {
+  const paperIBase =
+    group === "Literature"
+      ? "Language history, literary criticism, major genres, movements, and prescribed-text context."
+      : group === "Engineering"
+        ? "Core principles, design logic, numerical concepts, systems, and technical fundamentals."
+        : group === "Medical"
+          ? "Basic medical science, systems, pathology, pharmacology, public health, and clinical foundations."
+          : "Core theory, definitions, methods, foundational thinkers, and paper-specific concepts.";
+  const paperIIBase =
+    group === "Literature"
+      ? "Prescribed authors, texts, themes, criticism, language-specific literary development, and answer interpretation."
+      : group === "Engineering"
+        ? "Applied systems, design problems, industrial application, infrastructure, and problem-solving patterns."
+        : group === "Medical"
+          ? "Clinical application, public health, medicine, surgery, community health, and case-oriented reasoning."
+          : "Applied India-specific themes, case studies, contemporary issues, and paper-specific answer frameworks.";
+
+  return [
+    {
+      id: `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-paper-i-theme`,
+      title: `${title} Paper I demand`,
+      paper: "Paper I",
+      syllabusDemand: paperIBase,
+      trendUse: "Track repeated units, question verbs, and answer-pattern demand year-wise.",
+      answerWritingUse: "Use definitions, structure, examples, diagrams/tables where useful, and precise optional vocabulary.",
+    },
+    {
+      id: `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-paper-ii-theme`,
+      title: `${title} Paper II demand`,
+      paper: "Paper II",
+      syllabusDemand: paperIIBase,
+      trendUse: "Track repeated applied themes, case-study demand, and paper-specific scoring areas.",
+      answerWritingUse: "Use syllabus keywords, applied examples, concise evaluation, and year-wise trend awareness.",
+    },
+  ];
+}
+
+function optionalThemes(slug: string, title: string, group: string) {
+  return optionalThemeProfiles[slug] ?? defaultOptionalThemes(title, group);
+}
+
+function optionalYearRows(rows: PyqImportRow[]): OptionalYearPaperRow[] {
+  return mainsSourceYears.map((year) => {
+    const yearRows = rows.filter((row) => row.year === year);
+    const paperI = yearRows.find((row) => row.paper.endsWith("Paper I")) ?? yearRows[0];
+    const paperII = yearRows.find((row) => row.paper.endsWith("Paper II")) ?? yearRows[1];
+    const indexedCount = yearRows.filter((row) => row.status !== "text-import-pending").length;
+
+    return {
+      year,
+      paperI,
+      paperII,
+      indexedCount,
+      importCount: yearRows.length,
+    };
+  });
+}
+
+function optionalPaperSummary(rows: PyqImportRow[]): OptionalPaperSummary[] {
+  return (["Paper I", "Paper II"] as const).map((paper) => {
+    const paperRows = rows.filter((row) => row.paper.endsWith(paper));
+    const indexedRows = paperRows.filter((row) => row.status !== "text-import-pending").length;
+
+    return {
+      paper,
+      totalRows: paperRows.length,
+      indexedRows,
+      pendingRows: paperRows.length - indexedRows,
+      nextAction:
+        indexedRows > 0
+          ? "Extract indexed papers first, then tag every question to syllabus units and answer themes."
+          : "Connect official source rows before extracting paper text and topic tags.",
+    };
+  });
+}
+
 export const optionalSourcePacks: OptionalSourcePack[] = optionalSubjects.map((subject) => {
   const rows = optionalRows(subject.title);
   const indexedRows = rows.filter((row) => row.status !== "text-import-pending").length;
@@ -645,6 +825,9 @@ export const optionalSourcePacks: OptionalSourcePack[] = optionalSubjects.map((s
     group: subject.group,
     route: subject.route,
     paperRows: rows,
+    yearRows: optionalYearRows(rows),
+    syllabusThemes: optionalThemes(subject.slug, subject.title, subject.group),
+    paperSummary: optionalPaperSummary(rows),
     readinessScore: Math.round((indexedRows / rows.length) * 100),
   };
 });
