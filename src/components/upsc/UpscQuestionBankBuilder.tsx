@@ -20,10 +20,15 @@ import {
   getQuestionBankSubject,
   questionDifficulties,
   questionBankSubjects,
+  readLocalQuestionBankAttempts,
   readLocalQuestionBankProgress,
+  saveLocalQuestionBankAttempt,
   selectQuestionBankSet,
+  type QuestionBankAttempt,
   type QuestionBankProgressInput,
   type QuestionDifficulty,
+  type PracticeQuestion,
+  type QuestionOption,
 } from "@/lib/upsc/questionBankEngine";
 import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
@@ -46,6 +51,7 @@ export function UpscQuestionBankBuilder() {
   const [subjectSlug, setSubjectSlug] = useState(() => getQuestionBankSubject(requestedSubject).slug);
   const [progress, setProgress] = useState<QuestionBankProgressInput>({});
   const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [attempts, setAttempts] = useState<QuestionBankAttempt[]>([]);
   const [difficulty, setDifficulty] = useState<QuestionDifficulty | null>(null);
   const [count, setCount] = useState<number | null>(null);
 
@@ -60,14 +66,15 @@ export function UpscQuestionBankBuilder() {
     const timer = window.setTimeout(() => {
       setProfile(readStudentProfile());
       setProgress(readLocalQuestionBankProgress(subjectSlug));
+      setAttempts(readLocalQuestionBankAttempts(subjectSlug));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [subjectSlug]);
 
   const selectedSubject = useMemo(() => getQuestionBankSubject(subjectSlug), [subjectSlug]);
   const recommended = useMemo(
-    () => selectQuestionBankSet({ subjectSlug: selectedSubject.slug, progress, profile }),
-    [profile, progress, selectedSubject.slug]
+    () => selectQuestionBankSet({ subjectSlug: selectedSubject.slug, progress, profile, attempts }),
+    [attempts, profile, progress, selectedSubject.slug]
   );
   const activeDifficulty = difficulty ?? recommended.recommendation.recommendedDifficulty;
   const activeCount = count ?? recommended.recommendation.recommendedCount;
@@ -77,13 +84,20 @@ export function UpscQuestionBankBuilder() {
         subjectSlug: selectedSubject.slug,
         progress,
         profile,
+        attempts,
         difficulty: activeDifficulty,
         count: activeCount,
       }),
-    [activeCount, activeDifficulty, profile, progress, selectedSubject.slug]
+    [activeCount, activeDifficulty, attempts, profile, progress, selectedSubject.slug]
   );
 
   const recommendation = selection.recommendation;
+  const attemptByQuestionId = useMemo(
+    () => new Map(attempts.map((attempt) => [attempt.questionId, attempt])),
+    [attempts]
+  );
+  const solvedAccuracy = recommendation.solvedAccuracyPercent === null ? "Not measured" : `${recommendation.solvedAccuracyPercent}%`;
+  const lastSolved = attempts[0]?.solvedAt ? new Date(attempts[0].solvedAt).toLocaleDateString("en-IN") : "No solved question";
   const recommendationMetrics: RecommendationMetric[] = [
     { label: "Subject", value: selectedSubject.title, Icon: ClipboardCheck },
     { label: "Consistency", value: `${recommendation.consistencyPercent}%`, Icon: Gauge },
@@ -92,6 +106,9 @@ export function UpscQuestionBankBuilder() {
     { label: "Command", value: recommendation.commandCount, Icon: CheckCircle2 },
     { label: "Level", value: recommendation.learnerLevel, Icon: ClipboardCheck },
   ];
+  const markQuestionSolved = (question: PracticeQuestion, selectedOption: QuestionOption) => {
+    setAttempts(saveLocalQuestionBankAttempt(question, selectedOption));
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -101,6 +118,8 @@ export function UpscQuestionBankBuilder() {
           data-active-subject={selectedSubject.slug}
           data-active-difficulty={activeDifficulty}
           data-active-count={activeCount}
+          data-solved-count={recommendation.solvedCount}
+          data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
@@ -124,6 +143,8 @@ export function UpscQuestionBankBuilder() {
                 ["Subject", selectedSubject.title],
                 ["Recall", scoreText(recommendation.averageRecall, "/100")],
                 ["MCQ", scoreText(recommendation.averageMcq, "%")],
+                ["Solved", recommendation.solvedCount],
+                ["Accuracy", solvedAccuracy],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -171,6 +192,9 @@ export function UpscQuestionBankBuilder() {
           data-recommended-count={recommendation.recommendedCount}
           data-ai-gap-count={recommendation.teacherDoubtCount}
           data-target-days={recommendation.targetDays.join(",")}
+          data-solved-count={recommendation.solvedCount}
+          data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
+          data-unresolved-incorrect-count={recommendation.unresolvedIncorrectCount}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
@@ -274,6 +298,26 @@ export function UpscQuestionBankBuilder() {
           </div>
         </section>
 
+        <section
+          data-testid="upsc-question-bank-ledger"
+          data-solved-count={recommendation.solvedCount}
+          data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
+          data-unresolved-incorrect-count={recommendation.unresolvedIncorrectCount}
+          className="grid gap-3 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:grid-cols-4"
+        >
+          {[
+            ["Solved", recommendation.solvedCount],
+            ["Accuracy", solvedAccuracy],
+            ["Repair queue", recommendation.unresolvedIncorrectCount],
+            ["Last solved", lastSolved],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
+              <p className="mt-1 break-words text-lg font-black text-[#13251d]">{value}</p>
+            </div>
+          ))}
+        </section>
+
         <section data-testid="upsc-question-bank-set" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -292,13 +336,18 @@ export function UpscQuestionBankBuilder() {
 
           <div className="grid gap-3">
             {selection.questions.length ? (
-              selection.questions.map((question, index) => (
+              selection.questions.map((question, index) => {
+                const attempt = attemptByQuestionId.get(question.id);
+
+                return (
                 <article
                   key={question.id}
                   data-testid="upsc-question-bank-question"
+                  data-question-id={question.id}
                   data-subject-slug={question.subjectSlug}
                   data-question-difficulty={question.difficulty}
                   data-linked-day={question.linkedDay}
+                  data-solved-state={attempt ? (attempt.isCorrect ? "correct" : "incorrect") : "unsolved"}
                   className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
                 >
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -313,6 +362,11 @@ export function UpscQuestionBankBuilder() {
                       <Badge variant="outline" className="rounded-md border-[#dcd5c7] text-[#31443a]">
                         {question.difficulty.replace("_", " ")}
                       </Badge>
+                      {attempt ? (
+                        <Badge className={cn("rounded-md px-2 py-1 text-white", attempt.isCorrect ? "bg-[#1d9e75]" : "bg-[#ef9f27]")}>
+                          {attempt.isCorrect ? "Solved correct" : "Repair saved"}
+                        </Badge>
+                      ) : null}
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
                       {question.source.replaceAll("_", " ")}
@@ -321,11 +375,40 @@ export function UpscQuestionBankBuilder() {
                   <h3 className="text-lg font-black leading-7 tracking-tight">{question.stem}</h3>
                   <div className="mt-4 grid gap-2 md:grid-cols-2">
                     {Object.entries(question.options).map(([option, text]) => (
-                      <div key={option} className="rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-semibold text-[#31443a]">
+                      <button
+                        key={option}
+                        type="button"
+                        data-testid="upsc-question-bank-option"
+                        data-question-id={question.id}
+                        data-option={option}
+                        aria-pressed={attempt?.selectedOption === option}
+                        onClick={() => markQuestionSolved(question, option as QuestionOption)}
+                        className={cn(
+                          "rounded-md border p-3 text-left text-sm font-semibold transition",
+                          attempt?.selectedOption === option
+                            ? attempt.isCorrect
+                              ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
+                              : "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
+                            : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]"
+                        )}
+                      >
                         <span className="font-black text-[#085041]">{option}.</span> {text}
-                      </div>
+                      </button>
                     ))}
                   </div>
+                  {attempt ? (
+                    <div
+                      data-testid="upsc-question-bank-solved-proof"
+                      className={cn(
+                        "mt-4 rounded-md border p-3 text-sm font-bold leading-6",
+                        attempt.isCorrect
+                          ? "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]"
+                          : "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
+                      )}
+                    >
+                      Student selected {attempt.selectedOption}. {attempt.isCorrect ? "Correct evidence saved." : "Incorrect evidence saved for repair."}
+                    </div>
+                  ) : null}
                   <details className="mt-4 rounded-md border border-[#cfe5dc] bg-white p-3">
                     <summary className="cursor-pointer list-none text-sm font-black text-[#085041]">
                       Answer and UPSC trap
@@ -337,7 +420,8 @@ export function UpscQuestionBankBuilder() {
                     </p>
                   </details>
                 </article>
-              ))
+                );
+              })
             ) : (
               <div className="rounded-lg border border-dashed border-[#dcd5c7] bg-[#f7f4ee] p-5 text-sm font-semibold text-[#657066]">
                 No question is available for this exact selection yet. Choose another difficulty or reduce the set size.

@@ -4,6 +4,7 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
+const attemptKey = "sarit-upsc-question-bank-attempts-v1";
 const evidencePath = path.join(__dirname, "verify-question-bank-builder-evidence.json");
 
 function progressKey(subjectSlug) {
@@ -31,6 +32,7 @@ async function seedSession(page, { level, subjectSlug = "geography", progress })
   await page.evaluate(
     ({ profileStorageKey, progressStorageKey, learnerLevel, seededProgress }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_question_bank_builder");
+      window.localStorage.removeItem("sarit-upsc-question-bank-attempts-v1");
       window.localStorage.setItem(
         profileStorageKey,
         JSON.stringify({
@@ -66,10 +68,13 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
     const aiGap = document.querySelector('[data-testid="upsc-question-bank-ai-gap"]');
     const questions = [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) => ({
       subjectSlug: node.getAttribute("data-subject-slug"),
+      id: node.getAttribute("data-question-id"),
       difficulty: node.getAttribute("data-question-difficulty"),
       linkedDay: node.getAttribute("data-linked-day"),
+      solvedState: node.getAttribute("data-solved-state"),
       text: node.textContent || "",
     }));
+    const ledger = document.querySelector('[data-testid="upsc-question-bank-ledger"]');
 
     return {
       activeSubject: hero?.getAttribute("data-active-subject"),
@@ -79,6 +84,10 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       recommendedCount: recommendation?.getAttribute("data-recommended-count"),
       aiGapCount: recommendation?.getAttribute("data-ai-gap-count"),
       targetDays: recommendation?.getAttribute("data-target-days"),
+      solvedCount: recommendation?.getAttribute("data-solved-count"),
+      solvedAccuracy: recommendation?.getAttribute("data-solved-accuracy"),
+      unresolvedIncorrectCount: recommendation?.getAttribute("data-unresolved-incorrect-count"),
+      ledgerText: ledger?.textContent || "",
       aiGapText: aiGap?.textContent || "",
       questions,
     };
@@ -266,6 +275,40 @@ async function run() {
   });
   const environmentState = await readQuestionBankState(page, "environment-command-recommends-hard", checks, "environment");
   expectDifficultySet(environmentState, "HARD", 5, "environment-command-recommends-hard", "environment");
+  const firstEnvironmentQuestionId = environmentState.questions[0]?.id;
+  if (!firstEnvironmentQuestionId) {
+    throw new Error(`Missing first environment question id: ${JSON.stringify(environmentState)}`);
+  }
+  await page
+    .locator('[data-testid="upsc-question-bank-question"]')
+    .first()
+    .getByTestId("upsc-question-bank-option")
+    .filter({ hasText: /^A\./ })
+    .click();
+  await page.getByTestId("upsc-question-bank-ledger").getByText("Solved", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-question-bank-solved-proof").first().getByText("Correct evidence saved", { exact: false }).waitFor({ timeout: 15000 });
+  const storedAttempt = await page.evaluate(
+    ({ storageKey, questionId }) => JSON.parse(window.localStorage.getItem(storageKey) || "{}")[questionId],
+    { storageKey: attemptKey, questionId: firstEnvironmentQuestionId }
+  );
+  checks.push({ label: "question-bank-solved-ledger-storage", firstEnvironmentQuestionId, storedAttempt });
+  if (
+    storedAttempt?.questionId !== firstEnvironmentQuestionId ||
+    storedAttempt?.subjectSlug !== "environment" ||
+    storedAttempt?.selectedOption !== "A" ||
+    storedAttempt?.isCorrect !== true
+  ) {
+    throw new Error(`Solved ledger did not persist correctly: ${JSON.stringify(storedAttempt)}`);
+  }
+  const environmentAfterSolve = await readQuestionBankState(page, "environment-unsolved-priority-after-solve", checks, "environment");
+  if (
+    environmentAfterSolve.solvedCount !== "1" ||
+    environmentAfterSolve.solvedAccuracy !== "100" ||
+    environmentAfterSolve.questions[0]?.id === firstEnvironmentQuestionId ||
+    environmentAfterSolve.questions.some((question) => question.id === firstEnvironmentQuestionId && question.solvedState !== "correct")
+  ) {
+    throw new Error(`Unsolved-priority ledger failed: ${JSON.stringify(environmentAfterSolve)}`);
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/question-bank`, { waitUntil: "networkidle", timeout: 45000 });

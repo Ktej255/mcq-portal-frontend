@@ -5,6 +5,7 @@ import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 
 export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD" | "PYQ_STYLE";
 export type QuestionSource = "NCERT_BASE" | "REFERENCE_ADVANCED" | "PYQ_PATTERN" | "CURRENT_AFFAIRS_BRIDGE";
+export type QuestionOption = "A" | "B" | "C" | "D";
 
 export type QuestionBankSession = {
   day: number;
@@ -31,10 +32,23 @@ export type PracticeQuestion = {
   difficulty: QuestionDifficulty;
   stem: string;
   options: Record<"A" | "B" | "C" | "D", string>;
-  correctOption: "A" | "B" | "C" | "D";
+  correctOption: QuestionOption;
   explanation: string;
   trap: string;
   source: QuestionSource;
+};
+
+export type QuestionBankAttempt = {
+  questionId: string;
+  subjectSlug: string;
+  linkedDay: number;
+  topic: string;
+  difficulty: QuestionDifficulty;
+  source: QuestionSource;
+  selectedOption: QuestionOption;
+  correctOption: QuestionOption;
+  isCorrect: boolean;
+  solvedAt: string;
 };
 
 export type QuestionBankRecommendation = {
@@ -47,6 +61,9 @@ export type QuestionBankRecommendation = {
   recoveryCount: number;
   commandCount: number;
   teacherDoubtCount: number;
+  solvedCount: number;
+  solvedAccuracyPercent: number | null;
+  unresolvedIncorrectCount: number;
   teacherDoubt: {
     day: number;
     category: string;
@@ -68,8 +85,10 @@ export type QuestionBankProgress = SubjectDayProgress & {
 };
 
 export type QuestionBankProgressInput = Record<string, QuestionBankProgress | undefined>;
+export type QuestionBankAttemptInput = QuestionBankAttempt[];
 
 export const questionDifficulties: QuestionDifficulty[] = ["EASY", "MEDIUM", "HARD", "PYQ_STYLE"];
+export const questionBankAttemptStorageKey = "sarit-upsc-question-bank-attempts-v1";
 
 export const questionBankSubjects: QuestionBankSubject[] = [
   {
@@ -576,6 +595,59 @@ export function readLocalQuestionBankProgress(subjectSlug: string): QuestionBank
   }
 }
 
+function readStoredQuestionBankAttempts() {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(questionBankAttemptStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, QuestionBankAttempt>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function readLocalQuestionBankAttempts(subjectSlug?: string): QuestionBankAttempt[] {
+  const attempts = Object.values(readStoredQuestionBankAttempts()).filter((attempt) =>
+    subjectSlug ? attempt.subjectSlug === subjectSlug : true
+  );
+
+  return attempts.sort((left, right) => Date.parse(right.solvedAt) - Date.parse(left.solvedAt));
+}
+
+export function buildQuestionBankAttempt(
+  question: PracticeQuestion,
+  selectedOption: QuestionOption,
+  solvedAt = new Date().toISOString()
+): QuestionBankAttempt {
+  return {
+    questionId: question.id,
+    subjectSlug: question.subjectSlug,
+    linkedDay: question.linkedDay,
+    topic: question.topic,
+    difficulty: question.difficulty,
+    source: question.source,
+    selectedOption,
+    correctOption: question.correctOption,
+    isCorrect: selectedOption === question.correctOption,
+    solvedAt,
+  };
+}
+
+export function saveLocalQuestionBankAttempt(question: PracticeQuestion, selectedOption: QuestionOption) {
+  if (typeof window === "undefined") return [];
+
+  const current = readStoredQuestionBankAttempts();
+  const attempt = buildQuestionBankAttempt(question, selectedOption);
+  const next = {
+    ...current,
+    [question.id]: attempt,
+  };
+  window.localStorage.setItem(questionBankAttemptStorageKey, JSON.stringify(next));
+  return readLocalQuestionBankAttempts(question.subjectSlug);
+}
+
 function average(values: number[]) {
   if (!values.length) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
@@ -637,9 +709,12 @@ function resolveLearnerLevel(profile?: Pick<StudentProfile, "level"> | null): St
 export function buildQuestionBankRecommendation(
   progress: QuestionBankProgressInput,
   profile?: Pick<StudentProfile, "level"> | null,
-  subjectSlug = "geography"
+  subjectSlug = "geography",
+  attempts: QuestionBankAttemptInput = []
 ): QuestionBankRecommendation {
   const subject = getQuestionBankSubject(subjectSlug);
+  const subjectAttempts = attempts.filter((attempt) => attempt.subjectSlug === subject.slug);
+  const incorrectAttempts = subjectAttempts.filter((attempt) => !attempt.isCorrect);
   const learnerLevel = resolveLearnerLevel(profile);
   const dayStates = subject.sessions.map((session) => progress[String(session.day)]);
   const startedDays = subject.sessions.filter((session) => hasStarted(progress[String(session.day)]));
@@ -660,6 +735,8 @@ export function buildQuestionBankRecommendation(
       ? teacherDoubtDays
       : recoveryDays.length > 0
       ? recoveryDays
+      : incorrectAttempts.length > 0
+      ? subject.sessions.filter((session) => incorrectAttempts.some((attempt) => attempt.linkedDay === session.day))
       : subject.sessions.filter((session) => {
           const state = progress[String(session.day)];
           return typeof state?.talkScore === "number" && state.talkScore < 95;
@@ -680,6 +757,9 @@ export function buildQuestionBankRecommendation(
           "Can the learner explain the concept without skipping the cause-effect chain?",
       }
     : null;
+  const solvedAccuracyPercent = subjectAttempts.length
+    ? Math.round((subjectAttempts.filter((attempt) => attempt.isCorrect).length / subjectAttempts.length) * 100)
+    : null;
 
   let recommendedDifficulty: QuestionDifficulty = "MEDIUM";
   let reason = "Balanced practice is recommended until recall and MCQ evidence mature.";
@@ -689,11 +769,14 @@ export function buildQuestionBankRecommendation(
     reason = `AI teacher gap is active on Day ${teacherDoubt.day}: repair ${teacherDoubt.category} before harder MCQs.`;
   } else if (
     recoveryDays.length > 0 ||
+    incorrectAttempts.length > 0 ||
     (averageRecall !== null && averageRecall < 70) ||
     (averageMcq !== null && averageMcq < 50)
   ) {
     recommendedDifficulty = "EASY";
-    reason = "Recovery or low-score evidence is active, so the next set should rebuild basics first.";
+    reason = incorrectAttempts.length
+      ? "Solved-question ledger has incorrect answers, so the next set should rebuild basics before harder traps."
+      : "Recovery or low-score evidence is active, so the next set should rebuild basics first.";
   } else if (
     averageRecall !== null &&
     averageRecall >= 95 &&
@@ -734,6 +817,9 @@ export function buildQuestionBankRecommendation(
     recoveryCount: recoveryDays.length,
     commandCount: commandDays.length,
     teacherDoubtCount: teacherDoubtDays.length,
+    solvedCount: subjectAttempts.length,
+    solvedAccuracyPercent,
+    unresolvedIncorrectCount: incorrectAttempts.length,
     teacherDoubt,
     reason,
     targetDays,
@@ -746,24 +832,31 @@ export function selectQuestionBankSet({
   profile,
   difficulty,
   count,
+  attempts = [],
 }: {
   subjectSlug?: string;
   progress: QuestionBankProgressInput;
   profile?: Pick<StudentProfile, "level"> | null;
   difficulty?: QuestionDifficulty;
   count?: number;
+  attempts?: QuestionBankAttemptInput;
 }): QuestionBankSelection {
   const subject = getQuestionBankSubject(subjectSlug);
-  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug);
+  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts);
   const selectedDifficulty = difficulty ?? recommendation.recommendedDifficulty;
   const selectedCount = count ?? recommendation.recommendedCount;
   const targetDaySet = new Set(recommendation.targetDays);
+  const solvedQuestionIds = new Set(attempts.filter((attempt) => attempt.subjectSlug === subject.slug).map((attempt) => attempt.questionId));
   const questionPool = allPracticeQuestionBank.filter(
     (question) => question.subjectSlug === subject.slug && question.difficulty === selectedDifficulty
   );
   const targeted = questionPool.filter((question) => targetDaySet.has(question.linkedDay));
   const fallback = questionPool.filter((question) => !targetDaySet.has(question.linkedDay));
-  const questions = [...targeted, ...fallback].slice(0, selectedCount);
+  const prioritized = [...targeted, ...fallback];
+  const questions = [
+    ...prioritized.filter((question) => !solvedQuestionIds.has(question.id)),
+    ...prioritized.filter((question) => solvedQuestionIds.has(question.id)),
+  ].slice(0, selectedCount);
 
   return {
     recommendation,
