@@ -50,6 +50,7 @@ import {
   type SubjectMentorMode,
   type SubjectTalkClassroomStage,
   type SubjectTalkDiscussionStep,
+  type SubjectTalkTeacherStatus,
   useSubjectProgress,
 } from "@/lib/upsc/useSubjectProgress";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
@@ -356,8 +357,33 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                 detail: "Your first explanation is saved. Use the short lesson selected for the missing concepts, then return here.",
                 href: watchHref,
                 cta: "Open repair lesson",
-              }
+            }
             : null;
+  const mcqReady = Boolean(
+    assessment &&
+      assessment.score >= SUBJECT_RECALL_TARGET &&
+      isMcqUnlocked &&
+      !shouldOpenWatchAfterTalk &&
+      !isChallengePending
+  );
+  const talkState = talkFlowGate
+    ? "gated"
+    : isChallengePending
+      ? "repair-answer"
+      : assessment
+        ? "route-ready"
+        : "answer-required";
+  const primaryActionLabel = assessment
+    ? primaryRouteLabel
+    : teacherConnection === "checking"
+      ? "Checking answer"
+      : "Send to AI teacher";
+  const primaryActionHref = assessment && !isChallengePending ? primaryRouteHref : "";
+  const teacherStatus: SubjectTalkTeacherStatus = !assessment || isChallengePending
+    ? "answer-required"
+    : mcqReady
+      ? "mcq-ready"
+      : "repair-required";
 
   useEffect(() => {
     if (!isLoaded || hydratedDay === activeDay) return;
@@ -478,6 +504,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     nextRoute?: string;
     nextActionLabel?: string;
     preliminaryScore?: number;
+    teacherStatus?: SubjectTalkTeacherStatus;
+    teacherTurnCount?: number;
+    teacherFollowUpAnswer?: string;
     incrementSavedCount?: boolean;
   } = {}) => {
     const existing = getDayProgress(activeSession.day);
@@ -499,6 +528,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       talkNextRoute: patch.nextRoute ?? talkNextRoute,
       talkNextActionLabel: patch.nextActionLabel ?? talkNextActionLabel,
       talkPreliminaryScore: patch.preliminaryScore,
+      talkTeacherStatus: patch.teacherStatus ?? teacherStatus,
+      talkTeacherTurnCount: patch.teacherTurnCount ?? existing?.talkTeacherTurnCount,
+      talkTeacherFollowUpAnswer: patch.teacherFollowUpAnswer ?? existing?.talkTeacherFollowUpAnswer,
       savedCount: patch.incrementSavedCount ? (existing?.savedCount ?? 0) + 1 : existing?.savedCount,
     });
   };
@@ -599,6 +631,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       nextRoute,
       nextActionLabel,
       preliminaryScore: undefined,
+      teacherStatus: nextAssessment.score >= SUBJECT_RECALL_TARGET && nextIsMcqUnlocked && isWatchComplete ? "mcq-ready" : "repair-required",
+      teacherTurnCount: includeChallenge ? 2 : 1,
+      teacherFollowUpAnswer: includeChallenge ? challengeDraft.trim() : undefined,
       incrementSavedCount: true,
     });
     setTeacherCoach(null);
@@ -712,6 +747,11 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
           </Link>
           <section
             data-testid="subject-talk-flow-gate"
+            data-proof-rule="ai-teacher-recall-score-doubt-repair-route"
+            data-learner-level={learnerLevel}
+            data-flow-state="gated"
+            data-gate-href={talkFlowGate.href}
+            data-recall-target={SUBJECT_RECALL_TARGET}
             className="rounded-lg border border-[#ef9f27]/55 bg-[#fff4df] p-6 shadow-sm"
           >
             <div className="flex items-start gap-3">
@@ -761,7 +801,15 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
 
         <section
           data-testid="subject-talk-simple-step"
+          data-proof-rule="ai-teacher-recall-score-doubt-repair-route"
           data-student-flow="single-answer"
+          data-learner-level={learnerLevel}
+          data-flow-state={talkState}
+          data-recall-target={SUBJECT_RECALL_TARGET}
+          data-primary-action-label={primaryActionLabel}
+          data-primary-action-href={primaryActionHref}
+          data-watch-complete={isWatchComplete ? "true" : "false"}
+          data-mcq-ready={mcqReady ? "true" : "false"}
           className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7"
         >
           <div className="mb-5">
@@ -875,7 +923,14 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
           )}
 
           {assessment && !isChallengePending && (
-            <div data-testid="talk-score-card" className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
+            <div
+              data-testid="talk-score-card"
+              data-proof-rule="ai-teacher-recall-score-doubt-repair-route"
+              data-score={assessment.score}
+              data-band={assessment.band}
+              data-teacher-status={teacherStatus}
+              className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4"
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">AI teacher score</p>
@@ -967,6 +1022,18 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
 
               <div
                 data-testid="talk-route-gate"
+                data-proof-rule="ai-teacher-recall-score-doubt-repair-route"
+                data-day={activeSession.day}
+                data-learner-level={learnerLevel}
+                data-flow-state={talkState}
+                data-score={assessment.score}
+                data-band={assessment.band}
+                data-recall-target={SUBJECT_RECALL_TARGET}
+                data-next-action-route={primaryRouteHref}
+                data-next-action-label={primaryRouteLabel}
+                data-mcq-ready={mcqReady ? "true" : "false"}
+                data-watch-complete={isWatchComplete ? "true" : "false"}
+                data-teacher-status={teacherStatus}
                 className={cn(
                   "mt-4 rounded-lg border p-4",
                   routeGateTone === "unlocked" && "border-[#1d9e75]/45 bg-white/70",
@@ -1003,6 +1070,11 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                 </details>
                 <Link
                   data-testid="talk-primary-route"
+                  data-next-action-route={primaryRouteHref}
+                  data-next-action-label={primaryRouteLabel}
+                  data-recall-target={SUBJECT_RECALL_TARGET}
+                  data-score={assessment.score}
+                  data-mcq-ready={mcqReady ? "true" : "false"}
                   href={primaryRouteHref}
                   className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
                 >

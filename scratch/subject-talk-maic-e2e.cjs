@@ -146,9 +146,70 @@ async function run() {
     await page.getByTestId("subject-maic-discussion-turns").locator("summary").click();
     await page.getByTestId("subject-maic-discussion-turns").getByText("UPSC Examiner", { exact: false }).waitFor({ timeout: 15000 });
     const primaryRouteHref = await page.getByTestId("talk-primary-route").getAttribute("href");
+    const simplePanelContract = await page.getByTestId("subject-talk-simple-step").evaluate((element) => ({
+      proofRule: element.getAttribute("data-proof-rule"),
+      flowState: element.getAttribute("data-flow-state"),
+      learnerLevel: element.getAttribute("data-learner-level"),
+      recallTarget: element.getAttribute("data-recall-target"),
+      primaryActionHref: element.getAttribute("data-primary-action-href"),
+      primaryActionLabel: element.getAttribute("data-primary-action-label"),
+      watchComplete: element.getAttribute("data-watch-complete"),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+    }));
+    const routeGateContract = await page.getByTestId("talk-route-gate").evaluate((element) => ({
+      proofRule: element.getAttribute("data-proof-rule"),
+      flowState: element.getAttribute("data-flow-state"),
+      learnerLevel: element.getAttribute("data-learner-level"),
+      score: Number(element.getAttribute("data-score")),
+      band: element.getAttribute("data-band"),
+      recallTarget: Number(element.getAttribute("data-recall-target")),
+      nextActionRoute: element.getAttribute("data-next-action-route"),
+      nextActionLabel: element.getAttribute("data-next-action-label"),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+      watchComplete: element.getAttribute("data-watch-complete"),
+      teacherStatus: element.getAttribute("data-teacher-status"),
+    }));
+    const primaryRouteContract = await page.getByTestId("talk-primary-route").evaluate((element) => ({
+      nextActionRoute: element.getAttribute("data-next-action-route"),
+      nextActionLabel: element.getAttribute("data-next-action-label"),
+      recallTarget: Number(element.getAttribute("data-recall-target")),
+      score: Number(element.getAttribute("data-score")),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+    }));
     const teacherConnectionText = (await page.getByTestId("subject-talk-teacher-connection").innerText()).trim();
     if (primaryRouteHref !== "/upsc/environment/watch?day=5") {
       throw new Error(`Fresh environment Talk should repair through Watch before Lab/MCQ: ${primaryRouteHref}`);
+    }
+    if (
+      simplePanelContract.proofRule !== "ai-teacher-recall-score-doubt-repair-route" ||
+      simplePanelContract.flowState !== "route-ready" ||
+      simplePanelContract.learnerLevel !== "advanced" ||
+      simplePanelContract.recallTarget !== "95" ||
+      simplePanelContract.primaryActionHref !== "/upsc/environment/watch?day=5" ||
+      simplePanelContract.primaryActionLabel !== "Open class" ||
+      simplePanelContract.watchComplete !== "false" ||
+      simplePanelContract.mcqReady !== "false" ||
+      routeGateContract.proofRule !== "ai-teacher-recall-score-doubt-repair-route" ||
+      routeGateContract.flowState !== "route-ready" ||
+      routeGateContract.learnerLevel !== "advanced" ||
+      routeGateContract.recallTarget !== 95 ||
+      routeGateContract.nextActionRoute !== "/upsc/environment/watch?day=5" ||
+      routeGateContract.nextActionLabel !== "Open class" ||
+      routeGateContract.mcqReady !== "false" ||
+      routeGateContract.watchComplete !== "false" ||
+      routeGateContract.teacherStatus !== "repair-required" ||
+      primaryRouteContract.nextActionRoute !== "/upsc/environment/watch?day=5" ||
+      primaryRouteContract.nextActionLabel !== "Open class" ||
+      primaryRouteContract.recallTarget !== 95 ||
+      primaryRouteContract.mcqReady !== "false"
+    ) {
+      throw new Error(
+        `${viewportName} subject Talk production contract mismatch: ${JSON.stringify({
+          simplePanelContract,
+          routeGateContract,
+          primaryRouteContract,
+        }, null, 2)}`
+      );
     }
 
     const progress = await page.evaluate((key) => {
@@ -162,7 +223,9 @@ async function run() {
       !progress?.teacherDoubtCategory ||
       !progress?.teacherDoubtReason ||
       !progress?.teacherDoubtRepairAction ||
-      !progress?.teacherDoubtMasteryCheck
+      !progress?.teacherDoubtMasteryCheck ||
+      progress?.talkTeacherStatus !== "repair-required" ||
+      progress?.talkTeacherTurnCount !== 1
     ) {
       throw new Error(`Environment Talk adaptive teacher state did not persist correctly: ${JSON.stringify(progress)}`);
     }
@@ -173,6 +236,9 @@ async function run() {
       route: "environment-talk",
       mode: "single-answer-verdict",
       primaryRouteHref,
+      simplePanelContract,
+      routeGateContract,
+      primaryRouteContract,
       routeInsideScoreCard,
       teacherConnectionText,
       doubtDiagnosis: {
@@ -274,11 +340,35 @@ async function run() {
     await page.getByTestId("subject-maic-discussion-turns").locator("summary").click();
     await page.getByTestId("subject-maic-discussion-turns").getByText("UPSC Examiner", { exact: false }).first().waitFor({ timeout: 15000 });
     const economyTeacherConnectionText = (await page.getByTestId("subject-talk-teacher-connection").innerText()).trim();
+    const economyRouteGateContract = await page.getByTestId("talk-route-gate").evaluate((element) => ({
+      proofRule: element.getAttribute("data-proof-rule"),
+      flowState: element.getAttribute("data-flow-state"),
+      learnerLevel: element.getAttribute("data-learner-level"),
+      recallTarget: Number(element.getAttribute("data-recall-target")),
+      nextActionRoute: element.getAttribute("data-next-action-route"),
+      nextActionLabel: element.getAttribute("data-next-action-label"),
+      mcqReady: element.getAttribute("data-mcq-ready"),
+      teacherStatus: element.getAttribute("data-teacher-status"),
+    }));
     const economyProgress = await page.evaluate((key) => {
       const raw = window.localStorage.getItem(key);
       return raw ? JSON.parse(raw)["3"] : null;
     }, storageKey("economy"));
-    if (!economyProgress?.teacherDoubtCategory || !economyProgress?.teacherDoubtRepairAction || !economyProgress?.teacherDoubtMasteryCheck) {
+    if (
+      economyRouteGateContract.proofRule !== "ai-teacher-recall-score-doubt-repair-route" ||
+      economyRouteGateContract.flowState !== "route-ready" ||
+      economyRouteGateContract.learnerLevel !== "advanced" ||
+      economyRouteGateContract.recallTarget !== 95 ||
+      economyRouteGateContract.nextActionRoute !== "/upsc/economy/watch?day=3" ||
+      economyRouteGateContract.nextActionLabel !== "Open class" ||
+      economyRouteGateContract.mcqReady !== "false" ||
+      economyRouteGateContract.teacherStatus !== "repair-required" ||
+      !economyProgress?.teacherDoubtCategory ||
+      !economyProgress?.teacherDoubtRepairAction ||
+      !economyProgress?.teacherDoubtMasteryCheck ||
+      economyProgress?.talkTeacherStatus !== "repair-required" ||
+      economyProgress?.talkTeacherTurnCount !== 1
+    ) {
       throw new Error(`Economy Talk adaptive doubt diagnosis did not persist correctly: ${JSON.stringify(economyProgress)}`);
     }
     const pageMetrics = await metrics(page);
@@ -286,6 +376,7 @@ async function run() {
       viewport: "desktop",
       route: "economy-talk",
       routeInsideScoreCard: economyRouteInsideScoreCard,
+      economyRouteGateContract,
       teacherConnectionText: economyTeacherConnectionText,
       doubtDiagnosis: {
         category: economyProgress.teacherDoubtCategory,
@@ -337,6 +428,9 @@ async function run() {
     }
     if (!initialProgress?.talkNextRoute?.includes("/watch")) {
       throw new Error(`Weak pre-repair recall should retain Watch as next route: ${JSON.stringify(initialProgress)}`);
+    }
+    if (initialProgress?.talkTeacherStatus !== "repair-required" || initialProgress?.talkTeacherTurnCount !== 1) {
+      throw new Error(`Weak pre-repair recall should persist teacher repair status: ${JSON.stringify(initialProgress)}`);
     }
 
     await page.evaluate((storageKeyValue) => {

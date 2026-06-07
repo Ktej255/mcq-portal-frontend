@@ -16,6 +16,7 @@ export type SubjectMentorMode = "Concept logic" | "Cause-effect" | "UPSC trap";
 export type SubjectWatchState = "Queued" | "In class" | "Watched";
 export type SubjectWatchMediaAssetMap = Record<string, string>;
 export type SubjectTalkDiscussionStep = "explain" | "challenge" | "verdict";
+export type SubjectTalkTeacherStatus = "answer-required" | "repair-required" | "mcq-ready";
 export type SubjectTalkClassroomStage =
   | "teacher-brief"
   | "student-explain"
@@ -76,6 +77,9 @@ export type SubjectDayProgress = {
   teacherDoubtMasteryCheck?: string;
   teacherProviderScore?: number;
   talkTeacherFollowUpPrompt?: string;
+  talkTeacherFollowUpAnswer?: string;
+  talkTeacherTurnCount?: number;
+  talkTeacherStatus?: SubjectTalkTeacherStatus;
   labCompleted?: boolean;
   labMode?: string;
   labInsight?: string;
