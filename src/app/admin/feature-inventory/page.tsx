@@ -23,11 +23,16 @@ import {
 import { geographyDay1MediaAttachment } from "@/lib/upsc/geographyDay1Media";
 import {
   countInventoryStatuses,
+  countLaunchVisionStatuses,
   featureInventoryGroups,
   inventoryStatusLabels,
+  launchVisionRequirements,
+  launchVisionStatusLabels,
+  launchVisionSummary,
   morningBatchCorpusSummary,
   releaseGates,
   type InventoryStatus,
+  type LaunchVisionStatus,
 } from "@/lib/upsc/featureInventory";
 import { subjectMaturityRows, subjectMaturitySummary } from "@/lib/upsc/generated/subjectMaturity";
 
@@ -43,6 +48,20 @@ const statusIcons = {
   partial: CircleAlert,
   external: ExternalLink,
   isolated: LockKeyhole,
+};
+
+const launchVisionStatusStyles: Record<LaunchVisionStatus, string> = {
+  "ready-local": "border-emerald-200 bg-emerald-50 text-emerald-800",
+  partial: "border-amber-200 bg-amber-50 text-amber-800",
+  "live-action": "border-blue-200 bg-blue-50 text-blue-800",
+  "content-gap": "border-rose-200 bg-rose-50 text-rose-800",
+};
+
+const launchVisionStatusIcons = {
+  "ready-local": CheckCircle2,
+  partial: CircleAlert,
+  "live-action": ExternalLink,
+  "content-gap": BookOpenCheck,
 };
 
 const sourceStatusStyles: Record<GeographyDay1SourceStatus, string> = {
@@ -64,8 +83,22 @@ function StatusBadge({ status }: { status: InventoryStatus }) {
   );
 }
 
+function LaunchVisionBadge({ status }: { status: LaunchVisionStatus }) {
+  const Icon = launchVisionStatusIcons[status];
+  return (
+    <Badge
+      variant="outline"
+      className={`h-7 whitespace-nowrap rounded-md px-2 font-bold ${launchVisionStatusStyles[status]}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {launchVisionStatusLabels[status]}
+    </Badge>
+  );
+}
+
 export default function AdminFeatureInventoryPage() {
   const statusCounts = countInventoryStatuses();
+  const launchVisionCounts = countLaunchVisionStatuses();
   const completedGates = releaseGates.filter((gate) => gate.complete).length;
 
   return (
@@ -154,6 +187,88 @@ export default function AdminFeatureInventoryPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section
+        className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+        data-testid="admin-launch-vision-tracker"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
+            <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950">
+              <Rows3 className="h-5 w-5 text-emerald-700" />
+              Three-Day Launch Vision Tracker
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-500">
+              This translates the dictated product vision into explicit requirements, current evidence, and the next
+              production action. Ready locally does not mean safe to widen until the live gates close.
+            </p>
+          </div>
+          <Badge variant="outline" className="h-7 rounded-md border-zinc-200 bg-zinc-50 px-2 font-bold text-zinc-800">
+            {launchVisionSummary.readyLocal}/{launchVisionSummary.total} ready locally
+          </Badge>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Ready locally", launchVisionCounts["ready-local"], "Verified in the local product loop"],
+            ["Partial", launchVisionCounts.partial, "Built surface exists, but depth or release proof remains"],
+            ["Live action", launchVisionCounts["live-action"], "Needs Supabase, Vercel, OAuth, or continuity proof"],
+            ["Content gap", launchVisionCounts["content-gap"], "Needs founder-approved lecture, transcript, or MCQs"],
+          ].map(([label, value, detail]) => (
+            <div key={label} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+              <p className="mt-2 text-2xl font-black text-zinc-950">{value}</p>
+              <p className="mt-1 text-sm leading-6 text-zinc-600">{detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            ["Day 1", launchVisionSummary.dayOneFocus, "Geography pack, daily readiness, planner, price, and launch boundary"],
+            ["Day 2", launchVisionSummary.dayTwoFocus, "Sources, optional pages, revision, reports, question bank, and current affairs"],
+            ["Day 3", launchVisionSummary.dayThreeFocus, "Live stack, AI teacher provider, OAuth, limiter, and continuity rehearsal"],
+          ].map(([phase, count, detail]) => (
+            <div key={phase} className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">{phase}</p>
+              <p className="mt-2 text-2xl font-black text-emerald-950">{count} requirements</p>
+              <p className="mt-1 text-sm leading-6 text-emerald-800">{detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[1180px] text-left">
+            <thead>
+              <tr className="bg-zinc-50 text-xs font-black uppercase tracking-[0.12em] text-zinc-500">
+                <th className="px-4 py-3">Phase</th>
+                <th className="px-4 py-3">Area</th>
+                <th className="px-4 py-3">Requirement</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Current Evidence</th>
+                <th className="px-4 py-3">Next Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {launchVisionRequirements.map((item) => (
+                <tr key={`${item.area}-${item.requirement}`} className="align-top">
+                  <td className="px-4 py-4 text-sm font-black text-zinc-950">{item.phase}</td>
+                  <td className="px-4 py-4 text-sm font-black text-zinc-950">{item.area}</td>
+                  <td className="px-4 py-4 text-sm leading-6 text-zinc-700">{item.requirement}</td>
+                  <td className="px-4 py-4">
+                    <LaunchVisionBadge status={item.status} />
+                  </td>
+                  <td className="px-4 py-4 text-sm leading-6 text-zinc-600">
+                    <span className="block">{item.currentState}</span>
+                    <span className="mt-2 block text-xs font-bold text-zinc-500">{item.evidence}</span>
+                  </td>
+                  <td className="px-4 py-4 text-sm leading-6 text-zinc-600">{item.nextAction}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

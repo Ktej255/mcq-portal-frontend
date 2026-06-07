@@ -23,11 +23,34 @@ export type ReleaseGate = {
   detail: string;
 };
 
+export type LaunchVisionStatus =
+  | "ready-local"
+  | "partial"
+  | "live-action"
+  | "content-gap";
+
+export type LaunchVisionRequirement = {
+  area: string;
+  requirement: string;
+  status: LaunchVisionStatus;
+  currentState: string;
+  evidence: string;
+  nextAction: string;
+  phase: "Day 1" | "Day 2" | "Day 3";
+};
+
 export const inventoryStatusLabels: Record<InventoryStatus, string> = {
   verified: "Verified local",
   partial: "Partial",
   external: "External apply",
   isolated: "Isolated",
+};
+
+export const launchVisionStatusLabels: Record<LaunchVisionStatus, string> = {
+  "ready-local": "Ready locally",
+  partial: "Partial",
+  "live-action": "Live action",
+  "content-gap": "Content gap",
 };
 
 export const featureInventoryGroups: InventoryGroup[] = [
@@ -463,6 +486,195 @@ export const releaseGates: ReleaseGate[] = [
     detail: "Run the first tiny wave and repair every blocker before widening.",
   },
 ];
+
+export const launchVisionRequirements: LaunchVisionRequirement[] = [
+  {
+    area: "Launch boundary",
+    requirement: "Three-day target: software should be ready for controlled real-student testing.",
+    status: "partial",
+    currentState:
+      "The local product shell, learner loop, reports, pricing, planner, source library, and operator controls are built. Live release gates still remain.",
+    evidence: "releaseGates, route matrix, production build, and feature inventory",
+    nextAction: "Close live Supabase/OAuth continuity and attach the first real Geography launch pack before widening access.",
+    phase: "Day 1",
+  },
+  {
+    area: "Planner",
+    requirement: "Yearly planner with the month-wise UPSC subject sequence.",
+    status: "ready-local",
+    currentState:
+      "The yearly planner exposes nine windows and connects GS coverage, optional subjects, and source-library entry.",
+    evidence: "verify-pricing-planner.cjs",
+    nextAction: "Use it as the public study-calendar anchor after the live access gate closes.",
+    phase: "Day 1",
+  },
+  {
+    area: "Sources",
+    requirement: "Subject-wise syllabus plus Prelims and Mains PYQ source rows should be preloaded.",
+    status: "ready-local",
+    currentState:
+      "GS source rows, official anchors, trend boards, and optional-subject source pages are available locally.",
+    evidence: "verify-syllabus-pyq-trend-library.cjs and verify-optional-subject-pages.cjs",
+    nextAction: "Run a later OCR/topic-tagging depth pass for final public source precision.",
+    phase: "Day 1",
+  },
+  {
+    area: "Pricing",
+    requirement: "Rs 399 monthly plan plus yearly, 18-month, and three-year discount plans.",
+    status: "ready-local",
+    currentState:
+      "Pricing uses deterministic list price, discount, savings, effective monthly price, and checkout intent handoff.",
+    evidence: "verify-pricing-planner.cjs",
+    nextAction: "Connect the checkout provider only after the student-flow pilot is accepted.",
+    phase: "Day 1",
+  },
+  {
+    area: "Optional subjects",
+    requirement: "Every UPSC optional should have a page with Paper I and Paper II year-wise paper rows.",
+    status: "ready-local",
+    currentState:
+      "All optional subject routes are generated with Paper I and Paper II source rows for local review.",
+    evidence: "verify-optional-subject-pages.cjs",
+    nextAction: "Add final PDF extraction and topic tags after the GS pilot is stable.",
+    phase: "Day 2",
+  },
+  {
+    area: "Systematic path",
+    requirement:
+      "Each subject path should combine syllabus demand, PYQ trend, predicted focus, NCERT basics, reference depth, and covered current affairs.",
+    status: "partial",
+    currentState:
+      "The source library and subject command rooms expose the structure. Real lecture depth is strongest in Geography and thinner in later subjects.",
+    evidence: "source-library, subject plans, current-affairs bridge, and subject maturity matrix",
+    nextAction: "Finish the Geography production pack first, then deepen Environment using the same path contract.",
+    phase: "Day 2",
+  },
+  {
+    area: "Daily planner",
+    requirement: "Daily plan should adapt from yesterday's learner evidence instead of staying static.",
+    status: "ready-local",
+    currentState:
+      "Daily Mission reads local progress, me-time, recall baseline, MCQ, revisit, and command evidence to choose the next action.",
+    evidence: "daily-command-e2e.cjs and verify-student-dashboard.cjs",
+    nextAction: "Prove same-account recovery through live Supabase after migration.",
+    phase: "Day 1",
+  },
+  {
+    area: "Recall and gaps",
+    requirement: "Before a new topic, student should recall known points and receive automatic gap analysis.",
+    status: "ready-local",
+    currentState:
+      "Talk room and Daily Mission require recall/baseline evidence, identify missing UPSC links, and route repair before forward movement.",
+    evidence: "verify-adaptive-teacher-talk.cjs and verify-adaptive-teacher-transition.cjs",
+    nextAction: "Add live AI provider key and distributed limiter for production-grade discussion at scale.",
+    phase: "Day 1",
+  },
+  {
+    area: "Revision",
+    requirement: "Systematic revision should be generated from weak signals and due topics.",
+    status: "ready-local",
+    currentState:
+      "Revision Command and Revisit rooms read weak days, MCQ outcomes, teacher gaps, and me-time state.",
+    evidence: "verify-student-report-system.cjs and verify-mcq-revisit-simple.cjs",
+    nextAction: "Use controlled tester receipts to tune revision intervals.",
+    phase: "Day 2",
+  },
+  {
+    area: "Reports",
+    requirement:
+      "Reports should include tests, MCQs, recall, mood, current-affairs unlocks, weekly/monthly summaries, and growth from starting level.",
+    status: "ready-local",
+    currentState:
+      "Reports generate subject, weekly, monthly, growth, me-time, AI gap, MCQ, recall, and covered-news signals from local progress.",
+    evidence: "verify-student-report-system.cjs",
+    nextAction: "Persist reports remotely after learner-state SQL is live.",
+    phase: "Day 2",
+  },
+  {
+    area: "Question bank",
+    requirement:
+      "Solved questions should form a ledger, and custom easy/moderate/tough/adaptive MCQ sets should depend on learner level.",
+    status: "ready-local",
+    currentState:
+      "Question bank prioritizes unresolved AI gaps, weak days, requested difficulty, solved attempts, and repair-first practice.",
+    evidence: "verify-question-bank-builder.cjs",
+    nextAction: "Import founder-approved fresh MCQs before public Geography launch.",
+    phase: "Day 2",
+  },
+  {
+    area: "AI teacher",
+    requirement: "AI discussion room and doubt solving should work as a strong teacher-led discussion loop.",
+    status: "partial",
+    currentState:
+      "Local scoring, provider boundary, fallback guidance, timeout, and response validation work. Live provider key and SQL limiter remain open.",
+    evidence: "adaptive-teacher verifiers and production-boundary static check",
+    nextAction: "Apply rate-limit SQL, configure server-only AI key, and rehearse live Talk with one real account.",
+    phase: "Day 3",
+  },
+  {
+    area: "Current affairs",
+    requirement: "Only current affairs linked to already covered static topics should be visible.",
+    status: "ready-local",
+    currentState:
+      "Hooks stay hidden until the linked subject day has local topic evidence; beginner view is not an open-ended news feed.",
+    evidence: "verify-current-affairs-bridge.cjs",
+    nextAction: "Attach the daily source-writing process after content production stabilizes.",
+    phase: "Day 2",
+  },
+  {
+    area: "Me-time",
+    requirement: "Before each new day/session, automatic readiness and me-time state should guide the load.",
+    status: "ready-local",
+    currentState:
+      "Dashboard, Daily Mission, and Reports read the current session readiness state and show reset or load-reduction guidance.",
+    evidence: "verify-student-dashboard.cjs and verify-student-report-system.cjs",
+    nextAction: "Keep the visible student surface simple while expanding the internal readiness model.",
+    phase: "Day 1",
+  },
+  {
+    area: "Live stack",
+    requirement: "Vercel frontend, Supabase backend, GitHub code repository, and login continuity should be stable.",
+    status: "live-action",
+    currentState:
+      "GitHub sync is active and local Supabase adapters exist. Live migrations, OAuth callback rehearsal, and cross-browser continuity are still required.",
+    evidence: "releaseGates and SUPABASE_LIVE_APPLY_CHECKLIST_2026-05-31.md",
+    nextAction: "Apply Supabase SQL, set production env vars, verify OAuth, and run same-account recovery.",
+    phase: "Day 3",
+  },
+  {
+    area: "Geography launch pack",
+    requirement: "At least one subject, Geography, should be student-ready before moving to the next subject.",
+    status: "content-gap",
+    currentState:
+      "Geography has the full local loop and 30-day route map. Real Day 1 media, transcript approval, detailed animation depth, and fresh MCQs remain the main gap.",
+    evidence: "Geography pilot inventory, Day 1 intake, and release gates",
+    nextAction: "Attach final Day 1 lecture media, approve transcript, import fresh advanced MCQs, and run controlled tester receipts.",
+    phase: "Day 1",
+  },
+];
+
+export function countLaunchVisionStatuses() {
+  return launchVisionRequirements.reduce(
+    (counts, item) => {
+      counts[item.status] += 1;
+      return counts;
+    },
+    {
+      "ready-local": 0,
+      partial: 0,
+      "live-action": 0,
+      "content-gap": 0,
+    } satisfies Record<LaunchVisionStatus, number>
+  );
+}
+
+export const launchVisionSummary = {
+  total: launchVisionRequirements.length,
+  readyLocal: launchVisionRequirements.filter((item) => item.status === "ready-local").length,
+  dayOneFocus: launchVisionRequirements.filter((item) => item.phase === "Day 1").length,
+  dayTwoFocus: launchVisionRequirements.filter((item) => item.phase === "Day 2").length,
+  dayThreeFocus: launchVisionRequirements.filter((item) => item.phase === "Day 3").length,
+};
 
 export const morningBatchCorpusSummary = [
   { label: "Indexed local files", value: "1,504" },
