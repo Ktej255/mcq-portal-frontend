@@ -1,0 +1,418 @@
+import {
+  optionalSourcePacks,
+  subjectSourcePacks,
+  type SourceStage,
+} from "@/lib/upsc/syllabusPyqRegistry";
+
+export const PYQ_IMPORT_LEDGER_KEY = "sarit-upsc-pyq-import-ledger-v1";
+
+export type PyqQuestionKind = "GS_PRELIMS" | "GS_MAINS" | "OPTIONAL_MAINS";
+export type PyqImportStatus = "MAPPED" | "NEEDS_REVIEW";
+
+export type PyqImportCsvRow = {
+  year?: string;
+  stage?: string;
+  subject_slug?: string;
+  paper?: string;
+  question_number?: string;
+  question_text?: string;
+  syllabus_area?: string;
+  syllabus_node_id?: string;
+  topic_tags?: string;
+  trend_insight_id?: string;
+  source_href?: string;
+  official_source_title?: string;
+  answer_demand?: string;
+};
+
+export type PyqImportRecord = {
+  id: string;
+  year: number;
+  stage: SourceStage;
+  kind: PyqQuestionKind;
+  subjectSlug: string;
+  subjectTitle: string;
+  paper: string;
+  questionNumber: string;
+  questionText: string;
+  syllabusArea: string;
+  syllabusNodeId?: string;
+  topicTags: string[];
+  trendInsightId?: string;
+  sourceHref: string;
+  officialSourceTitle?: string;
+  answerDemand?: string;
+  importStatus: PyqImportStatus;
+  importedAt: string;
+};
+
+export type PyqImportValidationIssue = {
+  rowNumber: number;
+  reason: string;
+  row: PyqImportCsvRow;
+};
+
+export type PyqImportParseResult = {
+  accepted: PyqImportRecord[];
+  rejected: PyqImportValidationIssue[];
+};
+
+export type PyqImportCoverageRow = {
+  slug: string;
+  title: string;
+  route: string;
+  sourceRows: number;
+  importedQuestions: number;
+  mappedQuestions: number;
+  needsReview: number;
+  trendBoards: number;
+  coveragePercent: number;
+};
+
+export const pyqImportCsvColumns: Array<{
+  key: keyof PyqImportCsvRow;
+  label: string;
+  required: boolean;
+  detail: string;
+}> = [
+  {
+    key: "year",
+    label: "Year",
+    required: true,
+    detail: "Official paper year, normally 2015-2026 for the current 10-year window.",
+  },
+  {
+    key: "stage",
+    label: "Stage",
+    required: true,
+    detail: "Prelims, Mains, or Optional.",
+  },
+  {
+    key: "subject_slug",
+    label: "Subject Slug",
+    required: true,
+    detail: "GS slug such as geography/economy or optional slug such as anthropology.",
+  },
+  {
+    key: "paper",
+    label: "Paper",
+    required: true,
+    detail: "General Studies Paper I, General Studies Paper III, Anthropology Paper I, etc.",
+  },
+  {
+    key: "question_number",
+    label: "Question Number",
+    required: true,
+    detail: "Stable paper position such as Q1, Q12(a), or GS1-2024-Q3.",
+  },
+  {
+    key: "question_text",
+    label: "Question Text",
+    required: true,
+    detail: "Exact official question text copied from the UPSC paper after verification.",
+  },
+  {
+    key: "syllabus_area",
+    label: "Syllabus Area",
+    required: true,
+    detail: "Human-readable syllabus demand area that the question tests.",
+  },
+  {
+    key: "topic_tags",
+    label: "Topic Tags",
+    required: true,
+    detail: "Pipe-separated tags such as monsoon|ITCZ|jet stream.",
+  },
+  {
+    key: "source_href",
+    label: "Official Source URL",
+    required: true,
+    detail: "Official UPSC paper or source page URL.",
+  },
+  {
+    key: "syllabus_node_id",
+    label: "Syllabus Node ID",
+    required: false,
+    detail: "Optional internal node such as geo-physical or eco-core.",
+  },
+  {
+    key: "trend_insight_id",
+    label: "Trend Insight ID",
+    required: false,
+    detail: "Optional trend board id such as geo-map-process.",
+  },
+  {
+    key: "official_source_title",
+    label: "Official Source Title",
+    required: false,
+    detail: "Optional display name of the official paper/source.",
+  },
+  {
+    key: "answer_demand",
+    label: "Answer Demand",
+    required: false,
+    detail: "For mains: explain/analyse/discuss/evaluate. For prelims: concept/pair/map/elimination.",
+  },
+];
+
+function csvEscape(value: string | number) {
+  const text = String(value);
+  if (!/[",\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function normalize(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeStage(value: string): SourceStage | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "prelims" || normalized === "preliminary") return "Prelims";
+  if (normalized === "mains" || normalized === "main") return "Mains";
+  if (normalized === "optional") return "Optional";
+  return null;
+}
+
+function normalizeTopicTags(value: string) {
+  return value
+    .split(/[|,;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function sourcePackForSlug(slug: string) {
+  const gs = subjectSourcePacks.find((subject) => subject.slug === slug);
+  if (gs) return { title: gs.title, route: gs.route, type: "gs" as const };
+
+  const optional = optionalSourcePacks.find((subject) => subject.slug === slug);
+  if (optional) return { title: optional.title, route: optional.route, type: "optional" as const };
+
+  return null;
+}
+
+function resolveQuestionKind(stage: SourceStage, sourceType: "gs" | "optional"): PyqQuestionKind | null {
+  if (stage === "Prelims" && sourceType === "gs") return "GS_PRELIMS";
+  if (stage === "Mains" && sourceType === "gs") return "GS_MAINS";
+  if (stage === "Optional" && sourceType === "optional") return "OPTIONAL_MAINS";
+  return null;
+}
+
+function stablePyqId({
+  year,
+  stage,
+  subjectSlug,
+  paper,
+  questionNumber,
+}: {
+  year: number;
+  stage: SourceStage;
+  subjectSlug: string;
+  paper: string;
+  questionNumber: string;
+}) {
+  return [year, stage, subjectSlug, paper, questionNumber]
+    .join("-")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function isReviewRecord(record: Omit<PyqImportRecord, "importStatus">) {
+  return (
+    record.questionText.length < 30 ||
+    record.topicTags.length === 0 ||
+    !record.syllabusArea ||
+    !record.sourceHref.startsWith("http")
+  );
+}
+
+export function buildPyqImportCsvTemplate() {
+  const headers = pyqImportCsvColumns.map((column) => column.key);
+  const rows: PyqImportCsvRow[] = [
+    {
+      year: "2024",
+      stage: "Prelims",
+      subject_slug: "geography",
+      paper: "General Studies Paper I",
+      question_number: "Q1",
+      question_text: "Paste exact verified UPSC question text here.",
+      syllabus_area: "Indian geography and mapping",
+      syllabus_node_id: "geo-india",
+      topic_tags: "map|location|elimination",
+      trend_insight_id: "geo-map-process",
+      source_href: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+      official_source_title: "Civil Services Preliminary Examination 2024 Question Papers",
+      answer_demand: "Prelims elimination and map logic",
+    },
+    {
+      year: "2025",
+      stage: "Optional",
+      subject_slug: "anthropology",
+      paper: "Anthropology Paper I",
+      question_number: "Q1(a)",
+      question_text: "Paste exact verified UPSC optional question text here.",
+      syllabus_area: "Paper I syllabus unit",
+      topic_tags: "optional|paper-i|topic",
+      source_href: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202025",
+      official_source_title: "Civil Services Main Examination 2025 Question Papers",
+      answer_demand: "Mains explanation",
+    },
+  ];
+
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header] ?? "")).join(",")),
+  ].join("\n");
+}
+
+export function buildPyqImportRecordsFromCsvRows(rows: PyqImportCsvRow[]): PyqImportParseResult {
+  const accepted: PyqImportRecord[] = [];
+  const rejected: PyqImportValidationIssue[] = [];
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const year = Number(normalize(row.year));
+    const stage = normalizeStage(normalize(row.stage));
+    const subjectSlug = normalize(row.subject_slug).toLowerCase();
+    const subjectPack = sourcePackForSlug(subjectSlug);
+    const paper = normalize(row.paper);
+    const questionNumber = normalize(row.question_number);
+    const questionText = normalize(row.question_text);
+    const syllabusArea = normalize(row.syllabus_area);
+    const sourceHref = normalize(row.source_href);
+    const topicTags = normalizeTopicTags(normalize(row.topic_tags));
+
+    if (!Number.isInteger(year) || year < 2010 || year > 2026) {
+      rejected.push({ rowNumber, reason: "Year must be a valid UPSC paper year between 2010 and 2026.", row });
+      return;
+    }
+
+    if (!stage) {
+      rejected.push({ rowNumber, reason: "Stage must be Prelims, Mains, or Optional.", row });
+      return;
+    }
+
+    if (!subjectPack) {
+      rejected.push({ rowNumber, reason: "Subject slug is not present in the GS or optional source catalog.", row });
+      return;
+    }
+
+    const kind = resolveQuestionKind(stage, subjectPack.type);
+    if (!kind) {
+      rejected.push({
+        rowNumber,
+        reason: "Stage and subject type do not match. GS subjects use Prelims/Mains; optional subjects use Optional.",
+        row,
+      });
+      return;
+    }
+
+    if (!paper || !questionNumber || !questionText || !syllabusArea || !sourceHref) {
+      rejected.push({
+        rowNumber,
+        reason: "Paper, question number, question text, syllabus area, and source URL are required.",
+        row,
+      });
+      return;
+    }
+
+    const baseRecord: Omit<PyqImportRecord, "importStatus"> = {
+      id: stablePyqId({ year, stage, subjectSlug, paper, questionNumber }),
+      year,
+      stage,
+      kind,
+      subjectSlug,
+      subjectTitle: subjectPack.title,
+      paper,
+      questionNumber,
+      questionText,
+      syllabusArea,
+      syllabusNodeId: normalize(row.syllabus_node_id) || undefined,
+      topicTags,
+      trendInsightId: normalize(row.trend_insight_id) || undefined,
+      sourceHref,
+      officialSourceTitle: normalize(row.official_source_title) || undefined,
+      answerDemand: normalize(row.answer_demand) || undefined,
+      importedAt: new Date().toISOString(),
+    };
+
+    accepted.push({
+      ...baseRecord,
+      importStatus: isReviewRecord(baseRecord) ? "NEEDS_REVIEW" : "MAPPED",
+    });
+  });
+
+  return { accepted, rejected };
+}
+
+export function dedupePyqImportRecords(records: PyqImportRecord[]) {
+  const byId = new Map<string, PyqImportRecord>();
+  records.forEach((record) => byId.set(record.id, record));
+  return Array.from(byId.values()).sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    return `${a.subjectSlug}-${a.paper}-${a.questionNumber}`.localeCompare(
+      `${b.subjectSlug}-${b.paper}-${b.questionNumber}`
+    );
+  });
+}
+
+export function readLocalPyqImportRecords(): PyqImportRecord[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PYQ_IMPORT_LEDGER_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeLocalPyqImportRecords(records: PyqImportRecord[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PYQ_IMPORT_LEDGER_KEY, JSON.stringify(dedupePyqImportRecords(records)));
+}
+
+export function appendLocalPyqImportRecords(records: PyqImportRecord[]) {
+  const next = dedupePyqImportRecords([...readLocalPyqImportRecords(), ...records]);
+  writeLocalPyqImportRecords(next);
+  return next;
+}
+
+export function clearLocalPyqImportRecords() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PYQ_IMPORT_LEDGER_KEY);
+}
+
+export function buildPyqImportCoverage(records: PyqImportRecord[]): PyqImportCoverageRow[] {
+  return subjectSourcePacks.map((subject) => {
+    const subjectRecords = records.filter((record) => record.subjectSlug === subject.slug);
+    const mappedQuestions = subjectRecords.filter((record) => record.importStatus === "MAPPED").length;
+    const sourceRows = subject.pyqRows.length;
+
+    return {
+      slug: subject.slug,
+      title: subject.title,
+      route: subject.route,
+      sourceRows,
+      importedQuestions: subjectRecords.length,
+      mappedQuestions,
+      needsReview: subjectRecords.length - mappedQuestions,
+      trendBoards: subject.trendInsights.length,
+      coveragePercent: sourceRows > 0 ? Math.round((mappedQuestions / sourceRows) * 100) : 0,
+    };
+  });
+}
+
+export function summarizePyqImportLedger(records: PyqImportRecord[]) {
+  const mappedQuestions = records.filter((record) => record.importStatus === "MAPPED").length;
+  const subjectsTouched = new Set(records.map((record) => record.subjectSlug)).size;
+  const optionalQuestions = records.filter((record) => record.kind === "OPTIONAL_MAINS").length;
+
+  return {
+    importedQuestions: records.length,
+    mappedQuestions,
+    needsReview: records.length - mappedQuestions,
+    subjectsTouched,
+    optionalQuestions,
+  };
+}

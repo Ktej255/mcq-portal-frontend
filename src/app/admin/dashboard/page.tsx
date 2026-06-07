@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Database,
   FileSearch,
+  FileInput,
   ListChecks,
   ShieldCheck,
 } from "lucide-react";
@@ -56,6 +57,12 @@ const operatorLinks = [
     title: "Prelims V2 Audit",
     detail: "Master-only Morning Batch corpus room with public claims locked until proof review.",
     icon: FileSearch,
+  },
+  {
+    href: "/admin/pyq-import",
+    title: "Exact PYQ Import",
+    detail: "Stage verified official PYQ text with subject, syllabus, topic tags, and source URL before public claims.",
+    icon: FileInput,
   },
   {
     href: "/admin/questions/bulk",
