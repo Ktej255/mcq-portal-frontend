@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookMarked,
   CheckCircle2,
+  ClipboardList,
   Database,
   FileSearch,
   Route,
@@ -10,6 +11,8 @@ import {
 } from "lucide-react";
 
 import {
+  officialPaperIndexRows,
+  officialPaperIndexSummary,
   officialSourceAnchors,
   optionalSourcePacks,
   subjectSourcePacks,
@@ -33,6 +36,9 @@ function statusTone(status: ImportStatus) {
 export function UpscSyllabusPyqLibrary() {
   const [firstSubject] = subjectSourcePacks;
   const [firstOptional] = optionalSourcePacks;
+  const directPaperPreviewRows = officialPaperIndexRows
+    .filter((row) => row.status === "direct-paper-page-linked")
+    .slice(0, 6);
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -102,6 +108,64 @@ export function UpscSyllabusPyqLibrary() {
             <AuditMetric label="Text pending" value={syllabusPyqPreloadAudit.textImportPendingRows} />
             <AuditMetric label="Official anchors" value={syllabusPyqPreloadAudit.officialAnchorCount} />
             <AuditMetric label="Trend insights" value={syllabusPyqPreloadAudit.trendInsightCount} />
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-official-paper-index-proof"
+          data-proof-rule={officialPaperIndexSummary.proofRule}
+          data-year-window={officialPaperIndexSummary.yearWindow}
+          data-prelims-paper-rows={officialPaperIndexSummary.prelimsPaperRows}
+          data-gs-mains-paper-rows={officialPaperIndexSummary.gsMainsPaperRows}
+          data-optional-paper-index-rows={officialPaperIndexSummary.optionalPaperIndexRows}
+          data-total-paper-index-rows={officialPaperIndexSummary.totalPaperIndexRows}
+          data-direct-linked-paper-rows={officialPaperIndexSummary.directLinkedPaperRows}
+          data-index-page-paper-rows={officialPaperIndexSummary.indexPagePaperRows}
+          data-exact-question-text-rows={officialPaperIndexSummary.exactQuestionTextRows}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Official paper index
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Paper sources are loaded before exact question import.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {officialPaperIndexSummary.exactImportRule} {officialPaperIndexSummary.nextAction}
+              </p>
+            </div>
+            <ClipboardList className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <AuditMetric label="Prelims papers" value={officialPaperIndexSummary.prelimsPaperRows} />
+            <AuditMetric label="Mains GS papers" value={officialPaperIndexSummary.gsMainsPaperRows} />
+            <AuditMetric label="Optional papers" value={officialPaperIndexSummary.optionalPaperIndexRows} />
+            <AuditMetric label="Total papers" value={officialPaperIndexSummary.totalPaperIndexRows} />
+            <AuditMetric label="Direct linked" value={officialPaperIndexSummary.directLinkedPaperRows} />
+            <AuditMetric label="Index linked" value={officialPaperIndexSummary.indexPagePaperRows} />
+            <AuditMetric label="Exact text rows" value={officialPaperIndexSummary.exactQuestionTextRows} />
+            <AuditMetric label="Window" value={officialPaperIndexSummary.yearWindow} />
+          </div>
+          <div className="mt-4 grid gap-2 lg:grid-cols-2">
+            {directPaperPreviewRows.map((row) => (
+              <a
+                key={row.id}
+                href={row.sourceHref}
+                data-testid="upsc-official-paper-index-row"
+                data-stage={row.stage}
+                data-year={row.year}
+                data-status={row.status}
+                className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                  {row.year} / {row.stage} / {row.status.replaceAll("-", " ")}
+                </p>
+                <h3 className="mt-1 text-sm font-black">{row.paper}</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.nextAction}</p>
+              </a>
+            ))}
           </div>
         </section>
 

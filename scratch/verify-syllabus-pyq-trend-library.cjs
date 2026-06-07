@@ -62,11 +62,13 @@ async function run() {
 
   const libraryState = await page.evaluate(() => {
     const preloadProof = document.querySelector('[data-testid="upsc-syllabus-pyq-preload-proof"]');
+    const paperIndexProof = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
     const packs = [...document.querySelectorAll('[data-testid="upsc-subject-source-pack"]')];
     const geographyPack = document.querySelector('[data-testid="upsc-subject-source-pack"][data-subject-slug="geography"]');
     const trendInsights = [...document.querySelectorAll('[data-testid="upsc-pyq-trend-insight"]')];
     const officialAnchors = [...document.querySelectorAll('[data-testid="upsc-official-source-anchors"] a')];
     const optionalCards = [...document.querySelectorAll('[data-testid="upsc-optional-source-pack-link"]')];
+    const paperIndexRows = [...document.querySelectorAll('[data-testid="upsc-official-paper-index-row"]')];
 
     return {
       subjectPackCount: packs.length,
@@ -84,6 +86,24 @@ async function run() {
         trendInsightCount: preloadProof?.getAttribute("data-trend-insight-count"),
         text: preloadProof?.textContent || "",
       },
+      paperIndexProof: {
+        proofRule: paperIndexProof?.getAttribute("data-proof-rule"),
+        yearWindow: paperIndexProof?.getAttribute("data-year-window"),
+        prelimsPaperRows: paperIndexProof?.getAttribute("data-prelims-paper-rows"),
+        gsMainsPaperRows: paperIndexProof?.getAttribute("data-gs-mains-paper-rows"),
+        optionalPaperIndexRows: paperIndexProof?.getAttribute("data-optional-paper-index-rows"),
+        totalPaperIndexRows: paperIndexProof?.getAttribute("data-total-paper-index-rows"),
+        directLinkedPaperRows: paperIndexProof?.getAttribute("data-direct-linked-paper-rows"),
+        indexPagePaperRows: paperIndexProof?.getAttribute("data-index-page-paper-rows"),
+        exactQuestionTextRows: paperIndexProof?.getAttribute("data-exact-question-text-rows"),
+        text: paperIndexProof?.textContent || "",
+      },
+      paperIndexPreviewCount: paperIndexRows.length,
+      paperIndexPreviewRows: paperIndexRows.map((row) => ({
+        stage: row.getAttribute("data-stage"),
+        year: row.getAttribute("data-year"),
+        status: row.getAttribute("data-status"),
+      })),
       officialAnchorCount: officialAnchors.length,
       optionalCardCount: optionalCards.length,
       trendInsightCount: trendInsights.length,
@@ -123,6 +143,17 @@ async function run() {
     officialAnchorCount: "5",
     trendInsightCount: "13",
   };
+  const expectedPaperIndexProof = {
+    proofRule: "official-paper-index-before-exact-question-import",
+    yearWindow: "2015-2025",
+    prelimsPaperRows: "22",
+    gsMainsPaperRows: "55",
+    optionalPaperIndexRows: "1056",
+    totalPaperIndexRows: "1133",
+    directLinkedPaperRows: "204",
+    indexPagePaperRows: "929",
+    exactQuestionTextRows: "0",
+  };
 
   if (libraryState.subjectPackCount !== 8) {
     throw new Error(`Expected 8 GS source packs, got ${libraryState.subjectPackCount}`);
@@ -141,11 +172,24 @@ async function run() {
       throw new Error(`Preload proof ${key} mismatch: ${JSON.stringify({ expected, actual: libraryState.preloadProof[key], preloadProof: libraryState.preloadProof })}`);
     }
   }
+  for (const [key, expected] of Object.entries(expectedPaperIndexProof)) {
+    if (libraryState.paperIndexProof[key] !== expected) {
+      throw new Error(`Paper index proof ${key} mismatch: ${JSON.stringify({ expected, actual: libraryState.paperIndexProof[key], paperIndexProof: libraryState.paperIndexProof })}`);
+    }
+  }
   if (
     !libraryState.preloadProof.text.includes("GS and optional source rows are counted from one registry") ||
     !libraryState.preloadProof.text.includes("PDF text extraction and topic mapping")
   ) {
     throw new Error(`Preload proof missing visible audit language: ${libraryState.preloadProof.text}`);
+  }
+  if (
+    libraryState.paperIndexPreviewCount < 6 ||
+    !libraryState.paperIndexProof.text.includes("No exact question-text claim") ||
+    !libraryState.paperIndexProof.text.includes("Paper sources are loaded before exact question import") ||
+    libraryState.paperIndexPreviewRows.some((row) => row.status !== "direct-paper-page-linked")
+  ) {
+    throw new Error(`Paper index proof missing visible contract: ${JSON.stringify(libraryState.paperIndexProof)}`);
   }
   if (
     libraryState.subjectPackRows.some(
@@ -179,6 +223,8 @@ async function run() {
     "Current affairs:",
     "Gap:",
     "Revision:",
+    "Official paper index",
+    "Exact text rows",
     "Use trend signals to choose watch areas",
     "full PDF text extraction and exact topic tagging continue next",
   ]) {

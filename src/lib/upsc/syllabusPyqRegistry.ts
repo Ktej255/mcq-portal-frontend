@@ -4,6 +4,7 @@ export type SourceStage = "Prelims" | "Mains" | "Optional";
 export type ImportStatus = "source-indexed" | "topic-mapped" | "text-import-pending";
 export type TrendWeight = "High" | "Medium" | "Selective";
 export type TrendEvidenceLevel = "official-source-indexed" | "topic-pattern-model" | "full-text-pending";
+export type OfficialPaperIndexStatus = "direct-paper-page-linked" | "official-index-linked";
 
 export type OfficialSourceAnchor = {
   id: string;
@@ -12,6 +13,22 @@ export type OfficialSourceAnchor = {
   stage: SourceStage | "Notification";
   href: string;
   note: string;
+};
+
+export type OfficialPaperIndexRow = {
+  id: string;
+  year: number;
+  stage: SourceStage;
+  exam: string;
+  paper: string;
+  subjectSlug?: string;
+  subjectTitle?: string;
+  sourceAnchorId: string;
+  sourceHref: string;
+  status: OfficialPaperIndexStatus;
+  extractionPriority: "high" | "medium";
+  studentUse: string;
+  nextAction: string;
 };
 
 export type SyllabusNode = {
@@ -164,12 +181,128 @@ export const officialSourceAnchors: OfficialSourceAnchor[] = [
 
 const sourceYears = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015];
 const mainsSourceYears = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015];
+const prelimsPapers = ["General Studies Paper I", "CSAT Paper II"];
+const mainsGeneralStudiesPapers = [
+  "Essay",
+  "General Studies Paper - I",
+  "General Studies Paper - II",
+  "General Studies Paper - III",
+  "General Studies Paper - IV",
+];
 
 function previousQuestionPapersHref(year: number) {
   if (year === 2025) return officialSourceAnchors.find((source) => source.id === "csm-2025-papers")!.href;
   if (year === 2024) return officialSourceAnchors.find((source) => source.id === "csm-2024-papers")!.href;
   return officialSourceAnchors.find((source) => source.id === "upsc-previous-question-papers")!.href;
 }
+
+function paperId(parts: Array<string | number>) {
+  return parts
+    .join("-")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function prelimsPaperSource(year: number) {
+  const sourceAnchorId = year === 2024 ? "csp-2024-papers" : "upsc-previous-question-papers";
+  const sourceHref = officialSourceAnchors.find((source) => source.id === sourceAnchorId)!.href;
+
+  return {
+    sourceAnchorId,
+    sourceHref,
+    status: sourceAnchorId === "csp-2024-papers" ? ("direct-paper-page-linked" as const) : ("official-index-linked" as const),
+  };
+}
+
+function mainsPaperSource(year: number) {
+  const sourceAnchorId = year === 2025 ? "csm-2025-papers" : year === 2024 ? "csm-2024-papers" : "upsc-previous-question-papers";
+  const sourceHref = officialSourceAnchors.find((source) => source.id === sourceAnchorId)!.href;
+
+  return {
+    sourceAnchorId,
+    sourceHref,
+    status:
+      sourceAnchorId === "upsc-previous-question-papers" ? ("official-index-linked" as const) : ("direct-paper-page-linked" as const),
+  };
+}
+
+function buildOfficialPaperIndexRows(): OfficialPaperIndexRow[] {
+  const prelimsRows = sourceYears.flatMap((year) => {
+    const source = prelimsPaperSource(year);
+
+    return prelimsPapers.map((paper) => ({
+      id: paperId(["official", "prelims", year, paper]),
+      year,
+      stage: "Prelims" as const,
+      exam: "Civil Services Preliminary Examination",
+      paper,
+      ...source,
+      extractionPriority: paper === "General Studies Paper I" ? ("high" as const) : ("medium" as const),
+      studentUse:
+        paper === "General Studies Paper I"
+          ? "Tag subject-wise prelims concepts, elimination traps, map/current hooks, and static-current bridges."
+          : "Keep CSAT source availability visible without mixing it into GS subject trend claims.",
+      nextAction: "Extract exact question text from the official paper, then tag topic, syllabus line, and demand type.",
+    }));
+  });
+
+  const mainsGsRows = mainsSourceYears.flatMap((year) => {
+    const source = mainsPaperSource(year);
+
+    return mainsGeneralStudiesPapers.map((paper) => ({
+      id: paperId(["official", "mains", year, paper]),
+      year,
+      stage: "Mains" as const,
+      exam: "Civil Services Main Examination",
+      paper,
+      ...source,
+      extractionPriority: paper === "Essay" ? ("medium" as const) : ("high" as const),
+      studentUse: "Map answer-writing demand, syllabus line, examples, data hooks, and repeated UPSC command verbs.",
+      nextAction: "Extract exact question text, classify command verb, tag GS paper, and connect to the daily planner.",
+    }));
+  });
+
+  const optionalRows = optionalSubjects.flatMap((subject) =>
+    mainsSourceYears.flatMap((year) => {
+      const source = mainsPaperSource(year);
+
+      return (["Paper I", "Paper II"] as const).map((paper) => ({
+        id: paperId(["official", "optional", year, subject.slug, paper]),
+        year,
+        stage: "Optional" as const,
+        exam: "Civil Services Optional Mains",
+        paper: `${subject.title} ${paper}`,
+        subjectSlug: subject.slug,
+        subjectTitle: subject.title,
+        ...source,
+        extractionPriority: "medium" as const,
+        studentUse: "Build optional-specific year-wise paper pages, syllabus-unit tags, and answer-writing trend boards.",
+        nextAction: "Extract optional Paper I/II questions year-wise and map each question to optional syllabus themes.",
+      }));
+    })
+  );
+
+  return [...prelimsRows, ...mainsGsRows, ...optionalRows];
+}
+
+export const officialPaperIndexRows = buildOfficialPaperIndexRows();
+
+export const officialPaperIndexSummary = {
+  proofRule: "official-paper-index-before-exact-question-import",
+  yearWindow: `${sourceYears[sourceYears.length - 1]}-${sourceYears[0]}`,
+  prelimsPaperRows: officialPaperIndexRows.filter((row) => row.stage === "Prelims").length,
+  gsMainsPaperRows: officialPaperIndexRows.filter((row) => row.stage === "Mains").length,
+  optionalPaperIndexRows: officialPaperIndexRows.filter((row) => row.stage === "Optional").length,
+  totalPaperIndexRows: officialPaperIndexRows.length,
+  directLinkedPaperRows: officialPaperIndexRows.filter((row) => row.status === "direct-paper-page-linked").length,
+  indexPagePaperRows: officialPaperIndexRows.filter((row) => row.status === "official-index-linked").length,
+  exactQuestionTextRows: 0,
+  exactImportRule:
+    "No exact question-text claim is made from this index. Exact PYQ rows become live only after verified question text is imported and reviewed.",
+  nextAction:
+    "Use the direct-linked 2024/2025 paper pages first, then work backwards through the official UPSC previous-question-papers index.",
+};
 
 function subjectNodes(slug: string): SyllabusNode[] {
   const commonTrend = "Map the last 10 years of prelims and mains questions, then tag repeated demand and trap style.";
@@ -913,6 +1046,9 @@ export const syllabusPyqRegistrySummary = {
 export const syllabusPyqPreloadAudit = {
   ...syllabusPyqRegistrySummary,
   totalPyqRows: syllabusPyqRegistrySummary.gsPyqRows + syllabusPyqRegistrySummary.optionalPyqRows,
+  officialPaperIndexRows: officialPaperIndexSummary.totalPaperIndexRows,
+  directlyLinkedOfficialPapers: officialPaperIndexSummary.directLinkedPaperRows,
+  exactQuestionTextRows: officialPaperIndexSummary.exactQuestionTextRows,
   textImportPendingRows:
     syllabusPyqRegistrySummary.gsPyqRows +
     syllabusPyqRegistrySummary.optionalPyqRows -
