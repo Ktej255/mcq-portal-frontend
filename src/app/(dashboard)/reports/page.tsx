@@ -249,6 +249,59 @@ export default function ReportsPage() {
         </section>
 
         <section
+          data-testid="upsc-auto-report-proof"
+          data-weekly-report-id={allSubjectReport.autoReport.weeklyReportId}
+          data-monthly-report-id={allSubjectReport.autoReport.monthlyReportId}
+          className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <FileText className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                  Auto-generated report proof
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">Weekly and monthly reports rebuild from evidence</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                {allSubjectReport.autoReport.studentPromise}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["Weekly ID", allSubjectReport.autoReport.weeklyReportId],
+                ["Monthly ID", allSubjectReport.autoReport.monthlyReportId],
+                ["Growth start", allSubjectReport.autoReport.growthBaseline],
+                ["Growth now", allSubjectReport.autoReport.growthNow],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                  <p className="mt-1 text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Cadence</p>
+              <p className="mt-1 text-sm font-bold leading-6 text-[#4f5e55]">{allSubjectReport.autoReport.cadence}</p>
+            </div>
+            <div className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Evidence rule</p>
+              <p className="mt-1 text-sm font-bold leading-6 text-[#4f5e55]">
+                {allSubjectReport.autoReport.evidenceRule}
+              </p>
+            </div>
+            <div className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Next report action</p>
+              <p className="mt-1 text-sm font-bold leading-6 text-[#4f5e55]">
+                {allSubjectReport.autoReport.nextWeeklyAction}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section
           data-testid="upsc-all-subject-report-windows"
           className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >

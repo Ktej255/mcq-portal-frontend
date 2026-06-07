@@ -139,6 +139,7 @@ async function run() {
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-auto-report-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-growth-scale").waitFor({ timeout: 15000 });
@@ -154,6 +155,11 @@ async function run() {
   }));
   const readinessHref = await page.getByTestId("upsc-current-readiness-action").getAttribute("href");
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
+  const autoReportProof = await page.getByTestId("upsc-auto-report-proof").evaluate((node) => ({
+    weeklyReportId: node.getAttribute("data-weekly-report-id"),
+    monthlyReportId: node.getAttribute("data-monthly-report-id"),
+    text: node.textContent || "",
+  }));
   const allSubjectWindowText = await page.getByTestId("upsc-all-subject-report-windows").innerText();
   const allSubjectWeeklyCount = await page.getByTestId("upsc-all-subject-weekly-report").count();
   const allSubjectMonthlyText = await page.getByTestId("upsc-all-subject-monthly-report").innerText();
@@ -178,6 +184,7 @@ async function run() {
     weeklyCount,
     allSubjectWeeklyCount,
     allSubjectText,
+    autoReportProof,
     allSubjectWindowText,
     allSubjectMonthlyText,
     geographyCardText,
@@ -231,6 +238,20 @@ async function run() {
   if (!/exam stress: grounding needed/i.test(environmentCardText) || !/covered news\s+1 hook/i.test(environmentCardText.replace(/\s+/g, " "))) {
     throw new Error(`Environment report card missing readiness or covered-news evidence: ${environmentCardText}`);
   }
+  const compactAutoReportProof = autoReportProof.text.replace(/\s+/g, " ");
+  if (
+    autoReportProof.weeklyReportId !== "all-subject-week-1" ||
+    autoReportProof.monthlyReportId !== "all-subject-month" ||
+    !/Auto-generated report proof/i.test(compactAutoReportProof) ||
+    !/Weekly and monthly reports rebuild from evidence/i.test(compactAutoReportProof) ||
+    !/No manual spreadsheet/i.test(compactAutoReportProof) ||
+    !/Only saved learning evidence is counted/i.test(compactAutoReportProof) ||
+    !/Growth start\s*Geography: 3\/30 days started/i.test(compactAutoReportProof) ||
+    !/Growth now\s*1 AI teacher gap active/i.test(compactAutoReportProof) ||
+    !/Clear the latest AI teacher gap/i.test(compactAutoReportProof)
+  ) {
+    throw new Error(`Auto-report proof missing cadence, IDs, or growth evidence: ${JSON.stringify(autoReportProof)}`);
+  }
   const normalizedEvidence = `${evidenceText}\n${monthlyText}`.toLowerCase();
   for (const expectedText of ["recall", "mcq", "revision", "me-time", "current affairs", "2 unlocked"]) {
     if (!normalizedEvidence.includes(expectedText)) {
@@ -246,6 +267,7 @@ async function run() {
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-auto-report-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "reports-mobile", checks);

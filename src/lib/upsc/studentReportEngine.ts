@@ -71,6 +71,17 @@ export type UpscStudentReportSnapshot = {
   subjects: StudentSubjectReport[];
   weekly: StudentReportWindow[];
   monthly: StudentReportWindow;
+  autoReport: {
+    weeklyReportId: string;
+    monthlyReportId: string;
+    cadence: string;
+    evidenceRule: string;
+    growthBaseline: string;
+    growthNow: string;
+    nextWeeklyAction: string;
+    nextMonthlyAction: string;
+    studentPromise: string;
+  };
   totals: {
     totalDays: number;
     startedDays: number;
@@ -443,11 +454,35 @@ export function buildUpscStudentReportSnapshot(
         right.recoveryItems - left.recoveryItems ||
         left.startedDays / left.totalDays - right.startedDays / right.totalDays
     )[0]?.title ?? "Baseline pending";
+  const weeklyFocus = weekly.find((window) => window.startedDays > 0 || window.recoveryItems > 0 || window.teacherDoubtCount > 0) ?? weekly[0];
+  const growthBaseline = startedSubjects[0]
+    ? `${startedSubjects[0].title}: ${startedSubjects[0].startedDays}/${startedSubjects[0].totalDays} days started`
+    : "No subject baseline yet";
+  const growthNow =
+    teacherDoubtCount > 0
+      ? `${teacherDoubtCount} AI teacher gap${teacherDoubtCount === 1 ? "" : "s"} active`
+      : recoveryItems > 0
+        ? `${recoveryItems} recovery item${recoveryItems === 1 ? "" : "s"} across subjects`
+        : startedDays > 0
+          ? `${startedDays}/${totalDays} planned days have evidence`
+          : "Start the first daily loop to create evidence";
 
   return {
     subjects,
     weekly,
     monthly,
+    autoReport: {
+      weeklyReportId: weeklyFocus?.id ?? "all-subject-week-1",
+      monthlyReportId: monthly.id,
+      cadence: "Weekly report rebuilds from each active subject week; monthly report rebuilds from the full UPSC plan.",
+      evidenceRule:
+        "Only saved learning evidence is counted: recall, MCQ, recovery, AI teacher gaps, me-time, and covered-topic current affairs.",
+      growthBaseline,
+      growthNow,
+      nextWeeklyAction: weeklyFocus?.nextAction ?? "Start one subject day to generate the first weekly report row.",
+      nextMonthlyAction: monthly.nextAction,
+      studentPromise: "No manual spreadsheet: every report is regenerated from the learner's saved daily loop evidence.",
+    },
     totals: {
       totalDays,
       startedDays,
@@ -463,17 +498,8 @@ export function buildUpscStudentReportSnapshot(
       growthPercent: totalDays ? Math.round((startedDays / totalDays) * 100) : 0,
     },
     growth: {
-      startedFrom: startedSubjects[0]
-        ? `${startedSubjects[0].title}: ${startedSubjects[0].startedDays}/${startedSubjects[0].totalDays} days started`
-        : "No subject baseline yet",
-      currentPosition:
-        teacherDoubtCount > 0
-          ? `${teacherDoubtCount} AI teacher gap${teacherDoubtCount === 1 ? "" : "s"} active`
-          : recoveryItems > 0
-          ? `${recoveryItems} recovery item${recoveryItems === 1 ? "" : "s"} across subjects`
-          : startedDays > 0
-            ? `${startedDays}/${totalDays} planned days have evidence`
-            : "Start the first daily loop to create evidence",
+      startedFrom: growthBaseline,
+      currentPosition: growthNow,
       strongestSubject,
       weakestSubject,
     },
