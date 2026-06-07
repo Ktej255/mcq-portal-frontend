@@ -214,6 +214,12 @@ function checklistTone(status: "done" | "pending" | "repair") {
   return "border-[#dcd5c7] bg-white text-[#5d675f]";
 }
 
+function proofTone(status: "used" | "missing" | "blocked") {
+  if (status === "used") return "border-[#b9d9cd] bg-white text-[#085041]";
+  if (status === "blocked") return "border-[#ef9f27]/50 bg-white text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-white text-[#5d675f]";
+}
+
 function labelForDailyDoubt(href: string) {
   if (href.includes("/watch")) return "Open repair class";
   if (href.includes("/revisit")) return "Open revisit";
@@ -579,6 +585,43 @@ export function UpscDailyMissionControl() {
             {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
           </span>
         </Link>
+
+        <section
+          data-testid="daily-next-session-proof"
+          data-source-day={dailyPlanner.nextSessionProof.sourceDay}
+          data-target-day={dailyPlanner.nextSessionProof.targetDay}
+          data-decision={dailyPlanner.nextSessionProof.decision}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Next-session proof
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                Day {dailyPlanner.nextSessionProof.sourceDay} evidence chose Day {dailyPlanner.nextSessionProof.targetDay}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                {dailyPlanner.nextSessionProof.evidenceSummary}
+              </p>
+              <p className="mt-3 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#31443a]">
+                Rule: {dailyPlanner.nextSessionProof.adjustmentRule}
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {dailyPlanner.nextSessionProof.evidence.map((item) => (
+                <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                  <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {dailyPlanner.teacherDoubt ? (
           <section

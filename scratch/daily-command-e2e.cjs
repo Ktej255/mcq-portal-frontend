@@ -155,6 +155,26 @@ async function run() {
   if (repairAdjustment.status !== "Repair first" || repairAdjustment.href !== "/upsc/geography/watch?day=3") {
     throw new Error(`Unexpected repair adjustment: ${JSON.stringify(repairAdjustment)}`);
   }
+  await page.getByTestId("daily-next-session-proof").getByText("Day 3 evidence chose Day 3", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-next-session-proof").getByText("AI gap: Applied proof", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-next-session-proof").getByText("Recall", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-next-session-proof").getByText("MCQ evidence missing", { exact: false }).waitFor({ timeout: 15000 });
+  const repairProof = await page.getByTestId("daily-next-session-proof").evaluate((node) => ({
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    decision: node.getAttribute("data-decision"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label: "daily-next-session-repair-proof", repairProof });
+  if (
+    repairProof.sourceDay !== "3" ||
+    repairProof.targetDay !== "3" ||
+    repairProof.decision !== "Repair first" ||
+    !/blocker changed tomorrow's route/i.test(repairProof.text) ||
+    !/Me-time pending/i.test(repairProof.text)
+  ) {
+    throw new Error(`Unexpected repair next-session proof: ${JSON.stringify(repairProof)}`);
+  }
   await page.getByTestId("daily-teacher-doubt-plan").getByText("Attach one monsoon map proof", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-teacher-doubt-plan").getByText("Can the learner explain why one region receives rainfall", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-growth-signal").getByText("Average recall 72", { exact: false }).waitFor({ timeout: 15000 });
@@ -173,6 +193,18 @@ async function run() {
   checks.push({ label: "daily-session-readiness-after-me-time", repairReadinessAfterMeTime });
   if (repairReadinessAfterMeTime.status !== "Repair lock" || repairReadinessAfterMeTime.score !== "60") {
     throw new Error(`Unexpected repair readiness after me-time: ${JSON.stringify(repairReadinessAfterMeTime)}`);
+  }
+  const repairProofAfterMeTime = await page.getByTestId("daily-next-session-proof").evaluate((node) => ({
+    decision: node.getAttribute("data-decision"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label: "daily-next-session-proof-after-me-time", repairProofAfterMeTime });
+  if (
+    repairProofAfterMeTime.decision !== "Repair first" ||
+    !/Saved tired/i.test(repairProofAfterMeTime.text) ||
+    !/AI gap: Applied proof/i.test(repairProofAfterMeTime.text)
+  ) {
+    throw new Error(`Unexpected repair proof after me-time: ${JSON.stringify(repairProofAfterMeTime)}`);
   }
   await page.getByRole("link", { name: /Watch/i }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "daily-command-desktop-geography", checks);
@@ -213,6 +245,25 @@ async function run() {
   checks.push({ label: "daily-tomorrow-fresh-adjustment", freshAdjustment });
   if (freshAdjustment.status !== "Same topic" || freshAdjustment.href !== "/upsc/history/watch?day=4") {
     throw new Error(`Unexpected fresh adjustment: ${JSON.stringify(freshAdjustment)}`);
+  }
+  await page.getByTestId("daily-next-session-proof").getByText("Day 4 evidence chose Day 4", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-next-session-proof").getByText("missing evidence", { exact: false }).waitFor({ timeout: 15000 });
+  const freshProof = await page.getByTestId("daily-next-session-proof").evaluate((node) => ({
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    decision: node.getAttribute("data-decision"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label: "daily-next-session-fresh-proof", freshProof });
+  if (
+    freshProof.sourceDay !== "4" ||
+    freshProof.targetDay !== "4" ||
+    freshProof.decision !== "Same topic" ||
+    !/Me-time pending/i.test(freshProof.text) ||
+    !/Recall baseline missing/i.test(freshProof.text) ||
+    !/Class proof missing/i.test(freshProof.text)
+  ) {
+    throw new Error(`Unexpected fresh next-session proof: ${JSON.stringify(freshProof)}`);
   }
   await page.getByPlaceholder("Write today's target, doubt, or class instruction here.").fill(
     "Study Revolt of 1857 and then open Talk room."

@@ -61,6 +61,18 @@ export type DailyPlannerDecision = {
     href: string;
     statusLabel: string;
   };
+  nextSessionProof: {
+    sourceDay: number;
+    targetDay: number;
+    decision: string;
+    evidenceSummary: string;
+    adjustmentRule: string;
+    evidence: Array<{
+      label: string;
+      value: string;
+      status: "used" | "missing" | "blocked";
+    }>;
+  };
 };
 
 type PlannerInput = {
@@ -600,11 +612,90 @@ function buildTomorrowAdjustment(
   };
 }
 
+function buildNextSessionProof(
+  input: PlannerInput,
+  tomorrowAdjustment: DailyPlannerDecision["tomorrowAdjustment"],
+  teacherDoubt: DailyPlannerDecision["teacherDoubt"]
+): DailyPlannerDecision["nextSessionProof"] {
+  const active = input.progress[String(input.selectedDay)];
+  const currentSession = findSession(input.sessions, input.selectedDay);
+  const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
+  const targetDay = tomorrowAdjustment.statusLabel === "Advance" ? nextDay : currentSession.day;
+  const recentWindow = input.sessions.slice(Math.max(0, input.selectedDay - 7), input.selectedDay);
+  const recentStarted = recentWindow.filter((session) => hasStarted(input.progress[String(session.day)])).length;
+  const consistency = recentWindow.length ? Math.round((recentStarted / recentWindow.length) * 100) : 0;
+  const recallValue =
+    typeof active?.talkScore === "number"
+      ? `Recall ${active.talkScore}/100`
+      : active?.reflection?.trim()
+        ? "Recall note saved"
+        : "Recall baseline missing";
+  const recallStatus =
+    teacherDoubt || needsRecovery(active) || (typeof active?.talkScore === "number" && active.talkScore < recallTarget)
+      ? "blocked"
+      : active?.reflection?.trim() || typeof active?.talkScore === "number"
+        ? "used"
+        : "missing";
+  const practiceStatus =
+    active?.mcqOutcome === "Revisit"
+      ? "blocked"
+      : active?.mcqCompleted && active.mcqOutcome !== "Pending"
+        ? "used"
+        : "missing";
+  const evidence: DailyPlannerDecision["nextSessionProof"]["evidence"] = [
+    {
+      label: "Mind-state",
+      value: active?.meTimeCompletedAt ? `Saved ${active.meTimeMood ?? "ready"}` : "Me-time pending",
+      status: active?.meTimeCompletedAt ? "used" : "missing",
+    },
+    {
+      label: "Recall",
+      value: teacherDoubt ? `AI gap: ${teacherDoubt.category}` : recallValue,
+      status: recallStatus,
+    },
+    {
+      label: "Class",
+      value: active?.watched ? "Class watched" : "Class proof missing",
+      status: active?.watched ? "used" : "missing",
+    },
+    {
+      label: "Practice",
+      value: active?.mcqCompleted
+        ? `${active.mcqOutcome ?? "Completed"}${typeof active.mcqScorePercent === "number" ? ` ${active.mcqScorePercent}%` : ""}`
+        : "MCQ evidence missing",
+      status: practiceStatus,
+    },
+    {
+      label: "Consistency",
+      value: `${recentStarted}/${recentWindow.length || 1} recent days started (${consistency}%)`,
+      status: recentStarted > 0 ? "used" : "missing",
+    },
+  ];
+  const blockedCount = evidence.filter((item) => item.status === "blocked").length;
+  const missingCount = evidence.filter((item) => item.status === "missing").length;
+  const evidenceSummary =
+    blockedCount > 0
+      ? `${blockedCount} blocker${blockedCount === 1 ? "" : "s"} changed tomorrow's route.`
+      : missingCount > 0
+        ? `${missingCount} missing evidence signal${missingCount === 1 ? "" : "s"} kept the plan conservative.`
+        : "All required evidence is clear, so the next topic can open.";
+
+  return {
+    sourceDay: currentSession.day,
+    targetDay,
+    decision: tomorrowAdjustment.statusLabel,
+    evidenceSummary,
+    adjustmentRule: tomorrowAdjustment.detail,
+    evidence,
+  };
+}
+
 export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDecision {
   const revisionDue = findRevisionDue(input);
   const teacherDoubt = findTeacherDoubtDue(input);
   const fallbackRevisionDay = Math.min(input.selectedDay + 2, input.sessions.length);
   const fallbackRevision = findSession(input.sessions, fallbackRevisionDay);
+  const tomorrowAdjustment = buildTomorrowAdjustment(input, teacherDoubt);
 
   return {
     teacherDoubt,
@@ -627,6 +718,7 @@ export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDeci
     todayTask: buildTodayTask(input, revisionDue, teacherDoubt),
     growth: buildGrowth(input),
     sessionReadiness: buildSessionReadiness(input, teacherDoubt),
-    tomorrowAdjustment: buildTomorrowAdjustment(input, teacherDoubt),
+    tomorrowAdjustment,
+    nextSessionProof: buildNextSessionProof(input, tomorrowAdjustment, teacherDoubt),
   };
 }
