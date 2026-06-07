@@ -50,6 +50,8 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     node instanceof HTMLDetailsElement ? node.open : false
   );
   const meTimeStatus = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-status");
+  const meTimeResetPlan = await page.getByTestId("upsc-me-time-check").getAttribute("data-me-time-reset-plan");
+  const startSessionReadiness = await page.getByTestId("upsc-start-today").getAttribute("data-session-readiness");
 
   checks.push({
     label,
@@ -63,6 +65,8 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     dashboardVisibleMode,
     planningDrawerOpen,
     meTimeStatus,
+    meTimeResetPlan,
+    startSessionReadiness,
   });
 
   if (signalCount !== 4) {
@@ -94,6 +98,12 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   }
   if (!["pending", "ready"].includes(meTimeStatus)) {
     throw new Error(`${label}: me-time start check should expose a pending/ready status, got ${meTimeStatus}`);
+  }
+  if (!["check-pending", "ready"].includes(startSessionReadiness)) {
+    throw new Error(`${label}: start action should expose session readiness, got ${startSessionReadiness}`);
+  }
+  if (meTimeStatus === "ready" && !meTimeResetPlan) {
+    throw new Error(`${label}: ready me-time check should expose a saved reset plan`);
   }
 }
 
@@ -161,7 +171,11 @@ async function run() {
       const raw = window.localStorage.getItem(progressStorageKey);
       if (!raw) return false;
       const progress = JSON.parse(raw);
-      return Boolean(progress?.["1"]?.meTimeCompletedAt && progress?.["1"]?.meTimeMood === "focused");
+      return Boolean(
+        progress?.["1"]?.meTimeCompletedAt &&
+          progress?.["1"]?.meTimeMood === "focused" &&
+          progress?.["1"]?.meTimeResetPlan?.includes("main action now")
+      );
     },
     progressKey,
     { timeout: 15000 }
@@ -170,7 +184,11 @@ async function run() {
     if (node.getAttribute("data-me-time-status") !== "ready") {
       throw new Error("me-time check did not switch to ready after mood save");
     }
+    if (!node.getAttribute("data-me-time-reset-plan")?.includes("main action now")) {
+      throw new Error("me-time check did not expose the focused reset plan");
+    }
   });
+  await page.getByTestId("upsc-me-time-reset-plan").getByText("main action now", { exact: false }).waitFor({ timeout: 15000 });
   await page.goto(`${baseUrl}/history`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByText("focused", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("1 start check saved", { exact: true }).waitFor({ timeout: 15000 });

@@ -43,7 +43,11 @@ import {
   type StudyWindow,
   type WeakSignal,
 } from "@/lib/upsc/studentProfile";
-import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import {
+  useGeographyProgress,
+  type GeographyDayProgress,
+  type GeographyMeTimeMood,
+} from "@/lib/upsc/useGeographyProgress";
 
 const subjectRoadmap = upscCalendar.filter(({ href }) =>
   [
@@ -109,6 +113,24 @@ const classificationProof: Record<
     detail: "You have two or more attempts, so the portal hunts for traps, exceptions, and weak recall patterns first.",
   },
 };
+
+const meTimeResetPlans: Record<GeographyMeTimeMood, string> = {
+  calm: "Start directly with one clean recall line, then open the main task.",
+  focused: "Use the main action now and keep every side link closed for the first 15 minutes.",
+  tired: "Do one 60-second breathing reset, reduce note-taking, and complete only the first task.",
+  overloaded: "Ignore the drawer today; finish only the main action and stop after the feedback.",
+  "low-confidence": "Begin with one easy explanation, accept repair feedback, then retry once.",
+  "exam-stress": "Ground for 60 seconds, say the static base slowly, then start without checking extra pages.",
+};
+
+const meTimeMoodOptions: Array<{ value: GeographyMeTimeMood; label: string }> = [
+  { value: "calm", label: "calm" },
+  { value: "focused", label: "focused" },
+  { value: "tired", label: "tired" },
+  { value: "overloaded", label: "overloaded" },
+  { value: "low-confidence", label: "low confidence" },
+  { value: "exam-stress", label: "exam stress" },
+];
 
 function getClassificationProof(profile: Pick<StudentProfile, "preparationStage">) {
   return classificationProof[profile.preparationStage];
@@ -293,10 +315,11 @@ export const DailyWorkspace = () => {
     ]
   );
 
-  const saveMeTimeCheck = (mood: NonNullable<GeographyDayProgress["meTimeMood"]>) => {
+  const saveMeTimeCheck = (mood: GeographyMeTimeMood) => {
     saveDayProgress(today.day, {
       meTimeCompletedAt: new Date().toISOString(),
       meTimeMood: mood,
+      meTimeResetPlan: meTimeResetPlans[mood],
     });
   };
 
@@ -379,6 +402,8 @@ export const DailyWorkspace = () => {
                     <div
                       data-testid="upsc-me-time-check"
                       data-me-time-status={meTimeDone ? "ready" : "pending"}
+                      data-me-time-mood={todayProgress?.meTimeMood ?? ""}
+                      data-me-time-reset-plan={todayProgress?.meTimeResetPlan ?? ""}
                       className="mt-3 rounded-lg border border-[#cfe5dc] bg-white/70 p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -387,27 +412,33 @@ export const DailyWorkspace = () => {
                             60-sec start check
                           </p>
                           <p className="mt-1 text-xs font-bold leading-5 text-[#49675e]">
-                            Breathe once, recall yesterday in one line, then start the main action.
+                            Breathe once, choose your current state, then start the main action.
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {(["calm", "focused", "tired"] as const).map((mood) => (
+                          {meTimeMoodOptions.map(({ value, label }) => (
                             <button
-                              key={mood}
+                              key={value}
                               type="button"
-                              onClick={() => saveMeTimeCheck(mood)}
+                              onClick={() => saveMeTimeCheck(value)}
                               className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-xs font-black capitalize transition ${
-                                todayProgress?.meTimeMood === mood
+                                todayProgress?.meTimeMood === value
                                   ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                                   : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]"
                               }`}
                             >
-                              {todayProgress?.meTimeMood === mood ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                              {mood}
+                              {todayProgress?.meTimeMood === value ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                              {label}
                             </button>
                           ))}
                         </div>
                       </div>
+                      <p
+                        data-testid="upsc-me-time-reset-plan"
+                        className="mt-3 rounded-md border border-[#dcd5c7] bg-white px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                      >
+                        {todayProgress?.meTimeResetPlan ?? "Pick one state so the portal saves a simple start-readiness plan."}
+                      </p>
                     </div>
                     <details
                       data-testid="upsc-main-path-strip"
@@ -439,6 +470,7 @@ export const DailyWorkspace = () => {
                     data-testid="upsc-start-today"
                     data-student-level={profile.level}
                     data-next-action-room={todayLoop.room}
+                    data-session-readiness={meTimeDone ? "ready" : "check-pending"}
                     className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] md:w-auto"
                   >
                     {todayLoop.cta} <ArrowRight className="ml-2 h-4 w-4" />

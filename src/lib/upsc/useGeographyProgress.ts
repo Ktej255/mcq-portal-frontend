@@ -37,6 +37,8 @@ export type GeographyMcqReadinessStatus =
   | "command"
   | "revisit";
 
+export type GeographyMeTimeMood = "calm" | "focused" | "tired" | "overloaded" | "low-confidence" | "exam-stress";
+
 export type GeographyDayProgress = {
   day: number;
   watched?: boolean;
@@ -139,7 +141,8 @@ export type GeographyDayProgress = {
   mcqQualityPassed?: boolean;
   mcqQualityGateLabel?: string;
   meTimeCompletedAt?: string;
-  meTimeMood?: "calm" | "focused" | "tired";
+  meTimeMood?: GeographyMeTimeMood;
+  meTimeResetPlan?: string;
   savedCount?: number;
   updatedAt?: string;
 };
