@@ -30,6 +30,7 @@ export type SubjectMcqReadinessStatus =
   | "practice-active"
   | "command"
   | "revisit";
+export type SubjectMeTimeMood = "calm" | "focused" | "tired" | "overloaded" | "low-confidence" | "exam-stress";
 
 export type SubjectDayProgress = {
   day: number;
@@ -111,6 +112,9 @@ export type SubjectDayProgress = {
   mcqRecoveryRetestSummary?: string;
   mcqRecoveryRetestCompletedAt?: string;
   mcqRecoveryResolved?: boolean;
+  meTimeCompletedAt?: string;
+  meTimeMood?: SubjectMeTimeMood;
+  meTimeResetPlan?: string;
   savedCount?: number;
   updatedAt?: string;
 };

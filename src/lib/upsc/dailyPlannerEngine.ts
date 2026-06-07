@@ -1,10 +1,10 @@
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
-import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
+import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
 
 export type DailyPlannerProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
-  meTimeMood?: "calm" | "focused" | "tired";
+  meTimeMood?: SubjectMeTimeMood;
 };
 
 export type DailyPlannerDecision = {

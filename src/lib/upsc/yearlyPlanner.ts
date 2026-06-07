@@ -218,9 +218,9 @@ export const productEngineFeatures: ProductEngineFeature[] = [
   },
   {
     title: "Growth scale and me-time session",
-    status: "planned",
-    ownerSurface: "Dashboard and reports",
-    studentOutcome: "The student sees starting point, subject growth, stress pattern, and a short reset before each new day.",
+    status: "ready",
+    ownerSurface: "/upsc/daily-command and /reports",
+    studentOutcome: "The student saves a pre-class mind-state reset, then reports include growth and me-time evidence.",
   },
 ];
 

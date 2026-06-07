@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   FileText,
   Gauge,
+  HeartPulse,
   Layers3,
   LineChart,
   PlayCircle,
@@ -30,7 +31,7 @@ import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
-import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
+import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
 
 type DailySubject = {
@@ -89,6 +90,49 @@ const dailyStorageKey = "sarit-upsc-daily-command-v1";
 const contentStorageKey = "sarit-upsc-content-command-v1";
 const mcqStorageKey = "sarit-upsc-mcq-command-v1";
 const defaultMcqState: McqState = { planned: 25, drafted: 0, status: "DRAFT" };
+const meTimeOptions: Array<{
+  mood: SubjectMeTimeMood;
+  label: string;
+  detail: string;
+  resetPlan: string;
+}> = [
+  {
+    mood: "focused",
+    label: "Focused",
+    detail: "Start normal class",
+    resetPlan: "Keep one topic open and move directly into the planned task.",
+  },
+  {
+    mood: "calm",
+    label: "Calm",
+    detail: "Steady pace",
+    resetPlan: "Begin with a short recall line, then continue the normal loop.",
+  },
+  {
+    mood: "tired",
+    label: "Tired",
+    detail: "Reduce load",
+    resetPlan: "Do a two-minute reset and start with the smallest class action.",
+  },
+  {
+    mood: "low-confidence",
+    label: "Low confidence",
+    detail: "Small win first",
+    resetPlan: "Open a known point first, then explain one gap without rushing.",
+  },
+  {
+    mood: "exam-stress",
+    label: "Exam stress",
+    detail: "Short timed loop",
+    resetPlan: "Use one timed micro-task and avoid opening secondary rooms.",
+  },
+  {
+    mood: "overloaded",
+    label: "Overloaded",
+    detail: "One task only",
+    resetPlan: "Hide extra work mentally and finish only the top next action.",
+  },
+];
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -161,6 +205,8 @@ export function UpscDailyMissionControl() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [dailyState, setDailyState] = useState<DailyState>({ subjectSlug: "geography", day: 1, note: "" });
   const [saved, setSaved] = useState(false);
+  const [meTimeSaved, setMeTimeSaved] = useState(false);
+  const [evidenceRefresh, setEvidenceRefresh] = useState(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -216,16 +262,16 @@ export function UpscDailyMissionControl() {
       },
       { watched: 0, reflected: 0, revisit: 0, contentReady: 0, mcqBatchReady: 0, mcqCommand: 0, total: 0 }
     );
-  }, [isLoaded, dailyState]);
-  const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(8) : []), [isLoaded, dailyState, saved]);
-  const studentProfile = useMemo(() => (isLoaded ? readStudentProfile() : null), [isLoaded, dailyState, saved]);
+  }, [isLoaded, dailyState, evidenceRefresh]);
+  const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(8) : []), [isLoaded, dailyState, saved, evidenceRefresh]);
+  const studentProfile = useMemo(() => (isLoaded ? readStudentProfile() : null), [isLoaded, dailyState, saved, evidenceRefresh]);
   const activeProgressMap = useMemo<Record<string, DailyPlannerProgress | undefined>>(() => {
     if (!isLoaded) return {};
     return activeSubject.sessions.reduce<Record<string, DailyPlannerProgress | undefined>>((map, session) => {
       map[String(session.day)] = getProgress(activeSubject, session) as DailyPlannerProgress | undefined;
       return map;
     }, {});
-  }, [activeSubject, dailyState, isLoaded, saved]);
+  }, [activeSubject, dailyState, isLoaded, saved, evidenceRefresh]);
   const dailyPlanner = useMemo(
     () =>
       buildDailyPlannerDecision({
@@ -237,6 +283,9 @@ export function UpscDailyMissionControl() {
       }),
     [activeProgressMap, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
   );
+  const activeMeTimeOption = activeProgress?.meTimeMood
+    ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
+    : null;
 
   const saveDailyState = (patch: Partial<DailyState>) => {
     const next = {
@@ -253,14 +302,37 @@ export function UpscDailyMissionControl() {
     const subject = dailySubjects.find((item) => item.slug === slug) ?? dailySubjects[0];
     saveDailyState({ subjectSlug: subject.slug, day: subject.sessions[0]?.day ?? 1 });
     setSaved(false);
+    setMeTimeSaved(false);
   };
 
   const selectDay = (day: number) => {
     saveDailyState({ day });
     setSaved(false);
+    setMeTimeSaved(false);
   };
 
   const saveNote = () => saveDailyState({ note: dailyState.note ?? "" });
+
+  const saveMeTime = (option: (typeof meTimeOptions)[number]) => {
+    const now = new Date().toISOString();
+    const progressMap = readJson<Record<string, SubjectDayProgress>>(progressStorageKey(activeSubject.slug), {});
+    const key = String(activeSession.day);
+    const nextDay: SubjectDayProgress = {
+      ...progressMap[key],
+      day: activeSession.day,
+      meTimeCompletedAt: now,
+      meTimeMood: option.mood,
+      meTimeResetPlan: option.resetPlan,
+      updatedAt: now,
+    };
+
+    writeJson(progressStorageKey(activeSubject.slug), {
+      ...progressMap,
+      [key]: nextDay,
+    });
+    setMeTimeSaved(true);
+    setEvidenceRefresh((current) => current + 1);
+  };
 
   if (!isLoaded) {
     return (
@@ -407,6 +479,68 @@ export function UpscDailyMissionControl() {
               {dailyPlanner.growth.metricLabel}
             </p>
           </article>
+        </section>
+
+        <section
+          data-testid="daily-me-time-checkin"
+          data-active-mood={activeProgress?.meTimeMood ?? "pending"}
+          data-completed={activeProgress?.meTimeCompletedAt ? "true" : "false"}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <HeartPulse className="h-5 w-5" />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Me-time before class
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                Start with the student&apos;s mind-state.
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                This check-in is saved to the selected subject/day and becomes part of growth reports.
+              </p>
+              <div className="mt-4 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Current reset</p>
+                <p className="mt-1 text-sm font-bold leading-6 text-[#31443a]">
+                  {activeMeTimeOption?.resetPlan ?? "Choose a state once before opening the next class action."}
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {meTimeOptions.map((option) => {
+                const isActive = activeProgress?.meTimeMood === option.mood;
+
+                return (
+                  <button
+                    key={option.mood}
+                    type="button"
+                    data-testid={`daily-me-time-${option.mood}`}
+                    aria-pressed={isActive}
+                    onClick={() => saveMeTime(option)}
+                    className={cn(
+                      "min-h-24 rounded-md border p-3 text-left transition hover:-translate-y-0.5",
+                      isActive
+                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                    )}
+                  >
+                    <span className="block text-sm font-black leading-5">{option.label}</span>
+                    <span className="mt-2 block text-xs font-semibold leading-5 opacity-80">{option.detail}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {(meTimeSaved || activeProgress?.meTimeCompletedAt) && (
+            <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+              <p className="text-sm font-bold leading-6 text-[#085041]">
+                Me-time saved for {activeSubject.title} Day {activeSession.day}. Growth and reports will include this check.
+              </p>
+            </div>
+          )}
         </section>
 
         <section

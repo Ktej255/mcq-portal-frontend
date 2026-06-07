@@ -21,6 +21,22 @@ async function assertNoOverflow(page, label, checks) {
 
 async function seedMissionState(page) {
   await page.evaluate(() => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_daily_command_e2e");
+    window.localStorage.setItem(
+      "sarit-upsc-student-profile-v1",
+      JSON.stringify({
+        level: "beginner",
+        preparationStage: "active",
+        studyWindow: "90",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        attemptHistory: "no-attempt",
+        learningPattern: "deep-work",
+        mindState: "calm",
+        updatedAt: new Date().toISOString(),
+      })
+    );
     window.localStorage.setItem(
       "sarit-upsc-daily-command-v1",
       JSON.stringify({
@@ -97,8 +113,27 @@ async function run() {
   await page.getByTestId("daily-revision-signal").getByText("Due now", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-today-task").getByText("Repair Day 3", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("daily-growth-signal").getByText("Growth begins", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-me-time-checkin").waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-me-time-tired").click();
+  await page
+    .getByTestId("daily-me-time-checkin")
+    .getByText("Me-time saved for Geography Day 3", { exact: false })
+    .waitFor({ timeout: 15000 });
+  await page.getByTestId("daily-growth-signal").getByText("Reset before class", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByRole("link", { name: /Watch/i }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "daily-command-desktop-geography", checks);
+
+  const geographyProgress = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("sarit-upsc-geography-progress-v1") || "{}")
+  );
+  checks.push({ label: "daily-me-time-progress", geographyDay3: geographyProgress["3"] });
+  if (
+    geographyProgress["3"]?.meTimeMood !== "tired" ||
+    !geographyProgress["3"]?.meTimeCompletedAt ||
+    !geographyProgress["3"]?.meTimeResetPlan?.includes("two-minute reset")
+  ) {
+    throw new Error(`Me-time progress did not persist correctly: ${JSON.stringify(geographyProgress["3"])}`);
+  }
 
   await page.getByRole("button", { name: /December-January\s+History/i }).click();
   await page.getByRole("button", { name: /HIS-D04/i }).click();

@@ -2,11 +2,11 @@ import { geographyCurrentAffairsBridge } from "@/lib/upsc/currentAffairsBridge";
 import { geographySessions } from "@/lib/upsc/plan";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
-import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
+import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
 
 export type StudentReportProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
-  meTimeMood?: "calm" | "focused" | "tired";
+  meTimeMood?: SubjectMeTimeMood;
 };
 
 export type StudentReportProgressMap = Record<string, StudentReportProgress | undefined>;
