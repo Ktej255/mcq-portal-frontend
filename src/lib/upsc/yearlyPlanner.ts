@@ -92,6 +92,16 @@ export const productPricingPlans: ProductPlan[] = [
   pricingPlan("three-year", "Three Year", 36, 8999, "Foundation learners and college students", "Lowest effective monthly price for complete UPSC foundation plus optional."),
 ];
 
+export const recommendedProductPlanId = "eighteen-month";
+
+export function getProductPricingPlan(planId?: string | null) {
+  return productPricingPlans.find((plan) => plan.id === planId) ?? productPricingPlans[0];
+}
+
+export function pricingCheckoutPath(planId: string) {
+  return `/upsc/pricing/checkout?plan=${encodeURIComponent(planId)}`;
+}
+
 export const yearlyPlannerBlocks: YearlyPlannerBlock[] = [
   {
     window: "June",

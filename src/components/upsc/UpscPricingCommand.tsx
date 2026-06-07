@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   coreSubjectBlueprints,
   optionalSubjects,
+  pricingCheckoutPath,
   productPricingPlans,
+  recommendedProductPlanId,
   yearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
 import { syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
@@ -57,7 +59,7 @@ const inclusionBlocks = [
 
 export function UpscPricingCommand() {
   const monthly = productPricingPlans.find((plan) => plan.id === "monthly") ?? productPricingPlans[0];
-  const recommendedPlanId = "eighteen-month";
+  const recommendedPlanId = recommendedProductPlanId;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -102,6 +104,13 @@ export function UpscPricingCommand() {
             return (
               <article
                 key={plan.id}
+                data-testid="upsc-pricing-plan"
+                data-plan-id={plan.id}
+                data-months={plan.months}
+                data-list-price={plan.listPrice}
+                data-launch-price={plan.launchPrice}
+                data-discount-percent={plan.discountPercent}
+                data-effective-monthly={plan.effectiveMonthly}
                 className={`rounded-lg border p-4 shadow-sm ${
                   isRecommended ? "border-[#1d9e75] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#fffdf8]"
                 }`}
@@ -138,6 +147,17 @@ export function UpscPricingCommand() {
                     </li>
                   ))}
                 </ul>
+                <Link
+                  href={pricingCheckoutPath(plan.id)}
+                  data-testid="upsc-pricing-plan-select"
+                  className={`mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-md px-3 text-sm font-black transition ${
+                    isRecommended
+                      ? "bg-[#085041] text-white hover:bg-[#06392e]"
+                      : "bg-[#1a3a2a] text-white hover:bg-[#10291d]"
+                  }`}
+                >
+                  Select {plan.title} <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </article>
             );
           })}
@@ -176,7 +196,7 @@ export function UpscPricingCommand() {
                 "Yearly is priced below 12 separate monthly payments for one UPSC cycle.",
                 "18-month plan is the recommended recovery window for prelims-to-mains continuity.",
                 "Three-year plan is the deepest discount for foundation learners.",
-                "Checkout gateway can attach later without changing the plan math.",
+                "Checkout intent is now captured through a local plan handoff; payment gateway can attach later without changing the plan math.",
               ].map((rule) => (
                 <p key={rule} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-semibold leading-6 text-[#31443a]">
                   {rule}
