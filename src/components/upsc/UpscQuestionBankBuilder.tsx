@@ -104,7 +104,8 @@ export function UpscQuestionBankBuilder() {
     { label: "Recovery", value: recommendation.recoveryCount, Icon: Target },
     { label: "AI gaps", value: recommendation.teacherDoubtCount, Icon: CircleAlert },
     { label: "Command", value: recommendation.commandCount, Icon: CheckCircle2 },
-    { label: "Level", value: recommendation.learnerLevel, Icon: ClipboardCheck },
+    { label: "Profile", value: recommendation.learnerLevel, Icon: ClipboardCheck },
+    { label: "Evidence level", value: recommendation.adaptiveLevel, Icon: BrainCircuit },
   ];
   const markQuestionSolved = (question: PracticeQuestion, selectedOption: QuestionOption) => {
     setAttempts(saveLocalQuestionBankAttempt(question, selectedOption));
@@ -120,6 +121,8 @@ export function UpscQuestionBankBuilder() {
           data-active-count={activeCount}
           data-solved-count={recommendation.solvedCount}
           data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
+          data-adaptive-level={recommendation.adaptiveLevel}
+          data-adaptive-score={recommendation.adaptiveReadinessScore}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
@@ -143,6 +146,7 @@ export function UpscQuestionBankBuilder() {
                 ["Subject", selectedSubject.title],
                 ["Recall", scoreText(recommendation.averageRecall, "/100")],
                 ["MCQ", scoreText(recommendation.averageMcq, "%")],
+                ["Evidence level", `${recommendation.adaptiveLevel} / ${recommendation.adaptiveReadinessScore}`],
                 ["Solved", recommendation.solvedCount],
                 ["Accuracy", solvedAccuracy],
               ].map(([label, value]) => (
@@ -195,6 +199,14 @@ export function UpscQuestionBankBuilder() {
           data-solved-count={recommendation.solvedCount}
           data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
           data-unresolved-incorrect-count={recommendation.unresolvedIncorrectCount}
+          data-adaptive-level={recommendation.adaptiveLevel}
+          data-adaptive-score={recommendation.adaptiveReadinessScore}
+          data-recall-points={recommendation.adaptiveSignals.recallPoints}
+          data-consistency-points={recommendation.adaptiveSignals.consistencyPoints}
+          data-mcq-points={recommendation.adaptiveSignals.mcqPoints}
+          data-ledger-points={recommendation.adaptiveSignals.ledgerPoints}
+          data-command-bonus={recommendation.adaptiveSignals.commandBonus}
+          data-recovery-penalty={recommendation.adaptiveSignals.recoveryPenalty}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
@@ -209,8 +221,22 @@ export function UpscQuestionBankBuilder() {
               <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
                 Target days: {recommendation.targetDays.length ? recommendation.targetDays.join(", ") : "fresh baseline"}.
               </p>
+              <div
+                data-testid="upsc-question-bank-adaptive-level"
+                className="mt-4 rounded-md border border-[#b9d9cd] bg-white/75 p-3"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                  Evidence-derived MCQ level
+                </p>
+                <p className="mt-1 text-sm font-black capitalize text-[#13251d]">
+                  {recommendation.adaptiveLevel} / {recommendation.adaptiveReadinessScore}
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-[#49675e]">
+                  Recall, consistency, marks, solved ledger, command days, and recovery penalties decide the default set.
+                </p>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
               {recommendationMetrics.map(({ label, value, Icon }) => (
                 <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
                   <Icon className="mb-3 h-4 w-4 text-[#085041]" />

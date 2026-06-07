@@ -87,6 +87,16 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       solvedCount: recommendation?.getAttribute("data-solved-count"),
       solvedAccuracy: recommendation?.getAttribute("data-solved-accuracy"),
       unresolvedIncorrectCount: recommendation?.getAttribute("data-unresolved-incorrect-count"),
+      adaptiveLevel: recommendation?.getAttribute("data-adaptive-level"),
+      adaptiveScore: recommendation?.getAttribute("data-adaptive-score"),
+      recallPoints: recommendation?.getAttribute("data-recall-points"),
+      consistencyPoints: recommendation?.getAttribute("data-consistency-points"),
+      mcqPoints: recommendation?.getAttribute("data-mcq-points"),
+      ledgerPoints: recommendation?.getAttribute("data-ledger-points"),
+      commandBonus: recommendation?.getAttribute("data-command-bonus"),
+      recoveryPenalty: recommendation?.getAttribute("data-recovery-penalty"),
+      adaptiveLevelText:
+        document.querySelector('[data-testid="upsc-question-bank-adaptive-level"]')?.textContent || "",
       ledgerText: ledger?.textContent || "",
       aiGapText: aiGap?.textContent || "",
       questions,
@@ -145,6 +155,15 @@ async function run() {
   });
   const recoveryState = await readQuestionBankState(page, "recovery-recommends-easy", checks);
   expectDifficultySet(recoveryState, "EASY", 5, "recovery-recommends-easy");
+  if (
+    recoveryState.adaptiveLevel !== "beginner" ||
+    recoveryState.recallPoints !== "6" ||
+    recoveryState.mcqPoints !== "4" ||
+    recoveryState.recoveryPenalty !== "12" ||
+    !recoveryState.adaptiveLevelText.includes("Evidence-derived MCQ level")
+  ) {
+    throw new Error(`recovery adaptive level failed: ${JSON.stringify(recoveryState)}`);
+  }
   await assertNoOverflow(page, "question-bank-recovery-desktop", checks);
 
   await page.getByRole("button", { name: "MEDIUM" }).click();
@@ -236,6 +255,15 @@ async function run() {
   });
   const commandState = await readQuestionBankState(page, "command-recommends-hard", checks);
   expectDifficultySet(commandState, "HARD", 5, "command-recommends-hard");
+  if (
+    commandState.adaptiveLevel !== "advanced" ||
+    commandState.adaptiveScore !== "80" ||
+    commandState.recallPoints !== "35" ||
+    commandState.mcqPoints !== "30" ||
+    commandState.commandBonus !== "9"
+  ) {
+    throw new Error(`command adaptive level failed: ${JSON.stringify(commandState)}`);
+  }
 
   await seedSession(page, {
     level: "advanced",

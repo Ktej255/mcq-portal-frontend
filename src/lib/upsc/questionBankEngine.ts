@@ -53,6 +53,16 @@ export type QuestionBankAttempt = {
 
 export type QuestionBankRecommendation = {
   learnerLevel: StudentLevel;
+  adaptiveLevel: StudentLevel;
+  adaptiveReadinessScore: number;
+  adaptiveSignals: {
+    recallPoints: number;
+    consistencyPoints: number;
+    mcqPoints: number;
+    ledgerPoints: number;
+    commandBonus: number;
+    recoveryPenalty: number;
+  };
   recommendedDifficulty: QuestionDifficulty;
   recommendedCount: number;
   averageRecall: number | null;
@@ -653,6 +663,46 @@ function average(values: number[]) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function pointsFromRecall(averageRecall: number | null) {
+  if (averageRecall === null) return 0;
+  if (averageRecall >= 95) return 35;
+  if (averageRecall >= 85) return 26;
+  if (averageRecall >= 70) return 16;
+  return 6;
+}
+
+function pointsFromMcq(averageMcq: number | null) {
+  if (averageMcq === null) return 0;
+  if (averageMcq >= 80) return 30;
+  if (averageMcq >= 65) return 22;
+  if (averageMcq >= 50) return 12;
+  return 4;
+}
+
+function pointsFromConsistency(consistencyPercent: number) {
+  if (consistencyPercent >= 75) return 20;
+  if (consistencyPercent >= 45) return 12;
+  if (consistencyPercent > 0) return 6;
+  return 0;
+}
+
+function pointsFromSolvedLedger(solvedAccuracyPercent: number | null) {
+  if (solvedAccuracyPercent === null) return 0;
+  if (solvedAccuracyPercent >= 80) return 10;
+  if (solvedAccuracyPercent >= 60) return 6;
+  return -4;
+}
+
+function adaptiveLevelFromScore(score: number): StudentLevel {
+  if (score >= 75) return "advanced";
+  if (score >= 45) return "intermediate";
+  return "beginner";
+}
+
 function hasStarted(progress?: QuestionBankProgress) {
   return Boolean(
     progress?.watched ||
@@ -760,6 +810,25 @@ export function buildQuestionBankRecommendation(
   const solvedAccuracyPercent = subjectAttempts.length
     ? Math.round((subjectAttempts.filter((attempt) => attempt.isCorrect).length / subjectAttempts.length) * 100)
     : null;
+  const adaptiveSignals = {
+    recallPoints: pointsFromRecall(averageRecall),
+    consistencyPoints: pointsFromConsistency(consistencyPercent),
+    mcqPoints: pointsFromMcq(averageMcq),
+    ledgerPoints: pointsFromSolvedLedger(solvedAccuracyPercent),
+    commandBonus: Math.min(10, commandDays.length * 3),
+    recoveryPenalty: recoveryDays.length * 12 + teacherDoubtDays.length * 15 + incorrectAttempts.length * 8,
+  };
+  const adaptiveReadinessScore = clamp(
+    adaptiveSignals.recallPoints +
+      adaptiveSignals.consistencyPoints +
+      adaptiveSignals.mcqPoints +
+      adaptiveSignals.ledgerPoints +
+      adaptiveSignals.commandBonus -
+      adaptiveSignals.recoveryPenalty,
+    0,
+    100
+  );
+  const adaptiveLevel = adaptiveLevelFromScore(adaptiveReadinessScore);
 
   let recommendedDifficulty: QuestionDifficulty = "MEDIUM";
   let reason = "Balanced practice is recommended until recall and MCQ evidence mature.";
@@ -797,9 +866,9 @@ export function buildQuestionBankRecommendation(
   const baseRecommendedCount =
     recommendedDifficulty === "EASY"
       ? 5
-      : learnerLevel === "advanced"
+      : adaptiveLevel === "advanced"
         ? 10
-        : learnerLevel === "intermediate"
+        : adaptiveLevel === "intermediate"
           ? 8
           : 5;
   const availableQuestionCount = allPracticeQuestionBank.filter(
@@ -809,6 +878,9 @@ export function buildQuestionBankRecommendation(
 
   return {
     learnerLevel,
+    adaptiveLevel,
+    adaptiveReadinessScore,
+    adaptiveSignals,
     recommendedDifficulty,
     recommendedCount,
     averageRecall,
