@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/clean-next-output.mjs && next build --webpack",
+    "build": "node scripts/clean-next-output.mjs && node ./node_modules/next/dist/bin/next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
