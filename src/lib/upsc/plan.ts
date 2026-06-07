@@ -97,6 +97,13 @@ export const upscCalendar = [
     href: "/upsc/optional-subjects",
   },
   {
+    window: "Sources",
+    title: "Syllabus and PYQ Library",
+    detail: "Official source anchors, GS syllabus nodes, prelims/mains PYQ import rows, and optional Paper I/II ledger.",
+    status: "Structure ready",
+    href: "/upsc/source-library",
+  },
+  {
     window: "June",
     title: "Geography",
     detail: "First complete subject sprint with map-first learning.",

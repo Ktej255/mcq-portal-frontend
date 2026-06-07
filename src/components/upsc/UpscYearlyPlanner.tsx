@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileText,
   Layers3,
+  LibraryBig,
   Route,
   Sparkles,
   Target,
@@ -23,6 +24,7 @@ import {
   threeDayLaunchItems,
   yearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
+import { getOptionalSourcePack, syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
 
 function statusTone(status: string) {
   if (status === "ready") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
@@ -205,6 +207,27 @@ export function UpscYearlyPlanner() {
           </div>
         </section>
 
+        <section data-testid="upsc-source-library-link" className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
+          <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <LibraryBig className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                  Syllabus and PYQ preload ledger
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Official source rows are now inside the product.</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                {syllabusPyqRegistrySummary.gsPyqRows} GS rows and {syllabusPyqRegistrySummary.optionalPyqRows} optional Paper I/II rows
+                are seeded against official UPSC anchors. The remaining work is PDF text extraction and topic mapping.
+              </p>
+            </div>
+            <Link href="/upsc/source-library" className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
+              Open source library <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+
         <section data-testid="upsc-three-day-launch" className="grid gap-3 lg:grid-cols-3">
           {threeDayLaunchItems.map((item) => (
             <article key={item.day} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
@@ -285,6 +308,7 @@ export function OptionalSubjectDetail({
   subject,
 }: {
   subject: {
+    slug: string;
     title: string;
     group: string;
     papers: ["Paper I", "Paper II"];
@@ -292,6 +316,9 @@ export function OptionalSubjectDetail({
     firstBuildAction: string;
   };
 }) {
+  const sourcePack = getOptionalSourcePack(subject.slug);
+  const visibleRows = sourcePack?.paperRows.slice(0, 10) ?? [];
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8">
@@ -333,6 +360,38 @@ export function OptionalSubjectDetail({
             </article>
           ))}
         </section>
+        {sourcePack ? (
+          <section data-testid="upsc-optional-year-wise-pyqs" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                  Year-wise paper rows
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight">
+                  {sourcePack.paperRows.length} Paper I/II source rows seeded
+                </h2>
+              </div>
+              <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
+                Source library
+              </Link>
+            </div>
+            <div className="grid gap-2">
+              {visibleRows.map((row) => (
+                <a
+                  key={`${row.year}-${row.paper}`}
+                  href={row.sourceHref}
+                  className="grid gap-2 rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 sm:grid-cols-[0.3fr_1fr_0.7fr] sm:items-center"
+                >
+                  <span className="text-xs font-black">{row.year}</span>
+                  <span className="text-xs font-semibold leading-5 text-[#31443a]">{row.paper}</span>
+                  <span className="rounded-md border border-[#ef9f27] bg-[#fff4df] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#6f4a12]">
+                    {row.status === "text-import-pending" ? "Import pending" : "Source indexed"}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );
