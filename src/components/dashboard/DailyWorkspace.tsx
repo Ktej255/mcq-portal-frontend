@@ -471,6 +471,19 @@ export const DailyWorkspace = () => {
                     >
                       Use the main button only. The portal decides the next step after each result.
                     </p>
+                    <div
+                      data-testid="upsc-after-this-step"
+                      data-next-session-decision={activeMissionDecision.nextSessionProof.decision}
+                      data-source-day={activeMissionDecision.nextSessionProof.sourceDay}
+                      data-target-day={activeMissionDecision.nextSessionProof.targetDay}
+                      data-next-route={activeMissionDecision.tomorrowAdjustment.href}
+                      data-evidence-summary={activeMissionDecision.nextSessionProof.evidenceSummary}
+                      data-adjustment-rule={activeMissionDecision.nextSessionProof.adjustmentRule}
+                      className="mt-3 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                    >
+                      <span className="font-black uppercase tracking-[0.12em] text-[#085041]">After this: </span>
+                      {activeMissionDecision.tomorrowAdjustment.title}
+                    </div>
                   </div>
                   <Link
                     href={activeMissionHref}

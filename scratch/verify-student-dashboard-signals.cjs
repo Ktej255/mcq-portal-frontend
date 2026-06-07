@@ -73,6 +73,15 @@ async function assertStudentSafeDashboard(page, label, checks) {
     open: node.open,
   }));
   const oneActionRuleText = await page.getByTestId("upsc-one-action-rule").innerText();
+  const afterThisStep = await page.getByTestId("upsc-after-this-step").evaluate((node) => ({
+    decision: node.getAttribute("data-next-session-decision"),
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    nextRoute: node.getAttribute("data-next-route"),
+    evidenceSummary: node.getAttribute("data-evidence-summary"),
+    adjustmentRule: node.getAttribute("data-adjustment-rule"),
+    text: node.textContent || "",
+  }));
   const dashboardVisibleMode = await page.getByTestId("upsc-simple-dashboard").getAttribute("data-visible-mode");
   const planningDrawerOpen = await page.getByTestId("upsc-planning-drawer").evaluate((node) =>
     node instanceof HTMLDetailsElement ? node.open : false
@@ -85,6 +94,7 @@ async function assertStudentSafeDashboard(page, label, checks) {
     taskReadiness,
     mainPathStrip,
     oneActionRuleText,
+    afterThisStep,
     dashboardVisibleMode,
     planningDrawerOpen,
     leaked,
@@ -112,6 +122,17 @@ async function assertStudentSafeDashboard(page, label, checks) {
   }
   if (!oneActionRuleText.includes("Use the main button only")) {
     throw new Error(`${label}: one-action rule copy missing: ${oneActionRuleText}`);
+  }
+  if (
+    !afterThisStep.text.includes("After this") ||
+    !afterThisStep.decision ||
+    !afterThisStep.sourceDay ||
+    !afterThisStep.targetDay ||
+    !afterThisStep.nextRoute ||
+    !afterThisStep.evidenceSummary ||
+    !afterThisStep.adjustmentRule
+  ) {
+    throw new Error(`${label}: after-this dynamic planner proof missing: ${JSON.stringify(afterThisStep)}`);
   }
   if (planningDrawerOpen) throw new Error(`${label}: planning drawer should stay folded by default`);
   if (leaked.length) throw new Error(`${label}: dashboard leaked internal language ${JSON.stringify(leaked)}`);
