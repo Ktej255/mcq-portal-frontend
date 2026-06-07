@@ -46,6 +46,14 @@ export type QuestionBankRecommendation = {
   consistencyPercent: number;
   recoveryCount: number;
   commandCount: number;
+  teacherDoubtCount: number;
+  teacherDoubt: {
+    day: number;
+    category: string;
+    reason: string;
+    repairAction: string;
+    masteryCheck: string;
+  } | null;
   reason: string;
   targetDays: number[];
 };
@@ -591,7 +599,27 @@ function needsRecovery(progress?: QuestionBankProgress) {
     progress?.revisitQueued ||
       progress?.talkBand === "Revisit" ||
       progress?.mcqOutcome === "Revisit" ||
-      progress?.confidence === "Shaky"
+      progress?.confidence === "Shaky" ||
+      hasActiveTeacherDoubt(progress)
+  );
+}
+
+function hasTeacherDoubtSignal(progress?: QuestionBankProgress) {
+  return Boolean(
+    progress?.teacherDoubtCategory?.trim() ||
+      progress?.teacherDoubtReason?.trim() ||
+      progress?.teacherDoubtRepairAction?.trim() ||
+      progress?.teacherDoubtMasteryCheck?.trim()
+  );
+}
+
+function hasActiveTeacherDoubt(progress?: QuestionBankProgress) {
+  if (!hasTeacherDoubtSignal(progress)) return false;
+  return !(
+    progress?.confidence === "Command" ||
+    progress?.talkBand === "Command" ||
+    progress?.mcqOutcome === "Command" ||
+    (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75)
   );
 }
 
@@ -615,6 +643,7 @@ export function buildQuestionBankRecommendation(
   const learnerLevel = resolveLearnerLevel(profile);
   const dayStates = subject.sessions.map((session) => progress[String(session.day)]);
   const startedDays = subject.sessions.filter((session) => hasStarted(progress[String(session.day)]));
+  const teacherDoubtDays = subject.sessions.filter((session) => hasActiveTeacherDoubt(progress[String(session.day)]));
   const recoveryDays = subject.sessions.filter((session) => needsRecovery(progress[String(session.day)]));
   const commandDays = subject.sessions.filter((session) => hasCommand(progress[String(session.day)]));
   const recallScores = dayStates
@@ -627,18 +656,38 @@ export function buildQuestionBankRecommendation(
   const averageMcq = average(mcqScores);
   const consistencyPercent = Math.min(100, Math.round((startedDays.length / 7) * 100));
   const weakDays =
-    recoveryDays.length > 0
+    teacherDoubtDays.length > 0
+      ? teacherDoubtDays
+      : recoveryDays.length > 0
       ? recoveryDays
       : subject.sessions.filter((session) => {
           const state = progress[String(session.day)];
           return typeof state?.talkScore === "number" && state.talkScore < 95;
         });
   const targetDays = (weakDays.length ? weakDays : startedDays).map((session) => session.day);
+  const teacherDoubtSession = teacherDoubtDays[0];
+  const teacherDoubtProgress = teacherDoubtSession ? progress[String(teacherDoubtSession.day)] : undefined;
+  const teacherDoubt = teacherDoubtSession
+    ? {
+        day: teacherDoubtSession.day,
+        category: teacherDoubtProgress?.teacherDoubtCategory?.trim() || "Concept",
+        reason: teacherDoubtProgress?.teacherDoubtReason?.trim() || "The AI teacher found an unresolved explanation gap.",
+        repairAction:
+          teacherDoubtProgress?.teacherDoubtRepairAction?.trim() ||
+          "Rebuild the missed link before attempting advanced traps.",
+        masteryCheck:
+          teacherDoubtProgress?.teacherDoubtMasteryCheck?.trim() ||
+          "Can the learner explain the concept without skipping the cause-effect chain?",
+      }
+    : null;
 
   let recommendedDifficulty: QuestionDifficulty = "MEDIUM";
   let reason = "Balanced practice is recommended until recall and MCQ evidence mature.";
 
-  if (
+  if (teacherDoubt) {
+    recommendedDifficulty = "EASY";
+    reason = `AI teacher gap is active on Day ${teacherDoubt.day}: repair ${teacherDoubt.category} before harder MCQs.`;
+  } else if (
     recoveryDays.length > 0 ||
     (averageRecall !== null && averageRecall < 70) ||
     (averageMcq !== null && averageMcq < 50)
@@ -684,6 +733,8 @@ export function buildQuestionBankRecommendation(
     consistencyPercent,
     recoveryCount: recoveryDays.length,
     commandCount: commandDays.length,
+    teacherDoubtCount: teacherDoubtDays.length,
+    teacherDoubt,
     reason,
     targetDays,
   };

@@ -7,6 +7,7 @@ import {
   ArrowRight,
   BrainCircuit,
   CheckCircle2,
+  CircleAlert,
   ClipboardCheck,
   Gauge,
   ListChecks,
@@ -87,6 +88,7 @@ export function UpscQuestionBankBuilder() {
     { label: "Subject", value: selectedSubject.title, Icon: ClipboardCheck },
     { label: "Consistency", value: `${recommendation.consistencyPercent}%`, Icon: Gauge },
     { label: "Recovery", value: recommendation.recoveryCount, Icon: Target },
+    { label: "AI gaps", value: recommendation.teacherDoubtCount, Icon: CircleAlert },
     { label: "Command", value: recommendation.commandCount, Icon: CheckCircle2 },
     { label: "Level", value: recommendation.learnerLevel, Icon: ClipboardCheck },
   ];
@@ -167,6 +169,8 @@ export function UpscQuestionBankBuilder() {
           data-testid="upsc-question-bank-recommendation"
           data-recommended-difficulty={recommendation.recommendedDifficulty}
           data-recommended-count={recommendation.recommendedCount}
+          data-ai-gap-count={recommendation.teacherDoubtCount}
+          data-target-days={recommendation.targetDays.join(",")}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
@@ -182,7 +186,7 @@ export function UpscQuestionBankBuilder() {
                 Target days: {recommendation.targetDays.length ? recommendation.targetDays.join(", ") : "fresh baseline"}.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               {recommendationMetrics.map(({ label, value, Icon }) => (
                 <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
                   <Icon className="mb-3 h-4 w-4 text-[#085041]" />
@@ -192,6 +196,28 @@ export function UpscQuestionBankBuilder() {
               ))}
             </div>
           </div>
+          {recommendation.teacherDoubt ? (
+            <div
+              data-testid="upsc-question-bank-ai-gap"
+              className="mt-5 rounded-lg border border-[#ef9f27] bg-[#fff4df] p-4 text-[#6f4a12]"
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em]">AI teacher repair set</p>
+                <Badge className="rounded-md bg-[#6f4a12] px-2 py-1 text-white">
+                  Day {recommendation.teacherDoubt.day} / {recommendation.teacherDoubt.category}
+                </Badge>
+              </div>
+              <p className="text-sm font-bold leading-6">{recommendation.teacherDoubt.reason}</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <p className="rounded-md bg-white/80 p-3 text-xs font-bold leading-5">
+                  Repair: {recommendation.teacherDoubt.repairAction}
+                </p>
+                <p className="rounded-md bg-white/80 p-3 text-xs font-bold leading-5">
+                  Mastery check: {recommendation.teacherDoubt.masteryCheck}
+                </p>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section data-testid="upsc-question-bank-controls" className="grid gap-4 lg:grid-cols-[1fr_0.65fr]">

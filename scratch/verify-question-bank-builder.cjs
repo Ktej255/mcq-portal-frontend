@@ -63,6 +63,7 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
   const state = await page.evaluate(() => {
     const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
     const recommendation = document.querySelector('[data-testid="upsc-question-bank-recommendation"]');
+    const aiGap = document.querySelector('[data-testid="upsc-question-bank-ai-gap"]');
     const questions = [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) => ({
       subjectSlug: node.getAttribute("data-subject-slug"),
       difficulty: node.getAttribute("data-question-difficulty"),
@@ -76,6 +77,9 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       activeCount: hero?.getAttribute("data-active-count"),
       recommendedDifficulty: recommendation?.getAttribute("data-recommended-difficulty"),
       recommendedCount: recommendation?.getAttribute("data-recommended-count"),
+      aiGapCount: recommendation?.getAttribute("data-ai-gap-count"),
+      targetDays: recommendation?.getAttribute("data-target-days"),
+      aiGapText: aiGap?.textContent || "",
       questions,
     };
   });
@@ -153,6 +157,37 @@ async function run() {
     manualMediumState.questionDifficulties.some((difficulty) => difficulty !== "MEDIUM")
   ) {
     throw new Error(`manual-medium-override failed: ${JSON.stringify(manualMediumState)}`);
+  }
+
+  await seedSession(page, {
+    level: "intermediate",
+    progress: {
+      5: {
+        day: 5,
+        watched: true,
+        talkScore: 86,
+        talkBand: "Practice",
+        confidence: "Working",
+        mcqCompleted: true,
+        mcqScorePercent: 68,
+        teacherDoubtCategory: "Map proof",
+        teacherDoubtReason: "The explanation mentions monsoon but does not place the proof on India map.",
+        teacherDoubtRepairAction: "Use one India map anchor before selecting any monsoon option.",
+        teacherDoubtMasteryCheck: "Can the learner show the Bay branch or Western Ghats rain-shadow logic?",
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  });
+  const aiGapState = await readQuestionBankState(page, "teacher-gap-recommends-easy", checks);
+  expectDifficultySet(aiGapState, "EASY", 5, "teacher-gap-recommends-easy");
+  if (
+    aiGapState.aiGapCount !== "1" ||
+    aiGapState.targetDays !== "5" ||
+    !aiGapState.aiGapText.includes("Map proof") ||
+    !aiGapState.aiGapText.includes("India map anchor") ||
+    aiGapState.questions[0]?.linkedDay !== "5"
+  ) {
+    throw new Error(`teacher-gap-recommends-easy failed: ${JSON.stringify(aiGapState)}`);
   }
 
   await seedSession(page, {
