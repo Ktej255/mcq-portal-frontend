@@ -80,7 +80,7 @@ export default function ReportsPage() {
                 Started from: {allSubjectReport.growth.startedFrom}. Current position: {allSubjectReport.growth.currentPosition}.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 ["Started", `${allSubjectReport.totals.startedDays}/${allSubjectReport.totals.totalDays}`],
                 ["Weekly reports", allSubjectReport.totals.weeklyWindowsGenerated],
@@ -88,6 +88,7 @@ export default function ReportsPage() {
                 ["Recall", allSubjectReport.totals.averageRecall === null ? "Not measured" : `${allSubjectReport.totals.averageRecall}/100`],
                 ["MCQ", allSubjectReport.totals.averageMcq === null ? "No score" : `${allSubjectReport.totals.averageMcq}%`],
                 ["Me-time", allSubjectReport.totals.meTimeChecks],
+                ["Current affairs", allSubjectReport.totals.currentAffairsUnlocked],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">{label}</p>
@@ -125,6 +126,16 @@ export default function ReportsPage() {
                       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">{label}</p>
                     </div>
                   ))}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-[#d7e8df] bg-white/80 p-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">Readiness</p>
+                    <p className="mt-1 text-xs font-black leading-4 text-[#13251d]">{subject.readinessSignal}</p>
+                  </div>
+                  <div className="rounded-md border border-[#d7e8df] bg-white/80 p-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">Covered News</p>
+                    <p className="mt-1 text-xs font-black leading-4 text-[#13251d]">{subject.currentAffairsUnlocked} hook{subject.currentAffairsUnlocked === 1 ? "" : "s"}</p>
+                  </div>
                 </div>
                 <p className="mt-3 text-xs font-semibold leading-5 text-[#49675e]">{subject.nextAction}</p>
               </Link>

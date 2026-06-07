@@ -1,4 +1,4 @@
-import { geographyCurrentAffairsBridge } from "@/lib/upsc/currentAffairsBridge";
+import { getCurrentAffairsForSubject } from "@/lib/upsc/currentAffairsBridge";
 import { geographySessions } from "@/lib/upsc/plan";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
@@ -34,6 +34,9 @@ export type StudentSubjectReport = {
   recoveryItems: number;
   commandDays: number;
   meTimeChecks: number;
+  latestMeTimeMood: SubjectMeTimeMood | null;
+  latestMeTimeResetPlan: string | null;
+  readinessSignal: string;
   currentAffairsUnlocked: number;
   weeklyWindowsGenerated: number;
   monthlyVerdict: string;
@@ -123,9 +126,35 @@ function hasCommand(progress?: StudentReportProgress) {
   );
 }
 
+const meTimeMoodLabels: Record<SubjectMeTimeMood, string> = {
+  calm: "Calm start saved",
+  focused: "Focused start saved",
+  tired: "Tired: reset before class",
+  overloaded: "Overloaded: reduce load",
+  "low-confidence": "Low confidence: warm-up needed",
+  "exam-stress": "Exam stress: grounding needed",
+};
+
+function latestMeTimeSignal(states: Array<StudentReportProgress | undefined>) {
+  const completed = states
+    .filter((state): state is StudentReportProgress => Boolean(state?.meTimeCompletedAt))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.meTimeCompletedAt ?? "");
+      const rightTime = Date.parse(right.meTimeCompletedAt ?? "");
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    });
+  const latest = completed[0];
+  const mood = latest?.meTimeMood ?? null;
+
+  return {
+    latestMeTimeMood: mood,
+    latestMeTimeResetPlan: latest?.meTimeResetPlan ?? null,
+    readinessSignal: mood ? meTimeMoodLabels[mood] : "Me-time pending",
+  };
+}
+
 function currentAffairsUnlocked(subject: StudentReportSubject, progress: StudentReportProgressMap) {
-  if (subject.slug !== "geography") return 0;
-  return geographyCurrentAffairsBridge.filter((item) => hasStarted(progress[String(item.linkedDay)])).length;
+  return getCurrentAffairsForSubject(subject.slug).filter((item) => hasStarted(progress[String(item.linkedDay)])).length;
 }
 
 function weeklyWindowCount(subject: StudentReportSubject) {
@@ -162,6 +191,7 @@ export function buildStudentSubjectReport(
   const commandDays = states.filter(hasCommand).length;
   const mcqSets = states.filter((state) => state?.mcqCompleted).length;
   const meTimeChecks = states.filter((state) => state?.meTimeCompletedAt).length;
+  const meTimeSignal = latestMeTimeSignal(states);
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
   const completionRatio = subject.sessions.length ? startedDays / subject.sessions.length : 0;
@@ -199,6 +229,7 @@ export function buildStudentSubjectReport(
     recoveryItems,
     commandDays,
     meTimeChecks,
+    ...meTimeSignal,
     currentAffairsUnlocked: currentAffairsUnlocked(subject, progress),
     weeklyWindowsGenerated: weeklyWindowCount(subject),
     monthlyVerdict,

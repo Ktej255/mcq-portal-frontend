@@ -91,6 +91,9 @@ async function seedProfileAndProgress(page) {
             confidence: "Command",
             mcqCompleted: true,
             mcqScorePercent: 84,
+            meTimeCompletedAt: new Date().toISOString(),
+            meTimeMood: "exam-stress",
+            meTimeResetPlan: "Two-minute breathing and one diagram before class.",
             updatedAt: new Date().toISOString(),
           },
         })
@@ -127,8 +130,21 @@ async function run() {
   const evidenceText = await page.getByTestId("upsc-report-evidence-streams").innerText();
   const monthlyText = await page.getByTestId("upsc-monthly-report").innerText();
   const growthText = await page.getByTestId("upsc-growth-scale").innerText();
+  const environmentCardText = await page
+    .locator('[data-testid="upsc-subject-report-card"][data-subject-slug="environment"]')
+    .innerText();
 
-  checks.push({ label: "report-system-content", href, subjectCardCount, weeklyCount, allSubjectText, evidenceText, monthlyText, growthText });
+  checks.push({
+    label: "report-system-content",
+    href,
+    subjectCardCount,
+    weeklyCount,
+    allSubjectText,
+    environmentCardText,
+    evidenceText,
+    monthlyText,
+    growthText,
+  });
 
   if (href !== "/upsc/geography/revisit?day=1") {
     throw new Error(`Gap CTA should still open recovery day 1, got ${href}`);
@@ -139,6 +155,13 @@ async function run() {
   const normalizedAllSubjectText = allSubjectText.toLowerCase();
   if (subjectCardCount !== 8 || !normalizedAllSubjectText.includes("environment") || !normalizedAllSubjectText.includes("weekly reports")) {
     throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
+  }
+  const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
+  if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText)) {
+    throw new Error(`All-subject report should count Geography and Environment evidence: ${allSubjectText}`);
+  }
+  if (!/exam stress: grounding needed/i.test(environmentCardText) || !/covered news\s+1 hook/i.test(environmentCardText.replace(/\s+/g, " "))) {
+    throw new Error(`Environment report card missing readiness or covered-news evidence: ${environmentCardText}`);
   }
   const normalizedEvidence = `${evidenceText}\n${monthlyText}`.toLowerCase();
   for (const expectedText of ["recall", "mcq", "revision", "me-time", "current affairs", "2 unlocked"]) {
