@@ -149,6 +149,53 @@ async function assertStudentFocus(page, expected, checks, label) {
   }
 }
 
+async function assertLearningFunnel(page, expected, checks, label) {
+  await page.getByTestId("daily-student-learning-funnel").waitFor({ timeout: 15000 });
+  const funnel = await page.getByTestId("daily-student-learning-funnel").evaluate((node) => ({
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    stepCount: node.getAttribute("data-step-count"),
+    gapTitle: node.getAttribute("data-gap-title"),
+    todayTask: node.getAttribute("data-today-task"),
+    revisionLabel: node.getAttribute("data-revision-label"),
+    nextRoute: node.getAttribute("data-next-route"),
+    decision: node.getAttribute("data-decision"),
+    readinessStatus: node.getAttribute("data-readiness-status"),
+    text: node.textContent || "",
+  }));
+  const steps = await page.getByTestId("daily-student-learning-funnel").evaluate((node) =>
+    [...node.querySelectorAll('[data-testid="daily-funnel-step"]')].map((step) => ({
+      id: step.getAttribute("data-step-id"),
+      text: step.textContent || "",
+    }))
+  );
+  const primaryAction = await page.getByTestId("daily-funnel-primary-action").evaluate((node) => ({
+    href: node.getAttribute("href"),
+    text: node.textContent || "",
+  }));
+
+  checks.push({ label, funnel, steps, primaryAction });
+
+  if (
+    funnel.subject !== expected.subject ||
+    funnel.day !== expected.day ||
+    funnel.stepCount !== "4" ||
+    funnel.gapTitle !== expected.gapTitle ||
+    funnel.todayTask !== expected.todayTask ||
+    funnel.revisionLabel !== expected.revisionLabel ||
+    funnel.nextRoute !== expected.nextRoute ||
+    funnel.decision !== expected.decision ||
+    funnel.readinessStatus !== expected.readinessStatus ||
+    primaryAction.href !== expected.primaryHref ||
+    !primaryAction.text.includes(expected.primaryLabel) ||
+    steps.map((step) => step.id).join("|") !== "known-evidence|gap|today|revision" ||
+    !funnel.text.includes("Today's simple path") ||
+    !funnel.text.includes(expected.visibleText)
+  ) {
+    throw new Error(`${label}: learning funnel contract failed: ${JSON.stringify({ funnel, steps, primaryAction }, null, 2)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -194,6 +241,24 @@ async function run() {
     },
     checks,
     "daily-command-focus-repair-lock"
+  );
+  await assertLearningFunnel(
+    page,
+    {
+      subject: "geography",
+      day: "3",
+      gapTitle: "AI found Applied proof gap",
+      todayTask: "Repair Day 3 before new load",
+      revisionLabel: "AI gap",
+      nextRoute: "/upsc/geography/watch?day=3",
+      decision: "Repair first",
+      readinessStatus: "Repair lock",
+      primaryHref: "/upsc/geography/watch?day=3",
+      primaryLabel: "Open repair class",
+      visibleText: "Day 3 evidence",
+    },
+    checks,
+    "daily-learning-funnel-repair-lock"
   );
   await page.getByText("Geography: Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -279,6 +344,24 @@ async function run() {
     checks,
     "daily-command-focus-after-me-time"
   );
+  await assertLearningFunnel(
+    page,
+    {
+      subject: "geography",
+      day: "3",
+      gapTitle: "AI found Applied proof gap",
+      todayTask: "Repair Day 3 before new load",
+      revisionLabel: "AI gap",
+      nextRoute: "/upsc/geography/watch?day=3",
+      decision: "Repair first",
+      readinessStatus: "Repair lock",
+      primaryHref: "/upsc/geography/watch?day=3",
+      primaryLabel: "Open repair class",
+      visibleText: "Day 3 evidence",
+    },
+    checks,
+    "daily-learning-funnel-after-me-time"
+  );
   const repairProofAfterMeTime = await page.getByTestId("daily-next-session-proof").evaluate((node) => ({
     decision: node.getAttribute("data-decision"),
     text: node.textContent || "",
@@ -337,6 +420,24 @@ async function run() {
     },
     checks,
     "daily-command-focus-fresh-history"
+  );
+  await assertLearningFunnel(
+    page,
+    {
+      subject: "history",
+      day: "4",
+      gapTitle: "Recall baseline pending",
+      todayTask: "Save mind-state before starting",
+      revisionLabel: "Day 6",
+      nextRoute: "/upsc/history/watch?day=4",
+      decision: "Same topic",
+      readinessStatus: "Mind-state first",
+      primaryHref: "#daily-me-time-checkin",
+      primaryLabel: "Choose me-time",
+      visibleText: "Recall baseline missing",
+    },
+    checks,
+    "daily-learning-funnel-fresh-history"
   );
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Keep Day 4 as the next start", { exact: false }).waitFor({ timeout: 15000 });
   const freshAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({

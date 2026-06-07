@@ -313,6 +313,38 @@ export function UpscDailyMissionControl() {
   const activeMeTimeOption = activeProgress?.meTimeMood
     ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
     : null;
+  const recallEvidence =
+    dailyPlanner.nextSessionProof.evidence.find((item) => item.label === "Recall") ??
+    dailyPlanner.nextSessionProof.evidence[0];
+  const practiceEvidence =
+    dailyPlanner.nextSessionProof.evidence.find((item) => item.label === "Practice") ??
+    dailyPlanner.nextSessionProof.evidence.at(-1);
+  const learningFunnelSteps = [
+    {
+      id: "known-evidence",
+      label: "Known",
+      title: `Day ${dailyPlanner.nextSessionProof.sourceDay} evidence`,
+      detail: `${recallEvidence?.value ?? "Recall pending"}; ${practiceEvidence?.value ?? "Practice pending"}.`,
+    },
+    {
+      id: "gap",
+      label: "Gap",
+      title: dailyPlanner.learningGap.title,
+      detail: dailyPlanner.learningGap.detail,
+    },
+    {
+      id: "today",
+      label: "Today",
+      title: dailyPlanner.sessionReadiness.title,
+      detail: dailyPlanner.sessionReadiness.actionLabel,
+    },
+    {
+      id: "revision",
+      label: "Revise",
+      title: dailyPlanner.revision.dueLabel,
+      detail: dailyPlanner.revision.title,
+    },
+  ];
 
   const saveDailyState = (patch: Partial<DailyState>) => {
     const next = {
@@ -444,6 +476,54 @@ export function UpscDailyMissionControl() {
             >
               {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
             </Link>
+          </div>
+        </section>
+
+        <section
+          data-testid="daily-student-learning-funnel"
+          data-active-subject={activeSubject.slug}
+          data-active-day={activeSession.day}
+          data-step-count={learningFunnelSteps.length}
+          data-gap-title={dailyPlanner.learningGap.title}
+          data-today-task={dailyPlanner.sessionReadiness.title}
+          data-revision-label={dailyPlanner.revision.dueLabel}
+          data-next-route={dailyPlanner.tomorrowAdjustment.href}
+          data-decision={dailyPlanner.nextSessionProof.decision}
+          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Today&apos;s simple path
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                {activeSubject.title} Day {activeSession.day}
+              </h2>
+            </div>
+            <Link
+              href={dailyPlanner.sessionReadiness.href}
+              data-testid="daily-funnel-primary-action"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+            >
+              {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid gap-2 md:grid-cols-4">
+            {learningFunnelSteps.map((step, index) => (
+              <article
+                key={step.id}
+                data-testid="daily-funnel-step"
+                data-step-id={step.id}
+                className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                  {index + 1}. {step.label}
+                </p>
+                <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{step.title}</h3>
+                <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{step.detail}</p>
+              </article>
+            ))}
           </div>
         </section>
 
