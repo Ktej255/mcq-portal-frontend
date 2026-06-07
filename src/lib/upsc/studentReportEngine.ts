@@ -46,8 +46,31 @@ export type StudentSubjectReport = {
   nextAction: string;
 };
 
+export type StudentReportWindow = {
+  id: string;
+  title: string;
+  range: string;
+  subjectCount: number;
+  totalDays: number;
+  startedDays: number;
+  watchedDays: number;
+  recallAttempts: number;
+  averageRecall: number | null;
+  mcqSets: number;
+  averageMcq: number | null;
+  recoveryItems: number;
+  commandDays: number;
+  teacherDoubtCount: number;
+  meTimeChecks: number;
+  currentAffairsUnlocked: number;
+  verdict: string;
+  nextAction: string;
+};
+
 export type UpscStudentReportSnapshot = {
   subjects: StudentSubjectReport[];
+  weekly: StudentReportWindow[];
+  monthly: StudentReportWindow;
   totals: {
     totalDays: number;
     startedDays: number;
@@ -191,6 +214,124 @@ function weeklyWindowCount(subject: StudentReportSubject) {
   return new Set(subject.sessions.map((session) => session.week)).size;
 }
 
+function buildReportWindow(
+  id: string,
+  title: string,
+  range: string,
+  subjectSessions: Array<{
+    subject: StudentReportSubject;
+    sessions: SubjectSession[];
+    progress: StudentReportProgressMap;
+  }>
+): StudentReportWindow {
+  const dayRows = subjectSessions.flatMap(({ subject, sessions, progress }) =>
+    sessions.map((session) => ({
+      subject,
+      session,
+      progress: progress[String(session.day)],
+    }))
+  );
+  const startedDays = dayRows.filter((row) => hasStarted(row.progress)).length;
+  const watchedDays = dayRows.filter((row) => row.progress?.watched).length;
+  const recallScores = dayRows
+    .map((row) => row.progress?.talkScore)
+    .filter((score): score is number => typeof score === "number");
+  const mcqScores = dayRows
+    .map((row) => row.progress?.mcqScorePercent)
+    .filter((score): score is number => typeof score === "number");
+  const recoveryItems = dayRows.filter((row) => needsRecovery(row.progress)).length;
+  const commandDays = dayRows.filter((row) => hasCommand(row.progress)).length;
+  const teacherDoubtCount = dayRows.filter((row) => hasTeacherDoubt(row.progress) && !hasCommand(row.progress)).length;
+  const meTimeChecks = dayRows.filter((row) => row.progress?.meTimeCompletedAt).length;
+  const currentAffairsUnlocked = subjectSessions.reduce((sum, { subject, sessions, progress }) => {
+    const daySet = new Set(sessions.map((session) => session.day));
+    return (
+      sum +
+      getCurrentAffairsForSubject(subject.slug).filter(
+        (item) => daySet.has(item.linkedDay) && hasStarted(progress[String(item.linkedDay)])
+      ).length
+    );
+  }, 0);
+  const averageRecall = average(recallScores);
+  const averageMcq = average(mcqScores);
+  const completionRatio = dayRows.length ? startedDays / dayRows.length : 0;
+  const verdict =
+    startedDays === 0
+      ? "No evidence yet"
+      : teacherDoubtCount > 0
+        ? "AI repair active"
+        : recoveryItems > 0
+          ? "Recovery active"
+          : commandDays > 0 && completionRatio >= 0.35
+            ? "Command forming"
+            : "Evidence forming";
+  const nextAction =
+    teacherDoubtCount > 0
+      ? "Clear the latest AI teacher gap before increasing difficulty."
+      : recoveryItems > 0
+        ? "Clear one recovery item before adding new load."
+        : startedDays === 0
+          ? "Start one subject day to generate the first report row."
+          : averageRecall !== null && averageRecall < 95
+            ? "Run one more Talk check to move recall toward 95 percent."
+            : averageMcq === null
+              ? "Add MCQ evidence to complete the report cycle."
+              : "Continue the next planned topic and keep me-time saved.";
+
+  return {
+    id,
+    title,
+    range,
+    subjectCount: subjectSessions.length,
+    totalDays: dayRows.length,
+    startedDays,
+    watchedDays,
+    recallAttempts: recallScores.length,
+    averageRecall,
+    mcqSets: dayRows.filter((row) => row.progress?.mcqCompleted).length,
+    averageMcq,
+    recoveryItems,
+    commandDays,
+    teacherDoubtCount,
+    meTimeChecks,
+    currentAffairsUnlocked,
+    verdict,
+    nextAction,
+  };
+}
+
+function buildWeeklyReportWindows(progressBySubject: Record<string, StudentReportProgressMap>) {
+  const weekNumbers = Array.from(
+    new Set(studentReportSubjects.flatMap((subject) => subject.sessions.map((session) => session.week)))
+  ).sort((left, right) => left - right);
+
+  return weekNumbers.map((weekNumber) =>
+    buildReportWindow(
+      `all-subject-week-${weekNumber}`,
+      `All-subject Week ${weekNumber}`,
+      `Week ${weekNumber} across active subjects`,
+      studentReportSubjects.map((subject) => ({
+        subject,
+        sessions: subject.sessions.filter((session) => session.week === weekNumber),
+        progress: progressBySubject[subject.slug] ?? {},
+      }))
+    )
+  );
+}
+
+function buildMonthlyReportWindow(progressBySubject: Record<string, StudentReportProgressMap>) {
+  return buildReportWindow(
+    "all-subject-month",
+    "All-subject monthly report",
+    "Full UPSC subject path",
+    studentReportSubjects.map((subject) => ({
+      subject,
+      sessions: subject.sessions,
+      progress: progressBySubject[subject.slug] ?? {},
+    }))
+  );
+}
+
 export function readLocalStudentReportProgress(subjectSlug: string): StudentReportProgressMap {
   if (typeof window === "undefined") return {};
 
@@ -277,6 +418,8 @@ export function buildUpscStudentReportSnapshot(
   const subjects = studentReportSubjects.map((subject) =>
     buildStudentSubjectReport(subject, progressBySubject[subject.slug] ?? {})
   );
+  const weekly = buildWeeklyReportWindows(progressBySubject);
+  const monthly = buildMonthlyReportWindow(progressBySubject);
   const allRecallScores = subjects
     .map((subject) => subject.averageRecall)
     .filter((score): score is number => typeof score === "number");
@@ -303,6 +446,8 @@ export function buildUpscStudentReportSnapshot(
 
   return {
     subjects,
+    weekly,
+    monthly,
     totals: {
       totalDays,
       startedDays,

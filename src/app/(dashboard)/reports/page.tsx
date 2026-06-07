@@ -9,6 +9,7 @@ import {
   buildUpscStudentReportSnapshot,
   readLocalStudentReportProgress,
   studentReportSubjects,
+  type StudentReportWindow,
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
@@ -153,6 +154,33 @@ export default function ReportsPage() {
           </div>
         </section>
 
+        <section
+          data-testid="upsc-all-subject-report-windows"
+          className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Generated reports
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Weekly and monthly UPSC command reports</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                These windows are generated from all subject progress, not only Geography. AI gaps, recovery, recall,
+                MCQ, me-time, and covered news all affect the verdict.
+              </p>
+            </div>
+            <CalendarDays className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+          <div className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
+            <AllSubjectReportWindowCard report={allSubjectReport.monthly} variant="monthly" />
+            <div className="grid gap-3 md:grid-cols-2">
+              {allSubjectReport.weekly.slice(0, 4).map((week) => (
+                <AllSubjectReportWindowCard key={week.id} report={week} variant="weekly" />
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section data-testid="upsc-report-evidence-streams" className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -252,6 +280,52 @@ export default function ReportsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function AllSubjectReportWindowCard({
+  report,
+  variant,
+}: {
+  report: StudentReportWindow;
+  variant: "weekly" | "monthly";
+}) {
+  return (
+    <article
+      data-testid={variant === "monthly" ? "upsc-all-subject-monthly-report" : "upsc-all-subject-weekly-report"}
+      data-report-id={report.id}
+      className={`rounded-lg border p-4 shadow-sm ${
+        variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#f7f4ee]"
+      }`}
+    >
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{report.range}</p>
+          <h3 className="mt-1 text-lg font-black tracking-tight">{report.title}</h3>
+        </div>
+        <span className="rounded-md border border-[#b9d9cd] bg-white/80 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">
+          {report.verdict}
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["Started", `${report.startedDays}/${report.totalDays}`],
+          ["Recall", report.averageRecall === null ? "Not measured" : `${report.averageRecall}/100`],
+          ["MCQ", report.averageMcq === null ? "No score" : `${report.averageMcq}%`],
+          ["AI gaps", report.teacherDoubtCount],
+          ["Me-time", report.meTimeChecks],
+          ["News", report.currentAffairsUnlocked],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md border border-[#dcd5c7] bg-white/75 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+            <p className="mt-1 text-base font-black">{value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 rounded-md border border-[#dcd5c7] bg-white/75 p-3 text-xs font-bold leading-5 text-[#4f5e55]">
+        {report.nextAction}
+      </p>
+    </article>
   );
 }
 

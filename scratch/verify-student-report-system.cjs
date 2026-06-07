@@ -123,12 +123,16 @@ async function run() {
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-growth-scale").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-monthly-report").waitFor({ timeout: 15000 });
 
   const href = await page.getByTestId("student-gap-primary-action").getAttribute("href");
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
+  const allSubjectWindowText = await page.getByTestId("upsc-all-subject-report-windows").innerText();
+  const allSubjectWeeklyCount = await page.getByTestId("upsc-all-subject-weekly-report").count();
+  const allSubjectMonthlyText = await page.getByTestId("upsc-all-subject-monthly-report").innerText();
   const subjectCardCount = await page.getByTestId("upsc-subject-report-card").count();
   const weeklyCount = await page.getByTestId("upsc-weekly-report").count();
   const evidenceText = await page.getByTestId("upsc-report-evidence-streams").innerText();
@@ -146,7 +150,10 @@ async function run() {
     href,
     subjectCardCount,
     weeklyCount,
+    allSubjectWeeklyCount,
     allSubjectText,
+    allSubjectWindowText,
+    allSubjectMonthlyText,
     geographyCardText,
     environmentCardText,
     evidenceText,
@@ -160,6 +167,9 @@ async function run() {
   if (weeklyCount !== 4) {
     throw new Error(`Expected 4 weekly report cards, got ${weeklyCount}`);
   }
+  if (allSubjectWeeklyCount !== 4) {
+    throw new Error(`Expected 4 all-subject weekly report cards, got ${allSubjectWeeklyCount}`);
+  }
   const normalizedAllSubjectText = allSubjectText.toLowerCase();
   if (subjectCardCount !== 8 || !normalizedAllSubjectText.includes("environment") || !normalizedAllSubjectText.includes("weekly reports")) {
     throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
@@ -167,6 +177,16 @@ async function run() {
   const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
   if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText) || !/ai gaps\s+1/i.test(compactAllSubjectText)) {
     throw new Error(`All-subject report should count Geography and Environment evidence: ${allSubjectText}`);
+  }
+  const compactWindowText = allSubjectWindowText.replace(/\s+/g, " ");
+  if (
+    !/All-subject monthly report/i.test(allSubjectMonthlyText) ||
+    !/AI repair active/i.test(allSubjectMonthlyText) ||
+    !/AI gaps\s+1/i.test(compactWindowText) ||
+    !/Me-time\s+3/i.test(compactWindowText) ||
+    !/News\s+3/i.test(compactWindowText)
+  ) {
+    throw new Error(`All-subject report windows missing generated evidence: ${allSubjectWindowText}`);
   }
   if (!/latest ai gap:\s*mechanism/i.test(geographyCardText) || !/because-chain/i.test(geographyCardText)) {
     throw new Error(`Geography report card missing AI teacher gap evidence: ${geographyCardText}`);
@@ -188,6 +208,7 @@ async function run() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "reports-mobile", checks);
 
