@@ -1,0 +1,157 @@
+const fs = require("fs");
+const path = require("path");
+const { chromium } = require("@playwright/test");
+
+const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
+const profileKey = "sarit-upsc-student-profile-v1";
+const progressKey = "sarit-upsc-geography-progress-v1";
+const evidencePath = path.join(__dirname, "verify-student-report-system-evidence.json");
+
+async function assertNoOverflow(page, label, checks) {
+  const metrics = await page.evaluate(() => ({
+    url: window.location.href,
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
+  }));
+
+  checks.push({ label, metrics });
+
+  if (metrics.hasHorizontalOverflow) {
+    throw new Error(`${label} has horizontal overflow: ${JSON.stringify(metrics)}`);
+  }
+}
+
+async function seedProfileAndProgress(page) {
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.evaluate(
+    ({ profileStorageKey, progressStorageKey }) => {
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_report_system");
+      window.localStorage.setItem(
+        profileStorageKey,
+        JSON.stringify({
+          level: "advanced",
+          preparationStage: "multiple-attempts",
+          studyWindow: "120",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      window.localStorage.setItem(
+        progressStorageKey,
+        JSON.stringify({
+          1: {
+            day: 1,
+            watched: true,
+            talkScore: 62,
+            talkBand: "Revisit",
+            revisitQueued: true,
+            meTimeCompletedAt: new Date().toISOString(),
+            meTimeMood: "focused",
+            updatedAt: new Date().toISOString(),
+          },
+          5: {
+            day: 5,
+            watched: true,
+            talkScore: 96,
+            talkBand: "Command",
+            confidence: "Command",
+            mcqCompleted: true,
+            mcqScorePercent: 80,
+            meTimeCompletedAt: new Date().toISOString(),
+            meTimeMood: "calm",
+            updatedAt: new Date().toISOString(),
+          },
+          6: {
+            day: 6,
+            reflection: "Ocean currents and marine heatwaves are linked.",
+            talkScore: 88,
+            talkBand: "Practice",
+            mcqCompleted: true,
+            mcqScorePercent: 60,
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      );
+    },
+    { profileStorageKey: profileKey, progressStorageKey: progressKey }
+  );
+}
+
+async function run() {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+  const checks = [];
+  const consoleErrors = [];
+  const pageErrors = [];
+
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await seedProfileAndProgress(page);
+  await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-growth-scale").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-monthly-report").waitFor({ timeout: 15000 });
+
+  const href = await page.getByTestId("student-gap-primary-action").getAttribute("href");
+  const weeklyCount = await page.getByTestId("upsc-weekly-report").count();
+  const evidenceText = await page.getByTestId("upsc-report-evidence-streams").innerText();
+  const monthlyText = await page.getByTestId("upsc-monthly-report").innerText();
+  const growthText = await page.getByTestId("upsc-growth-scale").innerText();
+
+  checks.push({ label: "report-system-content", href, weeklyCount, evidenceText, monthlyText, growthText });
+
+  if (href !== "/upsc/geography/revisit?day=1") {
+    throw new Error(`Gap CTA should still open recovery day 1, got ${href}`);
+  }
+  if (weeklyCount !== 4) {
+    throw new Error(`Expected 4 weekly report cards, got ${weeklyCount}`);
+  }
+  const normalizedEvidence = `${evidenceText}\n${monthlyText}`.toLowerCase();
+  for (const expectedText of ["recall", "mcq", "revision", "me-time", "current affairs", "2 unlocked"]) {
+    if (!normalizedEvidence.includes(expectedText)) {
+      throw new Error(`Report missing expected text: ${expectedText}`);
+    }
+  }
+  if (!growthText.includes("Geography movement")) {
+    throw new Error(`Growth scale missing movement label: ${growthText}`);
+  }
+
+  await assertNoOverflow(page, "reports-desktop", checks);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("upsc-report-evidence-streams").waitFor({ timeout: 15000 });
+  await assertNoOverflow(page, "reports-mobile", checks);
+
+  const evidence = {
+    baseUrl,
+    checks,
+    finalUrl: page.url(),
+    consoleErrors,
+    pageErrors,
+    passed: consoleErrors.length === 0 && pageErrors.length === 0,
+  };
+
+  fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
+  await browser.close();
+
+  if (!evidence.passed) {
+    throw new Error(JSON.stringify(evidence, null, 2));
+  }
+
+  console.log(JSON.stringify(evidence, null, 2));
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

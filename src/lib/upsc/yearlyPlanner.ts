@@ -194,7 +194,7 @@ export const productEngineFeatures: ProductEngineFeature[] = [
   },
   {
     title: "Report system",
-    status: "planned",
+    status: "ready",
     ownerSurface: "/reports",
     studentOutcome: "Tests, MCQs, recall attempts, consistency, mood, and me-time signals become weekly and monthly reports.",
   },

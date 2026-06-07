@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Focus, Target, TriangleAlert } from "lucide-react";
+import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, FileText, Focus, Target, TriangleAlert } from "lucide-react";
 
+import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
+import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 
 export default function ReportsPage() {
   const overview = useGeographyStudentOverview();
+  const { progress } = useGeographyProgress();
+  const report = buildGeographyReportSnapshot(progress);
   const headline = overview.hasUrgentRecovery
     ? `${overview.metrics.revisitCount} recovery item${overview.metrics.revisitCount === 1 ? "" : "s"} need attention`
     : overview.metrics.startedCount
@@ -35,6 +39,53 @@ export default function ReportsPage() {
           </div>
         </section>
 
+        <section data-testid="upsc-report-evidence-streams" className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Auto report</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Weekly and monthly evidence summary</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                Reports are generated from recall, MCQ, recovery, me-time, and covered-topic current-affairs evidence.
+              </p>
+            </div>
+            <FileText className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+          <div className="grid gap-3 md:grid-cols-5">
+            {report.evidenceStreams.map((stream) => (
+              <div key={stream.label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{stream.label}</p>
+                <p className="mt-2 text-xl font-black tracking-tight">{stream.value}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{stream.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section data-testid="upsc-growth-scale" className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
+          <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <BrainCircuit className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Growth scale</p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">{report.growth.growthPercent}% Geography movement</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                Started from: {report.growth.startedFrom}. Current position: {report.growth.currentPosition}.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">Strongest signal</p>
+                <p className="mt-2 text-lg font-black">{report.growth.strongestSignal}</p>
+              </div>
+              <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">Needs attention</p>
+                <p className="mt-2 text-lg font-black">{report.growth.weakestSignal}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="mt-5 grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <TriangleAlert className="h-5 w-5 text-[#6f4a12]" />
@@ -54,6 +105,16 @@ export default function ReportsPage() {
             <h2 className="mt-2 text-xl font-black tracking-tight">{overview.loopState.label}</h2>
             <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">{overview.loopState.shortDetail}</p>
           </div>
+        </section>
+
+        <section data-testid="upsc-weekly-reports" className="mt-5 grid gap-4 lg:grid-cols-2">
+          {report.weekly.map((week) => (
+            <ReportWindowCard key={week.id} report={week} variant="weekly" />
+          ))}
+        </section>
+
+        <section data-testid="upsc-monthly-report" className="mt-5">
+          <ReportWindowCard report={report.monthly} variant="monthly" />
         </section>
 
         <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
@@ -77,5 +138,49 @@ export default function ReportsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ReportWindowCard({
+  report,
+  variant,
+}: {
+  report: GeographyReportWindow;
+  variant: "weekly" | "monthly";
+}) {
+  return (
+    <article
+      data-testid={variant === "weekly" ? "upsc-weekly-report" : "upsc-monthly-report-card"}
+      className={`rounded-lg border p-5 shadow-sm ${
+        variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#fffdf8]"
+      }`}
+    >
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{report.range}</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight">{report.title}</h2>
+        </div>
+        {variant === "monthly" ? <BarChart3 className="h-5 w-5 text-[#085041]" /> : <CalendarDays className="h-5 w-5 text-[#085041]" />}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["Started", `${report.startedDays}/${report.totalDays}`],
+          ["Recall", report.averageRecall === null ? "Not measured" : `${report.averageRecall}/100`],
+          ["MCQ", report.averageMcq === null ? "No score" : `${report.averageMcq}%`],
+          ["Recovery", report.recoveryItems],
+          ["Me-time", report.meTimeChecks],
+          ["Current affairs", report.currentAffairsUnlocked],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-md border border-[#dcd5c7] bg-white/70 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+            <p className="mt-1 text-base font-black">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-md border border-[#dcd5c7] bg-white/70 p-3">
+        <p className="text-sm font-black text-[#13251d]">{report.verdict}</p>
+        <p className="mt-1 text-sm font-semibold leading-6 text-[#657066]">{report.nextAction}</p>
+      </div>
+    </article>
   );
 }
