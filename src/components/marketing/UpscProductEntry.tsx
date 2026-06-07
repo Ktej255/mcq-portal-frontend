@@ -56,6 +56,8 @@ type ProductStat = {
 
 export function UpscProductEntry() {
   const [accessPass, setAccessPass] = useState<AccessPass | null>(null);
+  const showLocalAccess =
+    process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_STUDENT_PREVIEW_LOGIN === "true";
 
   useEffect(() => {
     const rawPass = localStorage.getItem(accessStorageKey);
@@ -69,13 +71,14 @@ export function UpscProductEntry() {
   }, []);
 
   const accessStatus = useMemo(() => {
+    if (!showLocalAccess) return "Student account required for personal progress";
     if (!accessPass) return "Access not activated on this device";
     return `Local access active since ${new Date(accessPass.activatedAt).toLocaleDateString()}`;
-  }, [accessPass]);
+  }, [accessPass, showLocalAccess]);
 
   const productStats: ProductStat[] = [
     { label: "Access", detail: accessStatus, icon: ShieldCheck },
-    { label: "Mode", detail: "Local testing without Firebase dependency", icon: BrainCircuit },
+    { label: "Mode", detail: showLocalAccess ? "Local preview access enabled" : "Supabase account continuity", icon: BrainCircuit },
     { label: "Core", detail: "MCQ is an action, not the whole product", icon: Layers3 },
   ];
 
@@ -140,22 +143,42 @@ export function UpscProductEntry() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                onClick={() => activateAccess("/upsc")}
-                className="h-11 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white hover:bg-[#10291d]"
-              >
-                Activate local UPSC access
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                onClick={() => activateAccess("/upsc/geography")}
-                variant="outline"
-                className="h-11 rounded-md border-[#1d9e75]/40 bg-[#e7f5ee] px-5 text-sm font-black text-[#085041] hover:bg-[#d8f0e6]"
-              >
-                Open Geography pilot
-              </Button>
+              {showLocalAccess ? (
+                <>
+                  <Button
+                    type="button"
+                    onClick={() => activateAccess("/upsc")}
+                    className="h-11 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white hover:bg-[#10291d]"
+                  >
+                    Activate local UPSC access
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => activateAccess("/upsc/geography")}
+                    variant="outline"
+                    className="h-11 rounded-md border-[#1d9e75]/40 bg-[#e7f5ee] px-5 text-sm font-black text-[#085041] hover:bg-[#d8f0e6]"
+                  >
+                    Open Geography pilot
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login?redirect=/upsc"
+                    className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    Start UPSC portal
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/login?redirect=/upsc/geography"
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-[#1d9e75]/40 bg-[#e7f5ee] px-5 text-sm font-black text-[#085041] transition hover:bg-[#d8f0e6]"
+                  >
+                    Open Geography pilot
+                  </Link>
+                </>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -214,10 +237,10 @@ export function UpscProductEntry() {
       <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 md:px-8 lg:grid-cols-[0.78fr_1.22fr]">
         <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Product status</p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight">Marketing entry is now wired for local testing.</h2>
+          <h2 className="mt-2 text-2xl font-black tracking-tight">Controlled Geography pilot is the first launch path.</h2>
           <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">
-            The cloud payment gateway can be attached later. For now, this gives a stable local proof of the expected
-            paid-user journey.
+            Students enter through one account route, complete the daily Geography loop, and use MCQs as one action
+            inside the wider learning system.
           </p>
         </div>
 

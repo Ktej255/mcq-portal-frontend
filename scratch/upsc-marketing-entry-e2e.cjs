@@ -5,6 +5,9 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "upsc-marketing-entry-evidence.json");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
+const expectsLocalAccess =
+  process.env.EXPECT_LOCAL_ACCESS === "true" ||
+  (process.env.EXPECT_LOCAL_ACCESS !== "false" && /127\.0\.0\.1|localhost/i.test(baseUrl));
 
 async function collectMetrics(page, label) {
   return page.evaluate((metricLabel) => {
@@ -20,6 +23,8 @@ async function collectMetrics(page, label) {
         bodyText.includes("ANTIGRAVITY") ||
         bodyText.toLowerCase().includes("antigravity"),
       containsUpscCommand: bodyText.includes("UPSC Command"),
+      containsLocalTestingCopy: /local testing|Firebase dependency|Activate local UPSC access/i.test(bodyText),
+      containsAccountCopy: /Student account required|Supabase account continuity|Start UPSC portal/i.test(bodyText),
     };
   }, label);
 }
@@ -44,7 +49,6 @@ async function run() {
   });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "UPSC Command", exact: true }).waitFor({ timeout: 15000 });
-  await page.getByRole("button", { name: /Activate local UPSC access/i }).waitFor({ timeout: 15000 });
 
   const entryMetrics = await collectMetrics(page, "desktop-marketing-entry");
   checks.push(entryMetrics);
@@ -60,31 +64,55 @@ async function run() {
     throw new Error(`Marketing entry has horizontal overflow: ${JSON.stringify(entryMetrics)}`);
   }
 
-  await page.getByRole("button", { name: /Activate local UPSC access/i }).click();
-  await page.waitForURL(`${baseUrl}/upsc`, { timeout: 15000 });
-  await page.getByText("UPSC self-study profile", { exact: false }).waitFor({ timeout: 15000 });
+  if (expectsLocalAccess) {
+    await page.getByRole("button", { name: /Activate local UPSC access/i }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: /Activate local UPSC access/i }).click();
+    await page.waitForURL(`${baseUrl}/upsc`, { timeout: 15000 });
+    await page.getByText("UPSC self-study profile", { exact: false }).waitFor({ timeout: 15000 });
 
-  const storedAccess = await page.evaluate(() => {
-    const rawPass = localStorage.getItem("sarit-upsc-access-pass-v1");
-    return {
-      token: localStorage.getItem("MOCK_TOKEN"),
-      pass: rawPass ? JSON.parse(rawPass) : null,
-      bodyText: document.body.innerText,
-    };
-  });
+    const storedAccess = await page.evaluate(() => {
+      const rawPass = localStorage.getItem("sarit-upsc-access-pass-v1");
+      return {
+        token: localStorage.getItem("MOCK_TOKEN"),
+        pass: rawPass ? JSON.parse(rawPass) : null,
+        bodyText: document.body.innerText,
+      };
+    });
 
-  checks.push({
-    label: "local-access-routing",
-    url: page.url(),
-    tokenPresent: Boolean(storedAccess.token && storedAccess.token.startsWith("MOCK_TOKEN")),
-    passStatus: storedAccess.pass?.status,
-    passProduct: storedAccess.pass?.product,
-    landedOnUpsc: storedAccess.bodyText.includes("UPSC self-study profile"),
-    containsOldBranding:
-      storedAccess.bodyText.includes("AntiGravity") ||
-      storedAccess.bodyText.includes("ANTIGRAVITY") ||
-      storedAccess.bodyText.toLowerCase().includes("antigravity"),
-  });
+    checks.push({
+      label: "local-access-routing",
+      url: page.url(),
+      tokenPresent: Boolean(storedAccess.token && storedAccess.token.startsWith("MOCK_TOKEN")),
+      passStatus: storedAccess.pass?.status,
+      passProduct: storedAccess.pass?.product,
+      landedOnUpsc: storedAccess.bodyText.includes("UPSC self-study profile"),
+      containsOldBranding:
+        storedAccess.bodyText.includes("AntiGravity") ||
+        storedAccess.bodyText.includes("ANTIGRAVITY") ||
+        storedAccess.bodyText.toLowerCase().includes("antigravity"),
+    });
+  } else {
+    const localButtonCount = await page.getByRole("button", { name: /Activate local UPSC access/i }).count();
+    const startHref = await page.getByRole("link", { name: /Start UPSC portal/i }).getAttribute("href");
+    const geographyHref = await page.getByRole("link", { name: /Open Geography pilot/i }).getAttribute("href");
+    checks.push({
+      label: "production-account-routing",
+      localButtonCount,
+      startHref,
+      geographyHref,
+      containsAccountCopy: entryMetrics.containsAccountCopy,
+      containsLocalTestingCopy: entryMetrics.containsLocalTestingCopy,
+    });
+    if (
+      localButtonCount !== 0 ||
+      startHref !== "/login?redirect=/upsc" ||
+      geographyHref !== "/login?redirect=/upsc/geography" ||
+      !entryMetrics.containsAccountCopy ||
+      entryMetrics.containsLocalTestingCopy
+    ) {
+      throw new Error(`Production entry contract failed: ${JSON.stringify(checks.at(-1), null, 2)}`);
+    }
+  }
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });
@@ -99,6 +127,9 @@ async function run() {
   }
   if (mobileMetrics.containsOldBranding) {
     throw new Error("Mobile marketing entry still contains old AntiGravity branding.");
+  }
+  if (!expectsLocalAccess && mobileMetrics.containsLocalTestingCopy) {
+    throw new Error("Mobile production entry still exposes local-testing copy.");
   }
 
   await browser.close();
