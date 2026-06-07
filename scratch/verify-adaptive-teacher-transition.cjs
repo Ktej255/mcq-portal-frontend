@@ -37,6 +37,12 @@ function fallbackPayload(nextPrompt) {
       summary: "Continue with the short repair lesson.",
       nextPrompt,
       focusConcepts: ["geography", "foundation"],
+      doubtDiagnosis: {
+        category: "UPSC trap",
+        reason: "The answer has a map relationship but misses the statement-level exception.",
+        repairAction: "Write one almost-correct UPSC statement and then reject the hidden exception.",
+        masteryCheck: "Can the learner explain why the statement is wrong without reopening notes?",
+      },
     },
   };
 }

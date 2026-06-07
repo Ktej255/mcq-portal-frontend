@@ -10,6 +10,7 @@ import {
   buildLocalAdaptiveTeacherResponse,
   ADAPTIVE_TEACHER_MAX_COACH_PROMPT_LENGTH,
   ADAPTIVE_TEACHER_MAX_COACH_SUMMARY_LENGTH,
+  ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH,
   ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPT_LENGTH,
   ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPTS,
   ADAPTIVE_TEACHER_MAX_PROVIDER_RESPONSE_BYTES,
@@ -45,6 +46,33 @@ const teacherCoachSchema = {
       items: { type: "string", maxLength: ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPT_LENGTH },
       description: "Up to five concepts that need attention.",
     },
+    doubtDiagnosis: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: ["Recall", "Mechanism", "Applied proof", "UPSC trap", "Expression", "Mastery"],
+          description: "The single most important gap category.",
+        },
+        reason: {
+          type: "string",
+          maxLength: ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH,
+          description: "Why this gap is blocking recall or exam performance.",
+        },
+        repairAction: {
+          type: "string",
+          maxLength: ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH,
+          description: "One concrete action the learner should do now.",
+        },
+        masteryCheck: {
+          type: "string",
+          maxLength: ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH,
+          description: "One question that proves the doubt is solved.",
+        },
+      },
+      required: ["category", "reason", "repairAction", "masteryCheck"],
+      description: "A structured doubt-solving record for planner and report evidence.",
+    },
     providerScore: {
       type: "integer",
       minimum: 0,
@@ -52,7 +80,7 @@ const teacherCoachSchema = {
       description: "Provider-side estimate of UPSC topic command.",
     },
   },
-  required: ["summary", "nextPrompt", "focusConcepts", "providerScore"],
+  required: ["summary", "nextPrompt", "focusConcepts", "doubtDiagnosis", "providerScore"],
 };
 
 function noStoreJson(body: object, init?: ResponseInit) {
@@ -186,6 +214,7 @@ export async function POST(request: NextRequest) {
     `Level-specific repair: ${levelInstruction.repairFrame}`,
     "Evaluate the explanation for concept recall, mechanism, applied proof, syllabus relevance, and UPSC statement trap.",
     "Do not invent facts. Keep the summary concise. Ask exactly one useful next question or provide one forward action.",
+    "Return one doubtDiagnosis object: category, reason, repairAction, and masteryCheck. It must name the single biggest blocker.",
     `Learner explanation: ${teacherRequest.answer}`,
     teacherRequest.challengeAnswer ? `Learner repair explanation: ${teacherRequest.challengeAnswer}` : "",
   ]

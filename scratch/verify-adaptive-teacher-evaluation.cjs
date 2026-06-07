@@ -53,6 +53,7 @@ async function evaluate(testCase) {
     band: payload.assessment?.band,
     nextAction: payload.assessment?.nextAction,
     nextPrompt: payload.coach?.nextPrompt,
+    doubtDiagnosis: payload.coach?.doubtDiagnosis,
   };
 }
 
@@ -73,7 +74,11 @@ async function run() {
       result.score > maximum ||
       result.trace?.promptVersion !== "upsc-teacher-2026-06-03.2" ||
       result.trace?.rubricVersion !== "upsc-recall-rubric-2026-06-03.1" ||
-      result.trace?.recallTarget !== 95
+      result.trace?.recallTarget !== 95 ||
+      !result.doubtDiagnosis?.category ||
+      !result.doubtDiagnosis?.reason ||
+      !result.doubtDiagnosis?.repairAction ||
+      !result.doubtDiagnosis?.masteryCheck
     ) {
       throw new Error(`Adaptive teacher evaluation mismatch: ${JSON.stringify(result, null, 2)}`);
     }

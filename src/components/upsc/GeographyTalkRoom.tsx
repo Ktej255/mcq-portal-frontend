@@ -32,8 +32,8 @@ import {
 } from "@/lib/upsc/geographyLearning";
 import { GEOGRAPHY_RECALL_TARGET } from "@/lib/upsc/guidedStudy";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
-import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
-import type { AdaptiveTeacherCoach } from "@/lib/upsc/adaptiveTeacher";
+import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import type { AdaptiveTeacherCoach, AdaptiveTeacherDoubtDiagnosis } from "@/lib/upsc/adaptiveTeacher";
 import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
 import { cn } from "@/lib/utils";
 
@@ -150,6 +150,24 @@ function getSpeechRecognitionConstructor() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
 }
 
+function readSavedDoubtDiagnosis(progress?: GeographyDayProgress): AdaptiveTeacherDoubtDiagnosis | null {
+  if (
+    !progress?.teacherDoubtCategory ||
+    !progress.teacherDoubtReason ||
+    !progress.teacherDoubtRepairAction ||
+    !progress.teacherDoubtMasteryCheck
+  ) {
+    return null;
+  }
+
+  return {
+    category: progress.teacherDoubtCategory as AdaptiveTeacherDoubtDiagnosis["category"],
+    reason: progress.teacherDoubtReason,
+    repairAction: progress.teacherDoubtRepairAction,
+    masteryCheck: progress.teacherDoubtMasteryCheck,
+  };
+}
+
 export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const { getDayProgress, isLoaded, saveDayProgress } = useGeographyProgress();
   const [activeDay] = useState(resolveSession(initialDay).day);
@@ -171,6 +189,8 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
 
   const activeSession = resolveSession(activeDay);
   const progress = getDayProgress(activeSession.day);
+  const savedDoubtDiagnosis = readSavedDoubtDiagnosis(progress);
+  const teacherDoubtDiagnosis = teacherCoach?.doubtDiagnosis ?? savedDoubtDiagnosis;
   const watchScenes = buildGeographyWatchScenes(activeSession);
   const watchProofCount = Math.min(progress?.watchSceneCompletedIds?.length ?? (progress?.watched ? watchScenes.length : 0), watchScenes.length);
   const isWatchComplete = Boolean(progress?.watched) && watchProofCount >= watchScenes.length;
@@ -275,6 +295,23 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
               }
             : buildGeographyMaicDiscussion(savedSession, savedProgress.reflection ?? "", restoredAssessment)
         );
+        setTeacherCoach(
+          savedProgress.teacherCoachSummary || savedProgress.teacherCoachNextPrompt || savedProgress.teacherDoubtCategory
+            ? {
+                summary: savedProgress.teacherCoachSummary ?? restoredAssessment.summary,
+                nextPrompt: savedProgress.teacherCoachNextPrompt ?? savedProgress.talkTeacherFollowUpPrompt ?? restoredAssessment.nextAction,
+                focusConcepts: [],
+                doubtDiagnosis: readSavedDoubtDiagnosis(savedProgress) ?? {
+                  category: "Mastery",
+                  reason: restoredAssessment.summary,
+                  repairAction: savedProgress.talkTeacherFollowUpPrompt ?? restoredAssessment.nextAction,
+                  masteryCheck: "Can the learner explain the concept again without notes?",
+                },
+                providerScore: savedProgress.teacherProviderScore,
+              }
+            : null
+        );
+        setTeacherConnection(savedProgress.teacherMode === "gemini" ? "ready" : savedProgress.teacherMode === "local-fallback" ? "local" : "idle");
       }
 
       setHydrated(true);
@@ -369,6 +406,10 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
           teacherRecallTarget: response.trace.recallTarget,
           teacherCoachSummary: response.coach.summary,
           teacherCoachNextPrompt: response.coach.nextPrompt,
+          teacherDoubtCategory: response.coach.doubtDiagnosis.category,
+          teacherDoubtReason: response.coach.doubtDiagnosis.reason,
+          teacherDoubtRepairAction: response.coach.doubtDiagnosis.repairAction,
+          teacherDoubtMasteryCheck: response.coach.doubtDiagnosis.masteryCheck,
           teacherProviderScore: response.coach.providerScore,
           talkTeacherFollowUpPrompt: response.coach.nextPrompt,
         });
@@ -643,6 +684,30 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                 <p className="mt-2 text-4xl font-black text-[#13251d]">{assessment.score}%</p>
                 <p className="mt-2 text-sm font-black text-[#085041]">{assessment.band}</p>
                 <p className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">{assessment.summary}</p>
+                {teacherDoubtDiagnosis ? (
+                  <div data-testid="geography-talk-doubt-diagnosis" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Doubt diagnosis</p>
+                        <h4 className="mt-1 text-sm font-black text-[#13251d]">{teacherDoubtDiagnosis.category}</h4>
+                      </div>
+                      <span className="rounded-md bg-[#eef8f3] px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                        Solving path
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{teacherDoubtDiagnosis.reason}</p>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      <p className="rounded-md bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#34453b]">
+                        <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">Repair action</span>
+                        {teacherDoubtDiagnosis.repairAction}
+                      </p>
+                      <p className="rounded-md bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#34453b]">
+                        <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">Mastery check</span>
+                        {teacherDoubtDiagnosis.masteryCheck}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
                 {assessment.score < GEOGRAPHY_RECALL_TARGET && !route ? (
                 <div data-testid="talk-mastery-plan" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Repair to {GEOGRAPHY_RECALL_TARGET}%</p>

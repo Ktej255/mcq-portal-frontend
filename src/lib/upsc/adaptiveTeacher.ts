@@ -23,6 +23,22 @@ export const ADAPTIVE_TEACHER_MAX_COACH_SUMMARY_LENGTH = 600;
 export const ADAPTIVE_TEACHER_MAX_COACH_PROMPT_LENGTH = 500;
 export const ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPT_LENGTH = 80;
 export const ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPTS = 5;
+export const ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH = 260;
+
+export type AdaptiveTeacherDoubtCategory =
+  | "Recall"
+  | "Mechanism"
+  | "Applied proof"
+  | "UPSC trap"
+  | "Expression"
+  | "Mastery";
+
+export type AdaptiveTeacherDoubtDiagnosis = {
+  category: AdaptiveTeacherDoubtCategory;
+  reason: string;
+  repairAction: string;
+  masteryCheck: string;
+};
 
 export type AdaptiveTeacherRequest = {
   subjectSlug?: string;
@@ -36,6 +52,7 @@ export type AdaptiveTeacherCoach = {
   summary: string;
   nextPrompt: string;
   focusConcepts: string[];
+  doubtDiagnosis: AdaptiveTeacherDoubtDiagnosis;
   providerScore?: number;
 };
 
@@ -97,6 +114,52 @@ function isBoundedStringArray(value: unknown, maxItems: number, maxLength: numbe
     value.length <= maxItems &&
     value.every((item) => isBoundedString(item, maxLength))
   );
+}
+
+function buildDoubtDiagnosis(
+  subject: AdaptiveTeacherSubject,
+  assessment: GeographyAssessment,
+  levelInstruction: ReturnType<typeof getAdaptiveTeacherLevelInstruction>
+): AdaptiveTeacherDoubtDiagnosis {
+  const weakRubric = assessment.rubric.find((item) => item.status !== "Ready");
+  if (!weakRubric) {
+    return {
+      category: "Mastery",
+      reason: `${subject.title} recall has crossed the ${subject.recallTarget}% command threshold.`,
+      repairAction: "Move into fresh MCQs and watch for statement-level traps.",
+      masteryCheck: "Can the learner create one almost-correct UPSC statement and reject it?",
+    };
+  }
+
+  const category: AdaptiveTeacherDoubtCategory = weakRubric.label === "Map proof" ? "Applied proof" : weakRubric.label;
+  const focusText = assessment.missingKeywords.slice(0, 3).join(", ") || subject.title;
+  const repairAction =
+    weakRubric.label === "Recall"
+      ? `Recall and define ${focusText}, then explain how it connects to the syllabus anchor.`
+      : weakRubric.label === "Mechanism"
+        ? "Build one because-chain: cause -> process -> effect -> exception."
+        : weakRubric.label === "Map proof"
+          ? "Attach one India, map, institution, report, scheme, case, or policy proof."
+          : weakRubric.label === "UPSC trap"
+            ? "Write one almost-correct UPSC statement and then identify the exception."
+            : "Repeat in a compact order: concept -> mechanism -> example -> trap.";
+  const masteryCheck =
+    weakRubric.label === "Recall"
+      ? `Can the learner explain ${focusText} without notes?`
+      : weakRubric.label === "Mechanism"
+        ? "Can the learner explain the sequence without skipping the middle cause?"
+        : weakRubric.label === "Map proof"
+          ? "Can the learner attach the answer to one concrete proof instead of a generic example?"
+          : weakRubric.label === "UPSC trap"
+            ? "Can the learner catch the hidden exception in a prelims-style statement?"
+            : "Can the learner speak the answer in 90 seconds with no wandering?";
+
+  return {
+    category,
+    reason: `${levelInstruction.diagnosisFrame} Weakest signal: ${weakRubric.evidence}`,
+    repairAction,
+    masteryCheck,
+  };
 }
 
 export function resolveAdaptiveTeacherSubject(subjectSlug?: string): AdaptiveTeacherSubject | null {
@@ -299,6 +362,7 @@ export function buildLocalAdaptiveTeacherResponse(
   const focusConcepts = assessment.missingKeywords.slice(0, 4);
   const examplePrompt = subject.assessmentKind === "geography" ? "India map example" : "applied example";
   const levelInstruction = getAdaptiveTeacherLevelInstruction(request.learnerLevel);
+  const doubtDiagnosis = buildDoubtDiagnosis(subject, assessment, levelInstruction);
   const nextPrompt =
     assessment.score >= subject.recallTarget
       ? "Apply the concept in fresh MCQs, then continue to the next topic."
@@ -319,6 +383,7 @@ export function buildLocalAdaptiveTeacherResponse(
       summary: `${levelInstruction.diagnosisFrame} ${assessment.summary}`,
       nextPrompt,
       focusConcepts,
+      doubtDiagnosis,
     },
   };
 }
@@ -326,8 +391,17 @@ export function buildLocalAdaptiveTeacherResponse(
 export function parseGeminiCoach(value: unknown): AdaptiveTeacherCoach | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<AdaptiveTeacherCoach>;
+  const diagnosis = candidate.doubtDiagnosis as Partial<AdaptiveTeacherDoubtDiagnosis> | undefined;
   const summary = typeof candidate.summary === "string" ? candidate.summary.trim() : "";
   const nextPrompt = typeof candidate.nextPrompt === "string" ? candidate.nextPrompt.trim() : "";
+  const categories: AdaptiveTeacherDoubtCategory[] = [
+    "Recall",
+    "Mechanism",
+    "Applied proof",
+    "UPSC trap",
+    "Expression",
+    "Mastery",
+  ];
   if (!Array.isArray(candidate.focusConcepts)) return null;
   const focusConcepts = candidate.focusConcepts
     .filter((item): item is string => typeof item === "string")
@@ -343,6 +417,11 @@ export function parseGeminiCoach(value: unknown): AdaptiveTeacherCoach | null {
     summary.length > ADAPTIVE_TEACHER_MAX_COACH_SUMMARY_LENGTH ||
     !nextPrompt ||
     nextPrompt.length > ADAPTIVE_TEACHER_MAX_COACH_PROMPT_LENGTH ||
+    !diagnosis ||
+    !categories.includes(diagnosis.category as AdaptiveTeacherDoubtCategory) ||
+    !isBoundedString(diagnosis.reason, ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH) ||
+    !isBoundedString(diagnosis.repairAction, ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH) ||
+    !isBoundedString(diagnosis.masteryCheck, ADAPTIVE_TEACHER_MAX_DOUBT_FIELD_LENGTH) ||
     focusConcepts.length !== candidate.focusConcepts.length ||
     focusConcepts.length > ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPTS ||
     focusConcepts.some((item) => item.length > ADAPTIVE_TEACHER_MAX_FOCUS_CONCEPT_LENGTH)
@@ -354,6 +433,12 @@ export function parseGeminiCoach(value: unknown): AdaptiveTeacherCoach | null {
     summary,
     nextPrompt,
     focusConcepts,
+    doubtDiagnosis: {
+      category: diagnosis.category as AdaptiveTeacherDoubtCategory,
+      reason: diagnosis.reason.trim(),
+      repairAction: diagnosis.repairAction.trim(),
+      masteryCheck: diagnosis.masteryCheck.trim(),
+    },
     providerScore,
   };
 }

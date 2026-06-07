@@ -75,7 +75,11 @@ async function run() {
     fallback.payload.trace?.recallTarget !== 95 ||
     typeof fallback.payload.assessment?.score !== "number" ||
     !fallback.payload.coach?.nextPrompt ||
-    !Array.isArray(fallback.payload.coach?.focusConcepts)
+    !Array.isArray(fallback.payload.coach?.focusConcepts) ||
+    !fallback.payload.coach?.doubtDiagnosis?.category ||
+    !fallback.payload.coach?.doubtDiagnosis?.reason ||
+    !fallback.payload.coach?.doubtDiagnosis?.repairAction ||
+    !fallback.payload.coach?.doubtDiagnosis?.masteryCheck
   ) {
     throw new Error(`Teacher response contract mismatch: ${JSON.stringify(fallback)}`);
   }

@@ -23,7 +23,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { SubjectLoopActions } from "@/components/upsc/SubjectLoopActions";
-import type { AdaptiveTeacherCoach } from "@/lib/upsc/adaptiveTeacher";
+import type { AdaptiveTeacherCoach, AdaptiveTeacherDoubtDiagnosis } from "@/lib/upsc/adaptiveTeacher";
 import { getDisasterManagementLearningPack } from "@/lib/upsc/disasterManagementLearningDecks";
 import { getEconomyLearningPack } from "@/lib/upsc/economyLearningDecks";
 import { getEnvironmentLearningPack } from "@/lib/upsc/environmentLearningDecks";
@@ -46,6 +46,7 @@ import { getSubjectLabProofCompletion, getSubjectWatchCompletion } from "@/lib/u
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import {
   type SubjectConfidence,
+  type SubjectDayProgress,
   type SubjectMentorMode,
   type SubjectTalkClassroomStage,
   type SubjectTalkDiscussionStep,
@@ -127,6 +128,24 @@ function getSpeechRecognitionConstructor() {
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
 }
 
+function readSavedDoubtDiagnosis(progress?: SubjectDayProgress): AdaptiveTeacherDoubtDiagnosis | null {
+  if (
+    !progress?.teacherDoubtCategory ||
+    !progress.teacherDoubtReason ||
+    !progress.teacherDoubtRepairAction ||
+    !progress.teacherDoubtMasteryCheck
+  ) {
+    return null;
+  }
+
+  return {
+    category: progress.teacherDoubtCategory as AdaptiveTeacherDoubtDiagnosis["category"],
+    reason: progress.teacherDoubtReason,
+    repairAction: progress.teacherDoubtRepairAction,
+    masteryCheck: progress.teacherDoubtMasteryCheck,
+  };
+}
+
 export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const router = useRouter();
   const { getDayProgress, isLoaded, saveDayProgress } = useSubjectProgress(plan.slug, plan.sessions);
@@ -198,6 +217,8 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const revisitHref = `${basePath}/revisit?day=${activeSession.day}`;
   const activeLab = plan.labs.find((lab) => lab.title === activeSession.lab) ?? plan.labs[0];
   const activeProgress = getDayProgress(activeSession.day);
+  const savedDoubtDiagnosis = readSavedDoubtDiagnosis(activeProgress);
+  const teacherDoubtDiagnosis = teacherCoach?.doubtDiagnosis ?? savedDoubtDiagnosis;
   const labHref = `${basePath}/lab?mode=${activeProgress?.labMode ?? activeLab?.slug ?? ""}&day=${activeSession.day}`;
   const mcqHref = `${basePath}/mcq-readiness?day=${activeSession.day}`;
   const watchCompletion = getSubjectWatchCompletion(activeProgress);
@@ -392,6 +413,12 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
               summary: saved.teacherCoachSummary ?? savedAssessment?.summary ?? "Saved teacher guidance.",
               nextPrompt: saved.teacherCoachNextPrompt ?? saved.talkTeacherFollowUpPrompt ?? savedAssessment?.nextAction ?? "Continue with the recommended step.",
               focusConcepts: [],
+              doubtDiagnosis: readSavedDoubtDiagnosis(saved) ?? {
+                category: "Mastery",
+                reason: savedAssessment?.summary ?? "Saved teacher guidance is available.",
+                repairAction: saved.talkTeacherFollowUpPrompt ?? savedAssessment?.nextAction ?? "Continue with the recommended step.",
+                masteryCheck: "Can the learner explain the concept again without notes?",
+              },
               providerScore: saved.teacherProviderScore,
             }
           : null
@@ -596,6 +623,10 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
           teacherRecallTarget: response.trace.recallTarget,
           teacherCoachSummary: response.coach.summary,
           teacherCoachNextPrompt: response.coach.nextPrompt,
+          teacherDoubtCategory: response.coach.doubtDiagnosis.category,
+          teacherDoubtReason: response.coach.doubtDiagnosis.reason,
+          teacherDoubtRepairAction: response.coach.doubtDiagnosis.repairAction,
+          teacherDoubtMasteryCheck: response.coach.doubtDiagnosis.masteryCheck,
           teacherProviderScore: response.coach.providerScore,
           talkTeacherFollowUpPrompt: response.coach.nextPrompt,
         });
@@ -876,6 +907,31 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                       : "Explain one clearer cause-effect chain, one example, and one UPSC trap before MCQ."}
                 </p>
               </div>
+
+              {teacherDoubtDiagnosis ? (
+                <div data-testid="subject-talk-doubt-diagnosis" className="mt-4 rounded-md border border-[#d7e8df] bg-white/80 p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Doubt diagnosis</p>
+                      <h4 className="mt-1 text-sm font-black text-[#13251d]">{teacherDoubtDiagnosis.category}</h4>
+                    </div>
+                    <span className="rounded-md bg-[#eef8f3] px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                      Solving path
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">{teacherDoubtDiagnosis.reason}</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <p className="rounded-md bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#34453b]">
+                      <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">Repair action</span>
+                      {teacherDoubtDiagnosis.repairAction}
+                    </p>
+                    <p className="rounded-md bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#34453b]">
+                      <span className="block text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">Mastery check</span>
+                      {teacherDoubtDiagnosis.masteryCheck}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               <div data-testid="subject-talk-teacher-coach" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">Your mastery plan</p>

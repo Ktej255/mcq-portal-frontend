@@ -58,6 +58,9 @@ async function run() {
   await page.getByTestId("talk-answer-draft").fill(diagnosticAnswer);
   await page.getByTestId("talk-assess-answer").click();
   await page.getByTestId("talk-route-gate").waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Repair action", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
   await page.waitForFunction(
     (key) => JSON.parse(localStorage.getItem(key) || "{}")["1"]?.teacherMode === "local-fallback",
     progressKey,
@@ -83,8 +86,13 @@ async function run() {
       teacherRecallTarget: progress?.teacherRecallTarget,
       teacherCoachNextPrompt: progress?.teacherCoachNextPrompt,
       teacherCoachSummary: progress?.teacherCoachSummary,
+      teacherDoubtCategory: progress?.teacherDoubtCategory,
+      teacherDoubtReason: progress?.teacherDoubtReason,
+      teacherDoubtRepairAction: progress?.teacherDoubtRepairAction,
+      teacherDoubtMasteryCheck: progress?.teacherDoubtMasteryCheck,
     };
   }, progressKey);
+  const doubtDiagnosisText = await page.getByTestId("geography-talk-doubt-diagnosis").innerText();
   const metrics = await assertNoOverflow(page);
   const evidence = {
     baseUrl,
@@ -92,6 +100,7 @@ async function run() {
       routeGate,
       masteryPlanVisible,
       repeatTo95Visible,
+      doubtDiagnosisText,
       persistedTeacherTrace,
       metrics,
     },
@@ -111,6 +120,11 @@ async function run() {
       persistedTeacherTrace.teacherPromptVersion === "upsc-teacher-2026-06-03.2" &&
       persistedTeacherTrace.teacherRubricVersion === "upsc-recall-rubric-2026-06-03.1" &&
       persistedTeacherTrace.teacherRecallTarget === 95 &&
+      Boolean(persistedTeacherTrace.teacherDoubtCategory) &&
+      Boolean(persistedTeacherTrace.teacherDoubtReason) &&
+      Boolean(persistedTeacherTrace.teacherDoubtRepairAction) &&
+      Boolean(persistedTeacherTrace.teacherDoubtMasteryCheck) &&
+      /doubt diagnosis/i.test(doubtDiagnosisText) &&
       /attempt-gap|attempt|diagnos/i.test(persistedTeacherTrace.teacherCoachNextPrompt || "") &&
       !metrics.hasHorizontalOverflow &&
       consoleErrors.length === 0 &&

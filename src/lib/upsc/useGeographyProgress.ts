@@ -81,6 +81,10 @@ export type GeographyDayProgress = {
   teacherRecallTarget?: number;
   teacherCoachSummary?: string;
   teacherCoachNextPrompt?: string;
+  teacherDoubtCategory?: string;
+  teacherDoubtReason?: string;
+  teacherDoubtRepairAction?: string;
+  teacherDoubtMasteryCheck?: string;
   teacherProviderScore?: number;
   talkTeacherFollowUpPrompt?: string;
   talkTeacherFollowUpAnswer?: string;

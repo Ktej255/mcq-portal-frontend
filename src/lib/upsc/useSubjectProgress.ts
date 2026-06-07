@@ -70,6 +70,10 @@ export type SubjectDayProgress = {
   teacherRecallTarget?: number;
   teacherCoachSummary?: string;
   teacherCoachNextPrompt?: string;
+  teacherDoubtCategory?: string;
+  teacherDoubtReason?: string;
+  teacherDoubtRepairAction?: string;
+  teacherDoubtMasteryCheck?: string;
   teacherProviderScore?: number;
   talkTeacherFollowUpPrompt?: string;
   labCompleted?: boolean;

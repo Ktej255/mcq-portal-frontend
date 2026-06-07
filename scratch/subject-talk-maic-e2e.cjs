@@ -107,6 +107,9 @@ async function run() {
     await page.getByRole("button", { name: /Assess explanation/i }).click();
     await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
     await page.getByTestId("talk-recall-target").getByText("Target 95% recall", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Repair action", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-teacher-coach").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const text = document.querySelector('[data-testid="subject-talk-teacher-connection"]')?.textContent || "";
@@ -152,7 +155,15 @@ async function run() {
       const raw = window.localStorage.getItem(key);
       return raw ? JSON.parse(raw)["5"] : null;
     }, storageKey("environment"));
-    if (!progress?.teacherMode || !progress?.teacherCoachNextPrompt || progress?.teacherRecallTarget !== 95) {
+    if (
+      !progress?.teacherMode ||
+      !progress?.teacherCoachNextPrompt ||
+      progress?.teacherRecallTarget !== 95 ||
+      !progress?.teacherDoubtCategory ||
+      !progress?.teacherDoubtReason ||
+      !progress?.teacherDoubtRepairAction ||
+      !progress?.teacherDoubtMasteryCheck
+    ) {
       throw new Error(`Environment Talk adaptive teacher state did not persist correctly: ${JSON.stringify(progress)}`);
     }
     const pageMetrics = await metrics(page);
@@ -164,6 +175,12 @@ async function run() {
       primaryRouteHref,
       routeInsideScoreCard,
       teacherConnectionText,
+      doubtDiagnosis: {
+        category: progress.teacherDoubtCategory,
+        reason: progress.teacherDoubtReason,
+        repairAction: progress.teacherDoubtRepairAction,
+        masteryCheck: progress.teacherDoubtMasteryCheck,
+      },
       progress,
       metrics: pageMetrics,
     });
@@ -227,6 +244,8 @@ async function run() {
     await page.getByRole("button", { name: /Assess explanation/i }).click();
     await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
     await page.getByTestId("talk-recall-target").getByText("Target 95% recall", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Doubt diagnosis", { exact: false }).waitFor({ timeout: 15000 });
+    await page.getByTestId("subject-talk-doubt-diagnosis").getByText("Mastery check", { exact: false }).waitFor({ timeout: 15000 });
     await page.getByTestId("subject-talk-teacher-coach").waitFor({ timeout: 15000 });
     await page.waitForFunction(() => {
       const text = document.querySelector('[data-testid="subject-talk-teacher-connection"]')?.textContent || "";
@@ -255,8 +274,26 @@ async function run() {
     await page.getByTestId("subject-maic-discussion-turns").locator("summary").click();
     await page.getByTestId("subject-maic-discussion-turns").getByText("UPSC Examiner", { exact: false }).first().waitFor({ timeout: 15000 });
     const economyTeacherConnectionText = (await page.getByTestId("subject-talk-teacher-connection").innerText()).trim();
+    const economyProgress = await page.evaluate((key) => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw)["3"] : null;
+    }, storageKey("economy"));
+    if (!economyProgress?.teacherDoubtCategory || !economyProgress?.teacherDoubtRepairAction || !economyProgress?.teacherDoubtMasteryCheck) {
+      throw new Error(`Economy Talk adaptive doubt diagnosis did not persist correctly: ${JSON.stringify(economyProgress)}`);
+    }
     const pageMetrics = await metrics(page);
-    checks.push({ viewport: "desktop", route: "economy-talk", routeInsideScoreCard: economyRouteInsideScoreCard, teacherConnectionText: economyTeacherConnectionText, metrics: pageMetrics });
+    checks.push({
+      viewport: "desktop",
+      route: "economy-talk",
+      routeInsideScoreCard: economyRouteInsideScoreCard,
+      teacherConnectionText: economyTeacherConnectionText,
+      doubtDiagnosis: {
+        category: economyProgress.teacherDoubtCategory,
+        repairAction: economyProgress.teacherDoubtRepairAction,
+        masteryCheck: economyProgress.teacherDoubtMasteryCheck,
+      },
+      metrics: pageMetrics,
+    });
     if (pageMetrics.hasHorizontalOverflow) {
       throw new Error(`Economy Talk has horizontal overflow: ${JSON.stringify(pageMetrics)}`);
     }
