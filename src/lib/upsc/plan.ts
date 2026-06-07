@@ -90,6 +90,13 @@ export const upscCalendar = [
     href: "/upsc/yearly-planner",
   },
   {
+    window: "Pricing",
+    title: "UPSC Pricing Command",
+    detail: "Rs 399 monthly base with yearly, 18-month, and three-year discount ladders for launch enrollment.",
+    status: "Structure ready",
+    href: "/upsc/pricing",
+  },
+  {
     window: "Optional",
     title: "Optional Subject Command",
     detail: "Paper I and Paper II page shell for every UPSC optional subject with syllabus and PYQ preload targets.",

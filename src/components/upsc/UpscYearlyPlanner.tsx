@@ -58,6 +58,9 @@ export function UpscYearlyPlanner() {
                 The product plan now binds the yearly subject sequence, PYQ preload target, optional-subject catalog,
                 pricing, gap analysis, revision, reports, and AI discussion loop into one visible operating map.
               </p>
+              <Link href="/upsc/pricing" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
+                Open pricing command <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[

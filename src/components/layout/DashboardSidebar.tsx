@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  BadgeIndianRupee,
   BarChart3,
   CalendarCheck,
   Database,
@@ -33,6 +34,7 @@ const adminNavItems = [
   { name: 'Admin Console', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Launch Plan', href: '/admin/launch-plan', icon: CalendarCheck },
   { name: 'Yearly Planner', href: '/upsc/yearly-planner', icon: FolderTree },
+  { name: 'Pricing', href: '/upsc/pricing', icon: BadgeIndianRupee },
   { name: 'Syllabus/PYQ', href: '/upsc/source-library', icon: LibraryBig },
   { name: 'Feature Inventory', href: '/admin/feature-inventory', icon: ListChecks },
   { name: 'Prelims V2', href: '/admin/prelims-audit-v2', icon: FileSearch },
