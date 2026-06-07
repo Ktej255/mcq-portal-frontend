@@ -44,6 +44,7 @@ export function UpscSyllabusPyqLibrary() {
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
                 This page is the operating checklist for subject-wise syllabus demand, prelims PYQs, mains PYQs,
                 optional Paper I/II sources, trend mapping, NCERT basics, reference depth, and current-affairs hooks.
+                Use trend signals to choose watch areas, not to claim exact question prediction.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -114,6 +115,8 @@ export function UpscSyllabusPyqLibrary() {
                   <div className="grid gap-2">
                     <PathRow label="Basics" value={subject.systematicPath.basicsStart} />
                     <PathRow label="Advanced" value={subject.systematicPath.advancedBridge} />
+                    <PathRow label="PYQ trend" value={subject.systematicPath.pyqTrendRule} />
+                    <PathRow label="Next-year focus" value={subject.systematicPath.nextYearFocusRule} />
                     <PathRow label="Current affairs" value={subject.systematicPath.currentAffairsRule} />
                     <PathRow label="Gap" value={subject.systematicPath.gapRule} />
                     <PathRow label="Revision" value={subject.systematicPath.revisionRule} />

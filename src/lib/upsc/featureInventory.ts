@@ -544,7 +544,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
       "Each subject path should combine syllabus demand, PYQ trend, predicted focus, NCERT basics, reference depth, and covered current affairs.",
     status: "partial",
     currentState:
-      "The source library and subject command rooms expose the structure. Real lecture depth is strongest in Geography and thinner in later subjects.",
+      "The source library now exposes syllabus demand, PYQ trend rule, cautious next-year focus rule, NCERT basics, reference depth, current-affairs rule, gap rule, and revision rule for every GS subject. Real lecture depth is strongest in Geography and thinner in later subjects.",
     evidence: "source-library, subject plans, current-affairs bridge, and subject maturity matrix",
     nextAction: "Finish the Geography production pack first, then deepen Environment using the same path contract.",
     phase: "Day 2",

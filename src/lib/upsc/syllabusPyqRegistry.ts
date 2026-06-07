@@ -50,6 +50,8 @@ export type PyqTrendInsight = {
 export type SubjectSystematicPath = {
   basicsStart: string;
   advancedBridge: string;
+  pyqTrendRule: string;
+  nextYearFocusRule: string;
   currentAffairsRule: string;
   gapRule: string;
   revisionRule: string;
@@ -321,6 +323,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     geography: {
       basicsStart: "NCERT map, landform, climate, water, India physical environment, and human geography foundations.",
       advancedBridge: "Reference-book process depth, atlas drills, location theory, resources, agriculture, and regional development.",
+      pyqTrendRule: "Read 2015-2025 questions by map anchor, process chain, location trap, and mains explanation demand.",
+      nextYearFocusRule: "Treat monsoon, water stress, Himalayan risk, resources, corridors, disasters, and places in news as watch areas, not guaranteed predictions.",
       currentAffairsRule: "Unlock only after linked static topic: monsoon, disasters, rivers, minerals, crops, places in news, and climate events.",
       gapRule: "Student recall must expose missing mechanism, missing map anchor, or one-factor explanation before watch room opens.",
       revisionRule: "Revise weak map/process topics on Day +2, then retest with PYQ-style elimination.",
@@ -328,6 +332,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     environment: {
       basicsStart: "NCERT ecology, biodiversity, pollution, biology, and basic climate vocabulary.",
       advancedBridge: "Conventions, protected-area logic, environment laws, reports, species, pollution standards, and policy instruments.",
+      pyqTrendRule: "Read 2015-2025 questions by species, convention, protected-area category, pollutant, report, and institution traps.",
+      nextYearFocusRule: "Watch climate finance, carbon markets, protected-area changes, species in news, pollution rules, and COP-linked updates without making exact-paper claims.",
       currentAffairsRule: "Unlock only where ecology, convention, species, or policy topic is already covered.",
       gapRule: "Student recall must separate term-definition memory from cause-impact-control reasoning.",
       revisionRule: "Revisit species, conventions, and pollution indicators through spaced mixed drills.",
@@ -335,6 +341,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     "polity-governance": {
       basicsStart: "NCERT Constitution, rights, Parliament, federalism, local government, and basic governance language.",
       advancedBridge: "Laxmikanth provisions, landmark cases, committees, ARC, governance schemes, and mains frameworks.",
+      pyqTrendRule: "Read 2015-2025 questions by article, body, procedure, limitation, case principle, and governance reform demand.",
+      nextYearFocusRule: "Watch judgments, bills, federal disputes, elections, constitutional bodies, welfare delivery, and digital governance as focus zones only.",
       currentAffairsRule: "Unlock bills, judgments, appointments, federal disputes, and governance reforms after matching static chapter.",
       gapRule: "Student recall must cite provision, institution, accountability tool, or case principle.",
       revisionRule: "Revision alternates articles/institutions with application-based mains prompts.",
@@ -342,6 +350,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     economy: {
       basicsStart: "NCERT macro, money, banking, budget, inflation, external sector, and development basics.",
       advancedBridge: "Budget, Economic Survey, RBI, fiscal policy, sector constraints, data interpretation, and reform logic.",
+      pyqTrendRule: "Read 2015-2025 questions by concept, data source, institution, policy instrument, sector, and consequence.",
+      nextYearFocusRule: "Watch inflation, fiscal choices, jobs, trade, banking, welfare, agriculture, logistics, and climate-economy links as priority signals.",
       currentAffairsRule: "Unlock fiscal, monetary, trade, jobs, agriculture, welfare, and infrastructure updates after static base.",
       gapRule: "Student recall must connect concept, data, institution, and policy consequence.",
       revisionRule: "Revise weak economy areas with data cards plus applied MCQs.",
@@ -349,6 +359,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     "science-tech": {
       basicsStart: "NCERT physics, chemistry, biology, space, energy, health, and everyday science fundamentals.",
       advancedBridge: "Applications, mission objectives, mechanisms, risk, ethics, governance, and emerging-technology examples.",
+      pyqTrendRule: "Read 2015-2025 questions by mechanism, application, institution, mission objective, risk, and governance angle.",
+      nextYearFocusRule: "Watch AI governance, space missions, biotech, cyber, semiconductors, health tech, defence tech, and clean energy without overstating prediction certainty.",
       currentAffairsRule: "Unlock only technology-in-news items that match completed science mechanisms.",
       gapRule: "Student recall must explain mechanism, application, and risk in simple language.",
       revisionRule: "Revision uses mechanism diagrams, application traps, and current affairs bridges.",
@@ -356,6 +368,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     "disaster-management": {
       basicsStart: "Hazard, exposure, vulnerability, capacity, early warning, and geography-linked disaster basics.",
       advancedBridge: "DM Act, NDMA guidelines, Sendai Framework, institutional flow, case studies, and response frameworks.",
+      pyqTrendRule: "Read 2015-2025 questions by hazard-risk chain, institution, mitigation, preparedness, response, and case-study demand.",
+      nextYearFocusRule: "Watch heatwaves, urban floods, landslides, earthquakes, cyclones, industrial accidents, and early-warning systems as risk themes.",
       currentAffairsRule: "Unlock disaster events after the relevant hazard and institution chain is covered.",
       gapRule: "Student recall must separate hazard from disaster risk and response from mitigation.",
       revisionRule: "Revision converts each disaster into risk-cause-impact-response-prevention grids.",
@@ -363,6 +377,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     "internal-security-society": {
       basicsStart: "NCERT society, social change, diversity, state, borders, security vocabulary, and cyber basics.",
       advancedBridge: "Internal security doctrines, border management, cyber, extremism, society frameworks, and vulnerable-section themes.",
+      pyqTrendRule: "Read 2015-2025 questions by cause, stakeholder, threat type, legal tool, institution, and social impact.",
+      nextYearFocusRule: "Watch cyber security, border management, migration, vulnerable groups, social cohesion, extremism, and tech-enabled threats.",
       currentAffairsRule: "Unlock cases only after the social/security concept is covered.",
       gapRule: "Student recall must identify cause, stakeholder, institution, and policy response.",
       revisionRule: "Revision uses issue-maps and answer frameworks rather than isolated facts.",
@@ -370,6 +386,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     history: {
       basicsStart: "NCERT ancient, medieval, modern, and art-culture chronology, personalities, sources, and institutions.",
       advancedBridge: "Old NCERT/Bipan Chandra/Nitin Singhania-style source, culture, movement, and theme depth.",
+      pyqTrendRule: "Read 2015-2025 questions by source, period, region, personality, movement, art form, and chronology trap.",
+      nextYearFocusRule: "Watch heritage sites, excavations, GI/culture themes, anniversaries, reform movements, and personalities as focus areas only.",
       currentAffairsRule: "Unlock culture/news links only after matching monument, movement, personality, or theme is covered.",
       gapRule: "Student recall must place event/source/art form in timeline, region, and theme.",
       revisionRule: "Revision rotates chronology, source-based traps, art-culture images, and movement themes.",
@@ -380,6 +398,8 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
     paths[slug] ?? {
       basicsStart: "NCERT foundation layer before reference-book depth.",
       advancedBridge: "Reference material, PYQ traps, reports, and answer frameworks.",
+      pyqTrendRule: "Read the last 10 years by repeated syllabus area, trap type, and answer demand.",
+      nextYearFocusRule: "Use trend signals to choose watch areas, not to claim exact question prediction.",
       currentAffairsRule: "Unlock only after the static topic has been completed.",
       gapRule: "Student recall must expose concept, fact, application, or source gaps.",
       revisionRule: "Revision follows weak-topic evidence from recall and MCQ score.",

@@ -100,16 +100,19 @@ async function run() {
     "Systematic path rule",
     "Basics:",
     "Advanced:",
+    "PYQ trend:",
+    "Next-year focus:",
     "Current affairs:",
     "Gap:",
     "Revision:",
+    "Use trend signals to choose watch areas",
     "full PDF text extraction and exact topic tagging continue next",
   ]) {
     if (!libraryState.bodyText.includes(required)) {
       throw new Error(`Missing source-library text: ${required}`);
     }
   }
-  for (const required of ["monsoon", "atlas proof", "recall prompts", "PYQ-style traps"]) {
+  for (const required of ["monsoon", "atlas proof", "recall prompts", "PYQ-style traps", "not guaranteed predictions"]) {
     if (!libraryState.geographyText.toLowerCase().includes(required.toLowerCase())) {
       throw new Error(`Missing geography trend detail: ${required}`);
     }
