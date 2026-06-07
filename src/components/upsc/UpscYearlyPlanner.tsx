@@ -323,6 +323,7 @@ export function OptionalSubjectDetail({
   const yearRows = sourcePack?.yearRows ?? [];
   const paperSummaries = sourcePack?.paperSummary ?? [];
   const syllabusThemes = sourcePack?.syllabusThemes ?? [];
+  const assemblyProof = sourcePack?.assemblyProof;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -373,6 +374,59 @@ export function OptionalSubjectDetail({
             <p className="text-sm font-semibold leading-6 text-[#085041]">{subject.firstBuildAction}</p>
           </div>
         </section>
+        {assemblyProof ? (
+          <section
+            data-testid="upsc-optional-assembly-proof"
+            data-year-window={assemblyProof.yearWindow}
+            data-total-years={assemblyProof.totalYears}
+            data-total-paper-rows={assemblyProof.totalPaperRows}
+            data-paper-rows-per-year={assemblyProof.paperRowsPerYear}
+            data-source-indexed-years={assemblyProof.sourceIndexedYears}
+            data-pending-text-years={assemblyProof.pendingTextYears}
+            className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm"
+          >
+            <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+              <div>
+                <div className="mb-3 flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-[#085041]" />
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                    Optional PYQ assembly proof
+                  </p>
+                </div>
+                <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+                  {assemblyProof.yearWindow} Paper I/II rows are assembled
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                  {assemblyProof.paperStructure}
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  ["Years", assemblyProof.totalYears],
+                  ["Paper rows", assemblyProof.totalPaperRows],
+                  ["Rows per year", assemblyProof.paperRowsPerYear],
+                  ["Source-indexed years", assemblyProof.sourceIndexedYears],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/75 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                    <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <p className="rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#085041]">
+                Source rule: {assemblyProof.sourceRule}
+              </p>
+              <p className="rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#085041]">
+                Student use: {assemblyProof.studentUse}
+              </p>
+              <p className="rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#085041]">
+                Next import step: {assemblyProof.nextImportStep}
+              </p>
+            </div>
+          </section>
+        ) : null}
         {paperSummaries.length ? (
           <section data-testid="upsc-optional-paper-summary" className="grid gap-3 md:grid-cols-2">
             {paperSummaries.map((summary) => (

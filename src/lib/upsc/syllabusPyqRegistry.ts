@@ -78,6 +78,7 @@ export type OptionalSourcePack = {
   yearRows: OptionalYearPaperRow[];
   syllabusThemes: OptionalSyllabusTheme[];
   paperSummary: OptionalPaperSummary[];
+  assemblyProof: OptionalAssemblyProof;
   readinessScore: number;
 };
 
@@ -104,6 +105,19 @@ export type OptionalPaperSummary = {
   indexedRows: number;
   pendingRows: number;
   nextAction: string;
+};
+
+export type OptionalAssemblyProof = {
+  yearWindow: string;
+  totalYears: number;
+  totalPaperRows: number;
+  paperRowsPerYear: number;
+  sourceIndexedYears: number;
+  pendingTextYears: number;
+  paperStructure: string;
+  sourceRule: string;
+  studentUse: string;
+  nextImportStep: string;
 };
 
 export const officialSourceAnchors: OfficialSourceAnchor[] = [
@@ -835,8 +849,30 @@ function optionalPaperSummary(rows: PyqImportRow[]): OptionalPaperSummary[] {
   });
 }
 
+function optionalAssemblyProof(yearRows: OptionalYearPaperRow[]): OptionalAssemblyProof {
+  const sortedYears = [...yearRows].sort((left, right) => left.year - right.year);
+  const firstYear = sortedYears[0]?.year ?? mainsSourceYears[mainsSourceYears.length - 1];
+  const latestYear = sortedYears[sortedYears.length - 1]?.year ?? mainsSourceYears[0];
+  const sourceIndexedYears = yearRows.filter((row) => row.indexedCount === row.importCount).length;
+  const totalPaperRows = yearRows.reduce((sum, row) => sum + row.importCount, 0);
+
+  return {
+    yearWindow: `${firstYear}-${latestYear}`,
+    totalYears: yearRows.length,
+    totalPaperRows,
+    paperRowsPerYear: 2,
+    sourceIndexedYears,
+    pendingTextYears: yearRows.length - sourceIndexedYears,
+    paperStructure: "Paper I and Paper II are assembled for every year in the optional mains window.",
+    sourceRule: "Rows point to official UPSC paper sources; source-indexed years are ready for immediate extraction and topic mapping.",
+    studentUse: "Student can open a year, compare Paper I and Paper II demand, then connect the paper to syllabus themes and answer-writing practice.",
+    nextImportStep: "Extract question text year-wise, tag each question to Paper I or Paper II syllabus units, then build trend and answer prompts.",
+  };
+}
+
 export const optionalSourcePacks: OptionalSourcePack[] = optionalSubjects.map((subject) => {
   const rows = optionalRows(subject.title);
+  const yearRows = optionalYearRows(rows);
   const indexedRows = rows.filter((row) => row.status !== "text-import-pending").length;
 
   return {
@@ -845,9 +881,10 @@ export const optionalSourcePacks: OptionalSourcePack[] = optionalSubjects.map((s
     group: subject.group,
     route: subject.route,
     paperRows: rows,
-    yearRows: optionalYearRows(rows),
+    yearRows,
     syllabusThemes: optionalThemes(subject.slug, subject.title, subject.group),
     paperSummary: optionalPaperSummary(rows),
+    assemblyProof: optionalAssemblyProof(yearRows),
     readinessScore: Math.round((indexedRows / rows.length) * 100),
   };
 });

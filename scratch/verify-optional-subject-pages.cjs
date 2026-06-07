@@ -47,10 +47,12 @@ async function readOptionalDetailState(page, slug, checks) {
   await page.goto(`${baseUrl}/upsc/optional-subjects/${slug}`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-optional-detail").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-optional-readiness").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-optional-assembly-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-optional-year-wise-pyqs").waitFor({ timeout: 15000 });
 
   const state = await page.evaluate(() => {
     const readiness = document.querySelector('[data-testid="upsc-optional-readiness"]');
+    const assembly = document.querySelector('[data-testid="upsc-optional-assembly-proof"]');
     const yearRows = [...document.querySelectorAll('[data-testid="upsc-optional-year-row"]')].map((row) => ({
       year: row.getAttribute("data-year"),
       indexedCount: row.getAttribute("data-indexed-count"),
@@ -68,6 +70,15 @@ async function readOptionalDetailState(page, slug, checks) {
       title: document.querySelector('[data-testid="upsc-optional-detail"] h1')?.textContent || "",
       yearCount: readiness?.getAttribute("data-year-count"),
       paperRowCount: readiness?.getAttribute("data-paper-row-count"),
+      assembly: {
+        yearWindow: assembly?.getAttribute("data-year-window"),
+        totalYears: assembly?.getAttribute("data-total-years"),
+        totalPaperRows: assembly?.getAttribute("data-total-paper-rows"),
+        paperRowsPerYear: assembly?.getAttribute("data-paper-rows-per-year"),
+        sourceIndexedYears: assembly?.getAttribute("data-source-indexed-years"),
+        pendingTextYears: assembly?.getAttribute("data-pending-text-years"),
+        text: assembly?.textContent || "",
+      },
       yearRows,
       themes,
       summaries,
@@ -120,6 +131,15 @@ async function run() {
   if (
     anthropologyState.yearCount !== "11" ||
     anthropologyState.paperRowCount !== "22" ||
+    anthropologyState.assembly.yearWindow !== "2015-2025" ||
+    anthropologyState.assembly.totalYears !== "11" ||
+    anthropologyState.assembly.totalPaperRows !== "22" ||
+    anthropologyState.assembly.paperRowsPerYear !== "2" ||
+    anthropologyState.assembly.sourceIndexedYears !== "2" ||
+    anthropologyState.assembly.pendingTextYears !== "9" ||
+    !/Paper I\/II rows are assembled/i.test(anthropologyState.assembly.text) ||
+    !/official UPSC paper sources/i.test(anthropologyState.assembly.text) ||
+    !/Extract question text year-wise/i.test(anthropologyState.assembly.text) ||
     anthropologyState.yearRows.length !== 11 ||
     anthropologyState.yearRows.some((row) => row.paperLinks !== 2) ||
     anthropologyState.themes.length < 2 ||
@@ -134,6 +154,8 @@ async function run() {
   if (
     publicAdminState.yearCount !== "11" ||
     publicAdminState.paperRowCount !== "22" ||
+    publicAdminState.assembly.yearWindow !== "2015-2025" ||
+    publicAdminState.assembly.totalPaperRows !== "22" ||
     !publicAdminState.themes.join(" ").includes("Administrative theory")
   ) {
     throw new Error(`public administration detail failed: ${JSON.stringify(publicAdminState)}`);
@@ -142,6 +164,7 @@ async function run() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/optional-subjects/anthropology`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-optional-detail").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-optional-assembly-proof").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "anthropology-detail-mobile", checks);
 
   const evidence = {
