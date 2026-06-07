@@ -4,8 +4,11 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
-const progressKey = "sarit-upsc-geography-progress-v1";
 const evidencePath = path.join(__dirname, "verify-question-bank-builder-evidence.json");
+
+function progressKey(subjectSlug) {
+  return `sarit-upsc-${subjectSlug}-progress-v1`;
+}
 
 async function assertNoOverflow(page, label, checks) {
   const metrics = await page.evaluate(() => ({
@@ -23,7 +26,7 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
-async function seedSession(page, { level, progress }) {
+async function seedSession(page, { level, subjectSlug = "geography", progress }) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
     ({ profileStorageKey, progressStorageKey, learnerLevel, seededProgress }) => {
@@ -44,12 +47,16 @@ async function seedSession(page, { level, progress }) {
       );
       window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey, learnerLevel: level, seededProgress: progress }
+    { profileStorageKey: profileKey, progressStorageKey: progressKey(subjectSlug), learnerLevel: level, seededProgress: progress }
   );
 }
 
-async function readQuestionBankState(page, label, checks) {
-  await page.goto(`${baseUrl}/upsc/question-bank`, { waitUntil: "networkidle", timeout: 45000 });
+async function readQuestionBankState(page, label, checks, subjectSlug = "geography") {
+  const route =
+    subjectSlug === "geography"
+      ? `${baseUrl}/upsc/question-bank`
+      : `${baseUrl}/upsc/question-bank?subject=${subjectSlug}`;
+  await page.goto(route, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-question-bank-hero").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-question-bank-recommendation").waitFor({ timeout: 15000 });
 
@@ -57,12 +64,14 @@ async function readQuestionBankState(page, label, checks) {
     const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
     const recommendation = document.querySelector('[data-testid="upsc-question-bank-recommendation"]');
     const questions = [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) => ({
+      subjectSlug: node.getAttribute("data-subject-slug"),
       difficulty: node.getAttribute("data-question-difficulty"),
       linkedDay: node.getAttribute("data-linked-day"),
       text: node.textContent || "",
     }));
 
     return {
+      activeSubject: hero?.getAttribute("data-active-subject"),
       activeDifficulty: hero?.getAttribute("data-active-difficulty"),
       activeCount: hero?.getAttribute("data-active-count"),
       recommendedDifficulty: recommendation?.getAttribute("data-recommended-difficulty"),
@@ -75,7 +84,10 @@ async function readQuestionBankState(page, label, checks) {
   return state;
 }
 
-function expectDifficultySet(state, expectedDifficulty, minimumQuestions, label) {
+function expectDifficultySet(state, expectedDifficulty, minimumQuestions, label, expectedSubject = "geography") {
+  if (state.activeSubject !== expectedSubject) {
+    throw new Error(`${label}: expected subject ${expectedSubject}, got ${JSON.stringify(state)}`);
+  }
   if (state.recommendedDifficulty !== expectedDifficulty || state.activeDifficulty !== expectedDifficulty) {
     throw new Error(`${label}: expected ${expectedDifficulty}, got ${JSON.stringify(state)}`);
   }
@@ -85,6 +97,10 @@ function expectDifficultySet(state, expectedDifficulty, minimumQuestions, label)
   const wrongDifficulty = state.questions.find((question) => question.difficulty !== expectedDifficulty);
   if (wrongDifficulty) {
     throw new Error(`${label}: wrong question difficulty found: ${JSON.stringify(wrongDifficulty)}`);
+  }
+  const wrongSubject = state.questions.find((question) => question.subjectSlug !== expectedSubject);
+  if (wrongSubject) {
+    throw new Error(`${label}: wrong question subject found: ${JSON.stringify(wrongSubject)}`);
   }
 }
 
@@ -176,6 +192,46 @@ async function run() {
   });
   const commandState = await readQuestionBankState(page, "command-recommends-hard", checks);
   expectDifficultySet(commandState, "HARD", 5, "command-recommends-hard");
+
+  await seedSession(page, {
+    level: "advanced",
+    subjectSlug: "environment",
+    progress: {
+      1: {
+        day: 1,
+        watched: true,
+        talkScore: 97,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 86,
+        updatedAt: new Date().toISOString(),
+      },
+      2: {
+        day: 2,
+        watched: true,
+        talkScore: 95,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 84,
+        updatedAt: new Date().toISOString(),
+      },
+      3: {
+        day: 3,
+        watched: true,
+        talkScore: 98,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 90,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  });
+  const environmentState = await readQuestionBankState(page, "environment-command-recommends-hard", checks, "environment");
+  expectDifficultySet(environmentState, "HARD", 5, "environment-command-recommends-hard", "environment");
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}/upsc/question-bank`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-question-bank-hero").waitFor({ timeout: 15000 });

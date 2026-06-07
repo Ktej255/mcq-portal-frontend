@@ -1,12 +1,31 @@
 import { geographySessions } from "@/lib/upsc/plan";
 import type { StudentLevel, StudentProfile } from "@/lib/upsc/studentProfile";
-import type { GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import { subjectPlans } from "@/lib/upsc/subjectPlans";
+import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 
 export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD" | "PYQ_STYLE";
+export type QuestionSource = "NCERT_BASE" | "REFERENCE_ADVANCED" | "PYQ_PATTERN" | "CURRENT_AFFAIRS_BRIDGE";
+
+export type QuestionBankSession = {
+  day: number;
+  week: number;
+  title: string;
+  chapter: string;
+  anchor: string;
+};
+
+export type QuestionBankSubject = {
+  slug: string;
+  title: string;
+  window: string;
+  route: string;
+  sessions: QuestionBankSession[];
+};
 
 export type PracticeQuestion = {
   id: string;
-  subjectSlug: "geography";
+  subjectSlug: string;
+  subjectTitle?: string;
   linkedDay: number;
   topic: string;
   difficulty: QuestionDifficulty;
@@ -15,7 +34,7 @@ export type PracticeQuestion = {
   correctOption: "A" | "B" | "C" | "D";
   explanation: string;
   trap: string;
-  source: "NCERT_BASE" | "REFERENCE_ADVANCED" | "PYQ_PATTERN" | "CURRENT_AFFAIRS_BRIDGE";
+  source: QuestionSource;
 };
 
 export type QuestionBankRecommendation = {
@@ -36,9 +55,38 @@ export type QuestionBankSelection = {
   questions: PracticeQuestion[];
 };
 
-export type GeographyProgressInput = Record<string, GeographyDayProgress | undefined>;
+export type QuestionBankProgress = SubjectDayProgress & {
+  meTimeCompletedAt?: string;
+};
+
+export type QuestionBankProgressInput = Record<string, QuestionBankProgress | undefined>;
 
 export const questionDifficulties: QuestionDifficulty[] = ["EASY", "MEDIUM", "HARD", "PYQ_STYLE"];
+
+export const questionBankSubjects: QuestionBankSubject[] = [
+  {
+    slug: "geography",
+    title: "Geography",
+    window: "June",
+    route: "/upsc/geography",
+    sessions: geographySessions,
+  },
+  ...[
+    subjectPlans.environment,
+    subjectPlans["disaster-management"],
+    subjectPlans.economy,
+    subjectPlans["science-tech"],
+    subjectPlans["polity-governance"],
+    subjectPlans["internal-security-society"],
+    subjectPlans.history,
+  ].map((plan) => ({
+    slug: plan.slug,
+    title: plan.title,
+    window: plan.window,
+    route: `/upsc/${plan.slug}`,
+    sessions: plan.sessions,
+  })),
+];
 
 export const geographyQuestionBank: PracticeQuestion[] = [
   {
@@ -421,12 +469,111 @@ export const geographyQuestionBank: PracticeQuestion[] = [
   },
 ];
 
+const sourceByDifficulty: Record<QuestionDifficulty, QuestionSource> = {
+  EASY: "NCERT_BASE",
+  MEDIUM: "REFERENCE_ADVANCED",
+  HARD: "CURRENT_AFFAIRS_BRIDGE",
+  PYQ_STYLE: "PYQ_PATTERN",
+};
+
+function generatedStem(subject: QuestionBankSubject, session: QuestionBankSession, difficulty: QuestionDifficulty) {
+  if (difficulty === "EASY") {
+    return `In ${subject.title}, which foundation idea should a student first connect with "${session.anchor}"?`;
+  }
+  if (difficulty === "MEDIUM") {
+    return `For ${session.title}, what is the most useful reference-level bridge after NCERT basics are clear?`;
+  }
+  if (difficulty === "HARD") {
+    return `A current-affairs update is linked to ${session.title}. Which approach best converts it into UPSC-ready understanding?`;
+  }
+  return `A PYQ-style question from ${subject.title} asks about ${session.chapter}. Which method gives the strongest elimination base?`;
+}
+
+function generatedExplanation(subject: QuestionBankSubject, session: QuestionBankSession, difficulty: QuestionDifficulty) {
+  if (difficulty === "EASY") {
+    return `Start with the NCERT-level meaning of ${session.chapter}, then attach the anchor: ${session.anchor}.`;
+  }
+  if (difficulty === "MEDIUM") {
+    return `The reference layer should move from definition to cause, mechanism, example, and limitation for ${session.title}.`;
+  }
+  if (difficulty === "HARD") {
+    return `Current affairs become useful only when the static base, institution or process, and consequence are connected.`;
+  }
+  return `PYQ-style practice is strongest when syllabus line, repeated pattern, trap, and answer demand are read together.`;
+}
+
+function generatedTrap(subject: QuestionBankSubject, difficulty: QuestionDifficulty) {
+  if (difficulty === "EASY") return `Do not jump to advanced ${subject.title} facts before the basic concept is stable.`;
+  if (difficulty === "MEDIUM") return "Do not memorize one reference-book line without the cause-effect chain.";
+  if (difficulty === "HARD") return "Do not treat a news item as useful unless it links to an already-covered static topic.";
+  return "Do not solve PYQs as isolated facts; read the repeated demand and elimination trap.";
+}
+
+function buildGeneratedSubjectQuestion(
+  subject: QuestionBankSubject,
+  session: QuestionBankSession,
+  difficulty: QuestionDifficulty
+): PracticeQuestion {
+  return {
+    id: `${subject.slug}-d${String(session.day).padStart(2, "0")}-${difficulty.toLowerCase()}`,
+    subjectSlug: subject.slug,
+    subjectTitle: subject.title,
+    linkedDay: session.day,
+    topic: session.title,
+    difficulty,
+    stem: generatedStem(subject, session, difficulty),
+    options: {
+      A: "Connect syllabus demand, concept logic, example, and trap type",
+      B: "Memorize the heading without examples",
+      C: "Skip the static topic and read only news headlines",
+      D: "Treat every question as a one-line factual recall",
+    },
+    correctOption: "A",
+    explanation: generatedExplanation(subject, session, difficulty),
+    trap: generatedTrap(subject, difficulty),
+    source: sourceByDifficulty[difficulty],
+  };
+}
+
+function buildGeneratedSubjectBank(subject: QuestionBankSubject) {
+  if (subject.slug === "geography") return [];
+  return subject.sessions
+    .slice(0, Math.min(8, subject.sessions.length))
+    .flatMap((session) => questionDifficulties.map((difficulty) => buildGeneratedSubjectQuestion(subject, session, difficulty)));
+}
+
+export const allPracticeQuestionBank: PracticeQuestion[] = [
+  ...geographyQuestionBank.map((question) => ({ ...question, subjectTitle: "Geography" })),
+  ...questionBankSubjects.flatMap(buildGeneratedSubjectBank),
+];
+
+export function getQuestionBankSubject(slug: string) {
+  return questionBankSubjects.find((subject) => subject.slug === slug) ?? questionBankSubjects[0];
+}
+
+export function getQuestionBankForSubject(subjectSlug: string) {
+  return allPracticeQuestionBank.filter((question) => question.subjectSlug === subjectSlug);
+}
+
+export function readLocalQuestionBankProgress(subjectSlug: string): QuestionBankProgressInput {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(`sarit-upsc-${subjectSlug}-progress-v1`);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as QuestionBankProgressInput) : {};
+  } catch {
+    return {};
+  }
+}
+
 function average(values: number[]) {
   if (!values.length) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-function hasStarted(progress?: GeographyDayProgress) {
+function hasStarted(progress?: QuestionBankProgress) {
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
@@ -439,7 +586,7 @@ function hasStarted(progress?: GeographyDayProgress) {
   );
 }
 
-function needsRecovery(progress?: GeographyDayProgress) {
+function needsRecovery(progress?: QuestionBankProgress) {
   return Boolean(
     progress?.revisitQueued ||
       progress?.talkBand === "Revisit" ||
@@ -448,7 +595,7 @@ function needsRecovery(progress?: GeographyDayProgress) {
   );
 }
 
-function hasCommand(progress?: GeographyDayProgress) {
+function hasCommand(progress?: QuestionBankProgress) {
   return Boolean(
     !needsRecovery(progress) &&
       (progress?.confidence === "Command" || progress?.mcqOutcome === "Command" || (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75))
@@ -460,14 +607,16 @@ function resolveLearnerLevel(profile?: Pick<StudentProfile, "level"> | null): St
 }
 
 export function buildQuestionBankRecommendation(
-  progress: GeographyProgressInput,
-  profile?: Pick<StudentProfile, "level"> | null
+  progress: QuestionBankProgressInput,
+  profile?: Pick<StudentProfile, "level"> | null,
+  subjectSlug = "geography"
 ): QuestionBankRecommendation {
+  const subject = getQuestionBankSubject(subjectSlug);
   const learnerLevel = resolveLearnerLevel(profile);
-  const dayStates = geographySessions.map((session) => progress[String(session.day)]);
-  const startedDays = geographySessions.filter((session) => hasStarted(progress[String(session.day)]));
-  const recoveryDays = geographySessions.filter((session) => needsRecovery(progress[String(session.day)]));
-  const commandDays = geographySessions.filter((session) => hasCommand(progress[String(session.day)]));
+  const dayStates = subject.sessions.map((session) => progress[String(session.day)]);
+  const startedDays = subject.sessions.filter((session) => hasStarted(progress[String(session.day)]));
+  const recoveryDays = subject.sessions.filter((session) => needsRecovery(progress[String(session.day)]));
+  const commandDays = subject.sessions.filter((session) => hasCommand(progress[String(session.day)]));
   const recallScores = dayStates
     .map((state) => state?.talkScore)
     .filter((score): score is number => typeof score === "number");
@@ -480,7 +629,7 @@ export function buildQuestionBankRecommendation(
   const weakDays =
     recoveryDays.length > 0
       ? recoveryDays
-      : geographySessions.filter((session) => {
+      : subject.sessions.filter((session) => {
           const state = progress[String(session.day)];
           return typeof state?.talkScore === "number" && state.talkScore < 95;
         });
@@ -521,8 +670,8 @@ export function buildQuestionBankRecommendation(
         : learnerLevel === "intermediate"
           ? 8
           : 5;
-  const availableQuestionCount = geographyQuestionBank.filter(
-    (question) => question.difficulty === recommendedDifficulty
+  const availableQuestionCount = allPracticeQuestionBank.filter(
+    (question) => question.subjectSlug === subject.slug && question.difficulty === recommendedDifficulty
   ).length;
   const recommendedCount = Math.min(baseRecommendedCount, availableQuestionCount || baseRecommendedCount);
 
@@ -541,21 +690,26 @@ export function buildQuestionBankRecommendation(
 }
 
 export function selectQuestionBankSet({
+  subjectSlug = "geography",
   progress,
   profile,
   difficulty,
   count,
 }: {
-  progress: GeographyProgressInput;
+  subjectSlug?: string;
+  progress: QuestionBankProgressInput;
   profile?: Pick<StudentProfile, "level"> | null;
   difficulty?: QuestionDifficulty;
   count?: number;
 }): QuestionBankSelection {
-  const recommendation = buildQuestionBankRecommendation(progress, profile);
+  const subject = getQuestionBankSubject(subjectSlug);
+  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug);
   const selectedDifficulty = difficulty ?? recommendation.recommendedDifficulty;
   const selectedCount = count ?? recommendation.recommendedCount;
   const targetDaySet = new Set(recommendation.targetDays);
-  const questionPool = geographyQuestionBank.filter((question) => question.difficulty === selectedDifficulty);
+  const questionPool = allPracticeQuestionBank.filter(
+    (question) => question.subjectSlug === subject.slug && question.difficulty === selectedDifficulty
+  );
   const targeted = questionPool.filter((question) => targetDaySet.has(question.linkedDay));
   const fallback = questionPool.filter((question) => !targetDaySet.has(question.linkedDay));
   const questions = [...targeted, ...fallback].slice(0, selectedCount);

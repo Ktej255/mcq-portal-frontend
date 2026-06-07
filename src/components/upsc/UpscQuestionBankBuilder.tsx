@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -15,12 +16,15 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import {
+  getQuestionBankSubject,
   questionDifficulties,
+  questionBankSubjects,
+  readLocalQuestionBankProgress,
   selectQuestionBankSet,
+  type QuestionBankProgressInput,
   type QuestionDifficulty,
 } from "@/lib/upsc/questionBankEngine";
 import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
-import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
 
 const questionCounts = [5, 8, 10, 15] as const;
@@ -36,32 +40,51 @@ function scoreText(value: number | null, suffix: string) {
 }
 
 export function UpscQuestionBankBuilder() {
-  const { progress } = useGeographyProgress();
+  const searchParams = useSearchParams();
+  const requestedSubject = searchParams.get("subject") ?? "geography";
+  const [subjectSlug, setSubjectSlug] = useState(() => getQuestionBankSubject(requestedSubject).slug);
+  const [progress, setProgress] = useState<QuestionBankProgressInput>({});
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [difficulty, setDifficulty] = useState<QuestionDifficulty | null>(null);
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setProfile(readStudentProfile()), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    const nextSubjectSlug = getQuestionBankSubject(requestedSubject).slug;
+    setSubjectSlug(nextSubjectSlug);
+    setDifficulty(null);
+    setCount(null);
+  }, [requestedSubject]);
 
-  const recommended = useMemo(() => selectQuestionBankSet({ progress, profile }), [profile, progress]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setProfile(readStudentProfile());
+      setProgress(readLocalQuestionBankProgress(subjectSlug));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [subjectSlug]);
+
+  const selectedSubject = useMemo(() => getQuestionBankSubject(subjectSlug), [subjectSlug]);
+  const recommended = useMemo(
+    () => selectQuestionBankSet({ subjectSlug: selectedSubject.slug, progress, profile }),
+    [profile, progress, selectedSubject.slug]
+  );
   const activeDifficulty = difficulty ?? recommended.recommendation.recommendedDifficulty;
   const activeCount = count ?? recommended.recommendation.recommendedCount;
   const selection = useMemo(
     () =>
       selectQuestionBankSet({
+        subjectSlug: selectedSubject.slug,
         progress,
         profile,
         difficulty: activeDifficulty,
         count: activeCount,
       }),
-    [activeCount, activeDifficulty, profile, progress]
+    [activeCount, activeDifficulty, profile, progress, selectedSubject.slug]
   );
 
   const recommendation = selection.recommendation;
   const recommendationMetrics: RecommendationMetric[] = [
+    { label: "Subject", value: selectedSubject.title, Icon: ClipboardCheck },
     { label: "Consistency", value: `${recommendation.consistencyPercent}%`, Icon: Gauge },
     { label: "Recovery", value: recommendation.recoveryCount, Icon: Target },
     { label: "Command", value: recommendation.commandCount, Icon: CheckCircle2 },
@@ -73,6 +96,7 @@ export function UpscQuestionBankBuilder() {
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
         <section
           data-testid="upsc-question-bank-hero"
+          data-active-subject={selectedSubject.slug}
           data-active-difficulty={activeDifficulty}
           data-active-count={activeCount}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
@@ -86,14 +110,16 @@ export function UpscQuestionBankBuilder() {
                 Practice adapts to recall, consistency, and marks.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                The builder selects easy, medium, hard, or PYQ-style questions from the Geography bank. The default
-                recommendation comes from Talk score, MCQ score, active recovery, command days, and study consistency.
+                The builder selects easy, medium, hard, or PYQ-style questions from the selected subject bank. The
+                default recommendation comes from Talk score, MCQ score, active recovery, command days, and study
+                consistency.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 ["Recommended", recommendation.recommendedDifficulty.replace("_", " ")],
                 ["Set size", recommendation.recommendedCount],
+                ["Subject", selectedSubject.title],
                 ["Recall", scoreText(recommendation.averageRecall, "/100")],
                 ["MCQ", scoreText(recommendation.averageMcq, "%")],
               ].map(([label, value]) => (
@@ -103,6 +129,37 @@ export function UpscQuestionBankBuilder() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-question-bank-subjects"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {questionBankSubjects.map((subject) => {
+              const isActive = selectedSubject.slug === subject.slug;
+              return (
+                <button
+                  key={subject.slug}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => {
+                    setSubjectSlug(subject.slug);
+                    setDifficulty(null);
+                    setCount(null);
+                  }}
+                  className={cn(
+                    "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                    isActive
+                      ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                      : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                  )}
+                >
+                  {subject.title}
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -125,7 +182,7 @@ export function UpscQuestionBankBuilder() {
                 Target days: {recommendation.targetDays.length ? recommendation.targetDays.join(", ") : "fresh baseline"}.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-5">
               {recommendationMetrics.map(({ label, value, Icon }) => (
                 <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
                   <Icon className="mb-3 h-4 w-4 text-[#085041]" />
@@ -200,7 +257,7 @@ export function UpscQuestionBankBuilder() {
               </h2>
             </div>
             <Link
-              href="/upsc/mcq-command?subject=geography"
+              href={`/upsc/mcq-command?subject=${selectedSubject.slug}`}
               className="inline-flex min-h-10 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
             >
               Admin batch map <ArrowRight className="ml-2 h-4 w-4" />
@@ -213,6 +270,7 @@ export function UpscQuestionBankBuilder() {
                 <article
                   key={question.id}
                   data-testid="upsc-question-bank-question"
+                  data-subject-slug={question.subjectSlug}
                   data-question-difficulty={question.difficulty}
                   data-linked-day={question.linkedDay}
                   className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
@@ -220,6 +278,9 @@ export function UpscQuestionBankBuilder() {
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">Q{index + 1}</Badge>
+                      <Badge variant="outline" className="rounded-md border-[#1d9e75] text-[#085041]">
+                        {question.subjectTitle ?? selectedSubject.title}
+                      </Badge>
                       <Badge variant="outline" className="rounded-md border-[#1d9e75] text-[#085041]">
                         Day {question.linkedDay}
                       </Badge>
