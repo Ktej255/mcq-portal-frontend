@@ -84,6 +84,8 @@ async function run() {
   await masterPage.getByText("verify-question-bank-builder.cjs", { exact: true }).first().waitFor();
   await masterPage.getByText("custom mixed sets across Easy, Medium, Hard, and PYQ-style questions", { exact: false }).waitFor();
   await masterPage.getByText("solved attempts feed the covered-topic current-affairs gate", { exact: false }).waitFor();
+  await masterPage.getByText("incorrect attempts feed Revision Command repair", { exact: false }).waitFor();
+  await masterPage.getByText("incorrect Question Bank answers", { exact: false }).first().waitFor();
   await masterPage.getByText("60-second start check now saves the learner state plus a reset plan", { exact: false }).waitFor();
   await masterPage.getByText("solved Question Bank practice evidence", { exact: false }).waitFor();
   await masterPage.getByText("Real Geography Day 1 pack", { exact: true }).first().waitFor();

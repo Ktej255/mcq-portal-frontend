@@ -133,7 +133,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Adaptive question bank builder",
         status: "verified",
-        behavior: "The learner-facing question bank derives an MCQ readiness level from recall, consistency, marks, solved-ledger accuracy, command days, and recovery penalties. It supports single-band practice plus custom mixed sets across Easy, Medium, Hard, and PYQ-style questions, then prioritizes unresolved AI gaps, weak days, and repair-first practice instead of showing a generic question dump.",
+        behavior: "The learner-facing question bank derives an MCQ readiness level from recall, consistency, marks, solved-ledger accuracy, command days, and recovery penalties. It supports single-band practice plus custom mixed sets across Easy, Medium, Hard, and PYQ-style questions, then prioritizes unresolved AI gaps, weak days, and repair-first practice instead of showing a generic question dump. Incorrect Question Bank answers now feed Revision Command and the global action queue as repair traps.",
         evidence: "verify-question-bank-builder.cjs",
       },
     ],
@@ -574,8 +574,8 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
     requirement: "Systematic revision should be generated from weak signals and due topics.",
     status: "ready-local",
     currentState:
-      "Revision Command and Revisit rooms read weak days, MCQ outcomes, teacher gaps, and me-time state.",
-    evidence: "verify-student-report-system.cjs and verify-mcq-revisit-simple.cjs",
+      "Revision Command and Revisit rooms read weak days, MCQ outcomes, teacher gaps, incorrect Question Bank answers, and me-time state.",
+    evidence: "verify-student-report-system.cjs, revision-command-e2e.cjs, and verify-mcq-revisit-simple.cjs",
     nextAction: "Use controlled tester receipts to tune revision intervals.",
     phase: "Day 2",
   },
@@ -596,7 +596,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
       "Solved questions should form a ledger, and custom easy/moderate/tough/adaptive MCQ sets should depend on learner level.",
     status: "ready-local",
     currentState:
-      "Question bank derives the evidence level from recall, consistency, marks, solved attempts, command days, and recovery penalties before selecting difficulty. Mixed custom sets now combine Easy, Medium, Hard, and PYQ-style rows, and solved attempts feed the covered-topic current-affairs gate.",
+      "Question bank derives the evidence level from recall, consistency, marks, solved attempts, command days, and recovery penalties before selecting difficulty. Mixed custom sets now combine Easy, Medium, Hard, and PYQ-style rows, solved attempts feed the covered-topic current-affairs gate, and incorrect attempts feed Revision Command repair.",
     evidence: "verify-question-bank-builder.cjs",
     nextAction: "Import founder-approved fresh MCQs before public Geography launch.",
     phase: "Day 2",

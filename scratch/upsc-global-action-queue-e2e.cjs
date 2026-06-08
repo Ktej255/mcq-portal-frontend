@@ -17,6 +17,7 @@ const subjectSlugs = [
 ];
 const contentStorageKey = "sarit-upsc-content-command-v1";
 const mcqStorageKey = "sarit-upsc-mcq-command-v1";
+const questionBankStorageKey = "sarit-upsc-question-bank-attempts-v1";
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
 function progressKey(subjectSlug) {
@@ -37,12 +38,29 @@ async function metrics(page) {
 }
 
 async function seed(page) {
-  await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   await page.evaluate(
-    ({ subjectSlugs: slugs, contentStorageKey: ck, mcqStorageKey: mk }) => {
+    ({ subjectSlugs: slugs, contentStorageKey: ck, mcqStorageKey: mk, questionBankStorageKey: qk }) => {
       for (const slug of slugs) window.localStorage.removeItem(`sarit-upsc-${slug}-progress-v1`);
       window.localStorage.removeItem(ck);
       window.localStorage.removeItem(mk);
+      window.localStorage.removeItem(qk);
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_global_action_queue");
+      window.localStorage.setItem(
+        "sarit-upsc-student-profile-v1",
+        JSON.stringify({
+          level: "beginner",
+          preparationStage: "active",
+          studyWindow: "90",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          attemptHistory: "no-attempt",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        })
+      );
 
       window.localStorage.setItem(
         "sarit-upsc-polity-governance-progress-v1",
@@ -212,8 +230,26 @@ async function seed(page) {
           "ECO-D02": { planned: 25, drafted: 25, difficulty: "MEDIUM", status: "READY", updatedAt: new Date().toISOString() },
         })
       );
+
+      window.localStorage.setItem(
+        qk,
+        JSON.stringify({
+          "sci-d02-wrong": {
+            questionId: "sci-d02-wrong",
+            subjectSlug: "science-tech",
+            linkedDay: 2,
+            topic: "Space technology basics",
+            difficulty: "HARD",
+            source: "PYQ_PATTERN",
+            selectedOption: "B",
+            correctOption: "A",
+            isCorrect: false,
+            solvedAt: new Date().toISOString(),
+          },
+        })
+      );
     },
-    { subjectSlugs, contentStorageKey, mcqStorageKey }
+    { subjectSlugs, contentStorageKey, mcqStorageKey, questionBankStorageKey }
   );
 }
 
@@ -230,40 +266,52 @@ async function run() {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
     namedPage.on("pageerror", (error) => pageErrors.push(error.message));
+    await namedPage.addInitScript(() => {
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_global_action_queue");
+    });
   }
 
   await seed(page);
 
-  await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   const dailyQueue = page.getByTestId("global-next-action-queue");
   await dailyQueue.waitFor({ timeout: 15000 });
   await dailyQueue.getByText("Polity and Governance", { exact: false }).waitFor({ timeout: 15000 });
   await dailyQueue.getByText("Revisit required", { exact: false }).waitFor({ timeout: 15000 });
-  await dailyQueue.locator("a").filter({ hasText: "Environment" }).filter({ hasText: "MCQ practice pending" }).first().waitFor({ timeout: 15000 });
-  await dailyQueue
-    .locator("a")
-    .filter({ hasText: "Environment" })
-    .filter({ hasText: "25/25 fresh MCQs ready; student practice is still pending." })
-    .first()
-    .waitFor({ timeout: 15000 });
-  await dailyQueue.locator("a").filter({ hasText: "Economy" }).filter({ hasText: "MCQ practice pending" }).first().waitFor({ timeout: 15000 });
+  await dailyQueue.getByText("Science and Tech", { exact: false }).waitFor({ timeout: 15000 });
+  await dailyQueue.getByText("Question Bank trap", { exact: false }).waitFor({ timeout: 15000 });
+  await dailyQueue.getByText("Question Bank ledger has 1 incorrect answer in Space technology basics", { exact: false }).waitFor({
+    timeout: 15000,
+  });
+  const dailyQueueCards = await dailyQueue.locator("a").evaluateAll((cards) =>
+    cards.map((card) => ({
+      href: card.getAttribute("href"),
+      text: card.textContent || "",
+    }))
+  );
   let pageMetrics = await metrics(page);
-  checks.push({ route: "daily-command-queue", metrics: pageMetrics });
+  checks.push({ route: "daily-command-queue", metrics: pageMetrics, cards: dailyQueueCards });
   if (pageMetrics.hasHorizontalOverflow) throw new Error(`Daily queue overflow: ${JSON.stringify(pageMetrics)}`);
 
-  await page.goto(`${baseUrl}/upsc/readiness-audit`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/upsc/readiness-audit`, { waitUntil: "networkidle" });
   const auditQueue = page.getByTestId("readiness-next-action-queue");
   await auditQueue.waitFor({ timeout: 15000 });
   await auditQueue.getByText("Polity and Governance", { exact: false }).waitFor({ timeout: 15000 });
   await auditQueue.getByText("Revisit required", { exact: false }).waitFor({ timeout: 15000 });
-  await auditQueue.locator("a").filter({ hasText: "Environment" }).filter({ hasText: "MCQ practice pending" }).first().waitFor({ timeout: 15000 });
-  await auditQueue.locator("a").filter({ hasText: "Economy" }).filter({ hasText: "MCQ practice pending" }).first().waitFor({ timeout: 15000 });
+  await auditQueue.getByText("Science and Tech", { exact: false }).waitFor({ timeout: 15000 });
+  await auditQueue.getByText("Question Bank trap", { exact: false }).waitFor({ timeout: 15000 });
+  const auditQueueCards = await auditQueue.locator("a").evaluateAll((cards) =>
+    cards.map((card) => ({
+      href: card.getAttribute("href"),
+      text: card.textContent || "",
+    }))
+  );
   pageMetrics = await metrics(page);
-  checks.push({ route: "readiness-audit-queue", metrics: pageMetrics });
+  checks.push({ route: "readiness-audit-queue", metrics: pageMetrics, cards: auditQueueCards });
   if (pageMetrics.hasHorizontalOverflow) throw new Error(`Readiness queue overflow: ${JSON.stringify(pageMetrics)}`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
-  await mobilePage.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "domcontentloaded" });
+  await mobilePage.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   await mobilePage.evaluate(
     ({ sourceKeys, contentStorageKey: ck, mcqStorageKey: mk }) => {
       for (const key of sourceKeys) {
@@ -278,9 +326,12 @@ async function run() {
     { sourceKeys: subjectSlugs.map(progressKey), contentStorageKey, mcqStorageKey }
   );
   await seed(mobilePage);
-  await mobilePage.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "domcontentloaded" });
+  await mobilePage.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle" });
   await mobilePage.getByTestId("global-next-action-queue").waitFor({ timeout: 15000 });
   await mobilePage.getByTestId("global-next-action-queue").getByText("Revisit required", { exact: false }).waitFor({
+    timeout: 15000,
+  });
+  await mobilePage.getByTestId("global-next-action-queue").getByText("Question Bank trap", { exact: false }).waitFor({
     timeout: 15000,
   });
   pageMetrics = await metrics(mobilePage);

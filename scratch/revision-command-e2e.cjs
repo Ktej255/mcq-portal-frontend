@@ -83,6 +83,23 @@ async function seedProgress(page) {
         },
       })
     );
+    window.localStorage.setItem(
+      "sarit-upsc-question-bank-attempts-v1",
+      JSON.stringify({
+        "sci-d02-wrong": {
+          questionId: "sci-d02-wrong",
+          subjectSlug: "science-tech",
+          linkedDay: 2,
+          topic: "Space technology basics",
+          difficulty: "HARD",
+          source: "PYQ_PATTERN",
+          selectedOption: "B",
+          correctOption: "A",
+          isCorrect: false,
+          solvedAt: new Date().toISOString(),
+        },
+      })
+    );
   });
 }
 
@@ -97,6 +114,9 @@ async function run() {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_revision_command");
+  });
 
   await page.goto(`${baseUrl}/upsc`, { waitUntil: "domcontentloaded" });
   await seedProgress(page);
@@ -108,23 +128,33 @@ async function run() {
   await page.getByText("AI teacher gap: Concept chain", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Repair the producer-consumer-decomposer chain", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("History / Day 4", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Science and Tech / Day 2", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Question Bank trap", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Question Bank ledger has 1 incorrect answer in Space technology basics", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Economy", { exact: true }).first().waitFor({ timeout: 15000 });
   const aiGapState = await page.evaluate(() => {
     const cards = [...document.querySelectorAll("a")].map((link) => ({
       href: link.getAttribute("href"),
       text: link.textContent || "",
+      source: link.getAttribute("data-revision-source"),
     }));
     return {
       hasAiGapTotal: document.body.textContent?.includes("AI gaps") ?? false,
+      hasQuestionBankTrapTotal: document.body.textContent?.includes("QB traps") ?? false,
       environmentRepairLinks: cards.filter((card) => card.href === "/upsc/environment/watch?day=2"),
+      questionBankRepairLinks: cards.filter(
+        (card) => card.href === "/upsc/science-tech/revisit?day=2" && card.source === "question-bank"
+      ),
     };
   });
   checks.push({ label: "revision-command-ai-gap-state", aiGapState });
   if (
     !aiGapState.hasAiGapTotal ||
+    !aiGapState.hasQuestionBankTrapTotal ||
     !aiGapState.environmentRepairLinks.some(
       (link) => link.text.includes("AI teacher gap") || link.text.includes("AI Concept chain repair")
-    )
+    ) ||
+    !aiGapState.questionBankRepairLinks.some((link) => link.text.includes("Question Bank ledger has 1 incorrect answer"))
   ) {
     throw new Error(`revision-command-ai-gap-state failed: ${JSON.stringify(aiGapState)}`);
   }
@@ -137,6 +167,27 @@ async function run() {
   checks.push({ label: "revision-command-ai-gap-direct-target", targetHref });
   if (targetHref !== "/upsc/environment/watch?day=2") {
     throw new Error(`revision-command-ai-gap-direct-target failed: ${targetHref}`);
+  }
+
+  await page.goto(`${baseUrl}/upsc/revision-command?subject=science-tech&day=2`, { waitUntil: "networkidle" });
+  await page.getByTestId("revision-target-focus").waitFor({ timeout: 15000 });
+  await page.getByText("Question Bank trap", { exact: false }).first().waitFor({ timeout: 15000 });
+  const questionBankTarget = await page.evaluate(() => {
+    const target = document.querySelector('[data-testid="revision-target-focus"]');
+    const link = document.querySelector('[data-testid="revision-target-route"]');
+    return {
+      trapCount: target?.getAttribute("data-question-bank-traps"),
+      targetHref: link?.getAttribute("href"),
+      text: target?.textContent || "",
+    };
+  });
+  checks.push({ label: "revision-command-question-bank-direct-target", questionBankTarget });
+  if (
+    questionBankTarget.trapCount !== "1" ||
+    questionBankTarget.targetHref !== "/upsc/science-tech/revisit?day=2" ||
+    !questionBankTarget.text.includes("Question Bank trap")
+  ) {
+    throw new Error(`revision-command-question-bank-direct-target failed: ${JSON.stringify(questionBankTarget)}`);
   }
 
   await page.setViewportSize({ width: 390, height: 844 });

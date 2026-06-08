@@ -6,6 +6,7 @@ import {
   isUpscMcqPracticeComplete,
   isUpscMcqRevisitOutcome,
 } from "@/lib/upsc/mcqCommandStatus";
+import { readLocalQuestionBankAttempts, type QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import {
   getSubjectLabProofCompletion,
@@ -141,6 +142,19 @@ function getLabCompletion(subject: QueueSubject, progress?: SubjectDayProgress) 
   return getSubjectLabProofCompletion(progress);
 }
 
+function getIncorrectQuestionBankAttempts(attempts: QuestionBankAttempt[]) {
+  return attempts.filter((attempt) => !attempt.isCorrect);
+}
+
+function questionBankTrapDetail(attempts: QuestionBankAttempt[]) {
+  const incorrectAttempts = getIncorrectQuestionBankAttempts(attempts);
+  const topics = Array.from(new Set(incorrectAttempts.map((attempt) => attempt.topic).filter(Boolean))).slice(0, 2);
+  const topicText = topics.length ? ` in ${topics.join(", ")}` : "";
+  return `Question Bank ledger has ${incorrectAttempts.length} incorrect answer${
+    incorrectAttempts.length === 1 ? "" : "s"
+  }${topicText}. Repair before retesting.`;
+}
+
 function buildItem(
   subject: QueueSubject,
   session: QueueSession,
@@ -164,7 +178,8 @@ function getActionForDay(
   session: QueueSession,
   progress: SubjectDayProgress | undefined,
   content: ContentState | undefined,
-  mcq: McqState | undefined
+  mcq: McqState | undefined,
+  questionBankAttempts: QuestionBankAttempt[] = []
 ) {
   const watchCompletion = getSubjectWatchCompletion(progress);
   const labCompletion = getLabCompletion(subject, progress);
@@ -175,6 +190,7 @@ function getActionForDay(
   const mcqRevisit = isUpscMcqRevisitOutcome(progress, activeBatchCode);
   const contentReady = isContentReady(content);
   const labSlug = getLabSlug(subject, session);
+  const incorrectQuestionBankAttempts = getIncorrectQuestionBankAttempts(questionBankAttempts);
 
   if (progress?.revisitQueued || progress?.talkUnlockStage === "revisit" || progress?.talkBand === "Revisit" || mcqRevisit) {
     return buildItem(subject, session, {
@@ -189,6 +205,19 @@ function getActionForDay(
           ? `Talk score ${progress.talkScore}%. Clear this before new practice.`
           : "Weak concept is queued for recovery.",
       badge: "Repair",
+      tone: "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
+    });
+  }
+
+  if (incorrectQuestionBankAttempts.length > 0) {
+    return buildItem(subject, session, {
+      priority: 1,
+      href: `${subject.href}/revisit?day=${session.day}`,
+      room: "Revisit",
+      actionLabel: "Repair trap",
+      statusLabel: "Question Bank trap",
+      detail: questionBankTrapDetail(incorrectQuestionBankAttempts),
+      badge: "QB Trap",
       tone: "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
     });
   }
@@ -292,6 +321,7 @@ export function buildUpscActionQueue(limit = 10, includeReady = false, itemsPerS
 
   const contentStates = readJson<Record<string, ContentState>>(contentStorageKey, {});
   const mcqStates = readJson<Record<string, McqState>>(mcqStorageKey, {});
+  const questionBankAttempts = readLocalQuestionBankAttempts();
 
   return upscActionSubjects
     .flatMap((subject) => {
@@ -304,7 +334,10 @@ export function buildUpscActionQueue(limit = 10, includeReady = false, itemsPerS
             session,
             progress[String(session.day)],
             contentStates[contentKey(subject, session)],
-            mcqStates[batchCode(subject, session)]
+            mcqStates[batchCode(subject, session)],
+            questionBankAttempts.filter(
+              (attempt) => attempt.subjectSlug === subject.slug && attempt.linkedDay === session.day
+            )
           )
         )
         .filter((item) => includeReady || item.room !== "Track")

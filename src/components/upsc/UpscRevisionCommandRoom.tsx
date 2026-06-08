@@ -19,6 +19,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { geographySessions } from "@/lib/upsc/plan";
+import { readLocalQuestionBankAttempts, type QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import { subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
@@ -39,9 +40,12 @@ type SubjectSummary = RevisionSubject & {
   aiGapCount: number;
   shakyCount: number;
   revisitCount: number;
+  questionBankTrapCount: number;
+  questionBankTrapDays: number;
   completionPercent: number;
   watchPercent: number;
   progress: Record<string, SubjectDayProgress>;
+  questionBankAttempts: QuestionBankAttempt[];
   nextSession: SubjectSession;
   nextHref: string;
   nextLabel: string;
@@ -95,6 +99,27 @@ function getSessionProgress(progress: Record<string, SubjectDayProgress>, sessio
   return progress[String(session.day)];
 }
 
+function getQuestionBankAttemptsForSession(attempts: QuestionBankAttempt[], session: SubjectSession) {
+  return attempts.filter((attempt) => attempt.linkedDay === session.day);
+}
+
+function getQuestionBankTrapAttempts(attempts: QuestionBankAttempt[]) {
+  return attempts.filter((attempt) => !attempt.isCorrect);
+}
+
+function hasQuestionBankTrap(attempts: QuestionBankAttempt[], session: SubjectSession) {
+  return getQuestionBankTrapAttempts(getQuestionBankAttemptsForSession(attempts, session)).length > 0;
+}
+
+function questionBankTrapDetail(attempts: QuestionBankAttempt[]) {
+  const wrongAttempts = getQuestionBankTrapAttempts(attempts);
+  const topics = Array.from(new Set(wrongAttempts.map((attempt) => attempt.topic).filter(Boolean))).slice(0, 2);
+  const topicText = topics.length ? ` in ${topics.join(", ")}` : "";
+  return `Question Bank ledger has ${wrongAttempts.length} incorrect answer${
+    wrongAttempts.length === 1 ? "" : "s"
+  }${topicText}. Repair before retesting.`;
+}
+
 function hasTeacherDoubtSignal(progress?: SubjectDayProgress) {
   return Boolean(
     progress?.teacherDoubtCategory?.trim() ||
@@ -122,7 +147,11 @@ function teacherDoubtHref(subject: RevisionSubject, session: SubjectSession, pro
   return progress?.talkNextRoute || `${subject.href}/talk?day=${session.day}`;
 }
 
-function getNextFocus(subject: RevisionSubject, progress: Record<string, SubjectDayProgress>) {
+function getNextFocus(
+  subject: RevisionSubject,
+  progress: Record<string, SubjectDayProgress>,
+  questionBankAttempts: QuestionBankAttempt[]
+) {
   const teacherDoubt = subject.sessions.find((session) => hasActiveTeacherDoubt(getSessionProgress(progress, session)));
   if (teacherDoubt) {
     const item = getSessionProgress(progress, teacherDoubt);
@@ -130,6 +159,15 @@ function getNextFocus(subject: RevisionSubject, progress: Record<string, Subject
       session: teacherDoubt,
       href: teacherDoubtHref(subject, teacherDoubt, item),
       label: `AI ${teacherDoubtCategory(item)} repair`,
+    };
+  }
+
+  const questionBankTrap = subject.sessions.find((session) => hasQuestionBankTrap(questionBankAttempts, session));
+  if (questionBankTrap) {
+    return {
+      session: questionBankTrap,
+      href: `${subject.href}/revisit?day=${questionBankTrap.day}`,
+      label: "Question Bank trap",
     };
   }
 
@@ -170,6 +208,7 @@ function getNextFocus(subject: RevisionSubject, progress: Record<string, Subject
 
 function buildSummary(subject: RevisionSubject): SubjectSummary {
   const progress = readProgress(subject.slug);
+  const questionBankAttempts = readLocalQuestionBankAttempts(subject.slug);
   const watchedDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.watched);
   const reflectedDays = subject.sessions.filter((session) =>
     Boolean(getSessionProgress(progress, session)?.reflection?.trim())
@@ -178,7 +217,9 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
   const aiGapDays = subject.sessions.filter((session) => hasActiveTeacherDoubt(getSessionProgress(progress, session)));
   const shakyDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.confidence === "Shaky");
   const revisitDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.revisitQueued);
-  const nextFocus = getNextFocus(subject, progress);
+  const questionBankTrapAttempts = getQuestionBankTrapAttempts(questionBankAttempts);
+  const questionBankTrapDays = subject.sessions.filter((session) => hasQuestionBankTrap(questionBankAttempts, session));
+  const nextFocus = getNextFocus(subject, progress, questionBankAttempts);
 
   return {
     ...subject,
@@ -188,9 +229,12 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
     aiGapCount: aiGapDays.length,
     shakyCount: shakyDays.length,
     revisitCount: revisitDays.length,
+    questionBankTrapCount: questionBankTrapAttempts.length,
+    questionBankTrapDays: questionBankTrapDays.length,
     completionPercent: Math.round((reflectedDays.length / subject.sessions.length) * 100),
     watchPercent: Math.round((watchedDays.length / subject.sessions.length) * 100),
     progress,
+    questionBankAttempts,
     nextSession: nextFocus.session,
     nextHref: nextFocus.href,
     nextLabel: nextFocus.label,
@@ -199,6 +243,7 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
 
 function subjectTone(summary: SubjectSummary) {
   if (summary.aiGapCount > 0) return "border-[#ef9f27] bg-[#fff7ed]";
+  if (summary.questionBankTrapCount > 0) return "border-[#ef9f27] bg-[#fff7ed]";
   if (summary.revisitCount > 0) return "border-[#ef9f27] bg-[#fff7ed]";
   if (summary.completionPercent >= 80) return "border-[#1d9e75] bg-[#e7f5ee]";
   if (summary.reflectedCount > 0 || summary.watchedCount > 0) return "border-[#dcd5c7] bg-[#fdfaf3]";
@@ -232,6 +277,7 @@ export function UpscRevisionCommandRoom({
     const aiGap = summaries.reduce((sum, subject) => sum + subject.aiGapCount, 0);
     const shaky = summaries.reduce((sum, subject) => sum + subject.shakyCount, 0);
     const revisit = summaries.reduce((sum, subject) => sum + subject.revisitCount, 0);
+    const questionBankTrap = summaries.reduce((sum, subject) => sum + subject.questionBankTrapCount, 0);
 
     return {
       totalDays,
@@ -241,6 +287,7 @@ export function UpscRevisionCommandRoom({
       aiGap,
       shaky,
       revisit,
+      questionBankTrap,
       completionPercent: totalDays ? Math.round((reflected / totalDays) * 100) : 0,
       watchPercent: totalDays ? Math.round((watched / totalDays) * 100) : 0,
     };
@@ -254,20 +301,40 @@ export function UpscRevisionCommandRoom({
             .map((session) => {
               const item = getSessionProgress(subject.progress, session);
               const isAiGap = hasActiveTeacherDoubt(item);
-              if (!isAiGap && !item?.revisitQueued && item?.confidence !== "Shaky") return null;
+              const questionBankAttempts = getQuestionBankAttemptsForSession(subject.questionBankAttempts, session);
+              const questionBankTrapAttempts = getQuestionBankTrapAttempts(questionBankAttempts);
+              const isQuestionBankTrap = questionBankTrapAttempts.length > 0;
+              if (!isAiGap && !isQuestionBankTrap && !item?.revisitQueued && item?.confidence !== "Shaky") return null;
               return {
                 subject,
                 session,
                 progress: item,
-                status: isAiGap ? "AI teacher gap" : item?.revisitQueued ? "Revisit queued" : "Shaky confidence",
+                source: isAiGap
+                  ? "ai-teacher"
+                  : isQuestionBankTrap
+                    ? "question-bank"
+                    : item?.revisitQueued
+                      ? "revisit"
+                      : "shaky",
+                status: isAiGap
+                  ? "AI teacher gap"
+                  : isQuestionBankTrap
+                    ? "Question Bank trap"
+                    : item?.revisitQueued
+                      ? "Revisit queued"
+                      : "Shaky confidence",
                 detail: isAiGap
                   ? item?.teacherDoubtRepairAction?.trim() || "Repair the AI-identified gap before new testing."
+                  : isQuestionBankTrap
+                    ? questionBankTrapDetail(questionBankTrapAttempts)
                   : item?.revisitQueued
                     ? "Revisit queued from local progress."
                     : "Shaky confidence from local progress.",
                 category: isAiGap ? teacherDoubtCategory(item) : null,
                 href: isAiGap
                   ? teacherDoubtHref(subject, session, item)
+                  : isQuestionBankTrap
+                    ? `${subject.href}/revisit?day=${session.day}`
                   : item?.revisitQueued
                     ? `${subject.href}/revisit?day=${session.day}`
                     : `${subject.href}/talk?day=${session.day}`,
@@ -284,10 +351,18 @@ export function UpscRevisionCommandRoom({
     targetSummary?.sessions.find((session) => session.day === initialDay) ?? targetSummary?.nextSession;
   const targetProgress =
     targetSummary && targetSession ? getSessionProgress(targetSummary.progress, targetSession) : undefined;
+  const targetQuestionBankAttempts =
+    targetSummary && targetSession
+      ? getQuestionBankAttemptsForSession(targetSummary.questionBankAttempts, targetSession)
+      : [];
+  const targetQuestionBankTrapAttempts = getQuestionBankTrapAttempts(targetQuestionBankAttempts);
+  const targetHasQuestionBankTrap = targetQuestionBankTrapAttempts.length > 0;
   const targetHref =
     targetSummary && targetSession
       ? hasActiveTeacherDoubt(targetProgress)
         ? teacherDoubtHref(targetSummary, targetSession, targetProgress)
+        : targetHasQuestionBankTrap
+          ? `${targetSummary.href}/revisit?day=${targetSession.day}`
         : targetProgress?.revisitQueued
         ? `${targetSummary.href}/revisit?day=${targetSession.day}`
         : targetProgress?.confidence === "Shaky"
@@ -296,6 +371,8 @@ export function UpscRevisionCommandRoom({
       : null;
   const targetStatus = hasActiveTeacherDoubt(targetProgress)
       ? `AI teacher gap: ${teacherDoubtCategory(targetProgress)}`
+    : targetHasQuestionBankTrap
+      ? "Question Bank trap"
     : targetProgress?.revisitQueued
       ? "Revisit queued"
       : targetProgress?.confidence === "Shaky"
@@ -343,13 +420,14 @@ export function UpscRevisionCommandRoom({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             {[
               { label: "Total days", value: totals.totalDays, icon: Compass },
               { label: "Watched", value: totals.watched, icon: PlayCircle },
               { label: "Reflections", value: totals.reflected, icon: BrainCircuit },
               { label: "Command", value: totals.command, icon: CheckCircle2 },
               { label: "AI gaps", value: totals.aiGap, icon: CircleAlert },
+              { label: "QB traps", value: totals.questionBankTrap, icon: CircleAlert },
               { label: "Revisit", value: totals.revisit, icon: RefreshCcw },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
@@ -375,7 +453,11 @@ export function UpscRevisionCommandRoom({
 
             <div className="grid gap-3 md:grid-cols-2">
               {summaries.map((summary) => (
-                <div key={summary.slug} className={cn("rounded-lg border p-4 shadow-sm", subjectTone(summary))}>
+                <div
+                  key={summary.slug}
+                  data-question-bank-traps={summary.questionBankTrapCount}
+                  className={cn("rounded-lg border p-4 shadow-sm", subjectTone(summary))}
+                >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{summary.window}</p>
@@ -386,12 +468,13 @@ export function UpscRevisionCommandRoom({
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-5 gap-2 text-center">
+                  <div className="grid grid-cols-6 gap-2 text-center">
                     {[
                       ["Watch", summary.watchedCount],
                       ["Talk", summary.reflectedCount],
                       ["Cmd", summary.commandCount],
                       ["AI", summary.aiGapCount],
+                      ["QB", summary.questionBankTrapCount],
                       ["Fix", summary.revisitCount],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-md bg-white/75 px-2 py-3">
@@ -426,7 +509,11 @@ export function UpscRevisionCommandRoom({
 
           <div className="grid gap-5">
             {targetSummary && targetSession && targetHref ? (
-              <div data-testid="revision-target-focus" className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-5 shadow-sm">
+              <div
+                data-testid="revision-target-focus"
+                data-question-bank-traps={targetQuestionBankTrapAttempts.length}
+                className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-5 shadow-sm"
+              >
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-[#1d9e75] text-white">
                   <Target className="h-5 w-5" />
                 </div>
@@ -474,6 +561,7 @@ export function UpscRevisionCommandRoom({
                   {focusQueue.map((item) => (
                     <Link
                       key={`${item.subject.slug}-${item.session.day}`}
+                      data-revision-source={item.source}
                       href={item.href}
                       className="rounded-md border border-[#ef9f27]/40 bg-[#fff4df] p-4 transition hover:border-[#ef9f27]"
                     >
@@ -481,7 +569,7 @@ export function UpscRevisionCommandRoom({
                         <p className="text-xs font-black uppercase tracking-[0.16em] text-[#9a6a16]">
                           {item.subject.title} / Day {item.session.day}
                         </p>
-                        {item.status === "AI teacher gap" ? (
+                        {item.status === "AI teacher gap" || item.status === "Question Bank trap" ? (
                           <CircleAlert className="h-4 w-4 text-[#9a6a16]" />
                         ) : item.progress?.revisitQueued ? (
                           <RefreshCcw className="h-4 w-4 text-[#9a6a16]" />
