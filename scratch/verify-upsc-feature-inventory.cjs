@@ -79,6 +79,7 @@ async function run() {
   await masterPage.getByText("solved Question Bank attempt for the same day", { exact: false }).waitFor();
   await masterPage.getByText("Reports and growth signal", { exact: true }).waitFor();
   await masterPage.getByText("verify-student-report-system.cjs", { exact: true }).first().waitFor();
+  await masterPage.getByText("question-bank solved ledger", { exact: false }).first().waitFor();
   await masterPage.getByText("Adaptive question bank builder", { exact: true }).waitFor();
   await masterPage.getByText("verify-question-bank-builder.cjs", { exact: true }).first().waitFor();
   await masterPage.getByText("custom mixed sets across Easy, Medium, Hard, and PYQ-style questions", { exact: false }).waitFor();

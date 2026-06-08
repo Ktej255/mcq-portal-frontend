@@ -7,6 +7,7 @@ const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const environmentProgressKey = "sarit-upsc-environment-progress-v1";
 const dailyCommandKey = "sarit-upsc-daily-command-v1";
+const questionBankAttemptKey = "sarit-upsc-question-bank-attempts-v1";
 const evidencePath = path.join(__dirname, "verify-student-report-system-evidence.json");
 
 async function assertNoOverflow(page, label, checks) {
@@ -36,7 +37,7 @@ function readNumber(value, label) {
 async function seedProfileAndProgress(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, envProgressStorageKey, dailyStorageKey }) => {
+    ({ profileStorageKey, progressStorageKey, envProgressStorageKey, dailyStorageKey, attemptStorageKey }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_report_system");
       window.localStorage.setItem(
         profileStorageKey,
@@ -59,6 +60,23 @@ async function seedProfileAndProgress(page) {
           day: 1,
           note: "Report should show the same repair lock as Daily Mission.",
           updatedAt: new Date().toISOString(),
+        })
+      );
+      window.localStorage.setItem(
+        attemptStorageKey,
+        JSON.stringify({
+          "geo-d02-medium-gis-scale": {
+            questionId: "geo-d02-medium-gis-scale",
+            subjectSlug: "geography",
+            linkedDay: 2,
+            topic: "Earth, Universe, and Location",
+            difficulty: "MEDIUM",
+            source: "REFERENCE_ADVANCED",
+            selectedOption: "A",
+            correctOption: "A",
+            isCorrect: true,
+            solvedAt: new Date().toISOString(),
+          },
         })
       );
       window.localStorage.setItem(
@@ -126,6 +144,7 @@ async function seedProfileAndProgress(page) {
       progressStorageKey: progressKey,
       envProgressStorageKey: environmentProgressKey,
       dailyStorageKey: dailyCommandKey,
+      attemptStorageKey: questionBankAttemptKey,
     }
   );
 }
@@ -179,6 +198,9 @@ async function run() {
     recoveryItems: node.getAttribute("data-recovery-items"),
     meTimeChecks: node.getAttribute("data-me-time-checks"),
     currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+    questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+    questionBankCorrect: node.getAttribute("data-question-bank-correct"),
+    questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
     text: node.textContent || "",
   }));
   const studentSummaryActionHref = await page.getByTestId("upsc-student-report-summary-action").getAttribute("href");
@@ -203,6 +225,9 @@ async function run() {
     weeklyWindowsGenerated: node.getAttribute("data-weekly-windows-generated"),
     averageRecall: node.getAttribute("data-average-recall"),
     averageMcq: node.getAttribute("data-average-mcq"),
+    questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+    questionBankCorrect: node.getAttribute("data-question-bank-correct"),
+    questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
     growthPercent: node.getAttribute("data-growth-percent"),
   }));
   const autoReportProof = await page.getByTestId("upsc-auto-report-proof").evaluate((node) => ({
@@ -226,6 +251,9 @@ async function run() {
       aiGapCount: node.getAttribute("data-ai-gap-count"),
       meTimeChecks: node.getAttribute("data-me-time-checks"),
       currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
+      questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+      questionBankCorrect: node.getAttribute("data-question-bank-correct"),
+      questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
       verdict: node.getAttribute("data-verdict"),
     }))
   );
@@ -237,6 +265,9 @@ async function run() {
     startedDays: node.getAttribute("data-started-days"),
     averageRecall: node.getAttribute("data-average-recall"),
     averageMcq: node.getAttribute("data-average-mcq"),
+    questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+    questionBankCorrect: node.getAttribute("data-question-bank-correct"),
+    questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
     aiGapCount: node.getAttribute("data-ai-gap-count"),
     meTimeChecks: node.getAttribute("data-me-time-checks"),
     currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
@@ -253,6 +284,9 @@ async function run() {
       averageRecall: node.getAttribute("data-average-recall"),
       mcqSets: node.getAttribute("data-mcq-sets"),
       averageMcq: node.getAttribute("data-average-mcq"),
+      questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+      questionBankCorrect: node.getAttribute("data-question-bank-correct"),
+      questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
       recoveryItems: node.getAttribute("data-recovery-items"),
       commandDays: node.getAttribute("data-command-days"),
       aiGapCount: node.getAttribute("data-ai-gap-count"),
@@ -344,11 +378,14 @@ async function run() {
     studentSummaryActionHref !== "/upsc/geography/talk?day=1" ||
     studentSummaryProof.weeklyReportId !== "all-subject-week-1" ||
     studentSummaryProof.monthlyReportId !== "all-subject-month" ||
-    studentSummaryProof.startedDays !== "4" ||
+    studentSummaryProof.startedDays !== "5" ||
     studentSummaryProof.aiGapCount !== "1" ||
     studentSummaryProof.recoveryItems !== "1" ||
     studentSummaryProof.meTimeChecks !== "3" ||
-    studentSummaryProof.currentAffairsUnlocked !== "3" ||
+    studentSummaryProof.currentAffairsUnlocked !== "4" ||
+    studentSummaryProof.questionBankAttempts !== "1" ||
+    studentSummaryProof.questionBankCorrect !== "1" ||
+    studentSummaryProof.questionBankAccuracy !== "100" ||
     readNumber(studentSummaryProof.totalDays, "studentSummaryProof.totalDays") <= 200 ||
     readNumber(studentSummaryProof.growthPercent, "studentSummaryProof.growthPercent") < 1 ||
     studentSummaryCards.length !== 4 ||
@@ -373,17 +410,20 @@ async function run() {
     throw new Error(`All-subject report missing expected evidence: ${JSON.stringify({ subjectCardCount, allSubjectText })}`);
   }
   if (
-    allSubjectProof.proofRule !== "recall-mcq-recovery-ai-me-time-current-affairs-growth" ||
+    allSubjectProof.proofRule !== "recall-mcq-question-bank-recovery-ai-me-time-current-affairs-growth" ||
     allSubjectProof.subjectCount !== "8" ||
-    allSubjectProof.startedDays !== "4" ||
+    allSubjectProof.startedDays !== "5" ||
     allSubjectProof.watchedDays !== "3" ||
     allSubjectProof.commandDays !== "2" ||
     allSubjectProof.recoveryItems !== "1" ||
     allSubjectProof.aiGapCount !== "1" ||
     allSubjectProof.meTimeChecks !== "3" ||
-    allSubjectProof.currentAffairsUnlocked !== "3" ||
+    allSubjectProof.currentAffairsUnlocked !== "4" ||
     allSubjectProof.averageRecall !== "90" ||
     allSubjectProof.averageMcq !== "77" ||
+    allSubjectProof.questionBankAttempts !== "1" ||
+    allSubjectProof.questionBankCorrect !== "1" ||
+    allSubjectProof.questionBankAccuracy !== "100" ||
     readNumber(allSubjectProof.totalDays, "allSubjectProof.totalDays") <= 200 ||
     readNumber(allSubjectProof.weeklyWindowsGenerated, "allSubjectProof.weeklyWindowsGenerated") < 25 ||
     readNumber(allSubjectProof.growthPercent, "allSubjectProof.growthPercent") < 1
@@ -391,7 +431,13 @@ async function run() {
     throw new Error(`All-subject report proof attributes failed: ${JSON.stringify(allSubjectProof)}`);
   }
   const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
-  if (!/current affairs\s+3/i.test(compactAllSubjectText) || !/me-time\s+3/i.test(compactAllSubjectText) || !/ai gaps\s+1/i.test(compactAllSubjectText)) {
+  if (
+    !/current affairs\s+4/i.test(compactAllSubjectText) ||
+    !/question bank\s+1/i.test(compactAllSubjectText) ||
+    !/qb accuracy\s+100%/i.test(compactAllSubjectText) ||
+    !/me-time\s+3/i.test(compactAllSubjectText) ||
+    !/ai gaps\s+1/i.test(compactAllSubjectText)
+  ) {
     throw new Error(`All-subject report should count Geography and Environment evidence: ${allSubjectText}`);
   }
   const compactWindowText = allSubjectWindowText.replace(/\s+/g, " ");
@@ -400,7 +446,9 @@ async function run() {
     !/AI repair active/i.test(allSubjectMonthlyText) ||
     !/AI gaps\s+1/i.test(compactWindowText) ||
     !/Me-time\s+3/i.test(compactWindowText) ||
-    !/News\s+3/i.test(compactWindowText)
+    !/News\s+4/i.test(compactWindowText) ||
+    !/QB\s+1/i.test(compactWindowText) ||
+    !/QB accuracy\s+100%/i.test(compactWindowText)
   ) {
     throw new Error(`All-subject report windows missing generated evidence: ${allSubjectWindowText}`);
   }
@@ -408,12 +456,15 @@ async function run() {
     allSubjectMonthlyProof.reportId !== "all-subject-month" ||
     allSubjectMonthlyProof.variant !== "monthly" ||
     allSubjectMonthlyProof.subjectCount !== "8" ||
-    allSubjectMonthlyProof.startedDays !== "4" ||
+    allSubjectMonthlyProof.startedDays !== "5" ||
     allSubjectMonthlyProof.averageRecall !== "86" ||
     allSubjectMonthlyProof.averageMcq !== "75" ||
+    allSubjectMonthlyProof.questionBankAttempts !== "1" ||
+    allSubjectMonthlyProof.questionBankCorrect !== "1" ||
+    allSubjectMonthlyProof.questionBankAccuracy !== "100" ||
     allSubjectMonthlyProof.aiGapCount !== "1" ||
     allSubjectMonthlyProof.meTimeChecks !== "3" ||
-    allSubjectMonthlyProof.currentAffairsUnlocked !== "3" ||
+    allSubjectMonthlyProof.currentAffairsUnlocked !== "4" ||
     allSubjectMonthlyProof.verdict !== "AI repair active"
   ) {
     throw new Error(`All-subject monthly proof attributes failed: ${JSON.stringify(allSubjectMonthlyProof)}`);
@@ -423,10 +474,13 @@ async function run() {
     allSubjectWeeklyProofs[0].reportId !== "all-subject-week-1" ||
     allSubjectWeeklyProofs[0].variant !== "weekly" ||
     allSubjectWeeklyProofs[0].subjectCount !== "8" ||
-    allSubjectWeeklyProofs[0].startedDays !== "4" ||
+    allSubjectWeeklyProofs[0].startedDays !== "5" ||
     allSubjectWeeklyProofs[0].aiGapCount !== "1" ||
     allSubjectWeeklyProofs[0].meTimeChecks !== "3" ||
-    allSubjectWeeklyProofs[0].currentAffairsUnlocked !== "3" ||
+    allSubjectWeeklyProofs[0].currentAffairsUnlocked !== "4" ||
+    allSubjectWeeklyProofs[0].questionBankAttempts !== "1" ||
+    allSubjectWeeklyProofs[0].questionBankCorrect !== "1" ||
+    allSubjectWeeklyProofs[0].questionBankAccuracy !== "100" ||
     allSubjectWeeklyProofs[0].verdict !== "AI repair active"
   ) {
     throw new Error(`All-subject weekly proof attributes failed: ${JSON.stringify(allSubjectWeeklyProofs)}`);
@@ -435,16 +489,19 @@ async function run() {
   const environmentProof = subjectProofs.find((subject) => subject.slug === "environment");
   if (
     !geographyProof ||
-    geographyProof.startedDays !== "3" ||
+    geographyProof.startedDays !== "4" ||
     geographyProof.recallAttempts !== "3" ||
     geographyProof.averageRecall !== "82" ||
     geographyProof.mcqSets !== "2" ||
     geographyProof.averageMcq !== "70" ||
+    geographyProof.questionBankAttempts !== "1" ||
+    geographyProof.questionBankCorrect !== "1" ||
+    geographyProof.questionBankAccuracy !== "100" ||
     geographyProof.recoveryItems !== "1" ||
     geographyProof.commandDays !== "1" ||
     geographyProof.aiGapCount !== "1" ||
     geographyProof.meTimeChecks !== "2" ||
-    geographyProof.currentAffairsUnlocked !== "2"
+    geographyProof.currentAffairsUnlocked !== "3"
   ) {
     throw new Error(`Geography subject proof attributes failed: ${JSON.stringify(geographyProof)}`);
   }
@@ -453,6 +510,8 @@ async function run() {
     environmentProof.startedDays !== "1" ||
     environmentProof.averageRecall !== "97" ||
     environmentProof.averageMcq !== "84" ||
+    environmentProof.questionBankAttempts !== "0" ||
+    environmentProof.questionBankAccuracy !== "no-attempts" ||
     environmentProof.commandDays !== "1" ||
     environmentProof.meTimeChecks !== "1" ||
     environmentProof.currentAffairsUnlocked !== "1" ||
@@ -471,7 +530,7 @@ async function run() {
     autoReportProof.proofRule !== "saved-daily-loop-evidence-regenerates-reports" ||
     autoReportProof.weeklyReportId !== "all-subject-week-1" ||
     autoReportProof.monthlyReportId !== "all-subject-month" ||
-    autoReportProof.growthBaseline !== "Geography: 3/30 days started" ||
+    autoReportProof.growthBaseline !== "Geography: 4/30 days started" ||
     autoReportProof.growthNow !== "1 AI teacher gap active" ||
     !autoReportProof.nextWeeklyAction.includes("Clear the latest AI teacher gap") ||
     !autoReportProof.nextMonthlyAction.includes("Clear the latest AI teacher gap") ||
@@ -479,7 +538,7 @@ async function run() {
     !/Weekly and monthly reports rebuild from evidence/i.test(compactAutoReportProof) ||
     !/No manual spreadsheet/i.test(compactAutoReportProof) ||
     !/Only saved learning evidence is counted/i.test(compactAutoReportProof) ||
-    !/Growth start\s*Geography: 3\/30 days started/i.test(compactAutoReportProof) ||
+    !/Growth start\s*Geography: 4\/30 days started/i.test(compactAutoReportProof) ||
     !/Growth now\s*1 AI teacher gap active/i.test(compactAutoReportProof) ||
     !/Clear the latest AI teacher gap/i.test(compactAutoReportProof)
   ) {

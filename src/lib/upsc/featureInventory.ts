@@ -127,7 +127,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Reports and growth signal",
         status: "verified",
-        behavior: "Weekly windows, monthly summary, growth percentage, current-affairs unlocks, AI gap count, MCQ evidence, recall evidence, and me-time checks are generated from local subject progress.",
+        behavior: "Weekly windows, monthly summary, growth percentage, current-affairs unlocks, AI gap count, MCQ evidence, question-bank solved ledger, recall evidence, and me-time checks are generated from local subject progress.",
         evidence: "verify-student-report-system.cjs",
       },
       {
@@ -585,7 +585,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
       "Reports should include tests, MCQs, recall, mood, current-affairs unlocks, weekly/monthly summaries, and growth from starting level.",
     status: "ready-local",
     currentState:
-      "Reports generate subject, weekly, monthly, growth, me-time, AI gap, MCQ, recall, and covered-news signals from local progress.",
+      "Reports generate subject, weekly, monthly, growth, me-time, AI gap, MCQ, question-bank solved ledger, recall, and covered-news signals from local progress.",
     evidence: "verify-student-report-system.cjs",
     nextAction: "Persist reports remotely after learner-state SQL is live.",
     phase: "Day 2",

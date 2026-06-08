@@ -6,10 +6,12 @@ import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, ClipboardCheck, File
 
 import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
 import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
+import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
 import {
   buildUpscStudentReportSnapshot,
   readLocalStudentReportProgress,
   studentReportSubjects,
+  type StudentReportQuestionBankAttemptMap,
   type StudentReportWindow,
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
@@ -43,6 +45,8 @@ export default function ReportsPage() {
   const overview = useGeographyStudentOverview();
   const { progress } = useGeographyProgress();
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
+  const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] =
+    useState<StudentReportQuestionBankAttemptMap>({});
   const [dailyState, setDailyState] = useState<DailyReportState>({ subjectSlug: "geography", day: 1 });
 
   useEffect(() => {
@@ -50,6 +54,11 @@ export default function ReportsPage() {
       setProgressBySubject(
         Object.fromEntries(
           studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
+        )
+      );
+      setQuestionBankAttemptsBySubject(
+        Object.fromEntries(
+          studentReportSubjects.map((subject) => [subject.slug, readLocalQuestionBankAttempts(subject.slug)])
         )
       );
       setDailyState(readJson<DailyReportState>(dailyStorageKey, { subjectSlug: "geography", day: 1 }));
@@ -60,8 +69,8 @@ export default function ReportsPage() {
 
   const report = buildGeographyReportSnapshot(progress);
   const allSubjectReport = useMemo(
-    () => buildUpscStudentReportSnapshot(progressBySubject),
-    [progressBySubject]
+    () => buildUpscStudentReportSnapshot(progressBySubject, questionBankAttemptsBySubject),
+    [progressBySubject, questionBankAttemptsBySubject]
   );
   const activeReportSubject =
     studentReportSubjects.find((subject) => subject.slug === dailyState.subjectSlug) ?? studentReportSubjects[0];
@@ -210,6 +219,9 @@ export default function ReportsPage() {
           data-recovery-items={allSubjectReport.totals.recoveryItems}
           data-me-time-checks={allSubjectReport.totals.meTimeChecks}
           data-current-affairs-unlocked={allSubjectReport.totals.currentAffairsUnlocked}
+          data-question-bank-attempts={allSubjectReport.totals.questionBankAttempts}
+          data-question-bank-correct={allSubjectReport.totals.questionBankCorrect}
+          data-question-bank-accuracy={allSubjectReport.totals.questionBankAccuracyPercent ?? "no-attempts"}
           className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -249,7 +261,7 @@ export default function ReportsPage() {
 
         <section
           data-testid="upsc-all-subject-report"
-          data-proof-rule="recall-mcq-recovery-ai-me-time-current-affairs-growth"
+          data-proof-rule="recall-mcq-question-bank-recovery-ai-me-time-current-affairs-growth"
           data-subject-count={allSubjectReport.subjects.length}
           data-total-days={allSubjectReport.totals.totalDays}
           data-started-days={allSubjectReport.totals.startedDays}
@@ -262,6 +274,9 @@ export default function ReportsPage() {
           data-weekly-windows-generated={allSubjectReport.totals.weeklyWindowsGenerated}
           data-average-recall={allSubjectReport.totals.averageRecall ?? "not-measured"}
           data-average-mcq={allSubjectReport.totals.averageMcq ?? "no-score"}
+          data-question-bank-attempts={allSubjectReport.totals.questionBankAttempts}
+          data-question-bank-correct={allSubjectReport.totals.questionBankCorrect}
+          data-question-bank-accuracy={allSubjectReport.totals.questionBankAccuracyPercent ?? "no-attempts"}
           data-growth-percent={allSubjectReport.totals.growthPercent}
           className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
@@ -280,7 +295,7 @@ export default function ReportsPage() {
                 Started from: {allSubjectReport.growth.startedFrom}. Current position: {allSubjectReport.growth.currentPosition}.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {[
                 ["Started", `${allSubjectReport.totals.startedDays}/${allSubjectReport.totals.totalDays}`],
                 ["Weekly reports", allSubjectReport.totals.weeklyWindowsGenerated],
@@ -288,6 +303,13 @@ export default function ReportsPage() {
                 ["AI gaps", allSubjectReport.totals.teacherDoubtCount],
                 ["Recall", allSubjectReport.totals.averageRecall === null ? "Not measured" : `${allSubjectReport.totals.averageRecall}/100`],
                 ["MCQ", allSubjectReport.totals.averageMcq === null ? "No score" : `${allSubjectReport.totals.averageMcq}%`],
+                ["Question bank", allSubjectReport.totals.questionBankAttempts],
+                [
+                  "QB accuracy",
+                  allSubjectReport.totals.questionBankAccuracyPercent === null
+                    ? "No attempts"
+                    : `${allSubjectReport.totals.questionBankAccuracyPercent}%`,
+                ],
                 ["Me-time", allSubjectReport.totals.meTimeChecks],
                 ["Current affairs", allSubjectReport.totals.currentAffairsUnlocked],
               ].map(([label, value]) => (
@@ -312,6 +334,9 @@ export default function ReportsPage() {
                 data-average-recall={subject.averageRecall ?? "not-measured"}
                 data-mcq-sets={subject.mcqSets}
                 data-average-mcq={subject.averageMcq ?? "no-score"}
+                data-question-bank-attempts={subject.questionBankAttempts}
+                data-question-bank-correct={subject.questionBankCorrect}
+                data-question-bank-accuracy={subject.questionBankAccuracyPercent ?? "no-attempts"}
                 data-recovery-items={subject.recoveryItems}
                 data-command-days={subject.commandDays}
                 data-ai-gap-count={subject.teacherDoubtCount}
@@ -329,12 +354,13 @@ export default function ReportsPage() {
                     {subject.monthlyVerdict}
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {[
                     ["Start", `${subject.startedDays}/${subject.totalDays}`],
                     ["Cmd", subject.commandDays],
                     ["Fix", subject.recoveryItems],
                     ["AI", subject.teacherDoubtCount],
+                    ["QB", subject.questionBankAttempts],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md bg-[#f7f4ee] p-2">
                       <p className="text-sm font-black text-[#13251d]">{value}</p>
@@ -436,7 +462,7 @@ export default function ReportsPage() {
               <h2 className="mt-1 text-2xl font-black tracking-tight">Weekly and monthly UPSC command reports</h2>
               <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
                 These windows are generated from all subject progress, not only Geography. AI gaps, recovery, recall,
-                MCQ, me-time, and covered news all affect the verdict.
+                MCQ, question-bank practice, me-time, and covered news all affect the verdict.
               </p>
             </div>
             <CalendarDays className="h-6 w-6 text-[#1a3a2a]" />
@@ -457,7 +483,8 @@ export default function ReportsPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Auto report</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">Weekly and monthly evidence summary</h2>
               <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                Reports are generated from recall, MCQ, recovery, me-time, and covered-topic current-affairs evidence.
+                Reports are generated from recall, MCQ, question-bank practice, recovery, me-time, and covered-topic
+                current-affairs evidence.
               </p>
             </div>
             <FileText className="h-6 w-6 text-[#1a3a2a]" />
@@ -581,6 +608,9 @@ function AllSubjectReportWindowCard({
       data-average-recall={report.averageRecall ?? "not-measured"}
       data-mcq-sets={report.mcqSets}
       data-average-mcq={report.averageMcq ?? "no-score"}
+      data-question-bank-attempts={report.questionBankAttempts}
+      data-question-bank-correct={report.questionBankCorrect}
+      data-question-bank-accuracy={report.questionBankAccuracyPercent ?? "no-attempts"}
       data-ai-gap-count={report.teacherDoubtCount}
       data-me-time-checks={report.meTimeChecks}
       data-current-affairs-unlocked={report.currentAffairsUnlocked}
@@ -598,11 +628,16 @@ function AllSubjectReportWindowCard({
           {report.verdict}
         </span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-4">
         {[
           ["Started", `${report.startedDays}/${report.totalDays}`],
           ["Recall", report.averageRecall === null ? "Not measured" : `${report.averageRecall}/100`],
           ["MCQ", report.averageMcq === null ? "No score" : `${report.averageMcq}%`],
+          ["QB", report.questionBankAttempts],
+          [
+            "QB accuracy",
+            report.questionBankAccuracyPercent === null ? "No attempts" : `${report.questionBankAccuracyPercent}%`,
+          ],
           ["AI gaps", report.teacherDoubtCount],
           ["Me-time", report.meTimeChecks],
           ["News", report.currentAffairsUnlocked],

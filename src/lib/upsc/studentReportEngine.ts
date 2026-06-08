@@ -1,5 +1,6 @@
 import { getCurrentAffairsForSubject } from "@/lib/upsc/currentAffairsBridge";
 import { geographySessions } from "@/lib/upsc/plan";
+import type { QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
@@ -10,6 +11,11 @@ export type StudentReportProgress = SubjectDayProgress & {
 };
 
 export type StudentReportProgressMap = Record<string, StudentReportProgress | undefined>;
+export type StudentReportQuestionBankAttempt = Pick<
+  QuestionBankAttempt,
+  "subjectSlug" | "linkedDay" | "difficulty" | "isCorrect" | "solvedAt"
+>;
+export type StudentReportQuestionBankAttemptMap = Record<string, StudentReportQuestionBankAttempt[] | undefined>;
 
 export type StudentReportSubject = {
   slug: string;
@@ -31,6 +37,9 @@ export type StudentSubjectReport = {
   averageRecall: number | null;
   mcqSets: number;
   averageMcq: number | null;
+  questionBankAttempts: number;
+  questionBankCorrect: number;
+  questionBankAccuracyPercent: number | null;
   recoveryItems: number;
   commandDays: number;
   meTimeChecks: number;
@@ -58,6 +67,9 @@ export type StudentReportWindow = {
   averageRecall: number | null;
   mcqSets: number;
   averageMcq: number | null;
+  questionBankAttempts: number;
+  questionBankCorrect: number;
+  questionBankAccuracyPercent: number | null;
   recoveryItems: number;
   commandDays: number;
   teacherDoubtCount: number;
@@ -94,6 +106,9 @@ export type UpscStudentReportSnapshot = {
     weeklyWindowsGenerated: number;
     averageRecall: number | null;
     averageMcq: number | null;
+    questionBankAttempts: number;
+    questionBankCorrect: number;
+    questionBankAccuracyPercent: number | null;
     growthPercent: number;
   };
   growth: {
@@ -134,7 +149,15 @@ function average(values: number[]) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
-function hasStarted(progress?: StudentReportProgress) {
+function attemptsForDay(attempts: StudentReportQuestionBankAttempt[] = [], day: number) {
+  return attempts.filter((attempt) => attempt.linkedDay === day);
+}
+
+function questionBankAccuracy(correct: number, total: number) {
+  return total ? Math.round((correct / total) * 100) : null;
+}
+
+function hasStarted(progress?: StudentReportProgress, questionBankAttempts: StudentReportQuestionBankAttempt[] = []) {
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
@@ -142,7 +165,8 @@ function hasStarted(progress?: StudentReportProgress) {
       typeof progress?.talkScore === "number" ||
       progress?.labCompleted ||
       progress?.mcqAttempted ||
-      progress?.meTimeCompletedAt
+      progress?.meTimeCompletedAt ||
+      questionBankAttempts.length
   );
 }
 
@@ -217,8 +241,14 @@ function latestMeTimeSignal(states: Array<StudentReportProgress | undefined>) {
   };
 }
 
-function currentAffairsUnlocked(subject: StudentReportSubject, progress: StudentReportProgressMap) {
-  return getCurrentAffairsForSubject(subject.slug).filter((item) => hasStarted(progress[String(item.linkedDay)])).length;
+function currentAffairsUnlocked(
+  subject: StudentReportSubject,
+  progress: StudentReportProgressMap,
+  questionBankAttempts: StudentReportQuestionBankAttempt[] = []
+) {
+  return getCurrentAffairsForSubject(subject.slug).filter((item) =>
+    hasStarted(progress[String(item.linkedDay)], attemptsForDay(questionBankAttempts, item.linkedDay))
+  ).length;
 }
 
 function weeklyWindowCount(subject: StudentReportSubject) {
@@ -233,16 +263,18 @@ function buildReportWindow(
     subject: StudentReportSubject;
     sessions: SubjectSession[];
     progress: StudentReportProgressMap;
+    questionBankAttempts?: StudentReportQuestionBankAttempt[];
   }>
 ): StudentReportWindow {
-  const dayRows = subjectSessions.flatMap(({ subject, sessions, progress }) =>
+  const dayRows = subjectSessions.flatMap(({ subject, sessions, progress, questionBankAttempts = [] }) =>
     sessions.map((session) => ({
       subject,
       session,
       progress: progress[String(session.day)],
+      questionBankAttempts: attemptsForDay(questionBankAttempts, session.day),
     }))
   );
-  const startedDays = dayRows.filter((row) => hasStarted(row.progress)).length;
+  const startedDays = dayRows.filter((row) => hasStarted(row.progress, row.questionBankAttempts)).length;
   const watchedDays = dayRows.filter((row) => row.progress?.watched).length;
   const recallScores = dayRows
     .map((row) => row.progress?.talkScore)
@@ -254,12 +286,19 @@ function buildReportWindow(
   const commandDays = dayRows.filter((row) => hasCommand(row.progress)).length;
   const teacherDoubtCount = dayRows.filter((row) => hasTeacherDoubt(row.progress) && !hasCommand(row.progress)).length;
   const meTimeChecks = dayRows.filter((row) => row.progress?.meTimeCompletedAt).length;
-  const currentAffairsUnlocked = subjectSessions.reduce((sum, { subject, sessions, progress }) => {
+  const questionBankAttemptsCount = dayRows.reduce((sum, row) => sum + row.questionBankAttempts.length, 0);
+  const questionBankCorrect = dayRows.reduce(
+    (sum, row) => sum + row.questionBankAttempts.filter((attempt) => attempt.isCorrect).length,
+    0
+  );
+  const currentAffairsUnlocked = subjectSessions.reduce((sum, { subject, sessions, progress, questionBankAttempts = [] }) => {
     const daySet = new Set(sessions.map((session) => session.day));
     return (
       sum +
       getCurrentAffairsForSubject(subject.slug).filter(
-        (item) => daySet.has(item.linkedDay) && hasStarted(progress[String(item.linkedDay)])
+        (item) =>
+          daySet.has(item.linkedDay) &&
+          hasStarted(progress[String(item.linkedDay)], attemptsForDay(questionBankAttempts, item.linkedDay))
       ).length
     );
   }, 0);
@@ -285,7 +324,7 @@ function buildReportWindow(
           ? "Start one subject day to generate the first report row."
           : averageRecall !== null && averageRecall < 95
             ? "Run one more Talk check to move recall toward 95 percent."
-            : averageMcq === null
+            : averageMcq === null && questionBankAttemptsCount === 0
               ? "Add MCQ evidence to complete the report cycle."
               : "Continue the next planned topic and keep me-time saved.";
 
@@ -301,6 +340,9 @@ function buildReportWindow(
     averageRecall,
     mcqSets: dayRows.filter((row) => row.progress?.mcqCompleted).length,
     averageMcq,
+    questionBankAttempts: questionBankAttemptsCount,
+    questionBankCorrect,
+    questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttemptsCount),
     recoveryItems,
     commandDays,
     teacherDoubtCount,
@@ -311,7 +353,10 @@ function buildReportWindow(
   };
 }
 
-function buildWeeklyReportWindows(progressBySubject: Record<string, StudentReportProgressMap>) {
+function buildWeeklyReportWindows(
+  progressBySubject: Record<string, StudentReportProgressMap>,
+  questionBankAttemptsBySubject: StudentReportQuestionBankAttemptMap = {}
+) {
   const weekNumbers = Array.from(
     new Set(studentReportSubjects.flatMap((subject) => subject.sessions.map((session) => session.week)))
   ).sort((left, right) => left - right);
@@ -325,12 +370,16 @@ function buildWeeklyReportWindows(progressBySubject: Record<string, StudentRepor
         subject,
         sessions: subject.sessions.filter((session) => session.week === weekNumber),
         progress: progressBySubject[subject.slug] ?? {},
+        questionBankAttempts: questionBankAttemptsBySubject[subject.slug] ?? [],
       }))
     )
   );
 }
 
-function buildMonthlyReportWindow(progressBySubject: Record<string, StudentReportProgressMap>) {
+function buildMonthlyReportWindow(
+  progressBySubject: Record<string, StudentReportProgressMap>,
+  questionBankAttemptsBySubject: StudentReportQuestionBankAttemptMap = {}
+) {
   return buildReportWindow(
     "all-subject-month",
     "All-subject monthly report",
@@ -339,6 +388,7 @@ function buildMonthlyReportWindow(progressBySubject: Record<string, StudentRepor
       subject,
       sessions: subject.sessions,
       progress: progressBySubject[subject.slug] ?? {},
+      questionBankAttempts: questionBankAttemptsBySubject[subject.slug] ?? [],
     }))
   );
 }
@@ -358,10 +408,16 @@ export function readLocalStudentReportProgress(subjectSlug: string): StudentRepo
 
 export function buildStudentSubjectReport(
   subject: StudentReportSubject,
-  progress: StudentReportProgressMap
+  progress: StudentReportProgressMap,
+  questionBankAttempts: StudentReportQuestionBankAttempt[] = []
 ): StudentSubjectReport {
-  const states = subject.sessions.map((session) => progress[String(session.day)]);
-  const startedDays = states.filter(hasStarted).length;
+  const rows = subject.sessions.map((session) => ({
+    session,
+    progress: progress[String(session.day)],
+    questionBankAttempts: attemptsForDay(questionBankAttempts, session.day),
+  }));
+  const states = rows.map((row) => row.progress);
+  const startedDays = rows.filter((row) => hasStarted(row.progress, row.questionBankAttempts)).length;
   const watchedDays = states.filter((state) => state?.watched).length;
   const recallScores = states
     .map((state) => state?.talkScore)
@@ -373,6 +429,11 @@ export function buildStudentSubjectReport(
   const commandDays = states.filter(hasCommand).length;
   const mcqSets = states.filter((state) => state?.mcqCompleted).length;
   const meTimeChecks = states.filter((state) => state?.meTimeCompletedAt).length;
+  const questionBankAttemptsCount = rows.reduce((sum, row) => sum + row.questionBankAttempts.length, 0);
+  const questionBankCorrect = rows.reduce(
+    (sum, row) => sum + row.questionBankAttempts.filter((attempt) => attempt.isCorrect).length,
+    0
+  );
   const teacherDoubtSignal = latestTeacherDoubtSignal(states);
   const meTimeSignal = latestMeTimeSignal(states);
   const averageRecall = average(recallScores);
@@ -395,7 +456,7 @@ export function buildStudentSubjectReport(
         ? "Start Day 1 to create the baseline report."
         : averageRecall !== null && averageRecall < 95
           ? "Use Talk once more to push recall toward 95 percent."
-          : mcqSets === 0
+          : mcqSets === 0 && questionBankAttemptsCount === 0
             ? "Add MCQ evidence for this subject."
             : "Continue the next scheduled topic.";
 
@@ -411,12 +472,15 @@ export function buildStudentSubjectReport(
     averageRecall,
     mcqSets,
     averageMcq,
+    questionBankAttempts: questionBankAttemptsCount,
+    questionBankCorrect,
+    questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttemptsCount),
     recoveryItems,
     commandDays,
     meTimeChecks,
     ...teacherDoubtSignal,
     ...meTimeSignal,
-    currentAffairsUnlocked: currentAffairsUnlocked(subject, progress),
+    currentAffairsUnlocked: currentAffairsUnlocked(subject, progress, questionBankAttempts),
     weeklyWindowsGenerated: weeklyWindowCount(subject),
     monthlyVerdict,
     nextAction,
@@ -424,13 +488,18 @@ export function buildStudentSubjectReport(
 }
 
 export function buildUpscStudentReportSnapshot(
-  progressBySubject: Record<string, StudentReportProgressMap>
+  progressBySubject: Record<string, StudentReportProgressMap>,
+  questionBankAttemptsBySubject: StudentReportQuestionBankAttemptMap = {}
 ): UpscStudentReportSnapshot {
   const subjects = studentReportSubjects.map((subject) =>
-    buildStudentSubjectReport(subject, progressBySubject[subject.slug] ?? {})
+    buildStudentSubjectReport(
+      subject,
+      progressBySubject[subject.slug] ?? {},
+      questionBankAttemptsBySubject[subject.slug] ?? []
+    )
   );
-  const weekly = buildWeeklyReportWindows(progressBySubject);
-  const monthly = buildMonthlyReportWindow(progressBySubject);
+  const weekly = buildWeeklyReportWindows(progressBySubject, questionBankAttemptsBySubject);
+  const monthly = buildMonthlyReportWindow(progressBySubject, questionBankAttemptsBySubject);
   const allRecallScores = subjects
     .map((subject) => subject.averageRecall)
     .filter((score): score is number => typeof score === "number");
@@ -441,6 +510,8 @@ export function buildUpscStudentReportSnapshot(
   const startedDays = subjects.reduce((sum, subject) => sum + subject.startedDays, 0);
   const recoveryItems = subjects.reduce((sum, subject) => sum + subject.recoveryItems, 0);
   const teacherDoubtCount = subjects.reduce((sum, subject) => sum + subject.teacherDoubtCount, 0);
+  const questionBankAttempts = subjects.reduce((sum, subject) => sum + subject.questionBankAttempts, 0);
+  const questionBankCorrect = subjects.reduce((sum, subject) => sum + subject.questionBankCorrect, 0);
   const startedSubjects = subjects.filter((subject) => subject.startedDays > 0);
   const strongestSubject =
     [...startedSubjects].sort(
@@ -476,7 +547,7 @@ export function buildUpscStudentReportSnapshot(
       monthlyReportId: monthly.id,
       cadence: "Weekly report rebuilds from each active subject week; monthly report rebuilds from the full UPSC plan.",
       evidenceRule:
-        "Only saved learning evidence is counted: recall, MCQ, recovery, AI teacher gaps, me-time, and covered-topic current affairs.",
+        "Only saved learning evidence is counted: recall, MCQ, question-bank solved ledger, recovery, AI teacher gaps, me-time, and covered-topic current affairs.",
       growthBaseline,
       growthNow,
       nextWeeklyAction: weeklyFocus?.nextAction ?? "Start one subject day to generate the first weekly report row.",
@@ -495,6 +566,9 @@ export function buildUpscStudentReportSnapshot(
       weeklyWindowsGenerated: subjects.reduce((sum, subject) => sum + subject.weeklyWindowsGenerated, 0),
       averageRecall: average(allRecallScores),
       averageMcq: average(allMcqScores),
+      questionBankAttempts,
+      questionBankCorrect,
+      questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttempts),
       growthPercent: totalDays ? Math.round((startedDays / totalDays) * 100) : 0,
     },
     growth: {
