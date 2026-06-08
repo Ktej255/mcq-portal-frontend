@@ -73,6 +73,87 @@ export type PyqImportCoverageRow = {
   coveragePercent: number;
 };
 
+function isSourceStage(value: unknown): value is SourceStage {
+  return value === "Prelims" || value === "Mains" || value === "Optional";
+}
+
+function isQuestionKind(value: unknown): value is PyqQuestionKind {
+  return value === "GS_PRELIMS" || value === "GS_MAINS" || value === "OPTIONAL_MAINS";
+}
+
+function isImportStatus(value: unknown): value is PyqImportStatus {
+  return value === "MAPPED" || value === "NEEDS_REVIEW";
+}
+
+function isTextStatus(value: unknown): value is PyqTextStatus {
+  return value === "EXACT_VERIFIED" || value === "PATTERN_SEED";
+}
+
+function requiredRecordText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function parsePyqImportRecord(input: unknown): PyqImportRecord | null {
+  if (!input || typeof input !== "object") return null;
+  const record = input as Record<string, unknown>;
+  const year = Number(record.year);
+  const stage = record.stage;
+  const kind = record.kind;
+  const importStatus = record.importStatus;
+  const textStatus = record.textStatus;
+  const topicTags = Array.isArray(record.topicTags)
+    ? record.topicTags.map(requiredRecordText).filter(Boolean)
+    : [];
+
+  if (!Number.isInteger(year) || year < 2010 || year > 2026) return null;
+  if (!isSourceStage(stage) || !isQuestionKind(kind) || !isImportStatus(importStatus) || !isTextStatus(textStatus)) {
+    return null;
+  }
+
+  const parsed: PyqImportRecord = {
+    id: requiredRecordText(record.id),
+    year,
+    stage,
+    kind,
+    subjectSlug: requiredRecordText(record.subjectSlug).toLowerCase(),
+    subjectTitle: requiredRecordText(record.subjectTitle),
+    paper: requiredRecordText(record.paper),
+    questionNumber: requiredRecordText(record.questionNumber),
+    questionText: requiredRecordText(record.questionText),
+    syllabusArea: requiredRecordText(record.syllabusArea),
+    syllabusNodeId: requiredRecordText(record.syllabusNodeId) || undefined,
+    topicTags,
+    trendInsightId: requiredRecordText(record.trendInsightId) || undefined,
+    sourceHref: requiredRecordText(record.sourceHref),
+    officialSourceTitle: requiredRecordText(record.officialSourceTitle) || undefined,
+    answerDemand: requiredRecordText(record.answerDemand) || undefined,
+    importStatus,
+    textStatus,
+    importedAt: requiredRecordText(record.importedAt),
+  };
+
+  if (
+    !parsed.id ||
+    !parsed.subjectSlug ||
+    !parsed.subjectTitle ||
+    !parsed.paper ||
+    !parsed.questionNumber ||
+    !parsed.questionText ||
+    !parsed.syllabusArea ||
+    !parsed.sourceHref ||
+    !parsed.importedAt
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function parsePyqImportRecords(input: unknown) {
+  if (!Array.isArray(input)) return [];
+  return dedupePyqImportRecords(input.map(parsePyqImportRecord).filter(Boolean) as PyqImportRecord[]);
+}
+
 export const pyqImportCsvColumns: Array<{
   key: keyof PyqImportCsvRow;
   label: string;

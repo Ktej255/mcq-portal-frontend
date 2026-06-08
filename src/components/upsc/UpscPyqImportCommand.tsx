@@ -1,25 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 import {
   ArrowRight,
   CheckCircle2,
+  CloudOff,
   Database,
   Download,
   FileInput,
+  RefreshCw,
+  Server,
   ShieldCheck,
   Trash2,
   XCircle,
 } from "lucide-react";
 
+import { readLocalMockToken } from "@/lib/auth/local-testing";
+import { supabase } from "@/lib/supabase/client";
 import {
   appendLocalPyqImportRecords,
   buildPyqImportCoverage,
   buildPyqImportCsvTemplate,
   buildPyqImportRecordsFromCsvRows,
   clearLocalPyqImportRecords,
+  dedupePyqImportRecords,
   pyqImportCsvColumns,
   readLocalPyqImportRecords,
   seededPyqPatternRecords,
@@ -27,7 +33,32 @@ import {
   type PyqImportCsvRow,
   type PyqImportParseResult,
   type PyqImportRecord,
+  writeLocalPyqImportRecords,
 } from "@/lib/upsc/pyqImportLedger";
+
+type PyqPersistenceMode = "checking" | "supabase" | "local-only" | "unavailable";
+
+type PyqPersistenceState = {
+  mode: PyqPersistenceMode;
+  message: string;
+  table?: string;
+  savedCount: number;
+  checkedAt?: string;
+};
+
+type PyqPersistencePayload = {
+  mode?: "supabase" | "local-only" | "unavailable";
+  message?: string;
+  table?: string;
+  savedCount?: number;
+  records?: PyqImportRecord[];
+};
+
+const defaultPersistenceState: PyqPersistenceState = {
+  mode: "checking",
+  message: "Checking exact PYQ persistence...",
+  savedCount: 0,
+};
 
 function downloadTemplate() {
   const blob = new Blob([buildPyqImportCsvTemplate()], { type: "text/csv;charset=utf-8" });
@@ -49,14 +80,136 @@ function parseCsv(input: string): PyqImportCsvRow[] {
   return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
 }
 
+async function buildInternalApiHeaders() {
+  const headers: Record<string, string> = {};
+  const mockToken = readLocalMockToken();
+  if (mockToken) {
+    headers.Authorization = `Bearer ${mockToken}`;
+    return headers;
+  }
+
+  if (!supabase) return headers;
+
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    return headers;
+  }
+
+  return headers;
+}
+
+async function requestPyqPersistence(records?: PyqImportRecord[]): Promise<PyqPersistencePayload> {
+  const headers = await buildInternalApiHeaders();
+  const response = await fetch("/api/admin/pyq-import", {
+    method: records ? "POST" : "GET",
+    headers: records
+      ? {
+          ...headers,
+          "Content-Type": "application/json",
+        }
+      : headers,
+    body: records ? JSON.stringify({ records }) : undefined,
+    cache: "no-store",
+  });
+
+  if (response.status === 403) {
+    return {
+      mode: "unavailable",
+      message: "Master access is required before exact PYQ rows can sync to the server.",
+      savedCount: 0,
+    };
+  }
+
+  const payload = (await response.json().catch(() => null)) as PyqPersistencePayload | null;
+  if (!payload || !payload.mode) {
+    return {
+      mode: "unavailable",
+      message: "PYQ persistence returned an invalid response. Browser-local staging remains available.",
+      savedCount: 0,
+    };
+  }
+
+  return payload;
+}
+
+function stateFromPersistencePayload(payload: PyqPersistencePayload): PyqPersistenceState {
+  const mode = payload.mode === "supabase" || payload.mode === "local-only" ? payload.mode : "unavailable";
+  return {
+    mode,
+    message:
+      payload.message ??
+      (mode === "supabase"
+        ? "Supabase persistence is active for exact PYQ import rows."
+        : "Browser-local staging remains available."),
+    table: payload.table,
+    savedCount: payload.savedCount ?? payload.records?.length ?? 0,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 export function UpscPyqImportCommand() {
   const [records, setRecords] = useState<PyqImportRecord[]>([]);
   const [csvInput, setCsvInput] = useState("");
   const [lastResult, setLastResult] = useState<PyqImportParseResult | null>(null);
+  const [persistence, setPersistence] = useState<PyqPersistenceState>(defaultPersistenceState);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const hydratePersistence = useCallback(async () => {
+    const localRecords = readLocalPyqImportRecords();
+    setRecords(localRecords);
+    setPersistence(defaultPersistenceState);
+
+    try {
+      const payload = await requestPyqPersistence();
+      const nextPersistence = stateFromPersistencePayload(payload);
+
+      if (payload.mode === "supabase" && Array.isArray(payload.records)) {
+        let nextRecords = dedupePyqImportRecords([...payload.records, ...localRecords]);
+        let nextState = {
+          ...nextPersistence,
+          savedCount: nextRecords.length,
+        };
+
+        if (localRecords.length > 0) {
+          const syncPayload = await requestPyqPersistence(nextRecords);
+          nextState = stateFromPersistencePayload(syncPayload);
+          if (syncPayload.mode === "supabase" && Array.isArray(syncPayload.records)) {
+            nextRecords = dedupePyqImportRecords(syncPayload.records);
+          }
+        }
+
+        writeLocalPyqImportRecords(nextRecords);
+        setRecords(nextRecords);
+        setPersistence({
+          ...nextState,
+          savedCount: nextRecords.length,
+        });
+        return;
+      }
+
+      setPersistence({
+        ...nextPersistence,
+        savedCount: localRecords.length,
+      });
+    } catch (error) {
+      setPersistence({
+        mode: "unavailable",
+        message:
+          error instanceof Error
+            ? `PYQ persistence check failed: ${error.message}. Browser-local staging remains available.`
+            : "PYQ persistence check failed. Browser-local staging remains available.",
+        savedCount: localRecords.length,
+        checkedAt: new Date().toISOString(),
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    setRecords(readLocalPyqImportRecords());
-  }, []);
+    void hydratePersistence();
+  }, [hydratePersistence]);
 
   const summary = useMemo(() => summarizePyqImportLedger(records), [records]);
   const coverage = useMemo(() => buildPyqImportCoverage(records), [records]);
@@ -67,12 +220,45 @@ export function UpscPyqImportCommand() {
     setCsvInput(buildPyqImportCsvTemplate());
   }
 
-  function handleImport() {
+  async function handleImport() {
     const parsedRows = parseCsv(csvInput);
     const result = buildPyqImportRecordsFromCsvRows(parsedRows);
     setLastResult(result);
     if (result.accepted.length > 0) {
-      setRecords(appendLocalPyqImportRecords(result.accepted));
+      const nextLocalRecords = appendLocalPyqImportRecords(result.accepted);
+      setRecords(nextLocalRecords);
+      setIsSyncing(true);
+
+      try {
+        const payload = await requestPyqPersistence(nextLocalRecords);
+        const nextPersistence = stateFromPersistencePayload(payload);
+        if (payload.mode === "supabase" && Array.isArray(payload.records)) {
+          const nextRecords = dedupePyqImportRecords(payload.records);
+          writeLocalPyqImportRecords(nextRecords);
+          setRecords(nextRecords);
+          setPersistence({
+            ...nextPersistence,
+            savedCount: nextRecords.length,
+          });
+        } else {
+          setPersistence({
+            ...nextPersistence,
+            savedCount: nextLocalRecords.length,
+          });
+        }
+      } catch (error) {
+        setPersistence({
+          mode: "unavailable",
+          message:
+            error instanceof Error
+              ? `PYQ server sync failed: ${error.message}. Accepted rows are still saved in this browser.`
+              : "PYQ server sync failed. Accepted rows are still saved in this browser.",
+          savedCount: nextLocalRecords.length,
+          checkedAt: new Date().toISOString(),
+        });
+      } finally {
+        setIsSyncing(false);
+      }
     }
   }
 
@@ -80,6 +266,14 @@ export function UpscPyqImportCommand() {
     clearLocalPyqImportRecords();
     setRecords([]);
     setLastResult(null);
+    setPersistence((current) => ({
+      ...current,
+      savedCount: 0,
+      message:
+        current.mode === "supabase"
+          ? "Browser staging was cleared. Supabase rows are retained; refresh sync to reload them."
+          : current.message,
+    }));
   }
 
   return (
@@ -114,6 +308,14 @@ export function UpscPyqImportCommand() {
           </div>
         </div>
       </header>
+
+      <PersistencePanel
+        persistence={persistence}
+        isSyncing={isSyncing}
+        onRefresh={() => {
+          void hydratePersistence();
+        }}
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6" data-testid="admin-pyq-import-summary">
         <Metric label="Exact rows" value={summary.importedQuestions} />
@@ -188,10 +390,10 @@ export function UpscPyqImportCommand() {
               type="button"
               data-testid="admin-pyq-import-run"
               onClick={handleImport}
-              disabled={!csvInput.trim()}
+              disabled={!csvInput.trim() || isSyncing}
               className="inline-flex h-10 items-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             >
-              <Database className="h-4 w-4" /> Validate and stage
+              <Database className="h-4 w-4" /> {isSyncing ? "Syncing..." : "Validate and stage"}
             </button>
             <button
               type="button"
@@ -351,6 +553,74 @@ export function UpscPyqImportCommand() {
         </div>
       </section>
     </div>
+  );
+}
+
+function PersistencePanel({
+  persistence,
+  isSyncing,
+  onRefresh,
+}: {
+  persistence: PyqPersistenceState;
+  isSyncing: boolean;
+  onRefresh: () => void;
+}) {
+  const isSupabase = persistence.mode === "supabase";
+  const isLocalOnly = persistence.mode === "local-only";
+  const Icon = isSupabase ? Server : isLocalOnly ? CloudOff : RefreshCw;
+  const title = isSupabase
+    ? "Supabase persistence active"
+    : isLocalOnly
+      ? "Local staging active"
+      : persistence.mode === "checking"
+        ? "Checking persistence"
+        : "Persistence needs attention";
+
+  return (
+    <section
+      data-testid="admin-pyq-import-persistence"
+      data-sync-mode={persistence.mode}
+      className={`rounded-lg border p-5 shadow-sm ${
+        isSupabase
+          ? "border-emerald-200 bg-emerald-50"
+          : isLocalOnly
+            ? "border-amber-200 bg-amber-50"
+            : "border-zinc-200 bg-white"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${
+              isSupabase
+                ? "border-emerald-300 bg-white text-emerald-800"
+                : isLocalOnly
+                  ? "border-amber-300 bg-white text-amber-800"
+                  : "border-zinc-200 bg-zinc-50 text-zinc-700"
+            }`}
+          >
+            <Icon className={`h-5 w-5 ${isSyncing || persistence.mode === "checking" ? "animate-spin" : ""}`} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-black text-zinc-950">{title}</h2>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-zinc-600">{persistence.message}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+              <span>{persistence.savedCount} exact rows visible</span>
+              {persistence.table ? <span>{persistence.table}</span> : null}
+              {persistence.checkedAt ? <span>checked {new Date(persistence.checkedAt).toLocaleTimeString()}</span> : null}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-xs font-black text-zinc-900 transition hover:bg-zinc-50"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh sync
+        </button>
+      </div>
+    </section>
   );
 }
 

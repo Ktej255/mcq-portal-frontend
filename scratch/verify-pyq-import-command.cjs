@@ -54,6 +54,11 @@ async function run() {
   await page.getByText("Operator-only exact PYQ staging", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("admin-pyq-seed-pack").waitFor({ timeout: 15000 });
   await page.getByText("Built-in PYQ pattern seed pack", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("admin-pyq-import-persistence").waitFor({ timeout: 15000 });
+  await page.waitForFunction(() => {
+    const mode = document.querySelector('[data-testid="admin-pyq-import-persistence"]')?.getAttribute("data-sync-mode");
+    return mode && mode !== "checking";
+  }, null, { timeout: 15000 }).catch(() => {});
   await page.getByRole("link", { name: /PYQ Import/i }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "pyq-import-empty-desktop", checks);
 
@@ -137,6 +142,8 @@ async function run() {
       optionalCount: records.filter((record) => record.kind === "OPTIONAL_MAINS").length,
       exactCount: records.filter((record) => record.textStatus === "EXACT_VERIFIED").length,
       seedPackText: document.querySelector('[data-testid="admin-pyq-seed-pack"]')?.textContent || "",
+      persistenceMode: document.querySelector('[data-testid="admin-pyq-import-persistence"]')?.getAttribute("data-sync-mode") || "",
+      persistenceText: document.querySelector('[data-testid="admin-pyq-import-persistence"]')?.textContent || "",
       geographyCoverageText: geographyRow?.textContent || "",
       recentText: document.querySelector('[data-testid="admin-pyq-recent-records"]')?.textContent || "",
       summaryText: document.querySelector('[data-testid="admin-pyq-import-summary"]')?.textContent || "",
@@ -158,6 +165,12 @@ async function run() {
     !importState.seedPackText.includes("not exact question text")
   ) {
     throw new Error(`Seed pack evidence missing: ${importState.seedPackText}`);
+  }
+  if (
+    !["supabase", "local-only", "unavailable"].includes(importState.persistenceMode) ||
+    !importState.persistenceText.includes("exact rows visible")
+  ) {
+    throw new Error(`Persistence evidence missing: ${JSON.stringify(importState)}`);
   }
   if (
     !importState.geographyCoverageText.includes("Geography") ||
