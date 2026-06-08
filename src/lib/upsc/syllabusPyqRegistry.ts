@@ -74,6 +74,28 @@ export type SubjectSystematicPath = {
   revisionRule: string;
 };
 
+export type SubjectDailyLoopStageId = "recall" | "learn" | "discuss" | "practice" | "repair-report";
+
+export type SubjectDailyLoopStage = {
+  id: SubjectDailyLoopStageId;
+  label: string;
+  studentAction: string;
+  evidence: string;
+  unlockRule: string;
+  routeSuffix: "watch" | "talk" | "mcq-readiness" | "revisit" | "track";
+};
+
+export type SubjectDailyLoopContract = {
+  proofRule: string;
+  stageCount: number;
+  targetRecallPercent: number;
+  commandScorePercent: number;
+  beginnerEntry: string;
+  experiencedEntry: string;
+  automaticHandoffRule: string;
+  stages: SubjectDailyLoopStage[];
+};
+
 export type SubjectSourcePack = {
   slug: string;
   title: string;
@@ -83,6 +105,7 @@ export type SubjectSourcePack = {
   pyqRows: PyqImportRow[];
   trendInsights: PyqTrendInsight[];
   systematicPath: SubjectSystematicPath;
+  dailyLoop: SubjectDailyLoopContract;
   readinessScore: number;
 };
 
@@ -667,6 +690,63 @@ function subjectSystematicPath(slug: string): SubjectSystematicPath {
   );
 }
 
+function subjectDailyLoopContract(slug: string): SubjectDailyLoopContract {
+  const isGeography = slug === "geography";
+
+  return {
+    proofRule: "recall-learn-discuss-mcq-repair-report-loop",
+    stageCount: 5,
+    targetRecallPercent: 95,
+    commandScorePercent: 75,
+    beginnerEntry: "Watch opens first so a beginner receives one short topic before diagnosis pressure.",
+    experiencedEntry: "Talk opens first so an experienced learner explains, exposes the gap, and studies only the repair.",
+    automaticHandoffRule:
+      "Daily Mission reads yesterday's recall, MCQ, Question Bank, me-time, revisit, and report evidence before opening the next session.",
+    stages: [
+      {
+        id: "recall",
+        label: "Recall baseline",
+        studentAction: "Student first writes or speaks what they already know before new load begins.",
+        evidence: "Baseline, me-time state, and prior day progress become the starting signal.",
+        unlockRule: "The day can open only as a focused current task; future load stays queued until evidence exists.",
+        routeSuffix: "talk",
+      },
+      {
+        id: "learn",
+        label: isGeography ? "Learn the map/process" : "Learn the topic",
+        studentAction: "Student watches one compact lesson aligned to syllabus, basics, advanced layer, and PYQ demand.",
+        evidence: "Watch completion, content pack status, and source-layer contract are saved.",
+        unlockRule: "Beginner moves from lesson to discussion; experienced learner sees this only for a detected repair gap.",
+        routeSuffix: "watch",
+      },
+      {
+        id: "discuss",
+        label: "AI teacher discussion",
+        studentAction: "Student explains the topic back to the AI teacher and receives one gap or clearance decision.",
+        evidence: "Recall score, missing link, teacher prompt, and learner explanation feed the gap ledger.",
+        unlockRule: "MCQ opens after the recall target is cleared; below-target recall stays in repair.",
+        routeSuffix: "talk",
+      },
+      {
+        id: "practice",
+        label: "Fresh MCQ command",
+        studentAction: "Student solves adaptive Easy, Medium, Hard, or PYQ-style questions matched to level.",
+        evidence: "MCQ outcome, Question Bank solved ledger, weak traps, and command score are saved.",
+        unlockRule: "Command score opens the next topic; weak score sends one specific repair item.",
+        routeSuffix: "mcq-readiness",
+      },
+      {
+        id: "repair-report",
+        label: "Revisit and report",
+        studentAction: "Student clears the weak note, then Reports show gap, revision due, growth, and next session handoff.",
+        evidence: "Revisit note, weekly/monthly report, growth signal, and automatic handoff proof are regenerated.",
+        unlockRule: "Next day is chosen from evidence, not from a static calendar click.",
+        routeSuffix: "revisit",
+      },
+    ],
+  };
+}
+
 function subjectTrendInsights(slug: string): PyqTrendInsight[] {
   const trendWindow = "2015-2025";
   const evidenceLevel: TrendEvidenceLevel = "topic-pattern-model";
@@ -957,6 +1037,7 @@ export const subjectSourcePacks: SubjectSourcePack[] = coreSubjectBlueprints.map
     pyqRows: rows,
     trendInsights: subjectTrendInsights(subject.slug),
     systematicPath: subjectSystematicPath(subject.slug),
+    dailyLoop: subjectDailyLoopContract(subject.slug),
     readinessScore: Math.round((indexedRows / rows.length) * 100),
   };
 });

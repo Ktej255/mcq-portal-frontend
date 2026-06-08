@@ -69,9 +69,18 @@ async function run() {
     const officialAnchors = [...document.querySelectorAll('[data-testid="upsc-official-source-anchors"] a')];
     const optionalCards = [...document.querySelectorAll('[data-testid="upsc-optional-source-pack-link"]')];
     const paperIndexRows = [...document.querySelectorAll('[data-testid="upsc-official-paper-index-row"]')];
+    const loopSummary = document.querySelector('[data-testid="upsc-daily-loop-contract-summary"]');
+    const loopContracts = [...document.querySelectorAll('[data-testid="upsc-subject-loop-contract"]')];
 
     return {
       subjectPackCount: packs.length,
+      loopSummary: {
+        proofRule: loopSummary?.getAttribute("data-proof-rule"),
+        subjectCount: loopSummary?.getAttribute("data-subject-count"),
+        totalLoopStages: loopSummary?.getAttribute("data-total-loop-stages"),
+        averageRecallTarget: loopSummary?.getAttribute("data-average-recall-target"),
+        text: loopSummary?.textContent || "",
+      },
       preloadProof: {
         proofRule: preloadProof?.getAttribute("data-proof-rule"),
         yearWindow: preloadProof?.getAttribute("data-year-window"),
@@ -117,6 +126,20 @@ async function run() {
         trendInsightCount: pack.getAttribute("data-trend-insight-count"),
         readinessScore: pack.getAttribute("data-readiness-score"),
       })),
+      loopContracts: loopContracts.map((contract) => ({
+        slug: contract.getAttribute("data-subject-slug"),
+        proofRule: contract.getAttribute("data-proof-rule"),
+        stageCount: contract.getAttribute("data-stage-count"),
+        targetRecall: contract.getAttribute("data-target-recall"),
+        commandScore: contract.getAttribute("data-command-score"),
+        stageIds: [...contract.querySelectorAll('[data-testid="upsc-subject-loop-stage"]')].map((stage) =>
+          stage.getAttribute("data-stage-id")
+        ),
+        stageHrefs: [...contract.querySelectorAll('[data-testid="upsc-subject-loop-stage"]')].map((stage) =>
+          stage.getAttribute("href")
+        ),
+        text: contract.textContent || "",
+      })),
       optionalPackRows: optionalCards.map((card) => ({
         slug: card.getAttribute("data-optional-slug"),
         paperRowCount: card.getAttribute("data-paper-row-count"),
@@ -141,7 +164,7 @@ async function run() {
     sourceIndexedRows: "216",
     textImportPendingRows: "1016",
     officialAnchorCount: "5",
-    trendInsightCount: "13",
+    trendInsightCount: "16",
   };
   const expectedPaperIndexProof = {
     proofRule: "official-paper-index-before-exact-question-import",
@@ -164,8 +187,17 @@ async function run() {
   if (libraryState.optionalCardCount !== 48) {
     throw new Error(`Expected optional source cards, got ${libraryState.optionalCardCount}`);
   }
-  if (libraryState.trendInsightCount !== 13) {
+  if (libraryState.trendInsightCount !== 16) {
     throw new Error(`Expected subject trend insights, got ${libraryState.trendInsightCount}`);
+  }
+  if (
+    libraryState.loopSummary.proofRule !== "source-path-to-daily-loop-bridge" ||
+    libraryState.loopSummary.subjectCount !== "8" ||
+    libraryState.loopSummary.totalLoopStages !== "40" ||
+    libraryState.loopSummary.averageRecallTarget !== "95" ||
+    !libraryState.loopSummary.text.includes("recall, learn, discuss, MCQ, then repair or report")
+  ) {
+    throw new Error(`Daily loop summary failed: ${JSON.stringify(libraryState.loopSummary)}`);
   }
   for (const [key, expected] of Object.entries(expectedPreloadProof)) {
     if (libraryState.preloadProof[key] !== expected) {
@@ -202,6 +234,34 @@ async function run() {
   ) {
     throw new Error(`Subject source-pack row contract failed: ${JSON.stringify(libraryState.subjectPackRows)}`);
   }
+  const expectedStageIds = ["recall", "learn", "discuss", "practice", "repair-report"];
+  if (
+    libraryState.loopContracts.length !== 8 ||
+    libraryState.loopContracts.some(
+      (contract) =>
+        contract.proofRule !== "recall-learn-discuss-mcq-repair-report-loop" ||
+        contract.stageCount !== "5" ||
+        contract.targetRecall !== "95" ||
+        contract.commandScore !== "75" ||
+        JSON.stringify(contract.stageIds) !== JSON.stringify(expectedStageIds) ||
+        !contract.text.includes("Daily Mission reads yesterday's recall") ||
+        !contract.text.includes("Beginner:") ||
+        !contract.text.includes("Experienced:")
+    )
+  ) {
+    throw new Error(`Subject daily loop contract failed: ${JSON.stringify(libraryState.loopContracts)}`);
+  }
+  const geographyLoop = libraryState.loopContracts.find((contract) => contract.slug === "geography");
+  if (
+    !geographyLoop ||
+    !geographyLoop.stageHrefs.includes("/upsc/geography/watch") ||
+    !geographyLoop.stageHrefs.includes("/upsc/geography/talk") ||
+    !geographyLoop.stageHrefs.includes("/upsc/geography/mcq-readiness") ||
+    !geographyLoop.stageHrefs.includes("/upsc/geography/revisit") ||
+    !geographyLoop.text.includes("Learn the map/process")
+  ) {
+    throw new Error(`Geography loop contract failed: ${JSON.stringify(geographyLoop)}`);
+  }
   if (
     libraryState.optionalPackRows.some(
       (pack) => pack.paperRowCount !== "22" || pack.yearCount !== "11" || pack.readinessScore !== "18"
@@ -223,6 +283,12 @@ async function run() {
     "Current affairs:",
     "Gap:",
     "Revision:",
+    "Source path to daily loop",
+    "Daily learner loop",
+    "Recall baseline",
+    "AI teacher discussion",
+    "Fresh MCQ command",
+    "Revisit and report",
     "Official paper index",
     "Exact text rows",
     "Use trend signals to choose watch areas",

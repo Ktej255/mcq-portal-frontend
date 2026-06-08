@@ -57,6 +57,11 @@ export function UpscSyllabusPyqLibrary() {
     .slice(0, 6);
   const studentReadyRows = sourceReadinessMatrix.filter((row) => row.studentReady).length;
   const importPendingRows = sourceReadinessMatrix.filter((row) => row.status === "import-pending").length;
+  const totalLoopStages = subjectSourcePacks.reduce((sum, subject) => sum + subject.dailyLoop.stageCount, 0);
+  const averageRecallTarget = Math.round(
+    subjectSourcePacks.reduce((sum, subject) => sum + subject.dailyLoop.targetRecallPercent, 0) /
+      subjectSourcePacks.length
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -185,6 +190,35 @@ export function UpscSyllabusPyqLibrary() {
         </section>
 
         <section
+          data-testid="upsc-daily-loop-contract-summary"
+          data-proof-rule="source-path-to-daily-loop-bridge"
+          data-subject-count={subjectSourcePacks.length}
+          data-total-loop-stages={totalLoopStages}
+          data-average-recall-target={averageRecallTarget}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                Source path to daily loop
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                Every source pack now declares the learner flow.
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                Syllabus, PYQ trend, current affairs, gap analysis, revision, and reports are connected through one
+                simple sequence: recall, learn, discuss, MCQ, then repair or report.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <AuditMetric label="Subjects" value={subjectSourcePacks.length} />
+              <AuditMetric label="Loop stages" value={totalLoopStages} />
+              <AuditMetric label="Recall target" value={`${averageRecallTarget}%`} />
+            </div>
+          </div>
+        </section>
+
+        <section
           data-testid="upsc-official-paper-index-proof"
           data-proof-rule={officialPaperIndexSummary.proofRule}
           data-year-window={officialPaperIndexSummary.yearWindow}
@@ -305,6 +339,55 @@ export function UpscSyllabusPyqLibrary() {
                     <PathRow label="Current affairs" value={subject.systematicPath.currentAffairsRule} />
                     <PathRow label="Gap" value={subject.systematicPath.gapRule} />
                     <PathRow label="Revision" value={subject.systematicPath.revisionRule} />
+                  </div>
+                </div>
+                <div
+                  className="mt-3 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                  data-testid="upsc-subject-loop-contract"
+                  data-subject-slug={subject.slug}
+                  data-proof-rule={subject.dailyLoop.proofRule}
+                  data-stage-count={subject.dailyLoop.stageCount}
+                  data-target-recall={subject.dailyLoop.targetRecallPercent}
+                  data-command-score={subject.dailyLoop.commandScorePercent}
+                >
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                        Daily learner loop
+                      </p>
+                      <h3 className="mt-1 text-base font-black tracking-tight">
+                        Recall to report handoff
+                      </h3>
+                    </div>
+                    <span className="rounded-md border border-[#b9d9cd] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">
+                      {subject.dailyLoop.targetRecallPercent}% recall
+                    </span>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-5">
+                    {subject.dailyLoop.stages.map((stage, index) => (
+                      <Link
+                        key={stage.id}
+                        href={`${subject.route}/${stage.routeSuffix}`}
+                        data-testid="upsc-subject-loop-stage"
+                        data-stage-id={stage.id}
+                        data-stage-index={index + 1}
+                        className="rounded-md border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
+                      >
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                          {String(index + 1).padStart(2, "0")} / {stage.label}
+                        </p>
+                        <p className="mt-2 text-xs font-semibold leading-5 text-[#31443a]">{stage.studentAction}</p>
+                        <p className="mt-2 rounded-md bg-[#e7f5ee] p-2 text-[11px] font-bold leading-4 text-[#085041]">
+                          Evidence: {stage.evidence}
+                        </p>
+                        <p className="mt-2 text-[11px] font-bold leading-4 text-[#6f4a12]">{stage.unlockRule}</p>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-[#31443a] md:grid-cols-3">
+                    <p className="rounded-md bg-white p-2">Beginner: {subject.dailyLoop.beginnerEntry}</p>
+                    <p className="rounded-md bg-white p-2">Experienced: {subject.dailyLoop.experiencedEntry}</p>
+                    <p className="rounded-md bg-white p-2">Handoff: {subject.dailyLoop.automaticHandoffRule}</p>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-2" data-testid="upsc-pyq-trend-board">
