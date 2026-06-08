@@ -1,3 +1,4 @@
+import type { QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
@@ -6,6 +7,11 @@ export type DailyPlannerProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
   meTimeMood?: SubjectMeTimeMood;
 };
+
+export type DailyPlannerQuestionBankAttempt = Pick<
+  QuestionBankAttempt,
+  "subjectSlug" | "linkedDay" | "difficulty" | "isCorrect" | "solvedAt"
+>;
 
 export type DailyPlannerDecision = {
   teacherDoubt: {
@@ -95,37 +101,65 @@ type PlannerInput = {
   selectedDay: number;
   progress: Record<string, DailyPlannerProgress | undefined>;
   profile?: StudentProfile | null;
+  questionBankAttempts?: DailyPlannerQuestionBankAttempt[];
 };
 
 const recallTarget = 95;
 const mcqCommandTarget = 75;
 
-function hasStarted(progress?: DailyPlannerProgress) {
+function attemptsForDay(input: Pick<PlannerInput, "questionBankAttempts">, day: number) {
+  return (input.questionBankAttempts ?? []).filter((attempt) => attempt.linkedDay === day);
+}
+
+function questionBankPracticeSignal(attempts: DailyPlannerQuestionBankAttempt[] = []) {
+  const correct = attempts.filter((attempt) => attempt.isCorrect).length;
+  const accuracy = attempts.length ? Math.round((correct / attempts.length) * 100) : null;
+
+  return {
+    count: attempts.length,
+    correct,
+    accuracy,
+    hasEvidence: attempts.length > 0,
+    hasIncorrect: attempts.some((attempt) => !attempt.isCorrect),
+    isCommand: attempts.length > 0 && attempts.every((attempt) => attempt.isCorrect),
+  };
+}
+
+function questionBankPracticeLabel(attempts: DailyPlannerQuestionBankAttempt[] = []) {
+  const signal = questionBankPracticeSignal(attempts);
+  if (!signal.hasEvidence) return null;
+  return `Question Bank ${signal.count} solved${signal.accuracy === null ? "" : ` / ${signal.accuracy}%`}`;
+}
+
+function hasStarted(progress?: DailyPlannerProgress, questionBankAttempts: DailyPlannerQuestionBankAttempt[] = []) {
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
       progress?.baselineSavedAt ||
       typeof progress?.talkScore === "number" ||
       progress?.labCompleted ||
-      progress?.mcqAttempted
+      progress?.mcqAttempted ||
+      questionBankAttempts.length
   );
 }
 
-function needsRecovery(progress?: DailyPlannerProgress) {
+function needsRecovery(progress?: DailyPlannerProgress, questionBankAttempts: DailyPlannerQuestionBankAttempt[] = []) {
   return Boolean(
     progress?.revisitQueued ||
       progress?.talkBand === "Revisit" ||
       progress?.mcqOutcome === "Revisit" ||
-      progress?.confidence === "Shaky"
+      progress?.confidence === "Shaky" ||
+      questionBankPracticeSignal(questionBankAttempts).hasIncorrect
   );
 }
 
-function hasCommand(progress?: DailyPlannerProgress) {
+function hasCommand(progress?: DailyPlannerProgress, questionBankAttempts: DailyPlannerQuestionBankAttempt[] = []) {
   return Boolean(
-    !needsRecovery(progress) &&
+    !needsRecovery(progress, questionBankAttempts) &&
       (progress?.confidence === "Command" ||
         progress?.mcqOutcome === "Command" ||
-        (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= mcqCommandTarget))
+        (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= mcqCommandTarget) ||
+        questionBankPracticeSignal(questionBankAttempts).isCommand)
   );
 }
 
@@ -181,16 +215,17 @@ function findRevisionDue(input: PlannerInput) {
   return input.sessions
     .map((source) => {
       const sourceProgress = input.progress[String(source.day)];
+      const sourceAttempts = attemptsForDay(input, source.day);
       const dueDay = Math.min(source.day + 2, input.sessions.length);
       const due = findSession(input.sessions, dueDay);
-      if (!sourceProgress || !hasStarted(sourceProgress) || hasCommand(sourceProgress)) return null;
-      if (dueDay > input.selectedDay && !needsRecovery(sourceProgress)) return null;
-      return { source, due, progress: sourceProgress, dueDay };
+      if (!hasStarted(sourceProgress, sourceAttempts) || hasCommand(sourceProgress, sourceAttempts)) return null;
+      if (dueDay > input.selectedDay && !needsRecovery(sourceProgress, sourceAttempts)) return null;
+      return { source, due, progress: sourceProgress, attempts: sourceAttempts, dueDay };
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .sort((left, right) => {
-      const leftUrgent = needsRecovery(left.progress) ? 0 : 1;
-      const rightUrgent = needsRecovery(right.progress) ? 0 : 1;
+      const leftUrgent = needsRecovery(left.progress, left.attempts) ? 0 : 1;
+      const rightUrgent = needsRecovery(right.progress, right.attempts) ? 0 : 1;
       return leftUrgent - rightUrgent || left.source.day - right.source.day;
     })[0];
 }
@@ -269,17 +304,29 @@ function buildGap(
 
   const active = input.progress[String(input.selectedDay)];
   const previous = input.progress[String(input.selectedDay - 1)];
-  const activeHasUnfinishedEvidence = Boolean(active && hasStarted(active) && !hasCommand(active));
+  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const previousAttempts = attemptsForDay(input, input.selectedDay - 1);
+  const activeHasUnfinishedEvidence = hasStarted(active, activeAttempts) && !hasCommand(active, activeAttempts);
   const reference = revisionDue?.progress ?? (activeHasUnfinishedEvidence ? active : previous ?? active);
+  const referenceAttempts =
+    revisionDue?.attempts ?? (activeHasUnfinishedEvidence ? activeAttempts : previous ? previousAttempts : activeAttempts);
   const weakSkill = weakSkillLabel(reference);
 
-  if (needsRecovery(reference)) {
+  if (needsRecovery(reference, referenceAttempts)) {
     const score =
       typeof reference?.talkScore === "number"
         ? `${reference.talkScore}/100 recall`
         : typeof reference?.mcqScorePercent === "number"
           ? `${reference.mcqScorePercent}% MCQ`
-        : "Recovery active";
+          : questionBankPracticeLabel(referenceAttempts) ?? "Recovery active";
+    if (questionBankPracticeSignal(referenceAttempts).hasIncorrect) {
+      return {
+        title: "Question-bank trap repair",
+        detail: "Solved-question evidence has an incorrect answer, so the next step should repair the trap before advancing.",
+        scoreLabel: score,
+        tone: "repair",
+      };
+    }
     return {
       title: weakSkill ? `${weakSkill} repair` : `Repair Day ${revisionDue?.source.day ?? input.selectedDay} before moving ahead`,
       detail: repairDetail(reference),
@@ -329,6 +376,8 @@ function buildTodayTask(
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["todayTask"] {
   const active = input.progress[String(input.selectedDay)];
+  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const activeQuestionBankSignal = questionBankPracticeSignal(activeAttempts);
 
   if (teacherDoubt) {
     return {
@@ -339,7 +388,7 @@ function buildTodayTask(
     };
   }
 
-  if (revisionDue && needsRecovery(revisionDue.progress)) {
+  if (revisionDue && needsRecovery(revisionDue.progress, revisionDue.attempts)) {
     return {
       title: `Repair Day ${revisionDue.source.day}`,
       detail: revisionDue.source.title,
@@ -366,21 +415,23 @@ function buildTodayTask(
     };
   }
 
-  if (!active.mcqCompleted || active.mcqOutcome === "Pending") {
+  if (activeQuestionBankSignal.hasIncorrect || active?.mcqOutcome === "Revisit") {
+    return {
+      title: `Recover Day ${input.selectedDay}`,
+      detail: activeQuestionBankSignal.hasIncorrect
+        ? "Question Bank has an incorrect trap that needs a repair loop."
+        : "Practice result needs a repair loop.",
+      href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
+      actionLabel: "Repair",
+    };
+  }
+
+  if ((!active?.mcqCompleted || active.mcqOutcome === "Pending") && !activeQuestionBankSignal.hasEvidence) {
     return {
       title: `MCQ Day ${input.selectedDay}`,
       detail: "Clear the fresh practice batch before the next topic.",
       href: routeFor(input.subjectSlug, "mcq-readiness", input.selectedDay),
       actionLabel: "Open MCQs",
-    };
-  }
-
-  if (active.mcqOutcome === "Revisit") {
-    return {
-      title: `Recover Day ${input.selectedDay}`,
-      detail: "Practice result needs a repair loop.",
-      href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
-      actionLabel: "Repair",
     };
   }
 
@@ -394,8 +445,12 @@ function buildTodayTask(
 
 function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
   const states = input.sessions.map((session) => input.progress[String(session.day)]);
-  const startedCount = states.filter(hasStarted).length;
-  const commandCount = states.filter(hasCommand).length;
+  const startedCount = input.sessions.filter((session) =>
+    hasStarted(input.progress[String(session.day)], attemptsForDay(input, session.day))
+  ).length;
+  const commandCount = input.sessions.filter((session) =>
+    hasCommand(input.progress[String(session.day)], attemptsForDay(input, session.day))
+  ).length;
   const recallScores = states
     .map((item) => item?.talkScore)
     .filter((score): score is number => typeof score === "number");
@@ -405,7 +460,9 @@ function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
   const recentWindow = input.sessions.slice(Math.max(0, input.selectedDay - 7), input.selectedDay);
-  const recentStarted = recentWindow.filter((session) => hasStarted(input.progress[String(session.day)])).length;
+  const recentStarted = recentWindow.filter((session) =>
+    hasStarted(input.progress[String(session.day)], attemptsForDay(input, session.day))
+  ).length;
   const consistency = recentWindow.length ? Math.round((recentStarted / recentWindow.length) * 100) : 0;
   const latestMeTime = states
     .filter((item) => item?.meTimeCompletedAt || item?.meTimeMood)
@@ -443,11 +500,17 @@ function buildSessionReadiness(
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["sessionReadiness"] {
   const active = input.progress[String(input.selectedDay)];
+  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const questionBankSignal = questionBankPracticeSignal(activeAttempts);
+  const questionBankLabel = questionBankPracticeLabel(activeAttempts);
   const meTimeReady = Boolean(active?.meTimeCompletedAt);
   const recallReady = hasRecallBaseline(active);
   const watchReady = Boolean(active?.watched);
   const talkReady = typeof active?.talkScore === "number" && active.talkScore >= recallTarget;
-  const mcqReady = Boolean(active?.mcqCompleted && active.mcqOutcome !== "Pending");
+  const mcqReady = Boolean(
+    (active?.mcqCompleted && active.mcqOutcome !== "Pending") ||
+      (questionBankSignal.hasEvidence && !questionBankSignal.hasIncorrect)
+  );
   const checklist: DailyPlannerDecision["sessionReadiness"]["checklist"] = [
     {
       label: "Mind-state",
@@ -471,8 +534,12 @@ function buildSessionReadiness(
     },
     {
       label: "Practice evidence",
-      detail: mcqReady ? `${active?.mcqScorePercent ?? 0}% MCQ evidence saved.` : "Fresh MCQ evidence is still pending.",
-      status: mcqReady ? "done" : active?.mcqOutcome === "Revisit" ? "repair" : "pending",
+      detail: mcqReady
+        ? questionBankLabel ?? `${active?.mcqScorePercent ?? 0}% MCQ evidence saved.`
+        : questionBankSignal.hasIncorrect
+          ? `${questionBankLabel}: repair incorrect trap.`
+          : "Fresh MCQ evidence is still pending.",
+      status: mcqReady ? "done" : active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect ? "repair" : "pending",
     },
   ];
   const scorePercent = Math.round(
@@ -492,10 +559,12 @@ function buildSessionReadiness(
     };
   }
 
-  if (needsRecovery(active)) {
+  if (needsRecovery(active, activeAttempts)) {
     return {
       title: `Recovery is active for Day ${input.selectedDay}`,
-      detail: "The next session should stay inside revisit until the weak signal is resolved.",
+      detail: questionBankSignal.hasIncorrect
+        ? "The solved-question ledger has an incorrect trap, so the next session should stay inside revisit."
+        : "The next session should stay inside revisit until the weak signal is resolved.",
       href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
       actionLabel: "Open revisit",
       statusLabel: "Recovery lock",
@@ -587,6 +656,8 @@ function buildTomorrowAdjustment(
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["tomorrowAdjustment"] {
   const active = input.progress[String(input.selectedDay)];
+  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const questionBankSignal = questionBankPracticeSignal(activeAttempts);
   const currentSession = findSession(input.sessions, input.selectedDay);
   const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
   const nextSession = findSession(input.sessions, nextDay);
@@ -600,16 +671,18 @@ function buildTomorrowAdjustment(
     };
   }
 
-  if (needsRecovery(active)) {
+  if (needsRecovery(active, activeAttempts)) {
     return {
       title: `Repeat Day ${currentSession.day} before moving ahead`,
-      detail: `${currentSession.title} stays active because the latest evidence is still in recovery.`,
+      detail: questionBankSignal.hasIncorrect
+        ? `${currentSession.title} stays active because the Question Bank ledger has an incorrect trap.`
+        : `${currentSession.title} stays active because the latest evidence is still in recovery.`,
       href: routeFor(input.subjectSlug, "revisit", currentSession.day),
       statusLabel: "Recovery lock",
     };
   }
 
-  if (!active || !hasStarted(active) || !active.watched) {
+  if (!active || !hasStarted(active, activeAttempts) || !active.watched) {
     return {
       title: `Keep Day ${currentSession.day} as the next start`,
       detail: "No completed class evidence is saved yet, so tomorrow should not jump to a new topic.",
@@ -627,7 +700,7 @@ function buildTomorrowAdjustment(
     };
   }
 
-  if (!active.mcqCompleted || active.mcqOutcome === "Pending") {
+  if ((!active.mcqCompleted || active.mcqOutcome === "Pending") && !questionBankSignal.hasEvidence) {
     return {
       title: `Attach Day ${currentSession.day} MCQs`,
       detail: "Class and recall evidence exist, but practice evidence is still missing.",
@@ -636,10 +709,12 @@ function buildTomorrowAdjustment(
     };
   }
 
-  if (active.mcqOutcome === "Revisit") {
+  if (active.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect) {
     return {
       title: `Repair Day ${currentSession.day} MCQ traps`,
-      detail: "Practice result needs a short recovery loop before the next topic can safely open.",
+      detail: questionBankSignal.hasIncorrect
+        ? "Question Bank result needs a short recovery loop before the next topic can safely open."
+        : "Practice result needs a short recovery loop before the next topic can safely open.",
       href: routeFor(input.subjectSlug, "revisit", currentSession.day),
       statusLabel: "MCQ repair",
     };
@@ -668,11 +743,16 @@ function buildNextSessionProof(
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["nextSessionProof"] {
   const active = input.progress[String(input.selectedDay)];
+  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const questionBankSignal = questionBankPracticeSignal(activeAttempts);
+  const questionBankLabel = questionBankPracticeLabel(activeAttempts);
   const currentSession = findSession(input.sessions, input.selectedDay);
   const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
   const targetDay = tomorrowAdjustment.statusLabel === "Advance" ? nextDay : currentSession.day;
   const recentWindow = input.sessions.slice(Math.max(0, input.selectedDay - 7), input.selectedDay);
-  const recentStarted = recentWindow.filter((session) => hasStarted(input.progress[String(session.day)])).length;
+  const recentStarted = recentWindow.filter((session) =>
+    hasStarted(input.progress[String(session.day)], attemptsForDay(input, session.day))
+  ).length;
   const consistency = recentWindow.length ? Math.round((recentStarted / recentWindow.length) * 100) : 0;
   const recallValue =
     typeof active?.talkScore === "number"
@@ -681,15 +761,17 @@ function buildNextSessionProof(
         ? "Recall note saved"
         : "Recall baseline missing";
   const recallStatus =
-    teacherDoubt || needsRecovery(active) || (typeof active?.talkScore === "number" && active.talkScore < recallTarget)
+    teacherDoubt ||
+    needsRecovery(active, activeAttempts) ||
+    (typeof active?.talkScore === "number" && active.talkScore < recallTarget)
       ? "blocked"
       : active?.reflection?.trim() || typeof active?.talkScore === "number"
         ? "used"
         : "missing";
   const practiceStatus =
-    active?.mcqOutcome === "Revisit"
+    active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect
       ? "blocked"
-      : active?.mcqCompleted && active.mcqOutcome !== "Pending"
+      : (active?.mcqCompleted && active.mcqOutcome !== "Pending") || questionBankSignal.hasEvidence
         ? "used"
         : "missing";
   const evidence: DailyPlannerDecision["nextSessionProof"]["evidence"] = [
@@ -710,7 +792,9 @@ function buildNextSessionProof(
     },
     {
       label: "Practice",
-      value: active?.mcqCompleted
+      value: questionBankLabel
+        ? questionBankLabel
+        : active?.mcqCompleted
         ? `${active.mcqOutcome ?? "Completed"}${typeof active.mcqScorePercent === "number" ? ` ${active.mcqScorePercent}%` : ""}`
         : "MCQ evidence missing",
       status: practiceStatus,
@@ -761,6 +845,9 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
   const sourceDay = input.selectedDay - 1;
   const sourceSession = findSession(input.sessions, sourceDay);
   const progress = input.progress[String(sourceDay)];
+  const sourceAttempts = attemptsForDay(input, sourceDay);
+  const questionBankSignal = questionBankPracticeSignal(sourceAttempts);
+  const questionBankLabel = questionBankPracticeLabel(sourceAttempts);
   const sourceDoubt =
     progress && hasTeacherDoubt(progress)
       ? {
@@ -775,11 +862,13 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
               : routeFor(input.subjectSlug, "talk", sourceDay)),
         }
       : null;
-  const commandReady = hasCommand(progress);
+  const commandReady = hasCommand(progress, sourceAttempts);
   const recallStatus =
     commandReady
       ? "used"
-      : sourceDoubt || needsRecovery(progress) || (typeof progress?.talkScore === "number" && progress.talkScore < recallTarget)
+      : sourceDoubt ||
+          needsRecovery(progress, sourceAttempts) ||
+          (typeof progress?.talkScore === "number" && progress.talkScore < recallTarget)
       ? "blocked"
       : hasRecallBaseline(progress)
         ? "used"
@@ -788,9 +877,9 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
   const practiceStatus =
     commandReady
       ? "used"
-      : progress?.mcqOutcome === "Revisit"
+      : progress?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect
       ? "blocked"
-      : progress?.mcqCompleted && progress.mcqOutcome !== "Pending"
+      : (progress?.mcqCompleted && progress.mcqOutcome !== "Pending") || questionBankSignal.hasEvidence
         ? "used"
         : "missing";
   const evidence: DailyPlannerDecision["todayOriginProof"]["evidence"] = [
@@ -823,14 +912,16 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
     },
     {
       label: "Practice",
-      value: progress?.mcqCompleted
+      value: questionBankLabel
+        ? questionBankLabel
+        : progress?.mcqCompleted
         ? `${progress.mcqOutcome ?? "Completed"}${typeof progress.mcqScorePercent === "number" ? ` ${progress.mcqScorePercent}%` : ""}`
         : "MCQ evidence missing",
       status: practiceStatus,
     },
   ];
 
-  if (!progress || !hasStarted(progress)) {
+  if (!hasStarted(progress, sourceAttempts)) {
     return {
       sourceDay,
       targetDay: input.selectedDay,
@@ -856,12 +947,14 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
     };
   }
 
-  if (needsRecovery(progress)) {
+  if (needsRecovery(progress, sourceAttempts)) {
     return {
       sourceDay,
       targetDay: sourceDay,
       title: `Day ${sourceDay} needs repair first`,
-      detail: repairDetail(progress),
+      detail: questionBankSignal.hasIncorrect
+        ? "Question Bank practice has an incorrect trap that needs repair first."
+        : repairDetail(progress),
       href: routeFor(input.subjectSlug, "revisit", sourceDay),
       statusLabel: "Yesterday repair",
       evidenceSummary: "Yesterday has a recovery signal, so today's plan should repair before advancing.",
@@ -869,7 +962,7 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
     };
   }
 
-  if (hasCommand(progress)) {
+  if (hasCommand(progress, sourceAttempts)) {
     return {
       sourceDay,
       targetDay: input.selectedDay,
@@ -877,12 +970,14 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
       detail: `${sourceSession.title} has enough command evidence to justify today's next topic.`,
       href: routeFor(input.subjectSlug, "watch", input.selectedDay),
       statusLabel: "Auto advance",
-      evidenceSummary: "Yesterday's command evidence is strong enough for the next subject day.",
+      evidenceSummary: questionBankLabel
+        ? `${questionBankLabel} helped clear yesterday, so the next subject day can open.`
+        : "Yesterday's command evidence is strong enough for the next subject day.",
       evidence,
     };
   }
 
-  if (!hasRecallBaseline(progress) || (typeof progress.talkScore === "number" && progress.talkScore < recallTarget)) {
+  if (!hasRecallBaseline(progress) || (typeof progress?.talkScore === "number" && progress.talkScore < recallTarget)) {
     return {
       sourceDay,
       targetDay: sourceDay,
@@ -895,7 +990,7 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
     };
   }
 
-  if (!progress.mcqCompleted || progress.mcqOutcome === "Pending") {
+  if ((!progress?.mcqCompleted || progress.mcqOutcome === "Pending") && !questionBankSignal.hasEvidence) {
     return {
       sourceDay,
       targetDay: sourceDay,
@@ -935,8 +1030,12 @@ export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDeci
           title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Revise Day ${revisionDue.source.day}`,
           detail: teacherDoubt ? teacherDoubt.masteryCheck : `${revisionDue.source.title} is due before ${revisionDue.due.title}.`,
           href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
-          dueLabel: teacherDoubt ? "AI gap" : needsRecovery(revisionDue.progress) ? "Due now" : `Day ${revisionDue.dueDay}`,
-          urgent: Boolean(teacherDoubt) || needsRecovery(revisionDue.progress),
+          dueLabel: teacherDoubt
+            ? "AI gap"
+            : needsRecovery(revisionDue.progress, revisionDue.attempts)
+              ? "Due now"
+              : `Day ${revisionDue.dueDay}`,
+          urgent: Boolean(teacherDoubt) || needsRecovery(revisionDue.progress, revisionDue.attempts),
         }
       : {
           title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Next revision Day ${fallbackRevision.day}`,

@@ -97,7 +97,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Student dashboard",
         status: "verified",
-        behavior: "Exactly four visible decisions: Today, Gaps, Revise, and Progress. Today advances from the first incomplete MCQ-command topic. The 60-second start check now saves the learner state plus a reset plan, and the main action exposes check-pending or ready session status. The folded planning drawer is read-only: its Learn, Discuss, and MCQ cards are orientation only, and its time-aware syllabus queue uses Current and Queued labels without skip-ahead links.",
+        behavior: "Exactly four visible decisions: Today, Gaps, Revise, and Progress. Today advances from the first incomplete MCQ-command topic or solved Question Bank practice evidence. The 60-second start check now saves the learner state plus a reset plan, and the main action exposes check-pending or ready session status. The folded planning drawer is read-only: its Learn, Discuss, and MCQ cards are orientation only, and its time-aware syllabus queue uses Current and Queued labels without skip-ahead links.",
         evidence: "verify-student-signal-pages.cjs and verify-generated-daily-path.cjs",
       },
       {
@@ -554,7 +554,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
     requirement: "Daily plan should adapt from yesterday's learner evidence instead of staying static.",
     status: "ready-local",
     currentState:
-      "Daily Mission reads local progress, me-time, recall baseline, MCQ, revisit, and command evidence to choose the next action.",
+      "Daily Mission reads local progress, me-time, recall baseline, MCQ, Question Bank solved ledger, revisit, and command evidence to choose the next action.",
     evidence: "daily-command-e2e.cjs and verify-student-dashboard.cjs",
     nextAction: "Prove same-account recovery through live Supabase after migration.",
     phase: "Day 1",

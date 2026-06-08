@@ -29,6 +29,7 @@ import {
 } from "@/lib/upsc/dailyPlannerEngine";
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
 import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
+import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
@@ -256,6 +257,10 @@ export function UpscDailyMissionControl() {
   const basePath = `/upsc/${activeSubject.slug}`;
   const activeBatchCode = batchCode(activeSubject, activeSession);
   const activeMcqCommand = isUpscMcqCommandCleared(activeProgress, activeBatchCode);
+  const activeQuestionBankAttempts = isLoaded ? readLocalQuestionBankAttempts(activeSubject.slug) : [];
+  const activeDayQuestionBankAttempts = activeQuestionBankAttempts.filter(
+    (attempt) => attempt.linkedDay === activeSession.day
+  );
 
   const totals = useMemo(() => {
     if (!isLoaded) {
@@ -307,8 +312,9 @@ export function UpscDailyMissionControl() {
         selectedDay: activeSession.day,
         progress: activeProgressMap,
         profile: studentProfile,
+        questionBankAttempts: activeQuestionBankAttempts,
       }),
-    [activeProgressMap, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
+    [activeProgressMap, activeQuestionBankAttempts, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
   );
   const activeMeTimeOption = activeProgress?.meTimeMood
     ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
@@ -422,6 +428,7 @@ export function UpscDailyMissionControl() {
           data-yesterday-decision={dailyPlanner.todayOriginProof.statusLabel}
           data-yesterday-source-day={dailyPlanner.todayOriginProof.sourceDay}
           data-yesterday-target-day={dailyPlanner.todayOriginProof.targetDay}
+          data-question-bank-attempts={activeDayQuestionBankAttempts.length}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
         >
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">

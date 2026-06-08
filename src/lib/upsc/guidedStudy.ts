@@ -1,6 +1,7 @@
 import type { StudentLevel } from "@/lib/upsc/studentProfile";
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
 import { geographySessions } from "@/lib/upsc/plan";
+import type { QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 
 export const GEOGRAPHY_RECALL_TARGET = 95;
 
@@ -13,10 +14,16 @@ export type GuidedStudyStep = {
 type GuidedPathProgress = Record<
   string,
   {
+    watched?: boolean;
+    reflection?: string;
+    talkScore?: number;
+    confidence?: string;
     mcqOutcome?: string;
     mcqCompleted?: boolean;
   }
 >;
+
+type GuidedPathQuestionBankAttempt = Pick<QuestionBankAttempt, "linkedDay" | "isCorrect">;
 
 export type GuidedDailyTopic = {
   day: number;
@@ -32,17 +39,41 @@ function topicCountForStudyWindow(studyWindow: StudentProfile["studyWindow"]) {
   return 1;
 }
 
-export function getCurrentGeographyTopic(progress: GuidedPathProgress) {
+function attemptsForDay(attempts: GuidedPathQuestionBankAttempt[], day: number) {
+  return attempts.filter((attempt) => attempt.linkedDay === day);
+}
+
+function isDayClearedByQuestionBank(
+  progress: GuidedPathProgress[string] | undefined,
+  attempts: GuidedPathQuestionBankAttempt[]
+) {
+  const hasLearningProof = Boolean(
+    progress?.watched &&
+      (progress.reflection?.trim() || (typeof progress.talkScore === "number" && progress.talkScore >= GEOGRAPHY_RECALL_TARGET))
+  );
+  return hasLearningProof && attempts.length > 0 && attempts.every((attempt) => attempt.isCorrect);
+}
+
+export function getCurrentGeographyTopic(
+  progress: GuidedPathProgress,
+  questionBankAttempts: GuidedPathQuestionBankAttempt[] = []
+) {
   return (
     geographySessions.find((session) => {
       const item = progress[String(session.day)];
-      return !(item?.mcqCompleted && item.mcqOutcome === "Command");
+      const commandMcq = Boolean(item?.mcqCompleted && item.mcqOutcome === "Command");
+      const commandQuestionBank = isDayClearedByQuestionBank(item, attemptsForDay(questionBankAttempts, session.day));
+      return !(commandMcq || commandQuestionBank);
     }) ?? geographySessions[geographySessions.length - 1]
   );
 }
 
-export function buildGeographyDailyPath(profile: StudentProfile, progress: GuidedPathProgress): GuidedDailyTopic[] {
-  const currentTopic = getCurrentGeographyTopic(progress);
+export function buildGeographyDailyPath(
+  profile: StudentProfile,
+  progress: GuidedPathProgress,
+  questionBankAttempts: GuidedPathQuestionBankAttempt[] = []
+): GuidedDailyTopic[] {
+  const currentTopic = getCurrentGeographyTopic(progress, questionBankAttempts);
   const topicCount = topicCountForStudyWindow(profile.studyWindow);
 
   return geographySessions

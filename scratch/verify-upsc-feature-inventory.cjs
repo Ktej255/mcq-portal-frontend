@@ -85,6 +85,7 @@ async function run() {
   await masterPage.getByText("custom mixed sets across Easy, Medium, Hard, and PYQ-style questions", { exact: false }).waitFor();
   await masterPage.getByText("solved attempts feed the covered-topic current-affairs gate", { exact: false }).waitFor();
   await masterPage.getByText("60-second start check now saves the learner state plus a reset plan", { exact: false }).waitFor();
+  await masterPage.getByText("solved Question Bank practice evidence", { exact: false }).waitFor();
   await masterPage.getByText("Real Geography Day 1 pack", { exact: true }).first().waitFor();
   await masterPage.getByTestId("admin-corpus-summary").getByText("24,131", { exact: true }).waitFor();
   await masterPage.getByTestId("admin-corpus-summary").getByText("Verified public claims", { exact: true }).waitFor();

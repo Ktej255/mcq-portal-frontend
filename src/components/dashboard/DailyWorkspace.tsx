@@ -18,6 +18,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
+import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
 import {
   buildGeographyDailyPath,
   getCurrentGeographyTopic,
@@ -168,9 +169,16 @@ export const DailyWorkspace = () => {
   const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
   const [dailyMissionState, setDailyMissionState] = useState<DailyMissionState>({ subjectSlug: "geography", day: 0 });
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
+  const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] = useState<
+    Record<string, ReturnType<typeof readLocalQuestionBankAttempts>>
+  >({});
   const { progress, saveDayProgress } = useGeographyProgress();
-  const today = getCurrentGeographyTopic(progress);
-  const dailyPath = useMemo(() => (profile ? buildGeographyDailyPath(profile, progress) : []), [profile, progress]);
+  const geographyQuestionBankAttempts = questionBankAttemptsBySubject.geography ?? [];
+  const today = getCurrentGeographyTopic(progress, geographyQuestionBankAttempts);
+  const dailyPath = useMemo(
+    () => (profile ? buildGeographyDailyPath(profile, progress, geographyQuestionBankAttempts) : []),
+    [geographyQuestionBankAttempts, profile, progress]
+  );
   const pathSteps = getGuidedStudySteps(profile?.level ?? "beginner");
   const personalPlan = useMemo(() => (profile ? buildStudentPlan(profile) : null), [profile]);
   const activeClassificationProof = profile ? getClassificationProof(profile) : null;
@@ -194,6 +202,10 @@ export const DailyWorkspace = () => {
     activeMissionSubject.slug === "geography" ? progress : progressBySubject[activeMissionSubject.slug] ?? {}
   ) as Record<string, DailyPlannerProgress | undefined>;
   const activeMissionProgress = activeMissionProgressMap[String(activeMissionDay)];
+  const activeMissionQuestionBankAttempts = questionBankAttemptsBySubject[activeMissionSubject.slug] ?? [];
+  const activeMissionDayQuestionBankAttempts = activeMissionQuestionBankAttempts.filter(
+    (attempt) => attempt.linkedDay === activeMissionDay
+  );
   const meTimeDone = Boolean(activeMissionProgress?.meTimeCompletedAt);
   const activeMissionDecision = useMemo(
     () =>
@@ -203,8 +215,16 @@ export const DailyWorkspace = () => {
         selectedDay: activeMissionDay,
         progress: activeMissionProgressMap,
         profile,
+        questionBankAttempts: activeMissionQuestionBankAttempts,
       }),
-    [activeMissionDay, activeMissionProgressMap, activeMissionSubject.sessions, activeMissionSubject.slug, profile]
+    [
+      activeMissionDay,
+      activeMissionProgressMap,
+      activeMissionQuestionBankAttempts,
+      activeMissionSubject.sessions,
+      activeMissionSubject.slug,
+      profile,
+    ]
   );
   const activeMissionReadiness = activeMissionDecision.sessionReadiness;
   const activeMissionHref = activeMissionReadiness.href.startsWith("#")
@@ -220,6 +240,11 @@ export const DailyWorkspace = () => {
       setProgressBySubject(
         Object.fromEntries(
           studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
+        )
+      );
+      setQuestionBankAttemptsBySubject(
+        Object.fromEntries(
+          studentReportSubjects.map((subject) => [subject.slug, readLocalQuestionBankAttempts(subject.slug)])
         )
       );
       if (saved) {
@@ -338,6 +363,7 @@ export const DailyWorkspace = () => {
             data-preparation-stage={profile.preparationStage}
             data-next-action-room={activeMissionReadiness.statusLabel}
             data-next-action-href={activeMissionHref}
+            data-question-bank-attempts={activeMissionDayQuestionBankAttempts.length}
             data-visible-mode="four-signal-one-action"
             data-essential-signal-count="4"
             data-essential-signals="todays-task|learning-gap|next-revision|current-path"
@@ -374,6 +400,7 @@ export const DailyWorkspace = () => {
                 data-active-day={activeMissionDay}
                 data-readiness-status={activeMissionReadiness.statusLabel}
                 data-readiness-score={activeMissionReadiness.scorePercent}
+                data-question-bank-attempts={activeMissionDayQuestionBankAttempts.length}
                 className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
               >
                 <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">

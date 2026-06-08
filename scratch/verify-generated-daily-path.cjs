@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
+const questionBankAttemptKey = "sarit-upsc-question-bank-attempts-v1";
 const evidencePath = path.join(__dirname, "verify-generated-daily-path-evidence.json");
 const screenshotPath = path.join(__dirname, "verify-generated-daily-path-mobile.png");
 
@@ -23,16 +24,25 @@ function profile(level, preparationStage, studyWindow) {
   };
 }
 
-async function seed(page, studentProfile, progress = null) {
+async function seed(page, studentProfile, progress = null, questionBankAttempts = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ studentProfileKey, geographyProgressKey, nextProfile, nextProgress }) => {
+    ({ studentProfileKey, geographyProgressKey, attemptStorageKey, nextProfile, nextProgress, nextAttempts }) => {
       localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_generated_daily_path");
       localStorage.setItem(studentProfileKey, JSON.stringify(nextProfile));
       localStorage.removeItem(geographyProgressKey);
+      localStorage.removeItem(attemptStorageKey);
       if (nextProgress) localStorage.setItem(geographyProgressKey, JSON.stringify(nextProgress));
+      if (nextAttempts) localStorage.setItem(attemptStorageKey, JSON.stringify(nextAttempts));
     },
-    { studentProfileKey: profileKey, geographyProgressKey: progressKey, nextProfile: studentProfile, nextProgress: progress }
+    {
+      studentProfileKey: profileKey,
+      geographyProgressKey: progressKey,
+      attemptStorageKey: questionBankAttemptKey,
+      nextProfile: studentProfile,
+      nextProgress: progress,
+      nextAttempts: questionBankAttempts,
+    }
   );
 }
 
@@ -48,6 +58,10 @@ async function dashboardSnapshot(page) {
     route: node.getAttribute("data-origin-route"),
     text: node.textContent || "",
   }));
+  const dashboardProof = await page.getByTestId("upsc-simple-dashboard").evaluate((node) => ({
+    questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
+    text: node.textContent || "",
+  }));
   await page.getByTestId("upsc-planning-drawer").locator("summary").first().click();
   const pathLinkCount = await page.getByTestId("upsc-generated-daily-path").locator("a").count();
   const pathTopics = await page.getByTestId("upsc-generated-daily-topic").evaluateAll((topics) =>
@@ -56,7 +70,7 @@ async function dashboardSnapshot(page) {
       text: topic.textContent,
     }))
   );
-  return { summary, startHref, yesterdayProof, pathLinkCount, pathTopics };
+  return { summary, startHref, yesterdayProof, dashboardProof, pathLinkCount, pathTopics };
 }
 
 async function run() {
@@ -115,6 +129,51 @@ async function run() {
     throw new Error(`Beginner Day 2 generated path mismatch: ${JSON.stringify(beginnerDay2)}`);
   }
 
+  await seed(
+    page,
+    profile("beginner", "not-started", "120"),
+    {
+      1: {
+        day: 1,
+        watched: true,
+        reflection: "I can explain location, coordinates, and basic map logic.",
+        talkScore: 96,
+        talkBand: "Command",
+        confidence: "Command",
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    {
+      "geo-d01-qb-correct": {
+        questionId: "geo-d01-qb-correct",
+        subjectSlug: "geography",
+        linkedDay: 1,
+        topic: "Geography Foundation",
+        difficulty: "MEDIUM",
+        source: "REFERENCE_ADVANCED",
+        selectedOption: "A",
+        correctOption: "A",
+        isCorrect: true,
+        solvedAt: new Date().toISOString(),
+      },
+    }
+  );
+  const beginnerDay2FromQuestionBank = await dashboardSnapshot(page);
+  if (
+    !beginnerDay2FromQuestionBank.summary.toLowerCase().includes("day 2 of 30") ||
+    beginnerDay2FromQuestionBank.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
+    beginnerDay2FromQuestionBank.yesterdayProof.status !== "Auto advance" ||
+    beginnerDay2FromQuestionBank.yesterdayProof.sourceDay !== "1" ||
+    beginnerDay2FromQuestionBank.yesterdayProof.targetDay !== "2" ||
+    !beginnerDay2FromQuestionBank.yesterdayProof.text.includes("Day 1 cleared") ||
+    !beginnerDay2FromQuestionBank.yesterdayProof.text.includes("Question Bank 1 solved") ||
+    beginnerDay2FromQuestionBank.dashboardProof.questionBankAttempts !== "0" ||
+    beginnerDay2FromQuestionBank.pathTopics.map((item) => item.state).join("|") !== "current|queued" ||
+    !beginnerDay2FromQuestionBank.pathTopics[0]?.text.includes("Day 2")
+  ) {
+    throw new Error(`Question Bank generated path mismatch: ${JSON.stringify(beginnerDay2FromQuestionBank)}`);
+  }
+
   await seed(page, profile("intermediate", "coaching-complete", "180"), {
     1: {
       day: 1,
@@ -156,7 +215,7 @@ async function run() {
 
   const evidence = {
     baseUrl,
-    checks: { beginnerDay1, beginnerDay2, intermediateDay2, metrics },
+    checks: { beginnerDay1, beginnerDay2, beginnerDay2FromQuestionBank, intermediateDay2, metrics },
     consoleErrors,
     pageErrors,
     passed: consoleErrors.length === 0 && pageErrors.length === 0,
