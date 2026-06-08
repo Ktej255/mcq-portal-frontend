@@ -130,7 +130,8 @@ function priorityFor(row: Omit<RevisionSubjectRow, "priority">) {
 function primaryHref(row: RevisionSubjectRow) {
   if (row.decision.teacherDoubt) return row.decision.teacherDoubt.href;
   if (row.decision.revision.urgent) return row.decision.revision.href;
-  return row.decision.sessionReadiness.href;
+  const href = row.decision.sessionReadiness.href;
+  return href.startsWith("#") ? `/upsc/daily-command${href}` : href;
 }
 
 function primaryLabel(row: RevisionSubjectRow) {

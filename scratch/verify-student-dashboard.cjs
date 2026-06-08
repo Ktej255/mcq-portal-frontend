@@ -6,6 +6,7 @@ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const dailyCommandKey = "sarit-upsc-daily-command-v1";
+const pyqImportLedgerKey = "sarit-upsc-pyq-import-ledger-v1";
 const authUserKey = "sarit-upsc-auth-user-v1";
 const evidencePath = path.join(__dirname, "verify-student-dashboard-evidence.json");
 const screenshotPath = path.join(__dirname, "verify-student-dashboard-final.png");
@@ -50,6 +51,18 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     day: node.getAttribute("data-active-day"),
     status: node.getAttribute("data-readiness-status"),
     score: node.getAttribute("data-readiness-score"),
+    exactTotalRows: node.getAttribute("data-exact-pyq-total-rows"),
+    exactSubjectRows: node.getAttribute("data-exact-pyq-active-subject-rows"),
+    exactDayRows: node.getAttribute("data-exact-pyq-active-day-rows"),
+    text: node.textContent || "",
+  }));
+  const exactPyqProof = await page.getByTestId("upsc-dashboard-exact-pyq-proof").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    totalRows: node.getAttribute("data-total-exact-pyq-rows"),
+    subjectRows: node.getAttribute("data-active-subject-exact-pyq-rows"),
+    dayRows: node.getAttribute("data-active-day-exact-pyq-rows"),
     text: node.textContent || "",
   }));
   const activeMissionPanelCount = await page.locator('[data-testid="upsc-active-mission-readiness"]').count();
@@ -107,6 +120,7 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     todaysTaskVisible,
     todaysTaskPriority,
     taskReadiness,
+    exactPyqProof,
     activeMissionPanelCount,
     monthlyPathCount,
     profileIntakeVisible,
@@ -145,6 +159,21 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   }
   if (!taskReadiness.subject || !taskReadiness.day || !taskReadiness.status || !taskReadiness.score) {
     throw new Error(`${label}: Today's task readiness proof is incomplete: ${JSON.stringify(taskReadiness)}`);
+  }
+  if (
+    taskReadiness.exactTotalRows !== "1" ||
+    taskReadiness.exactSubjectRows !== "1" ||
+    taskReadiness.exactDayRows !== "1" ||
+    exactPyqProof.proofRule !== "dashboard-today-card-reflects-exact-pyq-imports" ||
+    exactPyqProof.subject !== taskReadiness.subject ||
+    exactPyqProof.day !== taskReadiness.day ||
+    exactPyqProof.totalRows !== "1" ||
+    exactPyqProof.subjectRows !== "1" ||
+    exactPyqProof.dayRows !== "1" ||
+    !exactPyqProof.text.includes("Exact PYQ: 1 for today, 1 for Geography") ||
+    !exactPyqProof.text.includes("Pattern practice continues")
+  ) {
+    throw new Error(`${label}: exact PYQ dashboard proof failed: ${JSON.stringify({ taskReadiness, exactPyqProof })}`);
   }
   if (monthlyPathCount !== 0) {
     throw new Error(`${label}: monthly path signal should not be visible on the main dashboard`);
@@ -213,16 +242,43 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
 async function seedSession(page, progress = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileKey: profileStorageKey, progressKey: progressStorageKey, dailyKey, seededProgress }) => {
+    ({ profileKey: profileStorageKey, progressKey: progressStorageKey, dailyKey, pyqKey, seededProgress }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_dashboard");
       window.localStorage.removeItem(profileStorageKey);
       window.localStorage.removeItem(progressStorageKey);
       window.localStorage.removeItem(dailyKey);
+      window.localStorage.setItem(
+        pyqKey,
+        JSON.stringify([
+          {
+            id: "2024-prelims-geography-general-studies-paper-i-q-location-logic",
+            year: 2024,
+            stage: "Prelims",
+            kind: "GS_PRELIMS",
+            subjectSlug: "geography",
+            subjectTitle: "Geography",
+            paper: "General Studies Paper I",
+            questionNumber: "Q-Location-Logic",
+            questionText:
+              "Which statement best explains why absolute and relative location both matter in map-based reasoning?",
+            syllabusArea: "absolute and relative location",
+            syllabusNodeId: "geo-india",
+            topicTags: ["absolute location", "relative location", "site", "situation", "map"],
+            trendInsightId: "geo-map-process",
+            sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+            officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+            answerDemand: "Prelims map and location logic",
+            importStatus: "MAPPED",
+            textStatus: "EXACT_VERIFIED",
+            importedAt: new Date().toISOString(),
+          },
+        ])
+      );
       if (seededProgress) {
         window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
       }
     },
-    { profileKey, progressKey, dailyKey: dailyCommandKey, seededProgress: progress }
+    { profileKey, progressKey, dailyKey: dailyCommandKey, pyqKey: pyqImportLedgerKey, seededProgress: progress }
   );
 }
 
@@ -400,7 +456,7 @@ async function run() {
 
   const ctaChecks = [
     ["/reports", "student-gap-primary-action", "/upsc/geography/talk?day=1"],
-    ["/revision", "student-revision-primary-action", "/upsc/geography/talk?day=1"],
+    ["/revision", "student-revision-primary-action", "/upsc/daily-command#daily-me-time-checkin"],
     ["/history", "student-progress-primary-action", "/upsc/geography/talk?day=1"],
   ];
 

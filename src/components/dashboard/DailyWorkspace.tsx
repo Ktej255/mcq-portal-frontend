@@ -18,7 +18,10 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
-import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
+import {
+  buildQuestionBankQuestionsFromPyqImports,
+  readLocalQuestionBankAttempts,
+} from "@/lib/upsc/questionBankEngine";
 import {
   buildGeographyDailyPath,
   getCurrentGeographyTopic,
@@ -53,6 +56,7 @@ import {
   useGeographyProgress,
   type GeographyMeTimeMood,
 } from "@/lib/upsc/useGeographyProgress";
+import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 
 const subjectRoadmap = upscCalendar.filter(({ href }) =>
   [
@@ -178,6 +182,7 @@ export const DailyWorkspace = () => {
   const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] = useState<
     Record<string, ReturnType<typeof readLocalQuestionBankAttempts>>
   >({});
+  const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
   const { progress, saveDayProgress } = useGeographyProgress();
   const geographyQuestionBankAttempts = questionBankAttemptsBySubject.geography ?? [];
   const today = getCurrentGeographyTopic(progress, geographyQuestionBankAttempts);
@@ -211,6 +216,15 @@ export const DailyWorkspace = () => {
   const activeMissionQuestionBankAttempts = questionBankAttemptsBySubject[activeMissionSubject.slug] ?? [];
   const activeMissionDayQuestionBankAttempts = activeMissionQuestionBankAttempts.filter(
     (attempt) => attempt.linkedDay === activeMissionDay
+  );
+  const exactPyqQuestions = useMemo(() => buildQuestionBankQuestionsFromPyqImports(pyqRecords), [pyqRecords]);
+  const activeMissionExactPyqs = useMemo(
+    () => exactPyqQuestions.filter((question) => question.subjectSlug === activeMissionSubject.slug),
+    [activeMissionSubject.slug, exactPyqQuestions]
+  );
+  const activeMissionDayExactPyqs = useMemo(
+    () => activeMissionExactPyqs.filter((question) => question.linkedDay === activeMissionDay),
+    [activeMissionDay, activeMissionExactPyqs]
   );
   const meTimeDone = Boolean(activeMissionProgress?.meTimeCompletedAt);
   const activeMissionDecision = useMemo(
@@ -253,6 +267,7 @@ export const DailyWorkspace = () => {
           studentReportSubjects.map((subject) => [subject.slug, readLocalQuestionBankAttempts(subject.slug)])
         )
       );
+      setPyqRecords(readLocalPyqImportRecords());
       if (saved) {
         setProfile(saved);
         setDraft(saved);
@@ -370,6 +385,9 @@ export const DailyWorkspace = () => {
             data-next-action-room={activeMissionReadiness.statusLabel}
             data-next-action-href={activeMissionHref}
             data-question-bank-attempts={activeMissionDayQuestionBankAttempts.length}
+            data-exact-pyq-total-rows={exactPyqQuestions.length}
+            data-exact-pyq-active-subject-rows={activeMissionExactPyqs.length}
+            data-exact-pyq-active-day-rows={activeMissionDayExactPyqs.length}
             data-visible-mode="four-signal-one-action"
             data-essential-signal-count="4"
             data-essential-signals="todays-task|learning-gap|next-revision|current-path"
@@ -407,6 +425,8 @@ export const DailyWorkspace = () => {
                 data-readiness-status={activeMissionReadiness.statusLabel}
                 data-readiness-score={activeMissionReadiness.scorePercent}
                 data-question-bank-attempts={activeMissionDayQuestionBankAttempts.length}
+                data-exact-pyq-active-subject-rows={activeMissionExactPyqs.length}
+                data-exact-pyq-active-day-rows={activeMissionDayExactPyqs.length}
                 className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
               >
                 <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -428,19 +448,35 @@ export const DailyWorkspace = () => {
                     <p data-testid="upsc-generated-daily-path-summary" className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[#1d9e75]">
                       {activeMissionSubject.title} Day {activeMissionDay} of {activeMissionSubject.sessions.length} / {activeMissionSession.title}
                     </p>
-                    <div
-                      data-testid="upsc-task-readiness-proof"
-                      data-active-subject={activeMissionSubject.slug}
-                      data-active-day={activeMissionDay}
-                      data-readiness-status={activeMissionReadiness.statusLabel}
-                      data-readiness-score={activeMissionReadiness.scorePercent}
-                      className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
-                    >
-                      <ClipboardCheck className="h-4 w-4" />
-                      {activeMissionReadiness.statusLabel} / {activeMissionReadiness.scorePercent}% ready
-                    </div>
-                    <div
-                      data-testid="upsc-me-time-check"
+                      <div
+                        data-testid="upsc-task-readiness-proof"
+                        data-active-subject={activeMissionSubject.slug}
+                        data-active-day={activeMissionDay}
+                        data-readiness-status={activeMissionReadiness.statusLabel}
+                        data-readiness-score={activeMissionReadiness.scorePercent}
+                        data-exact-pyq-total-rows={exactPyqQuestions.length}
+                        data-exact-pyq-active-subject-rows={activeMissionExactPyqs.length}
+                        data-exact-pyq-active-day-rows={activeMissionDayExactPyqs.length}
+                        className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                        {activeMissionReadiness.statusLabel} / {activeMissionReadiness.scorePercent}% ready
+                      </div>
+                      <div
+                        data-testid="upsc-dashboard-exact-pyq-proof"
+                        data-proof-rule="dashboard-today-card-reflects-exact-pyq-imports"
+                        data-active-subject={activeMissionSubject.slug}
+                        data-active-day={activeMissionDay}
+                        data-total-exact-pyq-rows={exactPyqQuestions.length}
+                        data-active-subject-exact-pyq-rows={activeMissionExactPyqs.length}
+                        data-active-day-exact-pyq-rows={activeMissionDayExactPyqs.length}
+                        className="mt-3 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                      >
+                        Exact PYQ: {activeMissionDayExactPyqs.length} for today, {activeMissionExactPyqs.length} for{" "}
+                        {activeMissionSubject.title}. Pattern practice continues when exact rows are not available.
+                      </div>
+                      <div
+                        data-testid="upsc-me-time-check"
                       data-me-time-status={meTimeDone ? "ready" : "pending"}
                       data-me-time-mood={activeMissionProgress?.meTimeMood ?? ""}
                       data-me-time-reset-plan={activeMissionProgress?.meTimeResetPlan ?? ""}
