@@ -15,10 +15,12 @@ import {
   officialPaperIndexSummary,
   officialSourceAnchors,
   optionalSourcePacks,
+  sourceReadinessMatrix,
   subjectSourcePacks,
   syllabusPyqPreloadAudit,
   syllabusPyqRegistrySummary,
   type ImportStatus,
+  type SourceReadinessStatus,
 } from "@/lib/upsc/syllabusPyqRegistry";
 
 function statusLabel(status: ImportStatus) {
@@ -33,12 +35,28 @@ function statusTone(status: ImportStatus) {
   return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
 }
 
+function readinessStatusLabel(status: SourceReadinessStatus) {
+  if (status === "student-route-ready") return "Student route ready";
+  if (status === "source-index-ready") return "Source index ready";
+  if (status === "partial-mapping") return "Partial mapping";
+  return "Import pending";
+}
+
+function readinessStatusTone(status: SourceReadinessStatus) {
+  if (status === "student-route-ready") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
+  if (status === "source-index-ready") return "border-[#8ab6ff] bg-[#eef5ff] text-[#12366c]";
+  if (status === "partial-mapping") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#ffb6b6] bg-[#fff0f0] text-[#8a1111]";
+}
+
 export function UpscSyllabusPyqLibrary() {
   const [firstSubject] = subjectSourcePacks;
   const [firstOptional] = optionalSourcePacks;
   const directPaperPreviewRows = officialPaperIndexRows
     .filter((row) => row.status === "direct-paper-page-linked")
     .slice(0, 6);
+  const studentReadyRows = sourceReadinessMatrix.filter((row) => row.studentReady).length;
+  const importPendingRows = sourceReadinessMatrix.filter((row) => row.status === "import-pending").length;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -108,6 +126,61 @@ export function UpscSyllabusPyqLibrary() {
             <AuditMetric label="Text pending" value={syllabusPyqPreloadAudit.textImportPendingRows} />
             <AuditMetric label="Official anchors" value={syllabusPyqPreloadAudit.officialAnchorCount} />
             <AuditMetric label="Trend insights" value={syllabusPyqPreloadAudit.trendInsightCount} />
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-source-readiness-matrix"
+          data-total-rows={sourceReadinessMatrix.length}
+          data-student-ready-rows={studentReadyRows}
+          data-import-pending-rows={importPendingRows}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Student readiness matrix
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Source coverage is separated from exact PYQ import.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                This matrix keeps the portal honest: route coverage and official paper links can be student-visible,
+                while exact question text and question-level tagging remain gated until verified import is complete.
+              </p>
+            </div>
+            <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {sourceReadinessMatrix.map((row) => (
+              <article
+                key={row.id}
+                data-testid="upsc-source-readiness-row"
+                data-readiness-id={row.id}
+                data-status={row.status}
+                data-student-ready={String(row.studentReady)}
+                data-count-label={row.countLabel}
+                data-count-value={String(row.countValue)}
+                className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      {row.countLabel}: {row.countValue}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black tracking-tight">{row.title}</h3>
+                  </div>
+                  <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${readinessStatusTone(row.status)}`}>
+                    {readinessStatusLabel(row.status)}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs font-semibold leading-5 text-[#4f5e55]">
+                  <p className="rounded-md bg-white p-2 font-bold text-[#31443a]">Proof: {row.proof}</p>
+                  <p className="rounded-md bg-[#e7f5ee] p-2 font-bold text-[#085041]">Use: {row.productUse}</p>
+                  <p className="rounded-md bg-[#fff4df] p-2 font-bold text-[#6f4a12]">Remaining: {row.remainingWork}</p>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
 

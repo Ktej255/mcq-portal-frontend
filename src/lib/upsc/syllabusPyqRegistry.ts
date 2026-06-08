@@ -137,6 +137,20 @@ export type OptionalAssemblyProof = {
   nextImportStep: string;
 };
 
+export type SourceReadinessStatus = "student-route-ready" | "source-index-ready" | "partial-mapping" | "import-pending";
+
+export type SourceReadinessMatrixRow = {
+  id: string;
+  title: string;
+  status: SourceReadinessStatus;
+  studentReady: boolean;
+  countLabel: string;
+  countValue: number | string;
+  proof: string;
+  productUse: string;
+  remainingWork: string;
+};
+
 export const officialSourceAnchors: OfficialSourceAnchor[] = [
   {
     id: "cse-2025-notification",
@@ -356,6 +370,15 @@ function subjectNodes(slug: string): SyllabusNode[] {
         currentAffairsHook: "COP decisions, air quality, waste rules, climate finance, and carbon markets.",
         trendSignal: commonTrend,
       },
+      {
+        id: "env-sustainable-development",
+        title: "Sustainable development and impact assessment",
+        demand: "EIA, environmental governance, sustainable development, resource use, disaster-environment links, and reports.",
+        basicsLayer: "NCERT resource-use, environment-development, and basic report vocabulary.",
+        advancedLayer: "EIA process, environmental law, SDG linkages, conservation finance, and governance case studies.",
+        currentAffairsHook: "EIA changes, green finance, climate adaptation, forest rights, and environmental reports.",
+        trendSignal: commonTrend,
+      },
     ],
     "polity-governance": [
       {
@@ -374,6 +397,15 @@ function subjectNodes(slug: string): SyllabusNode[] {
         basicsLayer: "NCERT social and political life plus basic public administration vocabulary.",
         advancedLayer: "ARC reports, committee recommendations, case studies, and mains frameworks.",
         currentAffairsHook: "Schemes, reports, portals, DBT, social audit, and rights-based governance.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "polity-social-justice",
+        title: "Social justice and public policy",
+        demand: "Vulnerable sections, welfare mechanisms, rights-based schemes, education, health, and public service delivery.",
+        basicsLayer: "NCERT society-polity basics and welfare vocabulary.",
+        advancedLayer: "Policy design, committee recommendations, data-backed examples, and implementation bottlenecks.",
+        currentAffairsHook: "Welfare reforms, health and education data, social audits, and targeted-delivery debates.",
         trendSignal: commonTrend,
       },
     ],
@@ -396,15 +428,42 @@ function subjectNodes(slug: string): SyllabusNode[] {
         currentAffairsHook: "MSP, PLI, logistics, startups, welfare delivery, jobs, and global shocks.",
         trendSignal: commonTrend,
       },
+      {
+        id: "eco-external-data",
+        title: "External sector, data, and growth quality",
+        demand: "Trade, balance of payments, exchange rate, debt, employment, inequality, growth composition, and data interpretation.",
+        basicsLayer: "NCERT macro, trade, and development indicators.",
+        advancedLayer: "Economic Survey, RBI data, fiscal documents, employment reports, and global-economy linkages.",
+        currentAffairsHook: "Trade shocks, inflation, currency movement, fiscal data, jobs data, and global growth risks.",
+        trendSignal: commonTrend,
+      },
     ],
     "science-tech": [
       {
-        id: "snt-applied",
-        title: "Applied science and emerging tech",
-        demand: "Space, biotech, health, IT, AI, defence, energy, nuclear, and environmental science.",
-        basicsLayer: "NCERT science basics from biology, physics, chemistry, and general science.",
-        advancedLayer: "Technology mechanisms, mission objectives, applications, risks, ethics, and governance.",
-        currentAffairsHook: "ISRO, biotech, AI regulation, cyber, defence tech, diseases, and energy transitions.",
+        id: "snt-space-energy",
+        title: "Space, nuclear, and energy systems",
+        demand: "Space missions, satellite applications, nuclear basics, clean energy, storage, and strategic technology.",
+        basicsLayer: "NCERT physics, energy, atomic structure, and earth-observation basics.",
+        advancedLayer: "Mission objectives, launch systems, energy-transition mechanisms, nuclear governance, and applications.",
+        currentAffairsHook: "ISRO missions, satellite services, nuclear policy, hydrogen, storage, and renewable transition.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "snt-biotech-health",
+        title: "Biotech, health, and life science",
+        demand: "Biotechnology, genetics, vaccines, diseases, diagnostics, public health technology, and bioethics.",
+        basicsLayer: "NCERT biology, genetics, microbes, immunity, and health basics.",
+        advancedLayer: "Gene editing, vaccine platforms, disease surveillance, biotechnology applications, and ethical risk.",
+        currentAffairsHook: "Disease outbreaks, vaccines, genome editing, biotech missions, and health-tech regulation.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "snt-digital-defence",
+        title: "Digital, AI, cyber, and defence technology",
+        demand: "AI, cyber security, semiconductors, communication, defence technology, robotics, and governance risks.",
+        basicsLayer: "NCERT logic of electricity, communication, computers, and everyday technology.",
+        advancedLayer: "AI applications, cyber architecture, semiconductor supply chains, defence systems, and regulation.",
+        currentAffairsHook: "AI governance, cyber incidents, semiconductor policy, drones, quantum, and defence indigenisation.",
         trendSignal: commonTrend,
       },
     ],
@@ -418,26 +477,80 @@ function subjectNodes(slug: string): SyllabusNode[] {
         currentAffairsHook: "Cyclones, floods, landslides, earthquakes, heatwaves, urban risk, and industrial accidents.",
         trendSignal: commonTrend,
       },
+      {
+        id: "dm-mitigation",
+        title: "Mitigation, preparedness, and early warning",
+        demand: "Risk reduction, land-use planning, resilient infrastructure, warning systems, community preparedness, and capacity building.",
+        basicsLayer: "NCERT hazards, climate, settlements, and vulnerability basics.",
+        advancedLayer: "NDMA guidelines, Sendai targets, urban resilience, forecast systems, and mitigation examples.",
+        currentAffairsHook: "Heat action plans, flood forecasting, landslide alerts, cyclone preparedness, and resilient infrastructure.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "dm-response-recovery",
+        title: "Response, relief, recovery, and case studies",
+        demand: "Incident response, relief, rehabilitation, reconstruction, institutional coordination, and lessons from recent disasters.",
+        basicsLayer: "Basic response chain and administrative roles.",
+        advancedLayer: "Case-study grids, inter-agency coordination, financial mechanisms, and build-back-better logic.",
+        currentAffairsHook: "Recent disaster response, compensation, reconstruction, urban risk, and institutional audit reports.",
+        trendSignal: commonTrend,
+      },
     ],
     "internal-security-society": [
       {
-        id: "security-society",
-        title: "Security and Indian society",
-        demand: "Internal security threats, border management, cyber, society themes, vulnerable sections, and social change.",
-        basicsLayer: "NCERT sociology and polity basics for society and state response.",
-        advancedLayer: "Security doctrines, committees, social-issue frameworks, and mains answer examples.",
-        currentAffairsHook: "Cyber incidents, border issues, social justice updates, migration, and community conflict.",
+        id: "security-threats",
+        title: "Internal security threats and institutions",
+        demand: "Terrorism, extremism, organised crime, border management, intelligence, policing, and security institutions.",
+        basicsLayer: "NCERT polity, geography, and state-security vocabulary.",
+        advancedLayer: "Internal security doctrines, legal tools, committees, border-management models, and case studies.",
+        currentAffairsHook: "Border incidents, insurgency, security reforms, organised crime, and institutional updates.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "security-cyber-tech",
+        title: "Cyber, technology, and emerging security risks",
+        demand: "Cyber security, digital threats, social media, critical infrastructure, data security, drones, and tech-enabled crime.",
+        basicsLayer: "Basic cyber vocabulary, communication systems, and governance roles.",
+        advancedLayer: "Cyber architecture, CERT-In, critical infrastructure, AI-enabled threats, and regulatory frameworks.",
+        currentAffairsHook: "Cyber attacks, data breaches, AI misuse, drone threats, and digital-security policy.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "society-change",
+        title: "Indian society, diversity, and vulnerable sections",
+        demand: "Social change, diversity, communalism, regionalism, women, vulnerable groups, migration, and social cohesion.",
+        basicsLayer: "NCERT sociology, society, social institutions, and diversity basics.",
+        advancedLayer: "Mains frameworks, committees, social indicators, case studies, and policy-response models.",
+        currentAffairsHook: "Migration, demographic change, social justice data, gender issues, and vulnerable-section policies.",
         trendSignal: commonTrend,
       },
     ],
     history: [
       {
-        id: "history-blocks",
-        title: "Modern, ancient, medieval, art and culture",
-        demand: "Freedom movement, sources, polity, society, religion, economy, culture, architecture, and chronology.",
-        basicsLayer: "NCERT ancient, medieval, modern, and art-culture base.",
-        advancedLayer: "Bipan Chandra, old NCERT, Nitin Singhania-style culture, source and chronology depth.",
-        currentAffairsHook: "GI tags, UNESCO, excavations, personalities, anniversaries, and culture schemes.",
+        id: "history-ancient-culture",
+        title: "Ancient history and art-culture foundations",
+        demand: "Sources, prehistory, Indus, Vedic, mahajanapadas, Buddhism/Jainism, empires, architecture, religion, and culture.",
+        basicsLayer: "NCERT ancient history, culture basics, maps, and chronology.",
+        advancedLayer: "Old NCERT/source-based depth, art forms, inscriptions, schools of architecture, and religious traditions.",
+        currentAffairsHook: "Excavations, UNESCO sites, GI/culture tags, inscriptions, museums, and heritage conservation.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "history-medieval",
+        title: "Medieval history and cultural synthesis",
+        demand: "Delhi Sultanate, Mughals, regional kingdoms, Bhakti-Sufi, society, economy, architecture, and cultural exchange.",
+        basicsLayer: "NCERT medieval timeline, dynasties, religion, and culture.",
+        advancedLayer: "Source-based polity, administration, cultural synthesis, architecture, and historiography.",
+        currentAffairsHook: "Monuments, cultural festivals, heritage debates, conservation, and regional histories.",
+        trendSignal: commonTrend,
+      },
+      {
+        id: "history-modern",
+        title: "Modern India and freedom movement",
+        demand: "Colonial economy, revolts, reform movements, nationalism, constitutional development, movements, personalities, and post-1857 themes.",
+        basicsLayer: "NCERT modern timeline, reform movements, and national movement phases.",
+        advancedLayer: "Bipan Chandra-style movement analysis, constitutional development, social reform, and mains answer themes.",
+        currentAffairsHook: "Anniversaries, personalities, tribal/peasant movements, constitutional history, and culture-policy links.",
         trendSignal: commonTrend,
       },
     ],
@@ -686,6 +799,19 @@ function subjectTrendInsights(slug: string): PyqTrendInsight[] {
         dailyPlannerUse: commonDailyUse,
         evidenceLevel,
       },
+      {
+        id: "snt-mission-mechanism",
+        label: "Mission objective and mechanism clarity",
+        syllabusArea: "Space missions, biotech tools, cyber, energy, defence systems",
+        prelimsWeight: "High",
+        mainsWeight: "Medium",
+        trendWindow,
+        pyqSignal: "Prelims often tests what a technology does, where it is used, and which institution or mission owns it.",
+        nextYearWatch: "Satellite applications, gene editing, AI safety, semiconductors, cyber infrastructure, and clean-energy storage.",
+        contentDesign: "Use mechanism cards: principle, application, limitation, current example, and UPSC trap.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
     ],
     "disaster-management": [
       {
@@ -701,6 +827,19 @@ function subjectTrendInsights(slug: string): PyqTrendInsight[] {
         dailyPlannerUse: commonDailyUse,
         evidenceLevel,
       },
+      {
+        id: "dm-case-study-chain",
+        label: "Case-study and response chain",
+        syllabusArea: "Preparedness, response, relief, recovery, reconstruction",
+        prelimsWeight: "Selective",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Questions repeatedly ask students to convert events into mitigation, preparedness, response, and recovery frameworks.",
+        nextYearWatch: "Urban floods, heat action plans, landslide zoning, cyclone shelters, earthquake preparedness, and industrial safety.",
+        contentDesign: "Attach one Indian case study to each hazard and force the answer into prevention-response-recovery sequence.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
     ],
     "internal-security-society": [
       {
@@ -713,6 +852,19 @@ function subjectTrendInsights(slug: string): PyqTrendInsight[] {
         pyqSignal: "Mains asks causes, stakeholders, institutions, legal tools, and reforms.",
         nextYearWatch: "Cyber security, border management, social cohesion, migration, vulnerable groups, and extremism.",
         contentDesign: "Build every topic as cause-impact-stakeholder-response-reform.",
+        dailyPlannerUse: commonDailyUse,
+        evidenceLevel,
+      },
+      {
+        id: "security-tech-social-link",
+        label: "Technology risk and social cohesion",
+        syllabusArea: "Cyber security, tech threats, communalism, migration, vulnerable groups",
+        prelimsWeight: "Selective",
+        mainsWeight: "High",
+        trendWindow,
+        pyqSignal: "Mains often rewards linking security threats with social causes, institutions, rights, and practical reform.",
+        nextYearWatch: "AI-enabled cyber risk, data security, migration, border communities, women safety, and social-media conflict.",
+        contentDesign: "Build answers as threat, social driver, institutional tool, rights concern, and reform path.",
         dailyPlannerUse: commonDailyUse,
         evidenceLevel,
       },
@@ -1057,3 +1209,73 @@ export const syllabusPyqPreloadAudit = {
   statusRule:
     "Source-indexed rows point to official UPSC paper pages; text-import-pending rows still require PDF text extraction and topic mapping.",
 };
+
+export const sourceReadinessMatrix: SourceReadinessMatrixRow[] = [
+  {
+    id: "syllabus-route-coverage",
+    title: "Subject and optional route coverage",
+    status: "student-route-ready",
+    studentReady: true,
+    countLabel: "Route packs",
+    countValue: syllabusPyqRegistrySummary.coreSubjectCount + syllabusPyqRegistrySummary.optionalSubjectCount,
+    proof: `${syllabusPyqRegistrySummary.coreSubjectCount} GS subjects and ${syllabusPyqRegistrySummary.optionalSubjectCount} optional subjects are generated from one registry.`,
+    productUse:
+      "Students can open the yearly planner, GS source packs, optional catalog, and optional detail pages without waiting for a separate content upload.",
+    remainingWork:
+      "Replace broad theme notes with exact official syllabus paragraphs after the full official-text import pass.",
+  },
+  {
+    id: "official-paper-source-index",
+    title: "Official paper source index",
+    status: "source-index-ready",
+    studentReady: true,
+    countLabel: "Paper links",
+    countValue: officialPaperIndexSummary.totalPaperIndexRows,
+    proof: `${officialPaperIndexSummary.prelimsPaperRows} Prelims, ${officialPaperIndexSummary.gsMainsPaperRows} GS Mains, and ${officialPaperIndexSummary.optionalPaperIndexRows} optional paper rows point to official UPSC sources.`,
+    productUse:
+      "Students and admins can open official paper sources year-wise; the product can now work backwards from official source anchors.",
+    remainingWork:
+      "Download or import each paper PDF, extract exact question text, and keep a source URL beside every imported question.",
+  },
+  {
+    id: "exact-pyq-question-text",
+    title: "Exact PYQ question text",
+    status: "import-pending",
+    studentReady: false,
+    countLabel: "Verified text rows",
+    countValue: officialPaperIndexSummary.exactQuestionTextRows,
+    proof: officialPaperIndexSummary.exactImportRule,
+    productUse:
+      "The portal does not claim exact PYQ coverage until reviewed question text is imported, tagged, and linked back to source rows.",
+    remainingWork:
+      "Run the PDF extraction and review workflow for Prelims, GS Mains, and optional Paper I/II before using exact questions in student drills.",
+  },
+  {
+    id: "topic-trend-mapping",
+    title: "Syllabus and trend mapping",
+    status: "partial-mapping",
+    studentReady: false,
+    countLabel: "GS trend boards",
+    countValue: syllabusPyqRegistrySummary.trendInsightCount,
+    proof:
+      "GS trend boards and optional paper theme maps exist, but exact question-level tagging still waits on verified PYQ text import.",
+    productUse:
+      "The planner can guide basics, advanced layers, and current-affairs hooks now; question-level prediction remains disabled until stronger evidence exists.",
+    remainingWork:
+      "Attach each imported PYQ to syllabus line, demand type, difficulty, current-affairs hook, and revision trigger.",
+  },
+  {
+    id: "daily-planner-connection",
+    title: "Daily planner connection",
+    status: "partial-mapping",
+    studentReady: true,
+    countLabel: "GS source rows",
+    countValue: syllabusPyqRegistrySummary.gsPyqRows,
+    proof:
+      "Every GS subject has syllabus nodes, PYQ source rows, a systematic path rule, and daily-planner use text.",
+    productUse:
+      "The daily planner can already explain why a subject/day is selected and which source layer it belongs to.",
+    remainingWork:
+      "Feed exact PYQ tags and student performance evidence into the planner once the import workflow is complete.",
+  },
+];
