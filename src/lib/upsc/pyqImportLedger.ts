@@ -1,4 +1,6 @@
 import {
+  officialPaperIndexRows,
+  officialPaperIndexSummary,
   optionalSourcePacks,
   subjectSourcePacks,
   type SourceStage,
@@ -71,6 +73,35 @@ export type PyqImportCoverageRow = {
   needsReview: number;
   trendBoards: number;
   coveragePercent: number;
+};
+
+export type PyqImportPipelineStageStatus = "complete" | "active" | "pending";
+
+export type PyqImportPipelineStage = {
+  id: string;
+  title: string;
+  status: PyqImportPipelineStageStatus;
+  rowCount: number;
+  proof: string;
+  nextAction: string;
+  studentImpact: string;
+};
+
+export type ExactPyqImportReadiness = {
+  proofRule: string;
+  officialPaperIndexRows: number;
+  directLinkedOfficialPapers: number;
+  indexLinkedOfficialPapers: number;
+  highPriorityPaperRows: number;
+  exactQuestionTextRows: number;
+  mappedExactQuestionRows: number;
+  needsReviewRows: number;
+  strictCoveragePercent: number;
+  studentReady: boolean;
+  studentReadyLabel: string;
+  nextQueueRule: string;
+  sourceLibraryPath: string;
+  stages: PyqImportPipelineStage[];
 };
 
 function isSourceStage(value: unknown): value is SourceStage {
@@ -691,5 +722,97 @@ export function summarizePyqImportLedger(records: PyqImportRecord[]) {
     needsReview: records.length - mappedQuestions,
     subjectsTouched,
     optionalQuestions,
+  };
+}
+
+export function buildExactPyqImportReadiness(records: PyqImportRecord[]): ExactPyqImportReadiness {
+  const exactRecords = records.filter((record) => record.textStatus === "EXACT_VERIFIED");
+  const mappedExactRecords = exactRecords.filter((record) => record.importStatus === "MAPPED");
+  const needsReviewRows = exactRecords.length - mappedExactRecords.length;
+  const officialRows = officialPaperIndexSummary.totalPaperIndexRows;
+  const strictCoveragePercent = officialRows > 0 ? Math.round((mappedExactRecords.length / officialRows) * 100) : 0;
+  const studentReady = officialRows > 0 && mappedExactRecords.length >= officialRows;
+  const highPriorityPaperRows = officialPaperIndexRows.filter((row) => row.extractionPriority === "high").length;
+
+  return {
+    proofRule: "admin-exact-pyq-import-before-student-drills",
+    officialPaperIndexRows: officialRows,
+    directLinkedOfficialPapers: officialPaperIndexSummary.directLinkedPaperRows,
+    indexLinkedOfficialPapers: officialPaperIndexSummary.indexPagePaperRows,
+    highPriorityPaperRows,
+    exactQuestionTextRows: exactRecords.length,
+    mappedExactQuestionRows: mappedExactRecords.length,
+    needsReviewRows,
+    strictCoveragePercent,
+    studentReady,
+    studentReadyLabel: studentReady
+      ? "Exact PYQ bank can be exposed to student drills."
+      : exactRecords.length > 0
+        ? "Admin staging is active; student drills remain gated until the official queue is substantially mapped."
+        : "Not student-ready: official source index exists, exact question text has not been imported.",
+    nextQueueRule:
+      "Extract direct-linked 2024/2025 GS papers first, then work backwards through the official UPSC index and optional Paper I/II rows.",
+    sourceLibraryPath: "/upsc/source-library",
+    stages: [
+      {
+        id: "source-indexed",
+        title: "Official source index",
+        status: "complete",
+        rowCount: officialRows,
+        proof: `${officialPaperIndexSummary.prelimsPaperRows} Prelims rows, ${officialPaperIndexSummary.gsMainsPaperRows} GS Mains rows, and ${officialPaperIndexSummary.optionalPaperIndexRows} optional paper rows are indexed.`,
+        nextAction: "Keep official links visible and start extraction from direct-linked high-priority rows.",
+        studentImpact: "Students can see source-backed planning, but not exact PYQ drills yet.",
+      },
+      {
+        id: "text-extraction",
+        title: "Exact text extraction",
+        status: exactRecords.length > 0 ? "active" : "pending",
+        rowCount: exactRecords.length,
+        proof:
+          exactRecords.length > 0
+            ? `${exactRecords.length} exact verified rows are staged in the admin ledger.`
+            : officialPaperIndexSummary.exactImportRule,
+        nextAction: "Paste verified official question text using the import CSV, preserving the source URL beside every row.",
+        studentImpact: "Exact PYQ claims stay off until text rows are imported and reviewed.",
+      },
+      {
+        id: "review-verification",
+        title: "Reviewer verification",
+        status: exactRecords.length === 0 ? "pending" : needsReviewRows > 0 ? "active" : "complete",
+        rowCount: needsReviewRows,
+        proof:
+          exactRecords.length === 0
+            ? "No exact rows are waiting for review because no exact text has been imported yet."
+            : needsReviewRows > 0
+              ? `${needsReviewRows} imported rows still need review before student use.`
+              : "All currently staged exact rows pass the local mapped/review gate.",
+        nextAction: "Check question wording, paper, question number, and official source before marking rows mapped.",
+        studentImpact: "Unreviewed rows remain admin-only.",
+      },
+      {
+        id: "topic-tagging",
+        title: "Syllabus and topic tagging",
+        status: mappedExactRecords.length > 0 ? "active" : "pending",
+        rowCount: mappedExactRecords.length,
+        proof:
+          mappedExactRecords.length > 0
+            ? `${mappedExactRecords.length} exact rows have syllabus area, topic tags, and source references.`
+            : "No exact row has reached mapped topic status yet.",
+        nextAction: "Attach every row to syllabus node, trend insight, difficulty, and answer demand.",
+        studentImpact: "Mapped rows can later feed gap analysis, recall, revision, and question-bank selection.",
+      },
+      {
+        id: "planner-bank-connection",
+        title: "Planner and question-bank connection",
+        status: mappedExactRecords.length > 0 ? "active" : "pending",
+        rowCount: mappedExactRecords.length,
+        proof:
+          mappedExactRecords.length > 0
+            ? `${mappedExactRecords.length} rows are eligible for planner/question-bank wiring after operator review.`
+            : "Planner uses source-pattern guidance only until exact mapped rows are available.",
+        nextAction: "Route mapped exact rows into daily planner, custom MCQ bank, revision triggers, and report evidence.",
+        studentImpact: "Student-facing drills remain honest while the exact bank is being assembled.",
+      },
+    ],
   };
 }

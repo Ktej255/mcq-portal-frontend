@@ -21,6 +21,7 @@ import { readLocalMockToken } from "@/lib/auth/local-testing";
 import { supabase } from "@/lib/supabase/client";
 import {
   appendLocalPyqImportRecords,
+  buildExactPyqImportReadiness,
   buildPyqImportCoverage,
   buildPyqImportCsvTemplate,
   buildPyqImportRecordsFromCsvRows,
@@ -31,6 +32,7 @@ import {
   seededPyqPatternRecords,
   summarizePyqImportLedger,
   type PyqImportCsvRow,
+  type PyqImportPipelineStageStatus,
   type PyqImportParseResult,
   type PyqImportRecord,
   writeLocalPyqImportRecords,
@@ -213,6 +215,7 @@ export function UpscPyqImportCommand() {
 
   const summary = useMemo(() => summarizePyqImportLedger(records), [records]);
   const coverage = useMemo(() => buildPyqImportCoverage(records), [records]);
+  const readiness = useMemo(() => buildExactPyqImportReadiness(records), [records]);
   const recentRecords = records.slice(0, 8);
   const seedPreview = seededPyqPatternRecords.slice(0, 6);
 
@@ -316,6 +319,71 @@ export function UpscPyqImportCommand() {
           void hydratePersistence();
         }}
       />
+
+      <section
+        className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+        data-testid="admin-pyq-import-readiness-contract"
+        data-proof-rule={readiness.proofRule}
+        data-official-paper-index-rows={readiness.officialPaperIndexRows}
+        data-direct-linked-official-papers={readiness.directLinkedOfficialPapers}
+        data-index-linked-official-papers={readiness.indexLinkedOfficialPapers}
+        data-high-priority-paper-rows={readiness.highPriorityPaperRows}
+        data-exact-question-text-rows={readiness.exactQuestionTextRows}
+        data-mapped-exact-question-rows={readiness.mappedExactQuestionRows}
+        data-needs-review-rows={readiness.needsReviewRows}
+        data-strict-coverage-percent={readiness.strictCoveragePercent}
+        data-student-ready={String(readiness.studentReady)}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-black text-zinc-700">
+              <Database className="h-3.5 w-3.5" />
+              Exact PYQ readiness gate
+            </div>
+            <h2 className="text-2xl font-black text-zinc-950">Official paper queue to student-ready bank</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">{readiness.studentReadyLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">{readiness.nextQueueRule}</p>
+          </div>
+          <Link
+            href={readiness.sourceLibraryPath}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-900 transition hover:bg-zinc-50"
+          >
+            Check source proof <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Metric label="Official queue" value={readiness.officialPaperIndexRows} />
+          <Metric label="Direct paper links" value={readiness.directLinkedOfficialPapers} />
+          <Metric label="High priority" value={readiness.highPriorityPaperRows} />
+          <Metric label="Exact imported" value={readiness.exactQuestionTextRows} />
+          <Metric label="Strict coverage" value={readiness.strictCoveragePercent} suffix="%" />
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-5">
+          {readiness.stages.map((stage) => (
+            <article
+              key={stage.id}
+              className={`rounded-lg border p-4 ${stageTone(stage.status)}`}
+              data-testid="admin-pyq-import-stage-row"
+              data-stage-id={stage.id}
+              data-stage-status={stage.status}
+              data-row-count={stage.rowCount}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="rounded-md border border-current/20 bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  {stageStatusLabel(stage.status)}
+                </span>
+                <span className="font-mono text-sm font-black">{stage.rowCount}</span>
+              </div>
+              <h3 className="mt-3 text-sm font-black text-zinc-950">{stage.title}</h3>
+              <p className="mt-2 text-xs font-semibold leading-5 text-zinc-700">{stage.proof}</p>
+              <p className="mt-2 text-xs leading-5 text-zinc-500">{stage.nextAction}</p>
+              <p className="mt-2 text-[11px] font-bold leading-5 text-zinc-600">{stage.studentImpact}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6" data-testid="admin-pyq-import-summary">
         <Metric label="Exact rows" value={summary.importedQuestions} />
@@ -624,11 +692,26 @@ function PersistencePanel({
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function stageStatusLabel(status: PyqImportPipelineStageStatus) {
+  if (status === "complete") return "Complete";
+  if (status === "active") return "Active";
+  return "Pending";
+}
+
+function stageTone(status: PyqImportPipelineStageStatus) {
+  if (status === "complete") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "active") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-zinc-200 bg-zinc-50 text-zinc-700";
+}
+
+function Metric({ label, value, suffix = "" }: { label: string; value: number; suffix?: string }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-zinc-950">{value}</p>
+      <p className="mt-2 text-3xl font-black text-zinc-950">
+        {value}
+        {suffix}
+      </p>
     </div>
   );
 }
