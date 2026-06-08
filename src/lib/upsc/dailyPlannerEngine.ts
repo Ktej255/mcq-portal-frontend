@@ -117,6 +117,12 @@ export type DailyPlannerDecision = {
   };
 };
 
+export type AutoSessionHandoffRecord = DailyPlannerDecision["automaticSessionHandoff"] & {
+  generatedAt: string;
+  selectedDay: number;
+  selectedSubjectSlug: string;
+};
+
 type PlannerInput = {
   subjectSlug: string;
   sessions: SubjectSession[];
@@ -126,8 +132,84 @@ type PlannerInput = {
   questionBankAttempts?: DailyPlannerQuestionBankAttempt[];
 };
 
+export const AUTO_SESSION_HANDOFF_STORAGE_KEY = "sarit-upsc-auto-session-handoff-v1";
 const recallTarget = 95;
 const mcqCommandTarget = 75;
+
+function requiredText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function requiredNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseAutoSessionHandoffRecord(input: unknown): AutoSessionHandoffRecord | null {
+  if (!input || typeof input !== "object") return null;
+  const record = input as Record<string, unknown>;
+  const sourceDay = requiredNumber(record.sourceDay);
+  const targetDay = requiredNumber(record.targetDay);
+  const evidenceUsed = requiredNumber(record.evidenceUsed);
+  const evidenceMissing = requiredNumber(record.evidenceMissing);
+  const blockers = requiredNumber(record.blockers);
+  const readinessScorePercent = requiredNumber(record.readinessScorePercent);
+  const selectedDay = requiredNumber(record.selectedDay);
+  const requiredFields = {
+    id: requiredText(record.id),
+    subjectSlug: requiredText(record.subjectSlug),
+    targetTitle: requiredText(record.targetTitle),
+    statusLabel: requiredText(record.statusLabel),
+    href: requiredText(record.href),
+    actionLabel: requiredText(record.actionLabel),
+    readinessStatus: requiredText(record.readinessStatus),
+    learningGapTitle: requiredText(record.learningGapTitle),
+    revisionDueLabel: requiredText(record.revisionDueLabel),
+    studentInstruction: requiredText(record.studentInstruction),
+    reportHref: requiredText(record.reportHref),
+    questionBankHref: requiredText(record.questionBankHref),
+    proofRule: requiredText(record.proofRule),
+    generatedAt: requiredText(record.generatedAt),
+    selectedSubjectSlug: requiredText(record.selectedSubjectSlug),
+  };
+
+  if (
+    Object.values(requiredFields).some((value) => !value) ||
+    sourceDay === null ||
+    targetDay === null ||
+    evidenceUsed === null ||
+    evidenceMissing === null ||
+    blockers === null ||
+    readinessScorePercent === null ||
+    selectedDay === null ||
+    typeof record.canAdvance !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    ...requiredFields,
+    sourceDay,
+    targetDay,
+    canAdvance: record.canAdvance,
+    evidenceUsed,
+    evidenceMissing,
+    blockers,
+    readinessScorePercent,
+    selectedDay,
+  };
+}
+
+export function readLocalAutoSessionHandoff(): AutoSessionHandoffRecord | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(AUTO_SESSION_HANDOFF_STORAGE_KEY) || "null");
+    return parseAutoSessionHandoffRecord(parsed);
+  } catch {
+    return null;
+  }
+}
 
 function attemptsForDay(input: Pick<PlannerInput, "questionBankAttempts">, day: number) {
   return (input.questionBankAttempts ?? []).filter((attempt) => attempt.linkedDay === day);

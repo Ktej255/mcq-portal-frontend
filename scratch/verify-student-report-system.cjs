@@ -8,6 +8,7 @@ const progressKey = "sarit-upsc-geography-progress-v1";
 const environmentProgressKey = "sarit-upsc-environment-progress-v1";
 const dailyCommandKey = "sarit-upsc-daily-command-v1";
 const questionBankAttemptKey = "sarit-upsc-question-bank-attempts-v1";
+const autoSessionHandoffKey = "sarit-upsc-auto-session-handoff-v1";
 const evidencePath = path.join(__dirname, "verify-student-report-system-evidence.json");
 
 async function assertNoOverflow(page, label, checks) {
@@ -37,7 +38,7 @@ function readNumber(value, label) {
 async function seedProfileAndProgress(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, envProgressStorageKey, dailyStorageKey, attemptStorageKey }) => {
+    ({ profileStorageKey, progressStorageKey, envProgressStorageKey, dailyStorageKey, attemptStorageKey, handoffStorageKey }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_report_system");
       window.localStorage.setItem(
         profileStorageKey,
@@ -138,6 +139,34 @@ async function seedProfileAndProgress(page) {
           },
         })
       );
+      window.localStorage.setItem(
+        handoffStorageKey,
+        JSON.stringify({
+          id: "geography-d1-to-d1-repair-first-report-proof",
+          subjectSlug: "geography",
+          sourceDay: 1,
+          targetDay: 1,
+          targetTitle: "Geographic Thinking and Map Relationships",
+          statusLabel: "Repair first",
+          href: "/upsc/geography/talk?day=1",
+          actionLabel: "Repeat talk",
+          canAdvance: false,
+          evidenceUsed: 2,
+          evidenceMissing: 1,
+          blockers: 2,
+          readinessStatus: "Repair lock",
+          readinessScorePercent: 40,
+          learningGapTitle: "AI found Mechanism gap",
+          revisionDueLabel: "AI gap",
+          studentInstruction: "Do not open new load yet. Clear 2 blockers before moving ahead.",
+          reportHref: "/reports",
+          questionBankHref: "/upsc/question-bank?subject=geography",
+          proofRule: "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report",
+          generatedAt: new Date().toISOString(),
+          selectedDay: 1,
+          selectedSubjectSlug: "geography",
+        })
+      );
     },
     {
       profileStorageKey: profileKey,
@@ -145,6 +174,7 @@ async function seedProfileAndProgress(page) {
       envProgressStorageKey: environmentProgressKey,
       dailyStorageKey: dailyCommandKey,
       attemptStorageKey: questionBankAttemptKey,
+      handoffStorageKey: autoSessionHandoffKey,
     }
   );
 }
@@ -166,6 +196,7 @@ async function run() {
   await page.getByTestId("student-gap-primary-action").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-current-readiness-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-student-report-summary").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-auto-session-report-bridge").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-auto-report-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-all-subject-report-windows").waitFor({ timeout: 15000 });
@@ -210,6 +241,31 @@ async function run() {
       text: node.textContent || "",
     }))
   );
+  const autoHandoffBridge = await page.getByTestId("upsc-auto-session-report-bridge").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    status: node.getAttribute("data-handoff-status"),
+    current: node.getAttribute("data-handoff-current"),
+    id: node.getAttribute("data-handoff-id"),
+    subjectSlug: node.getAttribute("data-subject-slug"),
+    selectedDay: node.getAttribute("data-selected-day"),
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    statusLabel: node.getAttribute("data-status-label"),
+    actionLabel: node.getAttribute("data-action-label"),
+    actionHref: node.getAttribute("data-action-href"),
+    canAdvance: node.getAttribute("data-can-advance"),
+    evidenceUsed: node.getAttribute("data-evidence-used"),
+    evidenceMissing: node.getAttribute("data-evidence-missing"),
+    blockers: node.getAttribute("data-blockers"),
+    readinessStatus: node.getAttribute("data-readiness-status"),
+    readinessScore: node.getAttribute("data-readiness-score"),
+    learningGap: node.getAttribute("data-learning-gap"),
+    revisionDue: node.getAttribute("data-revision-due"),
+    reportHref: node.getAttribute("data-report-href"),
+    questionBankHref: node.getAttribute("data-question-bank-href"),
+    text: node.textContent || "",
+  }));
+  const autoHandoffActionHref = await page.getByTestId("upsc-auto-session-report-action").getAttribute("href");
   const allSubjectText = await page.getByTestId("upsc-all-subject-report").innerText();
   const allSubjectProof = await page.getByTestId("upsc-all-subject-report").evaluate((node) => ({
     proofRule: node.getAttribute("data-proof-rule"),
@@ -334,6 +390,8 @@ async function run() {
     studentSummaryProof,
     studentSummaryActionHref,
     studentSummaryCards,
+    autoHandoffBridge,
+    autoHandoffActionHref,
     allSubjectProof,
     subjectCardCount,
     subjectProofs,
@@ -397,6 +455,37 @@ async function run() {
   ) {
     throw new Error(
       `Student report summary proof failed: ${JSON.stringify({ studentSummaryProof, studentSummaryActionHref, studentSummaryCards }, null, 2)}`
+    );
+  }
+  if (
+    autoHandoffBridge.proofRule !== "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report" ||
+    autoHandoffBridge.status !== "saved" ||
+    autoHandoffBridge.current !== "true" ||
+    autoHandoffBridge.id !== "geography-d1-to-d1-repair-first-report-proof" ||
+    autoHandoffBridge.subjectSlug !== "geography" ||
+    autoHandoffBridge.selectedDay !== "1" ||
+    autoHandoffBridge.sourceDay !== "1" ||
+    autoHandoffBridge.targetDay !== "1" ||
+    autoHandoffBridge.statusLabel !== "Repair first" ||
+    autoHandoffBridge.actionLabel !== "Repeat talk" ||
+    autoHandoffBridge.actionHref !== "/upsc/geography/talk?day=1" ||
+    autoHandoffActionHref !== "/upsc/geography/talk?day=1" ||
+    autoHandoffBridge.canAdvance !== "false" ||
+    autoHandoffBridge.evidenceUsed !== "2" ||
+    autoHandoffBridge.evidenceMissing !== "1" ||
+    autoHandoffBridge.blockers !== "2" ||
+    autoHandoffBridge.readinessStatus !== "Repair lock" ||
+    autoHandoffBridge.readinessScore !== "40" ||
+    autoHandoffBridge.learningGap !== "AI found Mechanism gap" ||
+    autoHandoffBridge.revisionDue !== "AI gap" ||
+    autoHandoffBridge.reportHref !== "/reports" ||
+    autoHandoffBridge.questionBankHref !== "/upsc/question-bank?subject=geography" ||
+    !/Auto session report bridge/i.test(autoHandoffBridge.text) ||
+    !/Next session held: Repair first/i.test(autoHandoffBridge.text) ||
+    !/Clear 2 blockers/i.test(autoHandoffBridge.text)
+  ) {
+    throw new Error(
+      `Auto-session handoff bridge failed: ${JSON.stringify({ autoHandoffBridge, autoHandoffActionHref }, null, 2)}`
     );
   }
   if (weeklyCount !== 4) {

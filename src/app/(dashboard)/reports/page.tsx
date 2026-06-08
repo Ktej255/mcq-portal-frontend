@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, ClipboardCheck, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
 
 import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
-import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
+import {
+  buildDailyPlannerDecision,
+  readLocalAutoSessionHandoff,
+  type AutoSessionHandoffRecord,
+  type DailyPlannerProgress,
+} from "@/lib/upsc/dailyPlannerEngine";
 import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
 import {
   buildUpscStudentReportSnapshot,
@@ -48,6 +53,7 @@ export default function ReportsPage() {
   const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] =
     useState<StudentReportQuestionBankAttemptMap>({});
   const [dailyState, setDailyState] = useState<DailyReportState>({ subjectSlug: "geography", day: 1 });
+  const [autoSessionHandoff, setAutoSessionHandoff] = useState<AutoSessionHandoffRecord | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -62,6 +68,7 @@ export default function ReportsPage() {
         )
       );
       setDailyState(readJson<DailyReportState>(dailyStorageKey, { subjectSlug: "geography", day: 1 }));
+      setAutoSessionHandoff(readLocalAutoSessionHandoff());
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -125,6 +132,9 @@ export default function ReportsPage() {
       detail: allSubjectReport.autoReport.nextWeeklyAction,
     },
   ];
+  const handoffMatchesActiveDay =
+    autoSessionHandoff?.selectedSubjectSlug === activeReportSubject.slug &&
+    autoSessionHandoff.selectedDay === activeReportDay;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -256,6 +266,88 @@ export default function ReportsPage() {
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{card.detail}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-auto-session-report-bridge"
+          data-proof-rule={
+            autoSessionHandoff?.proofRule ??
+            "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report"
+          }
+          data-handoff-status={autoSessionHandoff ? "saved" : "missing"}
+          data-handoff-current={handoffMatchesActiveDay ? "true" : "false"}
+          data-handoff-id={autoSessionHandoff?.id ?? "missing"}
+          data-subject-slug={autoSessionHandoff?.subjectSlug ?? activeReportSubject.slug}
+          data-selected-day={autoSessionHandoff?.selectedDay ?? activeReportDay}
+          data-source-day={autoSessionHandoff?.sourceDay ?? "missing"}
+          data-target-day={autoSessionHandoff?.targetDay ?? "missing"}
+          data-status-label={autoSessionHandoff?.statusLabel ?? "missing"}
+          data-action-label={autoSessionHandoff?.actionLabel ?? "Open Daily Command"}
+          data-action-href={autoSessionHandoff?.href ?? "/upsc/daily-command"}
+          data-can-advance={autoSessionHandoff ? String(autoSessionHandoff.canAdvance) : "false"}
+          data-evidence-used={autoSessionHandoff?.evidenceUsed ?? 0}
+          data-evidence-missing={autoSessionHandoff?.evidenceMissing ?? 0}
+          data-blockers={autoSessionHandoff?.blockers ?? 0}
+          data-readiness-status={autoSessionHandoff?.readinessStatus ?? currentReadiness.statusLabel}
+          data-readiness-score={autoSessionHandoff?.readinessScorePercent ?? currentReadiness.scorePercent}
+          data-learning-gap={autoSessionHandoff?.learningGapTitle ?? "No saved handoff yet"}
+          data-revision-due={autoSessionHandoff?.revisionDueLabel ?? "Open Daily Command"}
+          data-report-href={autoSessionHandoff?.reportHref ?? "/reports"}
+          data-question-bank-href={autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`}
+          className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <CalendarDays className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                  Auto session report bridge
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">
+                {autoSessionHandoff
+                  ? autoSessionHandoff.canAdvance
+                    ? `Next session ready: Day ${autoSessionHandoff.targetDay}`
+                    : `Next session held: ${autoSessionHandoff.statusLabel}`
+                  : "Daily Command has not generated a handoff yet"}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                {autoSessionHandoff
+                  ? autoSessionHandoff.studentInstruction
+                  : "Open Daily Command once so the portal can save the next-session handoff from mind-state, recall, class, MCQ, revision, and report evidence."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href={autoSessionHandoff?.href ?? "/upsc/daily-command"}
+                  data-testid="upsc-auto-session-report-action"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                >
+                  {autoSessionHandoff?.actionLabel ?? "Open Daily Command"} <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/70 px-4 text-sm font-black text-[#085041] transition hover:bg-white"
+                >
+                  MCQ bank <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {[
+                ["Source", autoSessionHandoff ? `Day ${autoSessionHandoff.sourceDay}` : "Pending"],
+                ["Target", autoSessionHandoff ? `Day ${autoSessionHandoff.targetDay}` : "Pending"],
+                ["Evidence", autoSessionHandoff ? `${autoSessionHandoff.evidenceUsed} used / ${autoSessionHandoff.evidenceMissing} missing` : "No handoff"],
+                ["Blockers", autoSessionHandoff?.blockers ?? 0],
+                ["Readiness", `${autoSessionHandoff?.readinessStatus ?? currentReadiness.statusLabel} / ${autoSessionHandoff?.readinessScorePercent ?? currentReadiness.scorePercent}%`],
+                ["Current", handoffMatchesActiveDay ? "Same day" : autoSessionHandoff ? "Older handoff" : "Missing"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/70 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                  <p className="mt-1 text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

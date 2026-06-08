@@ -24,8 +24,9 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import {
+  AUTO_SESSION_HANDOFF_STORAGE_KEY,
   buildDailyPlannerDecision,
-  type DailyPlannerDecision,
+  type AutoSessionHandoffRecord,
   type DailyPlannerProgress,
 } from "@/lib/upsc/dailyPlannerEngine";
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
@@ -68,12 +69,6 @@ type DailyState = {
   updatedAt?: string;
 };
 
-type AutoSessionHandoffRecord = DailyPlannerDecision["automaticSessionHandoff"] & {
-  generatedAt: string;
-  selectedDay: number;
-  selectedSubjectSlug: string;
-};
-
 const dailySubjects: DailySubject[] = [
   {
     slug: "geography",
@@ -100,7 +95,6 @@ const dailySubjects: DailySubject[] = [
 ];
 
 const dailyStorageKey = "sarit-upsc-daily-command-v1";
-const autoSessionHandoffStorageKey = "sarit-upsc-auto-session-handoff-v1";
 const contentStorageKey = "sarit-upsc-content-command-v1";
 const mcqStorageKey = "sarit-upsc-mcq-command-v1";
 const defaultMcqState: McqState = { planned: 25, drafted: 0, status: "DRAFT" };
@@ -366,7 +360,7 @@ export function UpscDailyMissionControl() {
       selectedSubjectSlug: activeSubject.slug,
     };
 
-    writeJson(autoSessionHandoffStorageKey, record);
+    writeJson(AUTO_SESSION_HANDOFF_STORAGE_KEY, record);
     setAutoHandoffSavedAt(generatedAt);
   }, [activeSession.day, activeSubject.slug, automaticHandoff, isLoaded]);
 
