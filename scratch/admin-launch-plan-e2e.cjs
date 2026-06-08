@@ -5,6 +5,68 @@ const feedbackKey = "sarit-upsc-geography-pilot-feedback-v1";
 const releaseKey = "sarit-upsc-geography-pilot-release-v1";
 const rosterKey = "sarit-upsc-geography-pilot-roster-v1";
 const waveDecisionKey = "sarit-upsc-geography-pilot-wave-decision-v1";
+const mcqKey = "sarit-upsc-mcq-command-v1";
+const draftKey = "sarit-admin-bulk-question-drafts-v1";
+
+function buildReadyDay1Question(index) {
+  return {
+    test_id: 9100 + index,
+    topic_id: 9100 + index,
+    text_en: `Controlled Geography Day 1 launch question ${index}: choose the option that correctly uses location, scale, relationship, and map proof.`,
+    options_en: {
+      A: "Use site, situation, scale, physical process, and one India-map relationship before accepting the conclusion.",
+      B: "Use one memorized location and ignore the surrounding relationships.",
+      C: "Assume every map scale produces the same answer for every region.",
+      D: "Treat map evidence as unnecessary once a written statement appears.",
+    },
+    correct_option: "A",
+    explanation_en: `Question ${index} checks the Day 1 relationship method: what, where, why there, map proof, and the UPSC trap. Option A keeps the full chain intact.`,
+    difficulty: "MEDIUM",
+    source: "UPSC_MCQ_COMMAND",
+    status: "DRAFT",
+    quality_notes: {
+      batch_code: "GEO-D01",
+      subject: "Geography",
+      day: "1",
+      chapter: "Physical Geography Foundation",
+      topic: "Geographic Thinking and Map Relationships",
+      map_or_case_tag: "India map relationship drill",
+    },
+  };
+}
+
+async function seedReadyDay1Mcqs(page) {
+  const questions = Array.from({ length: 25 }, (_, index) => buildReadyDay1Question(index + 1));
+  await page.evaluate(
+    ({ localMcqKey, localDraftKey, seededQuestions }) => {
+      const now = new Date().toISOString();
+      window.localStorage.setItem(
+        localMcqKey,
+        JSON.stringify({
+          "GEO-D01": {
+            planned: 25,
+            drafted: seededQuestions.length,
+            difficulty: "MEDIUM",
+            status: "READY",
+            updatedAt: now,
+          },
+        }),
+      );
+      window.localStorage.setItem(
+        localDraftKey,
+        JSON.stringify([
+          {
+            id: "admin-launch-plan-geography-day1-ready",
+            createdAt: now,
+            importMode: "UPSC_MCQ_COMMAND",
+            questions: seededQuestions,
+          },
+        ]),
+      );
+    },
+    { localMcqKey: mcqKey, localDraftKey: draftKey, seededQuestions: questions },
+  );
+}
 
 async function assertNoOverflow(page, label) {
   const metrics = await page.evaluate(() => ({
@@ -211,6 +273,10 @@ async function run() {
   }
   await page.getByTestId("admin-founder-review-count").getByText("7/7 checked", { exact: true }).waitFor({ timeout: 15000 });
   await founderRunner.getByText("All review surfaces checked", { exact: true }).waitFor({ timeout: 15000 });
+  await seedReadyDay1Mcqs(page);
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.getByTestId("admin-geography-launch-readiness").getByText("25/25 ready", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("admin-pre-share-gate-status").getByText("Do not share yet", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("admin-pilot-approve").click();
   await page.getByTestId("admin-pre-share-gate-status").getByText("Safe to share with controlled testers", { exact: true }).waitFor({ timeout: 15000 });
   await preShareGate.getByText("Approved", { exact: true }).waitFor({ timeout: 15000 });

@@ -67,6 +67,7 @@ async function run() {
   await launchVisionTracker.getByText("Live stack", { exact: true }).waitFor();
   await launchVisionTracker.getByText("Apply Supabase SQL, set production env vars, verify OAuth, and run same-account recovery.", { exact: true }).waitFor();
   await launchVisionTracker.getByText("Geography launch pack", { exact: true }).waitFor();
+  await launchVisionTracker.getByText("25 reviewed READY questions", { exact: false }).waitFor();
   await launchVisionTracker.getByText("Attach final Day 1 lecture media, approve transcript, import fresh advanced MCQs, and run controlled tester receipts.", { exact: true }).waitFor();
   await masterPage.getByText("Verified local", { exact: true }).first().waitFor();
   await masterPage.getByText("External apply", { exact: true }).first().waitFor();

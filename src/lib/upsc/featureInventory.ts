@@ -646,7 +646,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
     requirement: "At least one subject, Geography, should be student-ready before moving to the next subject.",
     status: "content-gap",
     currentState:
-      "Geography has the full local loop and 30-day route map. Real Day 1 media, transcript approval, detailed animation depth, and fresh MCQs remain the main gap.",
+      "Geography has the full local loop and 30-day route map. The launch readiness snapshot now blocks controlled sharing until the Day 1 practice bank has 25 reviewed READY questions. Real Day 1 media, transcript approval, detailed animation depth, and founder-approved fresh MCQs remain the main content gap.",
     evidence: "Geography pilot inventory, Day 1 intake, and release gates",
     nextAction: "Attach final Day 1 lecture media, approve transcript, import fresh advanced MCQs, and run controlled tester receipts.",
     phase: "Day 1",

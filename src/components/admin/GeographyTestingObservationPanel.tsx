@@ -41,6 +41,7 @@ import {
   updateGeographyPilotWaveDecision,
   type GeographyPilotWaveDecisionStatus,
 } from "@/lib/upsc/geographyPilotWaveDecision";
+import { buildGeographyLaunchReadiness } from "@/lib/upsc/geographyLaunchReadiness";
 import { cn } from "@/lib/utils";
 
 const severityTone: Record<GeographyPilotFeedbackSeverity, string> = {
@@ -60,6 +61,7 @@ export function GeographyTestingObservationPanel() {
   const [releaseNote, setReleaseNote] = useState(releaseDecision.note);
   const [testerName, setTesterName] = useState("");
   const [testerContact, setTesterContact] = useState("");
+  const [launchGateRefresh, setLaunchGateRefresh] = useState(0);
   const origin = typeof window === "undefined" ? "http://127.0.0.1:3001" : window.location.origin;
   const testingLink = `${origin}/upsc/geography/pilot`;
 
@@ -68,6 +70,7 @@ export function GeographyTestingObservationPanel() {
   const reloadRelease = () => setReleaseDecision(readGeographyPilotRelease());
   const reloadWaveDecision = () => setWaveDecision(readGeographyPilotWaveDecision());
   const reloadFounderReview = () => setFounderReview(readGeographyFounderReview());
+  const reloadLaunchReadiness = () => setLaunchGateRefresh(Date.now());
 
   useEffect(() => {
     reloadFeedback();
@@ -75,11 +78,13 @@ export function GeographyTestingObservationPanel() {
     reloadRelease();
     reloadWaveDecision();
     reloadFounderReview();
+    reloadLaunchReadiness();
     window.addEventListener("storage", reloadFeedback);
     window.addEventListener("storage", reloadRoster);
     window.addEventListener("storage", reloadRelease);
     window.addEventListener("storage", reloadWaveDecision);
     window.addEventListener("storage", reloadFounderReview);
+    window.addEventListener("storage", reloadLaunchReadiness);
     window.addEventListener("geography-pilot-feedback-updated", reloadFeedback);
     window.addEventListener("geography-pilot-roster-updated", reloadRoster);
     window.addEventListener("geography-pilot-release-updated", reloadRelease);
@@ -91,6 +96,7 @@ export function GeographyTestingObservationPanel() {
       window.removeEventListener("storage", reloadRelease);
       window.removeEventListener("storage", reloadWaveDecision);
       window.removeEventListener("storage", reloadFounderReview);
+      window.removeEventListener("storage", reloadLaunchReadiness);
       window.removeEventListener("geography-pilot-feedback-updated", reloadFeedback);
       window.removeEventListener("geography-pilot-roster-updated", reloadRoster);
       window.removeEventListener("geography-pilot-release-updated", reloadRelease);
@@ -219,9 +225,24 @@ export function GeographyTestingObservationPanel() {
   const founderReviewComplete = isGeographyFounderReviewComplete(founderReview);
   const checkedFounderItems = founderReview.checkedIds.length;
   const nextFounderItem = geographyFounderReviewItems.find((item) => !founderReview.checkedIds.includes(item.id));
-  const readyToSharePilot =
-    founderReviewComplete && !sharingBlockedByFeedback && releaseDecision.status === "approved";
+  const launchReadiness = buildGeographyLaunchReadiness({
+    founderReviewComplete,
+    releaseApproved: releaseDecision.status === "approved",
+    openBlockerCount: summary.blockers,
+    rosterCount: roster.length,
+    completedTesterCount: rosterSummary.completed,
+    feedbackReceiptCount: feedbackCoverageCount,
+    blockedTesterCount: rosterSummary.blocked,
+  });
+  void launchGateRefresh;
+  const readyToSharePilot = launchReadiness.canShareControlledPilot;
   const preShareGateChecks = [
+    {
+      label: "Fresh MCQ set",
+      value: launchReadiness.mcqGate.value,
+      passed: launchReadiness.mcqGate.passed,
+      detail: launchReadiness.mcqGate.detail,
+    },
     {
       label: "Founder checklist",
       value: `${checkedFounderItems}/${geographyFounderReviewItems.length} checked`,
@@ -298,6 +319,17 @@ export function GeographyTestingObservationPanel() {
           status: "paused",
           reviewerName: reviewerName.trim() || "Founder",
           note: `Pilot remains paused until founder review is complete (${checkedFounderItems}/${geographyFounderReviewItems.length}).`,
+        })
+      );
+      return;
+    }
+
+    if (!launchReadiness.mcqGate.passed) {
+      setReleaseDecision(
+        updateGeographyPilotRelease({
+          status: "paused",
+          reviewerName: reviewerName.trim() || "Founder",
+          note: `Pilot remains paused until GEO-D01 has ${launchReadiness.mcqGate.detail}`,
         })
       );
       return;
@@ -425,6 +457,55 @@ export function GeographyTestingObservationPanel() {
       </div>
 
       <div
+        data-testid="admin-geography-launch-readiness"
+        data-launch-status={launchReadiness.status}
+        data-can-share-controlled-pilot={launchReadiness.canShareControlledPilot ? "true" : "false"}
+        data-fresh-mcq-count={launchReadiness.mcqGate.questionCount}
+        className={cn(
+          "mt-5 rounded-md border p-4 shadow-sm",
+          launchReadiness.canShareControlledPilot
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20"
+            : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20"
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-zinc-600 dark:text-zinc-300">
+              Geography launch readiness
+            </p>
+            <h3 className="mt-2 text-lg font-black text-zinc-950 dark:text-zinc-50">{launchReadiness.status}</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+              One proof snapshot for Day 1: lesson mode, 25-question MCQ gate, founder review, release, blocker state,
+              and tester receipts.
+            </p>
+          </div>
+          <span className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100">
+            {launchReadiness.canShareControlledPilot ? "Controlled link open" : "Hold link"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {launchReadiness.gates.map((gate) => (
+            <div
+              key={gate.id}
+              data-launch-gate={gate.id}
+              data-passed={gate.passed ? "true" : "false"}
+              className={cn(
+                "rounded-md border bg-white p-3 dark:bg-zinc-950",
+                gate.passed ? "border-emerald-200 dark:border-emerald-900" : "border-amber-200 dark:border-amber-900"
+              )}
+            >
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+                {gate.label}
+              </p>
+              <p className="mt-2 text-sm font-black text-zinc-950 dark:text-zinc-50">{gate.value}</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-zinc-600 dark:text-zinc-300">{gate.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
         data-testid="admin-pre-share-gate"
         className={cn(
           "mt-5 rounded-md border p-4 shadow-sm",
@@ -450,7 +531,7 @@ export function GeographyTestingObservationPanel() {
               {readyToSharePilot ? "Safe to share with controlled testers" : "Do not share yet"}
             </h3>
             <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-              Geography is locally built, but the student link should only be sent when all three launch gates are green.
+              Geography is locally built, but the student link should only be sent when every launch gate is green.
             </p>
           </div>
           <Link
@@ -465,7 +546,7 @@ export function GeographyTestingObservationPanel() {
             Open student link <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {preShareGateChecks.map((item) => (
             <div
               key={item.label}

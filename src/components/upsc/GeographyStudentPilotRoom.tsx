@@ -35,6 +35,7 @@ import {
   type GeographyPilotTesterEntry,
 } from "@/lib/upsc/geographyPilotRoster";
 import { getGeographyDayReadiness } from "@/lib/upsc/geographyReadiness";
+import { buildGeographyLaunchReadiness } from "@/lib/upsc/geographyLaunchReadiness";
 import { geographySessions } from "@/lib/upsc/plan";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
@@ -92,11 +93,13 @@ export function GeographyStudentPilotRoom() {
     typeof window === "undefined" ? [] : readGeographyPilotFeedback(),
   );
   const [releaseDecision, setReleaseDecision] = useState(() => readGeographyPilotRelease());
+  const [launchGateRefresh, setLaunchGateRefresh] = useState(0);
 
   useEffect(() => {
     const reloadFeedback = () => setFeedbackEntries(readGeographyPilotFeedback());
     const reloadRelease = () => setReleaseDecision(readGeographyPilotRelease());
     const reloadRoster = () => setRoster(readGeographyPilotRoster());
+    const reloadLaunchReadiness = () => setLaunchGateRefresh(Date.now());
     const reloadCheckIn = () => {
       const nextCheckIn = readGeographyPilotCheckIn();
       setCheckIn(nextCheckIn);
@@ -112,10 +115,12 @@ export function GeographyStudentPilotRoom() {
     reloadRelease();
     reloadRoster();
     reloadCheckIn();
+    reloadLaunchReadiness();
     window.addEventListener("storage", reloadFeedback);
     window.addEventListener("storage", reloadRelease);
     window.addEventListener("storage", reloadRoster);
     window.addEventListener("storage", reloadCheckIn);
+    window.addEventListener("storage", reloadLaunchReadiness);
     window.addEventListener("geography-pilot-feedback-updated", reloadFeedback);
     window.addEventListener("geography-pilot-release-updated", reloadRelease);
     window.addEventListener("geography-pilot-roster-updated", reloadRoster);
@@ -125,6 +130,7 @@ export function GeographyStudentPilotRoom() {
       window.removeEventListener("storage", reloadRelease);
       window.removeEventListener("storage", reloadRoster);
       window.removeEventListener("storage", reloadCheckIn);
+      window.removeEventListener("storage", reloadLaunchReadiness);
       window.removeEventListener("geography-pilot-feedback-updated", reloadFeedback);
       window.removeEventListener("geography-pilot-release-updated", reloadRelease);
       window.removeEventListener("geography-pilot-roster-updated", reloadRoster);
@@ -137,7 +143,19 @@ export function GeographyStudentPilotRoom() {
   const dayOneReadiness = getGeographyDayReadiness(dayOne, dayOneProgress, { isLoaded, labSlug: "india-map" });
   const openBlockerCount = feedbackEntries.filter((entry) => entry.status === "open" && entry.severity === "Blocker").length;
   const releaseBlockedByFeedback = openBlockerCount > 0;
-  const releaseApproved = releaseDecision.status === "approved" && !releaseBlockedByFeedback;
+  const completedTesterCount = roster.filter((tester) => tester.status === "completed").length;
+  const blockedTesterCount = roster.filter((tester) => tester.status === "blocked").length;
+  const launchReadiness = buildGeographyLaunchReadiness({
+    founderReviewComplete: true,
+    releaseApproved: releaseDecision.status === "approved",
+    openBlockerCount,
+    rosterCount: roster.length,
+    completedTesterCount,
+    feedbackReceiptCount: feedbackEntries.length,
+    blockedTesterCount,
+  });
+  void launchGateRefresh;
+  const releaseApproved = releaseDecision.status === "approved" && !releaseBlockedByFeedback && launchReadiness.mcqGate.passed;
   const hasPilotCheckIn = Boolean(checkIn?.testerName.trim());
   const pilotNavigationUnlocked = releaseApproved && hasPilotCheckIn;
 
@@ -176,6 +194,13 @@ export function GeographyStudentPilotRoom() {
         detail: "A blocker was reported. Wait for the admin to review it before continuing the student test.",
         href: "/upsc/geography/pilot",
         icon: TriangleAlert,
+      }
+    : !launchReadiness.mcqGate.passed
+    ? {
+        label: "Wait for fresh MCQs",
+        detail: "The Day 1 route opens only after the reviewed 25-question practice set is ready.",
+        href: "/upsc/geography/pilot",
+        icon: ShieldCheck,
       }
     : !releaseApproved
     ? {
@@ -321,6 +346,8 @@ export function GeographyStudentPilotRoom() {
                 >
                   {releaseBlockedByFeedback
                     ? "Pilot paused after blocker feedback"
+                    : !launchReadiness.mcqGate.passed
+                      ? "Day 1 practice is still being prepared"
                     : !releaseApproved
                       ? "Pilot opens after final approval"
                       : "Check in before starting"}
@@ -331,6 +358,8 @@ export function GeographyStudentPilotRoom() {
 
           <div
             data-testid="geography-student-pilot-release-state"
+            data-fresh-mcq-count={launchReadiness.mcqGate.questionCount}
+            data-fresh-mcq-ready={launchReadiness.mcqGate.passed ? "true" : "false"}
             className={cn(
               "rounded-lg border p-5 shadow-sm",
               releaseApproved ? "border-[#cfe5dc] bg-[#e7f5ee]" : "border-[#ef9f27]/50 bg-[#fff4df]",
@@ -345,11 +374,15 @@ export function GeographyStudentPilotRoom() {
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
                   {releaseBlockedByFeedback
                     ? "Paused after blocker feedback"
+                    : !launchReadiness.mcqGate.passed
+                      ? "Day 1 practice is still being prepared"
                     : releaseApproved ? "Ready for controlled testing" : "Not open for students yet"}
                 </h2>
                 <p className="mt-3 text-sm font-bold leading-6 text-[#49675e]">
                   {releaseBlockedByFeedback
                     ? "A blocker has been reported in the pilot feedback board. Wait until the admin marks it reviewed."
+                    : !launchReadiness.mcqGate.passed
+                    ? launchReadiness.mcqGate.detail
                     : releaseApproved
                     ? `This test is limited to ${releaseDecision.maxTesters} students for ${releaseDecision.testWindow}.`
                     : "Final local review is still being completed before this route is shared."}

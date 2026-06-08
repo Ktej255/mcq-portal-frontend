@@ -81,7 +81,7 @@ async function getProgress(page) {
 }
 
 async function seedApprovedFreshStudent(page) {
-  const questions = [buildQuestion(1), buildQuestion(2)];
+  const questions = Array.from({ length: 25 }, (_, index) => buildQuestion(index + 1));
   await page.evaluate(
     ({
       localProfileKey,
@@ -162,7 +162,7 @@ async function seedApprovedFreshStudent(page) {
         localMcqKey,
         JSON.stringify({
           "GEO-D01": {
-            planned: seededQuestions.length,
+            planned: 25,
             drafted: seededQuestions.length,
             difficulty: "MEDIUM",
             status: "READY",
@@ -236,7 +236,7 @@ async function run() {
   await page.getByTestId("geography-student-pilot-start").click();
   await page.waitForURL(`**/upsc/geography/watch?day=${day}`, { timeout: 15000 });
   await page.getByTestId("watch-topic-player").waitFor({ timeout: 15000 });
-  await page.getByText("Start with this focused lesson.", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-topic-player").getByText("Finish lesson and discuss", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "share-ready-lesson-entry", checks);
   await page.getByTestId("watch-complete-and-discuss").click();
 
@@ -268,19 +268,24 @@ async function run() {
   await page.waitForURL(`**/upsc/geography/mcq-readiness?day=${day}`, { timeout: 15000 });
   await page.getByTestId("mcq-start-local-practice").waitFor({ timeout: 15000 });
   await page.getByTestId("mcq-start-local-practice").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 2", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-A").click();
-  await page.getByRole("button", { name: "Next question" }).click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 2 of 2", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-A").click();
+  for (let questionNumber = 1; questionNumber <= 25; questionNumber += 1) {
+    await page
+      .getByTestId("mcq-local-practice-runner")
+      .getByText(`Question ${questionNumber} of 25`, { exact: false })
+      .waitFor({ timeout: 15000 });
+    await page.getByTestId("mcq-practice-option-A").click();
+    if (questionNumber < 25) {
+      await page.getByRole("button", { name: "Next question" }).click();
+    }
+  }
   await page.getByTestId("mcq-practice-outcome-gate").getByText("Command cleared", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "share-ready-mcq-command", checks);
 
   const mcqProgress = await getProgress(page);
   if (
     mcqProgress?.mcqCompleted !== true ||
-    mcqProgress?.mcqCorrectCount !== 2 ||
-    mcqProgress?.mcqTotal !== 2 ||
+    mcqProgress?.mcqCorrectCount !== 25 ||
+    mcqProgress?.mcqTotal !== 25 ||
     mcqProgress?.mcqOutcome !== "Command"
   ) {
     throw new Error(`Fresh MCQ command did not persist: ${JSON.stringify(mcqProgress, null, 2)}`);

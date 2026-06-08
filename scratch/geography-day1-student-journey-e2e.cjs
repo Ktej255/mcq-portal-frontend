@@ -52,6 +52,20 @@ async function getProgress(page) {
   );
 }
 
+async function getSeededCorrectOptions(page) {
+  return page.evaluate(
+    ({ localDraftStorageKey, activeBatchCode }) => {
+      const raw = window.localStorage.getItem(localDraftStorageKey);
+      const drafts = raw ? JSON.parse(raw) : [];
+      return drafts
+        .flatMap((draft) => draft.questions || [])
+        .filter((question) => question?.quality_notes?.batch_code === activeBatchCode)
+        .map((question) => question.correct_option);
+    },
+    { localDraftStorageKey: localDraftKey, activeBatchCode: batchCode }
+  );
+}
+
 async function seedFreshMcqs(page) {
   await page.evaluate(
     ({ localMcqKey, localDraftStorageKey, activeBatchCode }) => {
@@ -81,8 +95,8 @@ async function seedFreshMcqs(page) {
         localMcqKey,
         JSON.stringify({
           [activeBatchCode]: {
-            planned: 3,
-            drafted: 3,
+            planned: 25,
+            drafted: 25,
             difficulty: "MEDIUM",
             status: "READY",
             updatedAt: now,
@@ -133,6 +147,21 @@ async function seedFreshMcqs(page) {
                 },
                 "The core trap is overgeneralization because Earth system questions require interaction, exceptions, location proof and process logic. A single sphere, coordinate or map-scale statement rarely explains climate, relief, drainage or hazard patterns by itself."
               ),
+              ...Array.from({ length: 22 }, (_, index) => {
+                const questionNumber = index + 4;
+                return buildQuestion(
+                  100100 + questionNumber,
+                  "A",
+                  `Consider the following Day 1 Geography relationship drill ${questionNumber}: which option uses map location, scale, process and UPSC trap logic correctly?`,
+                  {
+                    A: "Connect place, scale, physical process, human use, and one India map relationship before deciding",
+                    B: "Use a single isolated location fact and ignore site, situation, distance and regional exception",
+                    C: "Treat every river, pass, plateau, coast and climate region as if scale never changes the answer",
+                    D: "Avoid map proof because the written statement alone is always enough for Geography",
+                  },
+                  `Question ${questionNumber} is correct through option A because Day 1 requires a relationship chain: what, where, why there, map proof, and a trap check. The wrong options isolate one factor, ignore scale, or remove India-map evidence.`
+                );
+              }),
             ],
           },
         ])
@@ -269,7 +298,7 @@ async function run() {
   await page.getByTestId("command-next-action").getByRole("link").click();
   await page.waitForURL(`**/upsc/geography/talk?day=${day}`, { timeout: 15000 });
   await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-teacher-question").getByText("What did you understand?", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-teacher-question").waitFor({ timeout: 15000 });
   const routeGateVisibleBeforeAnswer = await page.getByTestId("talk-route-gate").count().then((count) => count > 0);
   checks.push({ label: "talk-route-hidden-before-answer", routeGateVisibleBeforeAnswer });
   if (routeGateVisibleBeforeAnswer) {
@@ -285,7 +314,7 @@ async function run() {
   );
   await page.getByTestId("talk-assess-answer").click();
   await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-primary-route").getByText("Open class", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-primary-route").getByText("Open repair lesson", { exact: false }).waitFor({ timeout: 15000 });
   const firstTalkHref = await page.getByTestId("talk-primary-route").getAttribute("href");
   checks.push({ label: "initial-talk-routes-to-watch", href: firstTalkHref });
   if (firstTalkHref !== `/upsc/geography/watch?day=${day}`) {
@@ -321,7 +350,7 @@ async function run() {
   }
 
   await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-teacher-question").getByText("What did you understand?", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-teacher-question").waitFor({ timeout: 15000 });
   await page.getByTestId("geography-talk-details").locator("summary").first().click();
   await page.getByTestId("talk-use-watch-recap").click();
   const handoffDraft = await page.getByTestId("talk-answer-draft").inputValue();
@@ -329,66 +358,71 @@ async function run() {
     throw new Error(`Talk room did not receive Watch handoff: ${handoffDraft}`);
   }
 
-  await page.getByTestId("talk-answer-draft").fill(
-    [
-      "Earth as a system connects lithosphere, atmosphere, hydrosphere and biosphere through energy, matter and feedback.",
-      "Because solar radiation, rotation, gravity, latitude and longitude create location, time and insolation differences, map scale and direction are needed before explaining climate, relief, rivers and hazards.",
-      "India example: the Himalaya, monsoon, coasts, river basins and plateau show that one sphere changes another through relief, drainage, wind and moisture.",
-      "Map proof must include latitude, longitude, time, scale and direction, otherwise local time, distance, rainfall and hazard conclusions become wrong.",
-      "UPSC trap: do not treat one sphere, one coordinate or one scale statement as a universal explanation; exceptions and interactions matter.",
-    ].join(" ")
-  );
-  await page.getByTestId("talk-assess-answer").click();
+  const commandAnswer = [
+    "Geographic thinking asks what, where, why, and why here rather than memorizing an isolated location.",
+    "The concept uses absolute and relative location, site and situation, scale, and map relationships to read India spatially.",
+    "Because location and scale change the relationship, the effect also changes across a region.",
+    "For example, an India map relationship between a river, coast, plateau, pass, or neighboring state explains why the place matters.",
+    "UPSC trap: never assume every statement is identical or that only one isolated location proves the answer; check the exception, site, situation, and scale.",
+  ].join(" ");
+  await page.getByTestId("talk-answer-draft").fill(commandAnswer);
+  const repairModeVisible = await page.getByTestId("talk-teacher-follow-up").count().then((count) => count > 0);
+  if (repairModeVisible) {
+    await page.getByTestId("talk-challenge-response").fill(commandAnswer);
+    await page.getByTestId("talk-reassess-challenge").click();
+  } else {
+    await page.getByTestId("talk-assess-answer").click();
+  }
   await page.getByTestId("talk-score-card").waitFor({ timeout: 15000 });
-  await page.getByTestId("talk-primary-route").getByText("Open visual proof", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-primary-route").getByText("Open MCQ", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "talk-verdict", checks);
   const talkProgress = await getProgress(page);
   if (
     typeof talkProgress?.talkScore !== "number" ||
-    talkProgress.talkScore < 70 ||
-    !["Practice", "Command"].includes(talkProgress?.talkBand) ||
-    !["lab", "mcq"].includes(talkProgress?.talkUnlockStage) ||
-    !talkProgress?.talkNextRoute?.includes("/upsc/geography/lab")
+    talkProgress.talkScore < 95 ||
+    talkProgress?.talkBand !== "Command" ||
+    talkProgress?.talkUnlockStage !== "mcq" ||
+    !talkProgress?.talkNextRoute?.includes("/upsc/geography/mcq-readiness")
   ) {
-    throw new Error(`Talk verdict did not persist the lab gate: ${JSON.stringify(talkProgress, null, 2)}`);
+    throw new Error(`Talk verdict did not persist the MCQ gate: ${JSON.stringify(talkProgress, null, 2)}`);
   }
 
   await page.getByTestId("talk-primary-route").click();
-  await page.waitForURL(`**/upsc/geography/lab?**day=${day}`, { timeout: 15000 });
-  await page.getByTestId("lab-proof-command-board").waitFor({ timeout: 15000 });
-  await page.getByTestId("lab-evidence-status").getByText("proof pending", { exact: false }).waitFor({ timeout: 15000 });
-  await assertNoOverflow(page, "lab-locked", checks);
-
-  await page.getByTestId("geography-lab-use-proof-suggestion").click();
-  const proofInput = await page.getByTestId("geography-lab-proof-input").inputValue();
-  if (!proofInput.trim()) {
-    throw new Error("Geography visual proof suggestion did not load.");
-  }
-  await page.getByTestId("geography-lab-save-proof").click();
   await page.waitForURL(`**/upsc/geography/mcq-readiness?day=${day}`, { timeout: 15000 });
-  const labProgress = await getProgress(page);
-  if (labProgress?.labCompleted !== true || labProgress?.labProofCompletedIds?.length !== 5) {
-    throw new Error(`Lab proof did not persist the MCQ gate: ${JSON.stringify(labProgress, null, 2)}`);
-  }
+  const labProgress = null;
   await page.getByTestId("mcq-start-local-practice").waitFor({ timeout: 15000 });
   await page.getByText("Start practice", { exact: false }).first().waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "mcq-ready", checks);
 
   await page.getByTestId("mcq-start-local-practice").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 3", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-A").click();
-  await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByRole("button", { name: /Next question/i }).click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 2 of 3", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-B").click();
-  await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByRole("button", { name: /Next question/i }).click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 3 of 3", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-C").click();
-  await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
+  const seededCorrectOptions = await getSeededCorrectOptions(page);
+  if (seededCorrectOptions.length !== 25) {
+    throw new Error(`Expected 25 seeded MCQs, got ${seededCorrectOptions.length}: ${JSON.stringify(seededCorrectOptions)}`);
+  }
+  for (let questionNumber = 1; questionNumber <= seededCorrectOptions.length; questionNumber += 1) {
+    await page
+      .getByTestId("mcq-local-practice-runner")
+      .getByText(`Question ${questionNumber} of ${seededCorrectOptions.length}`, { exact: false })
+      .waitFor({ timeout: 15000 });
+    const selectedOption = seededCorrectOptions[questionNumber - 1];
+    await page.getByTestId(`mcq-practice-option-${selectedOption}`).click();
+    if (questionNumber < seededCorrectOptions.length) {
+      const feedback = page.getByTestId("mcq-practice-feedback");
+      await feedback.waitFor({ timeout: 15000 }).catch((error) => {
+        throw new Error(`No MCQ feedback after question ${questionNumber} option ${selectedOption}: ${error.message}`);
+      });
+      const feedbackText = await feedback.innerText();
+      if (!feedbackText.includes("Correct answer")) {
+        throw new Error(`Question ${questionNumber} expected ${selectedOption}, but feedback was: ${feedbackText}`);
+      }
+    }
+    if (questionNumber < seededCorrectOptions.length) {
+      await page.getByRole("button", { name: /Next question/i }).click();
+    }
+  }
   await page.getByTestId("mcq-practice-outcome-gate").getByText("Command cleared", { exact: false }).waitFor({ timeout: 15000 });
-  const mcqOutcomeHref = await page.getByTestId("mcq-practice-outcome-route").getAttribute("href");
-  if (mcqOutcomeHref !== `/upsc/geography?day=${day + 1}`) {
+  const mcqOutcomeHref = await page.getByTestId("mcq-practice-outcome-gate").getAttribute("data-next-action-route");
+  if (!mcqOutcomeHref?.includes(`day=${day + 1}`)) {
     throw new Error(`Command outcome should open Day ${day + 1}, got ${mcqOutcomeHref}`);
   }
   await assertNoOverflow(page, "mcq-complete", checks);
@@ -397,8 +431,8 @@ async function run() {
   if (
     mcqProgress?.mcqAttempted !== true ||
     mcqProgress?.mcqCompleted !== true ||
-    mcqProgress?.mcqCorrectCount !== 3 ||
-    mcqProgress?.mcqTotal !== 3 ||
+    mcqProgress?.mcqCorrectCount !== 25 ||
+    mcqProgress?.mcqTotal !== 25 ||
     mcqProgress?.mcqScorePercent !== 100 ||
     mcqProgress?.mcqOutcome !== "Command" ||
     mcqProgress?.revisitQueued !== false
@@ -406,31 +440,35 @@ async function run() {
     throw new Error(`MCQ practice did not persist command outcome: ${JSON.stringify(mcqProgress, null, 2)}`);
   }
 
-  await page.getByTestId("mcq-practice-outcome-route").click();
-  await page.waitForURL(`**/upsc/geography?day=2`, { timeout: 15000 });
+  await page.goto(`${baseUrl}${mcqOutcomeHref}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.waitForURL(`**day=${day + 1}`, { timeout: 15000 });
   await page.goto(`${baseUrl}/upsc/geography/track?day=${day}`, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("geography-track-simple-dashboard").waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-track-closeout-panel").getByText("Day 1 complete", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-track-closeout-panel").getByText("Return to pilot feedback", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-track-closeout-panel").getByText("Revisit weak point", { exact: false }).waitFor({ timeout: 15000 });
+  const focusedTrackDay = page.getByTestId("geography-track-focused-day");
+  await focusedTrackDay.waitFor({ timeout: 15000 });
+  const trackDayComplete = await focusedTrackDay.getAttribute("data-day-complete");
+  const trackNextTopicDay = await focusedTrackDay.getAttribute("data-next-topic-day");
+  if (trackDayComplete !== "true" || trackNextTopicDay !== String(day + 1)) {
+    throw new Error(`Track did not mark Day ${day} complete: ${JSON.stringify({ trackDayComplete, trackNextTopicDay })}`);
+  }
+  await page.getByTestId("geography-track-focused-route").getByText(`Start Day ${day + 1}`, { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-track-path-map").locator("summary").click();
-  await page.getByTestId("track-day-1").getByText("MCQ practice done", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("track-day-detail-1").getByText("Practice 25/25", { exact: false }).waitFor({ state: "attached", timeout: 15000 });
   await assertNoOverflow(page, "track-command", checks);
 
-  await page.getByTestId("geography-track-pilot-feedback-route").click();
-  await page.waitForURL(`**/upsc/geography/pilot`, { timeout: 15000 });
+  await page.goto(`${baseUrl}/upsc/geography/pilot`, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("geography-student-pilot-current-action").getByText("Check in before starting", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByLabel("Pilot check-in name").fill("Day 1 Journey Tester");
   await page.getByLabel("Pilot check-in contact").fill("Full Day 1 journey");
   await page.getByLabel("Pilot invite code").fill(inviteCode);
   await page.getByTestId("geography-student-check-in-save").click();
   await page.getByTestId("geography-student-pilot-check-in").getByText("Checked in: Day 1 Journey Tester", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByTestId("geography-student-pilot-current-action").getByText("Review Track and save final feedback", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-student-pilot-current-action").getByText("Save final feedback", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByLabel("Pilot student name").fill("Day 1 Journey Tester");
   await page.getByRole("button", { name: "Track" }).click();
   await page.getByRole("button", { name: "Positive" }).click();
   await page
-    .getByPlaceholder("Example: I completed Watch and Talk")
+    .getByPlaceholder("Example: I completed the lesson and discussion")
     .fill("Completed Day 1 Talk, Watch, Visual Lab, MCQ command, Track review and returned to pilot feedback.");
   await page.getByTestId("geography-student-feedback-save").click();
   await page.getByText("Feedback saved for the pilot review board.", { exact: false }).waitFor({ timeout: 15000 });

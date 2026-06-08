@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT } from "@/lib/upsc/geographyLaunchReadiness";
 import { hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { GEOGRAPHY_RECALL_TARGET, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
 import { getGeographyBatchCode } from "@/lib/upsc/mcqContract";
@@ -96,6 +97,9 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
   const batchCode = getGeographyBatchCode(activeSession);
   const [freshQuestions, setFreshQuestions] = useState<QuestionPayload[]>([]);
   const [batchStatus, setBatchStatus] = useState<"DRAFT" | "READY" | "EMPTY">("EMPTY");
+  const [plannedQuestionCount, setPlannedQuestionCount] = useState(
+    activeSession.day === 1 ? GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT : 1
+  );
   const [practiceStarted, setPracticeStarted] = useState(false);
   const [currentPracticeIndex, setCurrentPracticeIndex] = useState(0);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<number, string>>({});
@@ -107,6 +111,13 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
     const timer = window.setTimeout(() => {
       const state = readMcqCommandBatchState(batchCode);
       const questions = readLocalMcqCommandQuestionsForBatch(batchCode);
+      const requiredQuestionCount =
+        activeSession.day === 1
+          ? Math.max(
+              state?.planned ?? GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT,
+              GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT
+            )
+          : Math.max(state?.planned ?? questions.length, 1);
       const savedProgress = getDayProgress(activeSession.day);
       const canRestorePractice = savedProgress?.mcqLastBatchCode === batchCode && !savedProgress?.mcqCompleted;
       const restoredAnswers = canRestorePractice
@@ -122,6 +133,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
             : 0;
       setFreshQuestions(questions);
       setBatchStatus(state?.status ?? (questions.length > 0 ? "DRAFT" : "EMPTY"));
+      setPlannedQuestionCount(requiredQuestionCount);
       setPracticeStarted(canRestorePractice && restoredAnsweredCount > 0);
       setCurrentPracticeIndex(Math.max(0, Math.min(questions.length - 1, restoredIndex)));
       setPracticeAnswers(restoredAnswers);
@@ -134,7 +146,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
   const labProofCount = Math.min(progress?.labProofCompletedIds?.length ?? (progress?.labCompleted ? 5 : 0), 5);
   const labCleared = Boolean(progress?.labCompleted) && labProofCount >= 5;
   const gatesCleared = talkCleared;
-  const hasFreshQuestions = freshQuestions.length > 0;
+  const hasFreshQuestions = freshQuestions.length >= plannedQuestionCount;
   const isReady = gatesCleared && hasFreshQuestions && batchStatus === "READY";
   const currentPracticeQuestion = freshQuestions[currentPracticeIndex];
   const currentPracticeAnswer = practiceAnswers[currentPracticeIndex];
@@ -174,7 +186,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
       ? `${resolvedCorrectCount}/${resolvedTotal} correct (${resolvedScorePercent}%). Your next topic is ready.`
       : `${resolvedCorrectCount}/${resolvedTotal} correct (${resolvedScorePercent}%). Complete a short revision before trying again.`
     : !isReady
-      ? `${mcqLevelCopy.pendingDetail} Return to Today for the next available task.`
+      ? `${mcqLevelCopy.pendingDetail} Fresh set status: ${freshQuestions.length}/${plannedQuestionCount} reviewed.`
       : mcqLevelCopy.readyDetail;
   const nextActionHref = hasPracticeResult
     ? resolvedOutcome === "Command"
@@ -190,7 +202,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
     },
     {
       label: "Fresh MCQ",
-      detail: isReady || hasPracticeResult ? "One question at a time" : "Preparing reviewed set",
+      detail: isReady || hasPracticeResult ? "One question at a time" : `${freshQuestions.length}/${plannedQuestionCount} reviewed`,
     },
     {
       label: resolvedOutcome === "Revisit" ? "Repair" : "Next topic",
@@ -251,7 +263,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
               : "Open progress review"
             : "Finish practice",
       mcqFreshQuestionCount: freshQuestions.length,
-      mcqPlannedCount: Math.max(freshQuestions.length, 25),
+      mcqPlannedCount: plannedQuestionCount,
       mcqQualityPassed: batchStatus === "READY",
       mcqQualityGateLabel: batchStatus,
       revisitQueued: nextComplete && nextOutcome === "Revisit",
