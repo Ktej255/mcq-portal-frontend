@@ -168,6 +168,13 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         <section
           data-testid="subject-simple-student-flow"
+          data-visible-mode="four-signal-one-action"
+          data-essential-signal-count="4"
+          data-essential-signals="todays-task|learning-gap|next-revision|current-path"
+          data-primary-action-href={activeReadiness.href}
+          data-active-subject={plan.slug}
+          data-active-day={activeSession.day}
+          data-current-readiness={activeReadiness.label}
           className="space-y-4 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-4 shadow-sm md:p-5"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -196,6 +203,9 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
 
           <article
             data-testid="subject-command-next-action"
+            data-student-signal="todays-task"
+            data-next-action-href={activeReadiness.href}
+            data-next-action-label={activeReadiness.actionLabel}
             className={cn("rounded-lg border p-4 md:p-5", activeReadiness.tone)}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -293,7 +303,28 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
             </div>
           </section>
 
-          <div data-testid="subject-four-signal-grid" className="grid gap-3 md:grid-cols-3">
+          <div
+            data-testid="subject-four-signal-grid"
+            data-signal-count="4"
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+          >
+            <Link
+              href={activeReadiness.href}
+              data-testid="subject-signal-todays-task"
+              data-signal-priority="primary"
+              data-signal-route={activeReadiness.href}
+              className="rounded-lg border border-[var(--subject-accent)] bg-[var(--subject-light)] p-4 transition hover:border-[var(--subject-dark)] hover:bg-white"
+            >
+              <ClipboardCheck className="h-5 w-5 text-[var(--subject-accent)]" />
+              <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
+                Today's task
+              </p>
+              <p className="mt-2 text-sm font-black leading-6 text-[var(--subject-heading)]">
+                {activeReadiness.actionLabel}
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{activeSession.title}</p>
+            </Link>
+
             <Link
               href={activeReadiness.href}
               data-testid="subject-signal-learning-gap"
@@ -321,17 +352,23 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
 
             <Link
               href={`${basePath}/track?day=${activeSession.day}`}
-              data-testid="subject-signal-trend"
+              data-testid="subject-signal-current-path"
+              data-current-week={activeWeek}
+              data-current-day={activeSession.day}
+              data-total-days={plan.sessions.length}
+              data-sprint-progress={sprintProgress}
               className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 transition hover:border-[var(--subject-accent)] hover:bg-[var(--subject-light)]"
             >
-              <LineChart className="h-5 w-5 text-[var(--subject-accent)]" />
+              <CalendarDays className="h-5 w-5 text-[var(--subject-accent)]" />
               <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
-                Trend
+                Current path
               </p>
               <p className="mt-2 text-sm font-black leading-6 text-[var(--subject-heading)]">
-                {trendLabel} - {trendScore}% signal
+                Day {activeSession.day}/{plan.sessions.length} - Week {activeWeek}
               </p>
-              <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">Track decides whether the next step is repair or practice.</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">
+                {trendLabel} - {trendScore}% signal. Track decides repair, practice, or the next topic.
+              </p>
             </Link>
           </div>
 

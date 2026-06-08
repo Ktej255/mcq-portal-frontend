@@ -69,10 +69,68 @@ async function inspectSubject(page, subject, checks) {
   await page.getByTestId("subject-command-student-instruction").getByText("First action", { exact: false }).waitFor({ timeout: 15000 });
   await page.getByTestId("subject-command-action-route").waitFor({ timeout: 15000 });
   await page.getByTestId("subject-four-signal-grid").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-signal-todays-task").waitFor({ timeout: 15000 });
   await page.getByTestId("subject-signal-learning-gap").waitFor({ timeout: 15000 });
   await page.getByTestId("subject-signal-next-revision").waitFor({ timeout: 15000 });
-  await page.getByTestId("subject-signal-trend").waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-signal-current-path").waitFor({ timeout: 15000 });
   await page.getByTestId("subject-command-context-details").waitFor({ timeout: 15000 });
+
+  const simpleFlowProof = await page.getByTestId("subject-simple-student-flow").evaluate((node) => ({
+    mode: node.getAttribute("data-visible-mode"),
+    count: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    primaryActionHref: node.getAttribute("data-primary-action-href"),
+    activeSubject: node.getAttribute("data-active-subject"),
+    activeDay: node.getAttribute("data-active-day"),
+    currentReadiness: node.getAttribute("data-current-readiness"),
+  }));
+  const signalCount = await page.locator('[data-testid^="subject-signal-"]').count();
+  const signalIds = await page.locator('[data-testid^="subject-signal-"]').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-testid"))
+  );
+  const todaysTaskSignal = await page.getByTestId("subject-signal-todays-task").evaluate((node) => ({
+    priority: node.getAttribute("data-signal-priority"),
+    route: node.getAttribute("data-signal-route"),
+    text: node.textContent || "",
+  }));
+  const currentPathSignal = await page.getByTestId("subject-signal-current-path").evaluate((node) => ({
+    week: node.getAttribute("data-current-week"),
+    day: node.getAttribute("data-current-day"),
+    totalDays: node.getAttribute("data-total-days"),
+    sprintProgress: node.getAttribute("data-sprint-progress"),
+    text: node.textContent || "",
+  }));
+
+  if (
+    simpleFlowProof.mode !== "four-signal-one-action" ||
+    simpleFlowProof.count !== "4" ||
+    simpleFlowProof.signals !== "todays-task|learning-gap|next-revision|current-path" ||
+    simpleFlowProof.activeSubject !== subject.slug ||
+    simpleFlowProof.activeDay !== "1" ||
+    !simpleFlowProof.primaryActionHref ||
+    !simpleFlowProof.currentReadiness ||
+    signalCount !== 4 ||
+    signalIds.join("|") !==
+      "subject-signal-todays-task|subject-signal-learning-gap|subject-signal-next-revision|subject-signal-current-path" ||
+    todaysTaskSignal.priority !== "primary" ||
+    todaysTaskSignal.route !== simpleFlowProof.primaryActionHref ||
+    !todaysTaskSignal.text.includes("Today's task") ||
+    currentPathSignal.day !== "1" ||
+    currentPathSignal.week !== "1" ||
+    currentPathSignal.totalDays === "0" ||
+    !currentPathSignal.sprintProgress ||
+    !currentPathSignal.text.includes("Current path")
+  ) {
+    throw new Error(
+      `${subject.slug} simple four-signal contract failed: ${JSON.stringify({
+        simpleFlowProof,
+        signalCount,
+        signalIds,
+        todaysTaskSignal,
+        currentPathSignal,
+      })}`
+    );
+  }
 
   const contextOpenBefore = await page.getByTestId("subject-command-context-details").evaluate((element) => element.open);
   const syllabusVisibleBefore = await page.getByTestId("subject-command-syllabus-anchor").isVisible();
@@ -179,7 +237,7 @@ async function inspectSubject(page, subject, checks) {
   }
 
   await assertNoOverflow(page, `${subject.slug}-desktop`, checks);
-  return { theme, loopTheme, actionHref, actionLabel, syllabusText };
+  return { theme, loopTheme, actionHref, actionLabel, syllabusText, simpleFlowProof, signalIds };
 }
 
 async function run() {
