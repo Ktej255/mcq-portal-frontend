@@ -140,6 +140,12 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const syllabusChips = getGeographySubtopics(activeSession).slice(0, 4);
   const sourcePack = getSubjectSourcePack("geography");
   const leadTrendInsight = sourcePack?.trendInsights[0];
+  const revisionDay = Math.min(activeSession.day + 2, geographySessions.length);
+  const revisionSession = resolveSession(revisionDay);
+  const revisionSummary =
+    activeProgress?.revisitQueued || activeProgress?.talkBand === "Revisit"
+      ? `Revisit Day ${activeSession.day}: ${activeSession.revisit}`
+      : `Day ${revisionDay}: ${revisionSession.revisit}`;
 
   const canSelectDay = (day: number) => day <= generatedCurrentDay || Boolean(getDayProgress(day));
   const previousDay = activeSession.day > 1 ? activeSession.day - 1 : null;
@@ -185,6 +191,13 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8 md:py-8">
         <section
           data-testid="geography-today-simple-entry"
+          data-visible-mode="four-signal-one-action"
+          data-essential-signal-count="4"
+          data-essential-signals="todays-task|learning-gap|next-revision|current-path"
+          data-primary-action-href={nextAction.href}
+          data-active-subject="geography"
+          data-active-day={activeSession.day}
+          data-current-readiness={nextAction.label}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -295,7 +308,13 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
           </div>
         </section>
 
-        <section data-testid="geography-next-action" className={cn("rounded-lg border p-5 shadow-sm", nextAction.tone)}>
+        <section
+          data-testid="geography-next-action"
+          data-student-signal="todays-task"
+          data-next-action-href={nextAction.href}
+          data-next-action-label={nextAction.cta}
+          className={cn("rounded-lg border p-5 shadow-sm", nextAction.tone)}
+        >
           <div data-testid="command-next-action" className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
             <div className="flex min-w-0 gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white/70">
@@ -314,6 +333,73 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               {nextAction.cta} <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
+        </section>
+
+        <section
+          data-testid="geography-four-signal-grid"
+          data-signal-count="4"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
+          <Link
+            href={nextAction.href}
+            data-testid="geography-signal-todays-task"
+            data-signal-priority="primary"
+            data-signal-route={nextAction.href}
+            className="rounded-lg border border-[#1d9e75] bg-[#e7f5ee] p-4 transition hover:border-[#1a3a2a] hover:bg-white"
+          >
+            <ClipboardCheck className="h-5 w-5 text-[#1d9e75]" />
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+              Today's task
+            </p>
+            <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{nextAction.cta}</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{activeSession.title}</p>
+          </Link>
+
+          <Link
+            href={nextAction.href}
+            data-testid="geography-signal-learning-gap"
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+          >
+            <BrainCircuit className="h-5 w-5 text-[#1d9e75]" />
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+              Learning gap
+            </p>
+            <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{nextAction.label}</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{nextAction.detail}</p>
+          </Link>
+
+          <Link
+            href={`/upsc/geography/revisit?day=${activeSession.day}`}
+            data-testid="geography-signal-next-revision"
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+          >
+            <RefreshCcw className="h-5 w-5 text-[#1d9e75]" />
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+              Next revision
+            </p>
+            <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{revisionSummary}</p>
+          </Link>
+
+          <Link
+            href={`/upsc/geography/track?day=${activeSession.day}`}
+            data-testid="geography-signal-current-path"
+            data-current-week={activeSession.week}
+            data-current-day={activeSession.day}
+            data-total-days={geographySessions.length}
+            data-month-progress={monthPercent}
+            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+          >
+            <MapPinned className="h-5 w-5 text-[#1d9e75]" />
+            <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+              Current path
+            </p>
+            <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">
+              Day {activeSession.day}/{geographySessions.length} - Week {activeSession.week}
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">
+              {monthPercent}% June progress. Track decides repair, practice, or the next topic.
+            </p>
+          </Link>
         </section>
 
         <details

@@ -35,6 +35,87 @@ async function assertNextAction(page, expectedHref, checks) {
   }
 }
 
+async function assertFourSignalContract(page, expectedHref, expectedDay, checks) {
+  const entry = page.getByTestId("geography-today-simple-entry");
+  const nextAction = page.getByTestId("geography-next-action");
+  const grid = page.getByTestId("geography-four-signal-grid");
+  await grid.waitFor({ timeout: 15000 });
+
+  const contract = await entry.evaluate((node) => ({
+    visibleMode: node.getAttribute("data-visible-mode"),
+    signalCount: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    primaryActionHref: node.getAttribute("data-primary-action-href"),
+    activeSubject: node.getAttribute("data-active-subject"),
+    activeDay: node.getAttribute("data-active-day"),
+    readiness: node.getAttribute("data-current-readiness"),
+  }));
+
+  const nextActionContract = await nextAction.evaluate((node) => ({
+    studentSignal: node.getAttribute("data-student-signal"),
+    href: node.getAttribute("data-next-action-href"),
+    label: node.getAttribute("data-next-action-label"),
+  }));
+
+  const gridContract = await grid.evaluate((node) => ({
+    signalCount: node.getAttribute("data-signal-count"),
+    text: node.textContent || "",
+  }));
+
+  const signals = await grid.locator("[data-testid^='geography-signal-']").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      id: node.getAttribute("data-testid"),
+      route: node.getAttribute("data-signal-route"),
+      priority: node.getAttribute("data-signal-priority"),
+      href: node.getAttribute("href"),
+      currentWeek: node.getAttribute("data-current-week"),
+      currentDay: node.getAttribute("data-current-day"),
+      totalDays: node.getAttribute("data-total-days"),
+      monthProgress: node.getAttribute("data-month-progress"),
+      text: node.textContent || "",
+    }))
+  );
+
+  checks.push({ label: "geography-four-signal-contract", contract, nextActionContract, gridContract, signals });
+
+  const requiredSignals = [
+    "geography-signal-todays-task",
+    "geography-signal-learning-gap",
+    "geography-signal-next-revision",
+    "geography-signal-current-path",
+  ];
+  const signalIds = signals.map((signal) => signal.id);
+  const todaysTask = signals.find((signal) => signal.id === "geography-signal-todays-task");
+  const currentPath = signals.find((signal) => signal.id === "geography-signal-current-path");
+
+  if (
+    contract.visibleMode !== "four-signal-one-action" ||
+    contract.signalCount !== "4" ||
+    contract.signals !== "todays-task|learning-gap|next-revision|current-path" ||
+    contract.primaryActionHref !== expectedHref ||
+    contract.activeSubject !== "geography" ||
+    contract.activeDay !== String(expectedDay) ||
+    !contract.readiness ||
+    nextActionContract.studentSignal !== "todays-task" ||
+    nextActionContract.href !== expectedHref ||
+    !nextActionContract.label ||
+    gridContract.signalCount !== "4" ||
+    signals.length !== 4 ||
+    !requiredSignals.every((id) => signalIds.includes(id)) ||
+    todaysTask?.route !== expectedHref ||
+    todaysTask?.priority !== "primary" ||
+    currentPath?.currentDay !== String(expectedDay) ||
+    currentPath?.totalDays !== "30" ||
+    !currentPath?.monthProgress ||
+    !gridContract.text.includes("Today's task") ||
+    !gridContract.text.includes("Learning gap") ||
+    !gridContract.text.includes("Next revision") ||
+    !gridContract.text.includes("Current path")
+  ) {
+    throw new Error(`Geography four-signal contract failed: ${JSON.stringify({ contract, nextActionContract, gridContract, signals }, null, 2)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -101,6 +182,7 @@ async function run() {
     throw new Error(`Geography source path proof failed: ${JSON.stringify(geographySourcePath, null, 2)}`);
   }
   await assertNextAction(page, "/upsc/geography/talk?day=1", checks);
+  await assertFourSignalContract(page, "/upsc/geography/talk?day=1", 1, checks);
   await page.getByText("Open controls", { exact: false }).waitFor({ timeout: 15000 });
   const funnelVisibleBeforeOpen = await page.getByTestId("geography-day-funnel").isVisible();
   checks.push({ label: "funnel-hidden-before-open", funnelVisibleBeforeOpen });
@@ -213,6 +295,7 @@ async function run() {
   await page.goto(`${baseUrl}/upsc/geography?day=1`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("geography-today-simple-entry").waitFor({ timeout: 15000 });
   await assertNextAction(page, "/upsc/geography/talk?day=1", checks);
+  await assertFourSignalContract(page, "/upsc/geography/talk?day=1", 1, checks);
   const funnelVisibleMobile = await page.getByTestId("geography-day-funnel").isVisible();
   checks.push({ label: "funnel-hidden-before-open-mobile", funnelVisibleMobile });
   if (funnelVisibleMobile) {
