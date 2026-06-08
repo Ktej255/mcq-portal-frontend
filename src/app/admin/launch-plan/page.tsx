@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GeographyDay1ReleasePackPanel } from "@/components/admin/GeographyDay1ReleasePackPanel";
 import { GeographyTestingObservationPanel } from "@/components/admin/GeographyTestingObservationPanel";
 import { LiveContinuityRehearsalPanel } from "@/components/admin/LiveContinuityRehearsalPanel";
 import {
@@ -201,6 +202,8 @@ export default function AdminLaunchPlanPage() {
       </section>
 
       <GeographyTestingObservationPanel />
+
+      <GeographyDay1ReleasePackPanel />
 
       <section
         data-testid="admin-immediate-action-queue"

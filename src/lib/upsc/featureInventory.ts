@@ -307,7 +307,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Launch tracker",
         status: "verified",
-        behavior: "Shows honest readiness, pending live steps, controlled tester workflow, a separate public-launch boundary that stays locked until final Day 1 media/transcript, first-wave receipts, and live continuity receipts exist, an operator-only six-receipt live-release boundary, and an editable live continuity rehearsal board for Supabase RLS, Talk limiting, server-only AI configuration, deployed OAuth callback, same-account recovery, different-account isolation, and the public-launch hold rule.",
+        behavior: "Shows honest readiness, pending live steps, controlled tester workflow, a separate public-launch boundary that stays locked until the final Day 1 release-pack receipt board, first-wave receipts, and live continuity receipts exist, an operator-only six-receipt live-release boundary, an editable Day 1 content receipt board, and an editable live continuity rehearsal board for Supabase RLS, Talk limiting, server-only AI configuration, deployed OAuth callback, same-account recovery, different-account isolation, and the public-launch hold rule.",
         evidence: "admin-launch-plan-e2e.cjs",
       },
       {
@@ -478,7 +478,7 @@ export const releaseGates: ReleaseGate[] = [
   {
     title: "Real Geography Day 1 pack",
     complete: false,
-    detail: "Source-backed portal-native draft passes locally. Attach the final recorded lecture, transcript approval, detailed visual proof, and fresh MCQs.",
+    detail: "Source-backed portal-native draft passes locally. Complete the Day 1 release-pack receipt board for approved media, transcript, detailed visual proof, fresh MCQs, and founder sign-off.",
   },
   {
     title: "Controlled tester wave",
@@ -646,7 +646,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
     requirement: "At least one subject, Geography, should be student-ready before moving to the next subject.",
     status: "content-gap",
     currentState:
-      "Geography has the full local loop and 30-day route map. The launch readiness snapshot now blocks controlled sharing until the Day 1 practice bank has 25 reviewed READY questions, and the public-launch boundary remains locked until final Day 1 media/transcript plus clean first-wave receipts exist. Real Day 1 media, transcript approval, detailed animation depth, and founder-approved fresh MCQs remain the main content gap.",
+      "Geography has the full local loop and 30-day route map. The launch readiness snapshot now blocks controlled sharing until the Day 1 practice bank has 25 reviewed READY questions, and the public-launch boundary remains locked until the Day 1 release-pack receipt board, clean first-wave receipts, and live continuity receipts exist. Real Day 1 media, transcript approval, detailed animation depth, and founder-approved fresh MCQs remain the main content gap.",
     evidence: "Geography pilot inventory, Day 1 intake, and release gates",
     nextAction: "Attach final Day 1 lecture media, approve transcript, import fresh advanced MCQs, and run controlled tester receipts.",
     phase: "Day 1",

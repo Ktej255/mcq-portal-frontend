@@ -27,6 +27,9 @@ export type GeographyLaunchReadinessInput = {
   liveContinuityComplete?: boolean;
   liveContinuityReceiptCount?: number;
   liveContinuityTotal?: number;
+  day1ReleasePackComplete?: boolean;
+  day1ReleasePackReceiptCount?: number;
+  day1ReleasePackTotal?: number;
 };
 
 export function readGeographyDay1McqLaunchGate(): GeographyLaunchGate & {
@@ -81,6 +84,9 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
   const liveContinuityTotal = input.liveContinuityTotal ?? 6;
   const liveContinuityReceiptCount = input.liveContinuityReceiptCount ?? 0;
   const liveContinuityComplete = Boolean(input.liveContinuityComplete);
+  const day1ReleasePackTotal = input.day1ReleasePackTotal ?? 4;
+  const day1ReleasePackReceiptCount = input.day1ReleasePackReceiptCount ?? 0;
+  const day1ReleasePackComplete = Boolean(input.day1ReleasePackComplete);
 
   const gates: GeographyLaunchGate[] = [
     {
@@ -143,7 +149,8 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
     canShareControlledPilot &&
     geographyDay1MediaAttachment.releaseAssetPairReady &&
     firstWaveEvidenceComplete &&
-    liveContinuityComplete;
+    liveContinuityComplete &&
+    day1ReleasePackComplete;
   const publicLaunchGates: GeographyLaunchGate[] = [
     {
       id: "controlled-pilot",
@@ -162,6 +169,17 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
         ? "Approved recording and transcript are attached."
         : "Public launch needs the final approved recording plus transcript, not only the portal-native fallback.",
       passed: geographyDay1MediaAttachment.releaseAssetPairReady,
+    },
+    {
+      id: "day1-release-pack",
+      label: "Day 1 release pack",
+      value: day1ReleasePackComplete
+        ? "Complete"
+        : `${Math.min(day1ReleasePackReceiptCount, day1ReleasePackTotal)}/${day1ReleasePackTotal}`,
+      detail: day1ReleasePackComplete
+        ? "Final Day 1 media, visual proof, MCQ quality, and founder sign-off receipts are recorded."
+        : "Public launch needs the full Day 1 release-pack receipt board, not only the local fallback lesson.",
+      passed: day1ReleasePackComplete,
     },
     {
       id: "first-wave-receipts",

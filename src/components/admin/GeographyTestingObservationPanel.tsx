@@ -46,6 +46,10 @@ import {
   getLiveContinuityReceiptSummary,
   readLiveContinuityReceipts,
 } from "@/lib/upsc/liveContinuityReceipts";
+import {
+  getGeographyDay1ReleasePackReceiptSummary,
+  readGeographyDay1ReleasePackReceipts,
+} from "@/lib/upsc/geographyDay1ReleasePackReceipts";
 import { cn } from "@/lib/utils";
 
 const severityTone: Record<GeographyPilotFeedbackSeverity, string> = {
@@ -62,6 +66,7 @@ export function GeographyTestingObservationPanel() {
   const [waveDecision, setWaveDecision] = useState(() => readGeographyPilotWaveDecision());
   const [founderReview, setFounderReview] = useState(() => readGeographyFounderReview());
   const [liveContinuityState, setLiveContinuityState] = useState(() => readLiveContinuityReceipts());
+  const [day1ReleasePackState, setDay1ReleasePackState] = useState(() => readGeographyDay1ReleasePackReceipts());
   const [reviewerName, setReviewerName] = useState(releaseDecision.reviewerName);
   const [releaseNote, setReleaseNote] = useState(releaseDecision.note);
   const [testerName, setTesterName] = useState("");
@@ -76,6 +81,7 @@ export function GeographyTestingObservationPanel() {
   const reloadWaveDecision = () => setWaveDecision(readGeographyPilotWaveDecision());
   const reloadFounderReview = () => setFounderReview(readGeographyFounderReview());
   const reloadLiveContinuity = () => setLiveContinuityState(readLiveContinuityReceipts());
+  const reloadDay1ReleasePack = () => setDay1ReleasePackState(readGeographyDay1ReleasePackReceipts());
   const reloadLaunchReadiness = () => setLaunchGateRefresh(Date.now());
 
   useEffect(() => {
@@ -85,6 +91,7 @@ export function GeographyTestingObservationPanel() {
     reloadWaveDecision();
     reloadFounderReview();
     reloadLiveContinuity();
+    reloadDay1ReleasePack();
     reloadLaunchReadiness();
     window.addEventListener("storage", reloadFeedback);
     window.addEventListener("storage", reloadRoster);
@@ -92,6 +99,7 @@ export function GeographyTestingObservationPanel() {
     window.addEventListener("storage", reloadWaveDecision);
     window.addEventListener("storage", reloadFounderReview);
     window.addEventListener("storage", reloadLiveContinuity);
+    window.addEventListener("storage", reloadDay1ReleasePack);
     window.addEventListener("storage", reloadLaunchReadiness);
     window.addEventListener("geography-pilot-feedback-updated", reloadFeedback);
     window.addEventListener("geography-pilot-roster-updated", reloadRoster);
@@ -99,6 +107,7 @@ export function GeographyTestingObservationPanel() {
     window.addEventListener("geography-pilot-wave-decision-updated", reloadWaveDecision);
     window.addEventListener("geography-founder-review-updated", reloadFounderReview);
     window.addEventListener("upsc-live-continuity-receipts-updated", reloadLiveContinuity);
+    window.addEventListener("geography-day1-release-pack-receipts-updated", reloadDay1ReleasePack);
     return () => {
       window.removeEventListener("storage", reloadFeedback);
       window.removeEventListener("storage", reloadRoster);
@@ -106,6 +115,7 @@ export function GeographyTestingObservationPanel() {
       window.removeEventListener("storage", reloadWaveDecision);
       window.removeEventListener("storage", reloadFounderReview);
       window.removeEventListener("storage", reloadLiveContinuity);
+      window.removeEventListener("storage", reloadDay1ReleasePack);
       window.removeEventListener("storage", reloadLaunchReadiness);
       window.removeEventListener("geography-pilot-feedback-updated", reloadFeedback);
       window.removeEventListener("geography-pilot-roster-updated", reloadRoster);
@@ -113,6 +123,7 @@ export function GeographyTestingObservationPanel() {
       window.removeEventListener("geography-pilot-wave-decision-updated", reloadWaveDecision);
       window.removeEventListener("geography-founder-review-updated", reloadFounderReview);
       window.removeEventListener("upsc-live-continuity-receipts-updated", reloadLiveContinuity);
+      window.removeEventListener("geography-day1-release-pack-receipts-updated", reloadDay1ReleasePack);
     };
   }, []);
 
@@ -237,6 +248,7 @@ export function GeographyTestingObservationPanel() {
   const checkedFounderItems = founderReview.checkedIds.length;
   const nextFounderItem = geographyFounderReviewItems.find((item) => !founderReview.checkedIds.includes(item.id));
   const liveContinuitySummary = getLiveContinuityReceiptSummary(liveContinuityState);
+  const day1ReleasePackSummary = getGeographyDay1ReleasePackReceiptSummary(day1ReleasePackState);
   const launchReadiness = buildGeographyLaunchReadiness({
     founderReviewComplete,
     releaseApproved: releaseDecision.status === "approved",
@@ -248,6 +260,9 @@ export function GeographyTestingObservationPanel() {
     liveContinuityComplete: liveContinuitySummary.complete,
     liveContinuityReceiptCount: liveContinuitySummary.completedCount,
     liveContinuityTotal: liveContinuitySummary.total,
+    day1ReleasePackComplete: day1ReleasePackSummary.complete,
+    day1ReleasePackReceiptCount: day1ReleasePackSummary.completedCount,
+    day1ReleasePackTotal: day1ReleasePackSummary.total,
   });
   void launchGateRefresh;
   const readyToSharePilot = launchReadiness.canShareControlledPilot;
@@ -543,7 +558,7 @@ export function GeographyTestingObservationPanel() {
             </h3>
             <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
               Controlled tester sharing is not the same as public student launch. Public launch needs the controlled
-              pilot gate, final Day 1 media and transcript, and clean first-wave receipts.
+              pilot gate, final Day 1 release pack, clean first-wave receipts, and live continuity proof.
             </p>
           </div>
           <span

@@ -8,6 +8,7 @@ const waveDecisionKey = "sarit-upsc-geography-pilot-wave-decision-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const draftKey = "sarit-admin-bulk-question-drafts-v1";
 const liveReceiptKey = "sarit-upsc-live-continuity-receipts-v1";
+const day1ReleasePackKey = "sarit-upsc-geography-day1-release-pack-receipts-v1";
 const liveReceiptIds = [
   "learner-state-rls",
   "talk-limiter",
@@ -129,7 +130,7 @@ async function run() {
       }
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_admin_launch_plan");
     },
-    { keysToClear: [feedbackKey, releaseKey, rosterKey, waveDecisionKey, mcqKey, draftKey, liveReceiptKey] },
+    { keysToClear: [feedbackKey, releaseKey, rosterKey, waveDecisionKey, mcqKey, draftKey, liveReceiptKey, day1ReleasePackKey] },
   );
 
   await page.goto(`${baseUrl}/admin/launch-plan`, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -219,6 +220,29 @@ async function run() {
   await liveContinuityStatus.getByText("6/6 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
   if ((await liveContinuityStatus.getAttribute("data-live-continuity-ready")) !== "true") {
     throw new Error("Live continuity did not become ready after all receipts were recorded.");
+  }
+  const day1ReleasePack = page.getByTestId("admin-geography-day1-release-pack");
+  await day1ReleasePack.waitFor({ timeout: 15000 });
+  await day1ReleasePack.getByText("Geography Day 1 Release Pack", { exact: true }).waitFor({ timeout: 15000 });
+  const day1ReleasePackStatus = page.getByTestId("admin-day1-release-pack-status");
+  await day1ReleasePackStatus.getByText("Day 1 release pack locked", { exact: true }).waitFor({ timeout: 15000 });
+  await day1ReleasePackStatus.getByText("0/4 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
+  if ((await day1ReleasePackStatus.getAttribute("data-day1-release-pack-ready")) !== "false") {
+    throw new Error("Day 1 release pack started as ready without content receipts.");
+  }
+  if (!(await page.getByTestId("day1-release-pack-complete-approved-media-pair").isDisabled())) {
+    throw new Error("Approved media pair receipt can be completed while the media/transcript env pair is missing.");
+  }
+  await day1ReleasePack
+    .getByLabel("Proof note for Detailed visual and map proof is approved")
+    .fill("Founder reviewed the final Day 1 visual map relationship proof and accepted it.");
+  await page.getByTestId("day1-release-pack-complete-detailed-visual-proof").click();
+  await day1ReleasePackStatus.getByText("1/4 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
+  await day1ReleasePack
+    .getByLabel("Proof note for Fresh advanced Day 1 MCQ bank is launch-ready")
+    .fill("Fresh Day 1 MCQ quality gate will be completed only after the 25-question bank is ready.");
+  if (!(await page.getByTestId("day1-release-pack-complete-fresh-advanced-mcqs").isDisabled())) {
+    throw new Error("Fresh MCQ receipt can be completed before GEO-D01 reaches the ready gate.");
   }
   const sharePacket = page.getByTestId("admin-share-packet");
   await sharePacket.waitFor({ timeout: 15000 });
@@ -346,10 +370,22 @@ async function run() {
   await seedReadyDay1Mcqs(page);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("admin-geography-launch-readiness").getByText("25/25 ready", { exact: false }).waitFor({ timeout: 15000 });
+  const reloadedDay1ReleasePack = page.getByTestId("admin-geography-day1-release-pack");
+  await reloadedDay1ReleasePack
+    .getByLabel("Proof note for Fresh advanced Day 1 MCQ bank is launch-ready")
+    .fill("GEO-D01 has 25 reviewed advanced questions with trap language and map or case anchors.");
+  await page.getByTestId("day1-release-pack-complete-fresh-advanced-mcqs").click();
+  await reloadedDay1ReleasePack
+    .getByLabel("Proof note for Founder final Day 1 release-pack sign-off is recorded")
+    .fill("Founder confirmed the Day 1 release pack is ready except for the approved media environment pair.");
+  await page.getByTestId("day1-release-pack-complete-founder-final-signoff").click();
+  await page.getByTestId("admin-day1-release-pack-status").getByText("3/4 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
   const publicLaunchBoundary = page.getByTestId("admin-geography-public-launch-boundary");
   await publicLaunchBoundary.waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Public launch still locked", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Final Day 1 media", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Day 1 release pack", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("3/4", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Live continuity", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Proved", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Missing", { exact: true }).waitFor({ timeout: 15000 });
