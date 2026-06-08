@@ -484,6 +484,17 @@ export const DailyWorkspace = () => {
                       <span className="font-black uppercase tracking-[0.12em] text-[#085041]">After this: </span>
                       {activeMissionDecision.tomorrowAdjustment.title}
                     </div>
+                    <div
+                      data-testid="upsc-yesterday-proof"
+                      data-origin-status={activeMissionDecision.todayOriginProof.statusLabel}
+                      data-source-day={activeMissionDecision.todayOriginProof.sourceDay}
+                      data-target-day={activeMissionDecision.todayOriginProof.targetDay}
+                      data-origin-route={activeMissionDecision.todayOriginProof.href}
+                      className="mt-3 rounded-md border border-[#dcd5c7] bg-white/75 px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                    >
+                      <span className="font-black uppercase tracking-[0.12em] text-[#085041]">Why today: </span>
+                      {activeMissionDecision.todayOriginProof.title}. {activeMissionDecision.todayOriginProof.evidenceSummary}
+                    </div>
                   </div>
                   <Link
                     href={activeMissionHref}

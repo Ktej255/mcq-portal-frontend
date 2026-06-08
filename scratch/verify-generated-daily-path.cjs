@@ -41,6 +41,13 @@ async function dashboardSnapshot(page) {
   await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
   const summary = await page.getByTestId("upsc-generated-daily-path-summary").innerText();
   const startHref = await page.getByTestId("upsc-start-today").getAttribute("href");
+  const yesterdayProof = await page.getByTestId("upsc-yesterday-proof").evaluate((node) => ({
+    status: node.getAttribute("data-origin-status"),
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    route: node.getAttribute("data-origin-route"),
+    text: node.textContent || "",
+  }));
   await page.getByTestId("upsc-planning-drawer").locator("summary").first().click();
   const pathLinkCount = await page.getByTestId("upsc-generated-daily-path").locator("a").count();
   const pathTopics = await page.getByTestId("upsc-generated-daily-topic").evaluateAll((topics) =>
@@ -49,7 +56,7 @@ async function dashboardSnapshot(page) {
       text: topic.textContent,
     }))
   );
-  return { summary, startHref, pathLinkCount, pathTopics };
+  return { summary, startHref, yesterdayProof, pathLinkCount, pathTopics };
 }
 
 async function run() {
@@ -69,6 +76,10 @@ async function run() {
     !beginnerDay1Summary.includes("day 1 of 30") ||
     !beginnerDay1Summary.includes("geography day 1") ||
     beginnerDay1.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
+    beginnerDay1.yesterdayProof.status !== "Subject start" ||
+    beginnerDay1.yesterdayProof.sourceDay !== "0" ||
+    beginnerDay1.yesterdayProof.targetDay !== "1" ||
+    !beginnerDay1.yesterdayProof.text.includes("Day 1 starts here") ||
     beginnerDay1.pathLinkCount !== 0 ||
     beginnerDay1.pathTopics.map((item) => item.state).join("|") !== "current|queued" ||
     !beginnerDay1.pathTopics[0]?.text.includes("Day 1") ||
@@ -92,6 +103,10 @@ async function run() {
   if (
     !beginnerDay2Summary.includes("day 2 of 30") ||
     beginnerDay2.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
+    beginnerDay2.yesterdayProof.status !== "Auto advance" ||
+    beginnerDay2.yesterdayProof.sourceDay !== "1" ||
+    beginnerDay2.yesterdayProof.targetDay !== "2" ||
+    !beginnerDay2.yesterdayProof.text.includes("Day 1 cleared") ||
     beginnerDay2.pathLinkCount !== 0 ||
     beginnerDay2.pathTopics.map((item) => item.state).join("|") !== "current|queued" ||
     !beginnerDay2.pathTopics[0]?.text.includes("Day 2") ||
@@ -116,6 +131,10 @@ async function run() {
     !intermediateDay2Summary.includes("day 2 of 30") ||
     !intermediateDay2Summary.includes("geography day 2") ||
     intermediateDay2.startHref !== "/upsc/daily-command#daily-me-time-checkin" ||
+    intermediateDay2.yesterdayProof.status !== "Auto advance" ||
+    intermediateDay2.yesterdayProof.sourceDay !== "1" ||
+    intermediateDay2.yesterdayProof.targetDay !== "2" ||
+    !intermediateDay2.yesterdayProof.text.includes("Day 1 cleared") ||
     intermediateDay2.pathLinkCount !== 0 ||
     intermediateDay2.pathTopics.map((item) => item.state).join("|") !== "current|queued|queued" ||
     !intermediateDay2.pathTopics[0]?.text.includes("Day 2") ||

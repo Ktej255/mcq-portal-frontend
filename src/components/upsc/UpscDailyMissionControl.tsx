@@ -419,6 +419,9 @@ export function UpscDailyMissionControl() {
           data-revision-href={dailyPlanner.revision.href}
           data-after-this-decision={dailyPlanner.nextSessionProof.decision}
           data-after-this-route={dailyPlanner.tomorrowAdjustment.href}
+          data-yesterday-decision={dailyPlanner.todayOriginProof.statusLabel}
+          data-yesterday-source-day={dailyPlanner.todayOriginProof.sourceDay}
+          data-yesterday-target-day={dailyPlanner.todayOriginProof.targetDay}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
         >
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -460,6 +463,9 @@ export function UpscDailyMissionControl() {
                 </summary>
                 <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
                   {dailyPlanner.nextSessionProof.evidenceSummary}
+                </p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                  Why today: {dailyPlanner.todayOriginProof.title}. {dailyPlanner.todayOriginProof.evidenceSummary}
                 </p>
                 <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
                   After this: {dailyPlanner.tomorrowAdjustment.title}
@@ -524,6 +530,47 @@ export function UpscDailyMissionControl() {
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{step.detail}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="daily-today-origin-proof"
+          data-source-day={dailyPlanner.todayOriginProof.sourceDay}
+          data-target-day={dailyPlanner.todayOriginProof.targetDay}
+          data-origin-status={dailyPlanner.todayOriginProof.statusLabel}
+          data-origin-route={dailyPlanner.todayOriginProof.href}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                <CalendarDays className="h-5 w-5" />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Why this is today&apos;s task
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                {dailyPlanner.todayOriginProof.title}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                {dailyPlanner.todayOriginProof.evidenceSummary}
+              </p>
+              <Link
+                href={dailyPlanner.todayOriginProof.href}
+                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
+              >
+                {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {dailyPlanner.todayOriginProof.evidence.map((item) => (
+                <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                  <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

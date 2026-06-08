@@ -73,6 +73,20 @@ export type DailyPlannerDecision = {
       status: "used" | "missing" | "blocked";
     }>;
   };
+  todayOriginProof: {
+    sourceDay: number;
+    targetDay: number;
+    title: string;
+    detail: string;
+    href: string;
+    statusLabel: string;
+    evidenceSummary: string;
+    evidence: Array<{
+      label: string;
+      value: string;
+      status: "used" | "missing" | "blocked";
+    }>;
+  };
 };
 
 type PlannerInput = {
@@ -726,6 +740,186 @@ function buildNextSessionProof(
   };
 }
 
+function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["todayOriginProof"] {
+  if (input.selectedDay <= 1) {
+    return {
+      sourceDay: 0,
+      targetDay: 1,
+      title: "Day 1 starts here",
+      detail: "No yesterday evidence is required for the first subject day.",
+      href: routeFor(input.subjectSlug, "watch", 1),
+      statusLabel: "Subject start",
+      evidenceSummary: "The subject starts with mind-state, recall baseline, class, discussion, and MCQ evidence.",
+      evidence: [
+        { label: "Yesterday", value: "No earlier day", status: "used" },
+        { label: "Rule", value: "Start Day 1", status: "used" },
+        { label: "Next proof", value: "Me-time and recall baseline", status: "missing" },
+      ],
+    };
+  }
+
+  const sourceDay = input.selectedDay - 1;
+  const sourceSession = findSession(input.sessions, sourceDay);
+  const progress = input.progress[String(sourceDay)];
+  const sourceDoubt =
+    progress && hasTeacherDoubt(progress)
+      ? {
+          category: progress.teacherDoubtCategory!,
+          reason: progress.teacherDoubtReason!,
+          repairAction: progress.teacherDoubtRepairAction!,
+          masteryCheck: progress.teacherDoubtMasteryCheck!,
+          href:
+            progress.talkNextRoute ??
+            (progress.talkUnlockStage === "mcq"
+              ? routeFor(input.subjectSlug, "mcq-readiness", sourceDay)
+              : routeFor(input.subjectSlug, "talk", sourceDay)),
+        }
+      : null;
+  const commandReady = hasCommand(progress);
+  const recallStatus =
+    commandReady
+      ? "used"
+      : sourceDoubt || needsRecovery(progress) || (typeof progress?.talkScore === "number" && progress.talkScore < recallTarget)
+      ? "blocked"
+      : hasRecallBaseline(progress)
+        ? "used"
+        : "missing";
+  const classStatus = progress?.watched || commandReady ? "used" : "missing";
+  const practiceStatus =
+    commandReady
+      ? "used"
+      : progress?.mcqOutcome === "Revisit"
+      ? "blocked"
+      : progress?.mcqCompleted && progress.mcqOutcome !== "Pending"
+        ? "used"
+        : "missing";
+  const evidence: DailyPlannerDecision["todayOriginProof"]["evidence"] = [
+    {
+      label: "Mind-state",
+      value: progress?.meTimeCompletedAt ? `Saved ${progress.meTimeMood ?? "ready"}` : "Yesterday me-time missing",
+      status: progress?.meTimeCompletedAt ? "used" : "missing",
+    },
+    {
+      label: "Recall",
+      value: sourceDoubt
+        ? `AI gap: ${sourceDoubt.category}`
+        : typeof progress?.talkScore === "number"
+          ? `Recall ${progress.talkScore}/100`
+          : commandReady
+            ? "Command recall accepted"
+          : progress?.reflection?.trim()
+            ? "Recall note saved"
+            : "Recall baseline missing",
+      status: recallStatus,
+    },
+    {
+      label: "Class",
+      value: progress?.watched
+        ? `${sourceSession.title} watched`
+        : commandReady
+          ? "Command class gate accepted"
+          : "Class proof missing",
+      status: classStatus,
+    },
+    {
+      label: "Practice",
+      value: progress?.mcqCompleted
+        ? `${progress.mcqOutcome ?? "Completed"}${typeof progress.mcqScorePercent === "number" ? ` ${progress.mcqScorePercent}%` : ""}`
+        : "MCQ evidence missing",
+      status: practiceStatus,
+    },
+  ];
+
+  if (!progress || !hasStarted(progress)) {
+    return {
+      sourceDay,
+      targetDay: input.selectedDay,
+      title: `Day ${sourceDay} evidence is missing`,
+      detail: `Today is on Day ${input.selectedDay}, but the auto planner still needs Day ${sourceDay} proof before it can claim a true advance.`,
+      href: routeFor(input.subjectSlug, "watch", sourceDay),
+      statusLabel: "Manual selection",
+      evidenceSummary: "Yesterday did not provide enough evidence, so the plan stays conservative.",
+      evidence,
+    };
+  }
+
+  if (sourceDoubt) {
+    return {
+      sourceDay,
+      targetDay: sourceDay,
+      title: `Day ${sourceDay} AI gap controls today`,
+      detail: sourceDoubt.repairAction,
+      href: sourceDoubt.href,
+      statusLabel: "Yesterday repair",
+      evidenceSummary: `Yesterday produced an AI ${sourceDoubt.category} gap, so new work should wait.`,
+      evidence,
+    };
+  }
+
+  if (needsRecovery(progress)) {
+    return {
+      sourceDay,
+      targetDay: sourceDay,
+      title: `Day ${sourceDay} needs repair first`,
+      detail: repairDetail(progress),
+      href: routeFor(input.subjectSlug, "revisit", sourceDay),
+      statusLabel: "Yesterday repair",
+      evidenceSummary: "Yesterday has a recovery signal, so today's plan should repair before advancing.",
+      evidence,
+    };
+  }
+
+  if (hasCommand(progress)) {
+    return {
+      sourceDay,
+      targetDay: input.selectedDay,
+      title: `Day ${sourceDay} cleared, Day ${input.selectedDay} opens`,
+      detail: `${sourceSession.title} has enough command evidence to justify today's next topic.`,
+      href: routeFor(input.subjectSlug, "watch", input.selectedDay),
+      statusLabel: "Auto advance",
+      evidenceSummary: "Yesterday's command evidence is strong enough for the next subject day.",
+      evidence,
+    };
+  }
+
+  if (!hasRecallBaseline(progress) || (typeof progress.talkScore === "number" && progress.talkScore < recallTarget)) {
+    return {
+      sourceDay,
+      targetDay: sourceDay,
+      title: `Day ${sourceDay} recall proof is incomplete`,
+      detail: "Yesterday cannot open a fresh topic until recall reaches command level.",
+      href: routeFor(input.subjectSlug, "talk", sourceDay),
+      statusLabel: "Yesterday recall",
+      evidenceSummary: "Recall evidence is missing or below target, so the next route remains discussion-first.",
+      evidence,
+    };
+  }
+
+  if (!progress.mcqCompleted || progress.mcqOutcome === "Pending") {
+    return {
+      sourceDay,
+      targetDay: sourceDay,
+      title: `Day ${sourceDay} MCQs are pending`,
+      detail: "Yesterday has class and recall evidence, but practice proof is still required before a true advance.",
+      href: routeFor(input.subjectSlug, "mcq-readiness", sourceDay),
+      statusLabel: "Yesterday practice",
+      evidenceSummary: "Practice evidence is missing, so the route stays on yesterday's MCQ gate.",
+      evidence,
+    };
+  }
+
+  return {
+    sourceDay,
+    targetDay: sourceDay,
+    title: `Day ${sourceDay} remains under review`,
+    detail: "Yesterday has partial evidence, so the planner keeps a conservative route until command is clear.",
+    href: routeFor(input.subjectSlug, "track", sourceDay),
+    statusLabel: "Review",
+    evidenceSummary: "Partial evidence exists, but command is not yet proven.",
+    evidence,
+  };
+}
+
 export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDecision {
   const revisionDue = findRevisionDue(input);
   const teacherDoubt = findTeacherDoubtDue(input);
@@ -756,5 +950,6 @@ export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDeci
     sessionReadiness: buildSessionReadiness(input, teacherDoubt),
     tomorrowAdjustment,
     nextSessionProof: buildNextSessionProof(input, tomorrowAdjustment, teacherDoubt),
+    todayOriginProof: buildTodayOriginProof(input),
   };
 }

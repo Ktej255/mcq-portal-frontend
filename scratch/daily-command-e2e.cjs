@@ -110,6 +110,9 @@ async function assertStudentFocus(page, expected, checks, label) {
     revisionHref: node.getAttribute("data-revision-href"),
     afterThisDecision: node.getAttribute("data-after-this-decision"),
     afterThisRoute: node.getAttribute("data-after-this-route"),
+    yesterdayDecision: node.getAttribute("data-yesterday-decision"),
+    yesterdaySourceDay: node.getAttribute("data-yesterday-source-day"),
+    yesterdayTargetDay: node.getAttribute("data-yesterday-target-day"),
     text: node.textContent || "",
   }));
   const primaryAction = await page.getByTestId("daily-command-primary-action").evaluate((node) => ({
@@ -134,6 +137,9 @@ async function assertStudentFocus(page, expected, checks, label) {
     focus.readinessScore !== expected.readinessScore ||
     focus.afterThisDecision !== expected.afterThisDecision ||
     focus.afterThisRoute !== expected.afterThisRoute ||
+    focus.yesterdayDecision !== expected.yesterdayDecision ||
+    focus.yesterdaySourceDay !== expected.yesterdaySourceDay ||
+    focus.yesterdayTargetDay !== expected.yesterdayTargetDay ||
     !focus.learningGap ||
     !focus.revisionHref ||
     !focus.text.includes("Do this now") ||
@@ -146,6 +152,29 @@ async function assertStudentFocus(page, expected, checks, label) {
     focusProofOpen
   ) {
     throw new Error(`${label}: student focus contract failed: ${JSON.stringify({ focus, primaryAction, focusProofOpen }, null, 2)}`);
+  }
+}
+
+async function assertTodayOriginProof(page, expected, checks, label) {
+  await page.getByTestId("daily-today-origin-proof").waitFor({ timeout: 15000 });
+  const origin = await page.getByTestId("daily-today-origin-proof").evaluate((node) => ({
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    status: node.getAttribute("data-origin-status"),
+    route: node.getAttribute("data-origin-route"),
+    text: node.textContent || "",
+  }));
+  checks.push({ label, origin });
+
+  if (
+    origin.sourceDay !== expected.sourceDay ||
+    origin.targetDay !== expected.targetDay ||
+    origin.status !== expected.status ||
+    origin.route !== expected.route ||
+    !origin.text.includes(expected.titleText) ||
+    !origin.text.includes(expected.summaryText)
+  ) {
+    throw new Error(`${label}: today origin proof failed: ${JSON.stringify(origin, null, 2)}`);
   }
 }
 
@@ -237,6 +266,9 @@ async function run() {
       readinessScore: "40",
       afterThisDecision: "Repair first",
       afterThisRoute: "/upsc/geography/watch?day=3",
+      yesterdayDecision: "Manual selection",
+      yesterdaySourceDay: "2",
+      yesterdayTargetDay: "3",
       visibleText: "Repair Day 3 before new load",
     },
     checks,
@@ -259,6 +291,19 @@ async function run() {
     },
     checks,
     "daily-learning-funnel-repair-lock"
+  );
+  await assertTodayOriginProof(
+    page,
+    {
+      sourceDay: "2",
+      targetDay: "3",
+      status: "Manual selection",
+      route: "/upsc/geography/watch?day=2",
+      titleText: "Day 2 evidence is missing",
+      summaryText: "Yesterday did not provide enough evidence",
+    },
+    checks,
+    "daily-today-origin-proof-repair-lock"
   );
   await page.getByText("Geography: Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("GEO-D03", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -339,6 +384,9 @@ async function run() {
       readinessScore: "60",
       afterThisDecision: "Repair first",
       afterThisRoute: "/upsc/geography/watch?day=3",
+      yesterdayDecision: "Manual selection",
+      yesterdaySourceDay: "2",
+      yesterdayTargetDay: "3",
       visibleText: "Repair Day 3 before new load",
     },
     checks,
@@ -416,6 +464,9 @@ async function run() {
       readinessScore: "0",
       afterThisDecision: "Same topic",
       afterThisRoute: "/upsc/history/watch?day=4",
+      yesterdayDecision: "Manual selection",
+      yesterdaySourceDay: "3",
+      yesterdayTargetDay: "4",
       visibleText: "Save mind-state before starting",
     },
     checks,
@@ -438,6 +489,19 @@ async function run() {
     },
     checks,
     "daily-learning-funnel-fresh-history"
+  );
+  await assertTodayOriginProof(
+    page,
+    {
+      sourceDay: "3",
+      targetDay: "4",
+      status: "Manual selection",
+      route: "/upsc/history/watch?day=3",
+      titleText: "Day 3 evidence is missing",
+      summaryText: "Yesterday did not provide enough evidence",
+    },
+    checks,
+    "daily-today-origin-proof-fresh-history"
   );
   await page.getByTestId("daily-tomorrow-adjustment").getByText("Keep Day 4 as the next start", { exact: false }).waitFor({ timeout: 15000 });
   const freshAdjustment = await page.getByTestId("daily-tomorrow-adjustment").evaluate((node) => ({
