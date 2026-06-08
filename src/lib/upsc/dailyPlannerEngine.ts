@@ -11,7 +11,8 @@ export type DailyPlannerProgress = SubjectDayProgress & {
 export type DailyPlannerQuestionBankAttempt = Pick<
   QuestionBankAttempt,
   "subjectSlug" | "linkedDay" | "difficulty" | "isCorrect" | "solvedAt"
->;
+> &
+  Partial<Pick<QuestionBankAttempt, "source">>;
 
 export type DailyPlannerDecision = {
   teacherDoubt: {
@@ -217,11 +218,17 @@ function attemptsForDay(input: Pick<PlannerInput, "questionBankAttempts">, day: 
 
 function questionBankPracticeSignal(attempts: DailyPlannerQuestionBankAttempt[] = []) {
   const correct = attempts.filter((attempt) => attempt.isCorrect).length;
+  const exactPyqAttempts = attempts.filter((attempt) => attempt.source === "EXACT_PYQ_IMPORT");
+  const exactPyqCorrect = exactPyqAttempts.filter((attempt) => attempt.isCorrect).length;
   const accuracy = attempts.length ? Math.round((correct / attempts.length) * 100) : null;
 
   return {
     count: attempts.length,
     correct,
+    exactPyqCount: exactPyqAttempts.length,
+    exactPyqCorrect,
+    hasExactPyqEvidence: exactPyqAttempts.length > 0,
+    hasIncorrectExactPyq: exactPyqAttempts.some((attempt) => !attempt.isCorrect),
     accuracy,
     hasEvidence: attempts.length > 0,
     hasIncorrect: attempts.some((attempt) => !attempt.isCorrect),
@@ -232,6 +239,9 @@ function questionBankPracticeSignal(attempts: DailyPlannerQuestionBankAttempt[] 
 function questionBankPracticeLabel(attempts: DailyPlannerQuestionBankAttempt[] = []) {
   const signal = questionBankPracticeSignal(attempts);
   if (!signal.hasEvidence) return null;
+  if (signal.hasExactPyqEvidence) {
+    return `Exact PYQ ${signal.exactPyqCount} solved / ${signal.exactPyqCorrect} clear`;
+  }
   return `Question Bank ${signal.count} solved${signal.accuracy === null ? "" : ` / ${signal.accuracy}%`}`;
 }
 
@@ -424,9 +434,12 @@ function buildGap(
           ? `${reference.mcqScorePercent}% MCQ`
           : questionBankPracticeLabel(referenceAttempts) ?? "Recovery active";
     if (questionBankPracticeSignal(referenceAttempts).hasIncorrect) {
+      const exactPyqSignal = questionBankPracticeSignal(referenceAttempts);
       return {
-        title: "Question-bank trap repair",
-        detail: "Solved-question evidence has an incorrect answer, so the next step should repair the trap before advancing.",
+        title: exactPyqSignal.hasIncorrectExactPyq ? "Exact PYQ trap repair" : "Question-bank trap repair",
+        detail: exactPyqSignal.hasIncorrectExactPyq
+          ? "An exact PYQ demand drill is incorrect, so the next step should repair the official-question trap before advancing."
+          : "Solved-question evidence has an incorrect answer, so the next step should repair the trap before advancing.",
         scoreLabel: score,
         tone: "repair",
       };
@@ -522,7 +535,9 @@ function buildTodayTask(
   if (activeQuestionBankSignal.hasIncorrect || active?.mcqOutcome === "Revisit") {
     return {
       title: `Recover Day ${input.selectedDay}`,
-      detail: activeQuestionBankSignal.hasIncorrect
+      detail: activeQuestionBankSignal.hasIncorrectExactPyq
+        ? "Exact PYQ practice has an official-question trap that needs a repair loop."
+        : activeQuestionBankSignal.hasIncorrect
         ? "Question Bank has an incorrect trap that needs a repair loop."
         : "Practice result needs a repair loop.",
       href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
@@ -641,7 +656,9 @@ function buildSessionReadiness(
       detail: mcqReady
         ? questionBankLabel ?? `${active?.mcqScorePercent ?? 0}% MCQ evidence saved.`
         : questionBankSignal.hasIncorrect
-          ? `${questionBankLabel}: repair incorrect trap.`
+          ? questionBankSignal.hasIncorrectExactPyq
+            ? `${questionBankLabel}: repair exact PYQ trap.`
+            : `${questionBankLabel}: repair incorrect trap.`
           : "Fresh MCQ evidence is still pending.",
       status: mcqReady ? "done" : active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect ? "repair" : "pending",
     },
@@ -666,7 +683,9 @@ function buildSessionReadiness(
   if (needsRecovery(active, activeAttempts)) {
     return {
       title: `Recovery is active for Day ${input.selectedDay}`,
-      detail: questionBankSignal.hasIncorrect
+      detail: questionBankSignal.hasIncorrectExactPyq
+        ? "The solved-question ledger has an incorrect exact PYQ trap, so the next session should stay inside revisit."
+        : questionBankSignal.hasIncorrect
         ? "The solved-question ledger has an incorrect trap, so the next session should stay inside revisit."
         : "The next session should stay inside revisit until the weak signal is resolved.",
       href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
@@ -779,7 +798,9 @@ function buildTomorrowAdjustment(
     return {
       title: `Repeat Day ${currentSession.day} before moving ahead`,
       detail: questionBankSignal.hasIncorrect
-        ? `${currentSession.title} stays active because the Question Bank ledger has an incorrect trap.`
+        ? questionBankSignal.hasIncorrectExactPyq
+          ? `${currentSession.title} stays active because the exact PYQ ledger has an official-question trap.`
+          : `${currentSession.title} stays active because the Question Bank ledger has an incorrect trap.`
         : `${currentSession.title} stays active because the latest evidence is still in recovery.`,
       href: routeFor(input.subjectSlug, "revisit", currentSession.day),
       statusLabel: "Recovery lock",
@@ -817,7 +838,9 @@ function buildTomorrowAdjustment(
     return {
       title: `Repair Day ${currentSession.day} MCQ traps`,
       detail: questionBankSignal.hasIncorrect
-        ? "Question Bank result needs a short recovery loop before the next topic can safely open."
+        ? questionBankSignal.hasIncorrectExactPyq
+          ? "Exact PYQ result needs a short recovery loop before the next topic can safely open."
+          : "Question Bank result needs a short recovery loop before the next topic can safely open."
         : "Practice result needs a short recovery loop before the next topic can safely open.",
       href: routeFor(input.subjectSlug, "revisit", currentSession.day),
       statusLabel: "MCQ repair",
@@ -1057,7 +1080,9 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
       targetDay: sourceDay,
       title: `Day ${sourceDay} needs repair first`,
       detail: questionBankSignal.hasIncorrect
-        ? "Question Bank practice has an incorrect trap that needs repair first."
+        ? questionBankSignal.hasIncorrectExactPyq
+          ? "Exact PYQ practice has an official-question trap that needs repair first."
+          : "Question Bank practice has an incorrect trap that needs repair first."
         : repairDetail(progress),
       href: routeFor(input.subjectSlug, "revisit", sourceDay),
       statusLabel: "Yesterday repair",
