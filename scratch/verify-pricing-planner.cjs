@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const evidencePath = path.join(__dirname, "verify-pricing-planner-evidence.json");
 const profileKey = "sarit-upsc-student-profile-v1";
+const pricingIntentKey = "sarit-upsc-pricing-intent-v1";
 const expectedMonthlyBase = 399;
 
 const expectedPlans = {
@@ -218,10 +219,20 @@ async function run() {
 
   await page.goto(`${baseUrl}/upsc/pricing/checkout?plan=three-year`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-pricing-checkout-intent").waitFor({ timeout: 15000 });
+  await page.waitForFunction(
+    (storageKey) =>
+      document.querySelector('[data-testid="upsc-pricing-intent-recorder"]')?.getAttribute("data-saved") === "true" &&
+      Boolean(window.localStorage.getItem(storageKey)),
+    pricingIntentKey,
+    { timeout: 15000 }
+  );
   const checkoutState = await page.evaluate(() => {
     const intent = document.querySelector('[data-testid="upsc-pricing-checkout-intent"]');
     const math = document.querySelector('[data-testid="upsc-pricing-checkout-math"]');
     const proof = document.querySelector('[data-testid="upsc-pricing-checkout-proof"]');
+    const recorder = document.querySelector('[data-testid="upsc-pricing-intent-recorder"]');
+    const storageKey = recorder?.getAttribute("data-storage-key") || "";
+    const storedIntent = storageKey ? JSON.parse(window.localStorage.getItem(storageKey) || "null") : null;
     return {
       planId: intent?.getAttribute("data-plan-id"),
       months: intent?.getAttribute("data-months"),
@@ -232,6 +243,18 @@ async function run() {
       discountPercent: intent?.getAttribute("data-discount-percent"),
       effectiveMonthly: intent?.getAttribute("data-effective-monthly"),
       proofRule: proof?.getAttribute("data-proof-rule"),
+      recorder: {
+        storageKey,
+        planId: recorder?.getAttribute("data-plan-id"),
+        months: recorder?.getAttribute("data-months"),
+        launchPrice: recorder?.getAttribute("data-launch-price"),
+        savings: recorder?.getAttribute("data-savings"),
+        commerceMode: recorder?.getAttribute("data-commerce-mode"),
+        readyForPayment: recorder?.getAttribute("data-ready-for-payment"),
+        saved: recorder?.getAttribute("data-saved"),
+        text: recorder?.textContent || "",
+      },
+      storedIntent,
       paymentBoundary: {
         mode: document.querySelector('[data-testid="upsc-pricing-checkout-payment-boundary"]')?.getAttribute("data-commerce-mode"),
         readyForPayment: document.querySelector('[data-testid="upsc-pricing-checkout-payment-boundary"]')?.getAttribute("data-ready-for-payment"),
@@ -256,6 +279,24 @@ async function run() {
     checkoutState.proofRule !== "monthly-base-times-duration-minus-launch-price" ||
     !checkoutState.proofText.includes(money(expectedMonthlyBase)) ||
     !checkoutState.proofText.includes(money(threeYearMath.savings)) ||
+    checkoutState.recorder.storageKey !== pricingIntentKey ||
+    checkoutState.recorder.saved !== "true" ||
+    checkoutState.recorder.planId !== "three-year" ||
+    readNumber(checkoutState.recorder.months) !== threeYearMath.months ||
+    readNumber(checkoutState.recorder.launchPrice) !== threeYearMath.launchPrice ||
+    readNumber(checkoutState.recorder.savings) !== threeYearMath.savings ||
+    checkoutState.recorder.commerceMode !== "pilot-plan-intent" ||
+    checkoutState.recorder.readyForPayment !== "false" ||
+    !checkoutState.recorder.text.includes("Local plan receipt") ||
+    !checkoutState.recorder.text.includes("Three Year intent saved") ||
+    checkoutState.storedIntent?.planId !== "three-year" ||
+    checkoutState.storedIntent?.title !== "Three Year" ||
+    checkoutState.storedIntent?.months !== threeYearMath.months ||
+    checkoutState.storedIntent?.launchPrice !== threeYearMath.launchPrice ||
+    checkoutState.storedIntent?.savings !== threeYearMath.savings ||
+    checkoutState.storedIntent?.commerceMode !== "pilot-plan-intent" ||
+    checkoutState.storedIntent?.readyForPayment !== false ||
+    typeof checkoutState.storedIntent?.savedAt !== "string" ||
     !checkoutState.text.includes("₹8,999") ||
     checkoutState.paymentBoundary.mode !== "pilot-plan-intent" ||
     checkoutState.paymentBoundary.readyForPayment !== "false" ||

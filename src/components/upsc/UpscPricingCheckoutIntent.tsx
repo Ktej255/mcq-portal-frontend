@@ -10,6 +10,7 @@ import {
   recommendedProductPlanId,
 } from "@/lib/upsc/yearlyPlanner";
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
+import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -103,6 +104,13 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             {money(selectedPlan.launchPrice)}, so the student saves {money(savings)}.
           </p>
         </section>
+
+        <UpscPricingIntentRecorder
+          plan={selectedPlan}
+          savings={savings}
+          commerceMode={publicCommerceLaunchBoundary.mode}
+          readyForPayment={publicCommerceLaunchBoundary.readyForPayment}
+        />
 
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
