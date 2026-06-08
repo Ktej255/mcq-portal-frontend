@@ -7,6 +7,7 @@ const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const dailyCommandKey = "sarit-upsc-daily-command-v1";
 const pyqImportLedgerKey = "sarit-upsc-pyq-import-ledger-v1";
+const autoSessionHandoffKey = "sarit-upsc-auto-session-handoff-v1";
 const authUserKey = "sarit-upsc-auth-user-v1";
 const evidencePath = path.join(__dirname, "verify-student-dashboard-evidence.json");
 const screenshotPath = path.join(__dirname, "verify-student-dashboard-final.png");
@@ -83,6 +84,22 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     evidenceCount: node.getAttribute("data-adaptive-evidence-count"),
     text: node.textContent || "",
   }));
+  const autoHandoffProof = await page.getByTestId("upsc-dashboard-auto-handoff-proof").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    source: node.getAttribute("data-handoff-source"),
+    id: node.getAttribute("data-handoff-id"),
+    status: node.getAttribute("data-handoff-status"),
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    nextRoute: node.getAttribute("data-next-route"),
+    canAdvance: node.getAttribute("data-can-advance"),
+    readinessStatus: node.getAttribute("data-readiness-status"),
+    readinessScore: node.getAttribute("data-readiness-score"),
+    evidenceUsed: node.getAttribute("data-evidence-used"),
+    evidenceMissing: node.getAttribute("data-evidence-missing"),
+    blockers: node.getAttribute("data-blockers"),
+    text: node.textContent || "",
+  }));
   const adaptiveEvidence = await page.locator('[data-testid="upsc-adaptive-evidence-chip"]').evaluateAll((nodes) =>
     nodes.map((node) => ({
       label: node.getAttribute("data-evidence-label"),
@@ -127,6 +144,7 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     mainPathStrip,
     oneActionRuleText,
     afterThisStep,
+    autoHandoffProof,
     adaptiveEvidence,
     yesterdayProof,
     yesterdayEvidence,
@@ -202,6 +220,36 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
   ) {
     throw new Error(`${label}: after-this dynamic planner proof missing: ${JSON.stringify(afterThisStep)}`);
   }
+  if (
+    autoHandoffProof.proofRule !== "dashboard-uses-auto-session-handoff" ||
+    !["saved", "computed"].includes(autoHandoffProof.source) ||
+    !autoHandoffProof.id ||
+    !autoHandoffProof.status ||
+    !autoHandoffProof.sourceDay ||
+    !autoHandoffProof.targetDay ||
+    !autoHandoffProof.nextRoute ||
+    !autoHandoffProof.readinessStatus ||
+    !autoHandoffProof.readinessScore ||
+    !autoHandoffProof.evidenceUsed ||
+    !autoHandoffProof.evidenceMissing ||
+    !autoHandoffProof.blockers ||
+    !autoHandoffProof.text.includes("Next session")
+  ) {
+    throw new Error(`${label}: dashboard auto handoff proof failed: ${JSON.stringify(autoHandoffProof)}`);
+  }
+  if (
+    autoHandoffProof.status !== afterThisStep.decision ||
+    autoHandoffProof.sourceDay !== afterThisStep.sourceDay ||
+    autoHandoffProof.targetDay !== afterThisStep.targetDay ||
+    autoHandoffProof.nextRoute !== afterThisStep.nextRoute
+  ) {
+    throw new Error(
+      `${label}: dashboard auto handoff proof is stale against the current route: ${JSON.stringify({
+        afterThisStep,
+        autoHandoffProof,
+      })}`
+    );
+  }
   const adaptiveLabels = adaptiveEvidence.map((item) => item.label).join("|");
   const adaptiveStatuses = adaptiveEvidence.map((item) => item.status).join("|");
   if (
@@ -242,11 +290,46 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
 async function seedSession(page, progress = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileKey: profileStorageKey, progressKey: progressStorageKey, dailyKey, pyqKey, seededProgress }) => {
+    ({
+      profileKey: profileStorageKey,
+      progressKey: progressStorageKey,
+      dailyKey,
+      pyqKey,
+      autoHandoffKey,
+      seededProgress,
+    }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_student_dashboard");
       window.localStorage.removeItem(profileStorageKey);
       window.localStorage.removeItem(progressStorageKey);
       window.localStorage.removeItem(dailyKey);
+      window.localStorage.setItem(
+        autoHandoffKey,
+        JSON.stringify({
+          id: "geography-d1-to-d1-same-topic",
+          subjectSlug: "geography",
+          sourceDay: 1,
+          targetDay: 1,
+          targetTitle: "Interior of Earth and Plate Movement",
+          statusLabel: "Same topic",
+          href: "/upsc/geography/watch?day=1",
+          actionLabel: "Start class",
+          canAdvance: false,
+          evidenceUsed: 0,
+          evidenceMissing: 5,
+          blockers: 0,
+          readinessStatus: "Mind-state first",
+          readinessScorePercent: 0,
+          learningGapTitle: "Recall baseline pending",
+          revisionDueLabel: "Day 3",
+          studentInstruction: "Complete 5 missing evidence signals before the next session changes.",
+          reportHref: "/reports",
+          questionBankHref: "/upsc/question-bank?subject=geography",
+          proofRule: "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report",
+          generatedAt: new Date().toISOString(),
+          selectedDay: 1,
+          selectedSubjectSlug: "geography",
+        })
+      );
       window.localStorage.setItem(
         pyqKey,
         JSON.stringify([
@@ -278,7 +361,14 @@ async function seedSession(page, progress = null) {
         window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
       }
     },
-    { profileKey, progressKey, dailyKey: dailyCommandKey, pyqKey: pyqImportLedgerKey, seededProgress: progress }
+    {
+      profileKey,
+      progressKey,
+      dailyKey: dailyCommandKey,
+      pyqKey: pyqImportLedgerKey,
+      autoHandoffKey: autoSessionHandoffKey,
+      seededProgress: progress,
+    }
   );
 }
 

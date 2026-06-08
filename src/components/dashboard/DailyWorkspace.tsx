@@ -17,7 +17,12 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { buildDailyPlannerDecision, type DailyPlannerProgress } from "@/lib/upsc/dailyPlannerEngine";
+import {
+  buildDailyPlannerDecision,
+  readLocalAutoSessionHandoff,
+  type AutoSessionHandoffRecord,
+  type DailyPlannerProgress,
+} from "@/lib/upsc/dailyPlannerEngine";
 import {
   buildQuestionBankQuestionsFromPyqImports,
   readLocalQuestionBankAttempts,
@@ -183,6 +188,7 @@ export const DailyWorkspace = () => {
     Record<string, ReturnType<typeof readLocalQuestionBankAttempts>>
   >({});
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+  const [autoSessionHandoff, setAutoSessionHandoff] = useState<AutoSessionHandoffRecord | null>(null);
   const { progress, saveDayProgress } = useGeographyProgress();
   const geographyQuestionBankAttempts = questionBankAttemptsBySubject.geography ?? [];
   const today = getCurrentGeographyTopic(progress, geographyQuestionBankAttempts);
@@ -251,6 +257,21 @@ export const DailyWorkspace = () => {
     ? `/upsc/daily-command${activeMissionReadiness.href}`
     : activeMissionReadiness.href;
   const activeMissionTrackHref = `/upsc/${activeMissionSubject.slug}/track?day=${activeMissionDay}`;
+  const computedAutoSessionHandoff = activeMissionDecision.automaticSessionHandoff;
+  const savedAutoSessionHandoffMatches =
+    autoSessionHandoff?.selectedSubjectSlug === activeMissionSubject.slug &&
+    autoSessionHandoff.selectedDay === activeMissionDay &&
+    autoSessionHandoff.id === computedAutoSessionHandoff.id &&
+    autoSessionHandoff.statusLabel === computedAutoSessionHandoff.statusLabel &&
+    autoSessionHandoff.href === computedAutoSessionHandoff.href &&
+    autoSessionHandoff.readinessScorePercent === computedAutoSessionHandoff.readinessScorePercent &&
+    autoSessionHandoff.evidenceUsed === computedAutoSessionHandoff.evidenceUsed &&
+    autoSessionHandoff.evidenceMissing === computedAutoSessionHandoff.evidenceMissing &&
+    autoSessionHandoff.blockers === computedAutoSessionHandoff.blockers;
+  const dashboardAutoSessionHandoff = savedAutoSessionHandoffMatches
+    ? autoSessionHandoff
+    : computedAutoSessionHandoff;
+  const dashboardAutoSessionSource = savedAutoSessionHandoffMatches ? "saved" : "computed";
 
   useEffect(() => {
     let cancelled = false;
@@ -268,6 +289,7 @@ export const DailyWorkspace = () => {
         )
       );
       setPyqRecords(readLocalPyqImportRecords());
+      setAutoSessionHandoff(readLocalAutoSessionHandoff());
       if (saved) {
         setProfile(saved);
         setDraft(saved);
@@ -553,6 +575,26 @@ export const DailyWorkspace = () => {
                     >
                       <span className="font-black uppercase tracking-[0.12em] text-[#085041]">After this: </span>
                       {activeMissionDecision.tomorrowAdjustment.title}
+                      <div
+                        data-testid="upsc-dashboard-auto-handoff-proof"
+                        data-proof-rule="dashboard-uses-auto-session-handoff"
+                        data-handoff-source={dashboardAutoSessionSource}
+                        data-handoff-id={dashboardAutoSessionHandoff.id}
+                        data-handoff-status={dashboardAutoSessionHandoff.statusLabel}
+                        data-source-day={dashboardAutoSessionHandoff.sourceDay}
+                        data-target-day={dashboardAutoSessionHandoff.targetDay}
+                        data-next-route={dashboardAutoSessionHandoff.href}
+                        data-can-advance={dashboardAutoSessionHandoff.canAdvance ? "true" : "false"}
+                        data-readiness-status={dashboardAutoSessionHandoff.readinessStatus}
+                        data-readiness-score={dashboardAutoSessionHandoff.readinessScorePercent}
+                        data-evidence-used={dashboardAutoSessionHandoff.evidenceUsed}
+                        data-evidence-missing={dashboardAutoSessionHandoff.evidenceMissing}
+                        data-blockers={dashboardAutoSessionHandoff.blockers}
+                        className="mt-3 rounded-md border border-[#b9d9cd] bg-[#f8fffb] px-3 py-2 text-xs font-bold leading-5 text-[#31443a]"
+                      >
+                        <span className="font-black uppercase tracking-[0.12em] text-[#085041]">Next session: </span>
+                        {dashboardAutoSessionHandoff.studentInstruction}
+                      </div>
                       <div
                         data-testid="upsc-adaptive-evidence-strip"
                         className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5"
