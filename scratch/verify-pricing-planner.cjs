@@ -116,6 +116,11 @@ async function run() {
 
     return {
       plans,
+      launchBoundary: {
+        mode: document.querySelector('[data-testid="upsc-pricing-launch-boundary"]')?.getAttribute("data-commerce-mode"),
+        readyForPayment: document.querySelector('[data-testid="upsc-pricing-launch-boundary"]')?.getAttribute("data-ready-for-payment"),
+        text: document.querySelector('[data-testid="upsc-pricing-launch-boundary"]')?.textContent || "",
+      },
       discountProof: {
         monthlyBase: discountProof?.getAttribute("data-monthly-base"),
         planCount: discountProof?.getAttribute("data-plan-count"),
@@ -125,6 +130,7 @@ async function run() {
       },
       inclusionText: document.querySelector('[data-testid="upsc-pricing-inclusions"]')?.textContent || "",
       readinessText: document.querySelector('[data-testid="upsc-pricing-operating-rules"]')?.textContent || "",
+      bodyText: document.body.textContent || "",
     };
   });
   checks.push({ label: "pricing-plan-math", pricingState });
@@ -197,7 +203,11 @@ async function run() {
 
   if (
     !pricingState.inclusionText.includes("Systematic subject path") ||
-    !pricingState.readinessText.includes("Optional PYQ rows")
+    !pricingState.readinessText.includes("Optional PYQ rows") ||
+    pricingState.launchBoundary.mode !== "pilot-plan-intent" ||
+    pricingState.launchBoundary.readyForPayment !== "false" ||
+    !pricingState.launchBoundary.text.includes("Payments open only after") ||
+    !pricingState.bodyText.includes("Record intent for 18 Month")
   ) {
     throw new Error(`Pricing page missing inclusion/readiness proof: ${JSON.stringify(pricingState)}`);
   }
@@ -219,6 +229,11 @@ async function run() {
       discountPercent: intent?.getAttribute("data-discount-percent"),
       effectiveMonthly: intent?.getAttribute("data-effective-monthly"),
       proofRule: proof?.getAttribute("data-proof-rule"),
+      paymentBoundary: {
+        mode: document.querySelector('[data-testid="upsc-pricing-checkout-payment-boundary"]')?.getAttribute("data-commerce-mode"),
+        readyForPayment: document.querySelector('[data-testid="upsc-pricing-checkout-payment-boundary"]')?.getAttribute("data-ready-for-payment"),
+        text: document.querySelector('[data-testid="upsc-pricing-checkout-payment-boundary"]')?.textContent || "",
+      },
       proofText: proof?.textContent || "",
       mathText: math?.textContent || "",
       text: document.body.textContent || "",
@@ -238,7 +253,12 @@ async function run() {
     checkoutState.proofRule !== "monthly-base-times-duration-minus-launch-price" ||
     !checkoutState.proofText.includes(money(expectedMonthlyBase)) ||
     !checkoutState.proofText.includes(money(threeYearMath.savings)) ||
-    !checkoutState.text.includes("Local checkout handoff")
+    checkoutState.paymentBoundary.mode !== "pilot-plan-intent" ||
+    checkoutState.paymentBoundary.readyForPayment !== "false" ||
+    !checkoutState.paymentBoundary.text.includes("No payment collected today") ||
+    !checkoutState.text.includes("Plan intent only") ||
+    !checkoutState.text.includes("Payments open only after") ||
+    checkoutState.text.includes("Payable now")
   ) {
     throw new Error(`Checkout intent failed: ${JSON.stringify(checkoutState)}`);
   }

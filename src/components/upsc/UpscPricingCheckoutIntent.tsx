@@ -9,6 +9,7 @@ import {
   productPricingPlans,
   recommendedProductPlanId,
 } from "@/lib/upsc/yearlyPlanner";
+import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 
 function money(value: number) {
   return `Rs ${value.toLocaleString("en-IN")}`;
@@ -42,22 +43,29 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#085041]">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Local checkout handoff
+                {publicCommerceLaunchBoundary.checkoutBadge}
               </div>
               <h1 className="text-3xl font-black tracking-tight md:text-5xl">{selectedPlan.title} plan selected</h1>
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                This page records the pricing intent and exact plan math inside the portal. A payment gateway can attach
-                to this plan id without changing the public pricing ladder.
+                {publicCommerceLaunchBoundary.studentExplanation} {publicCommerceLaunchBoundary.gateSummary}
               </p>
             </div>
             <div className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4">
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
                 <BadgeIndianRupee className="h-4 w-4" />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">Payable now</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">Plan price reserved</p>
               <p className="mt-1 text-3xl font-black">{money(selectedPlan.launchPrice)}</p>
               <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#49675e]">
                 {money(selectedPlan.effectiveMonthly)} effective monthly
+              </p>
+              <p
+                data-testid="upsc-pricing-checkout-payment-boundary"
+                data-commerce-mode={publicCommerceLaunchBoundary.mode}
+                data-ready-for-payment={String(publicCommerceLaunchBoundary.readyForPayment)}
+                className="mt-3 rounded-md border border-[#b9d9cd] bg-white/70 p-2 text-xs font-black text-[#085041]"
+              >
+                {publicCommerceLaunchBoundary.paymentStatusValue}
               </p>
             </div>
           </div>
@@ -111,7 +119,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
               "Daily planner, AI discussion, MCQ builder, revision command, and reports.",
               "Subject-wise syllabus, GS PYQ source rows, yearly planner, and current-affairs gates.",
               "Optional-subject catalog with Paper I and Paper II year-wise source rows.",
-              "Local progress works immediately; live payment and gateway receipts can attach at this handoff.",
+              "Local progress works immediately; live payment opens only after the launch gates close.",
             ].map((item) => (
               <p key={item} className="flex gap-2 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-semibold leading-6 text-[#31443a]">
                 <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#1d9e75]" />

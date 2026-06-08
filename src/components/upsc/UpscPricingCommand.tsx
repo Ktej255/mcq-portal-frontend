@@ -22,6 +22,7 @@ import {
   recommendedProductPlanId,
   yearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
+import { pricingPlanIntentLabel, publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
 
 function money(value: number) {
@@ -86,6 +87,17 @@ export function UpscPricingCommand() {
                 The commercial layer now mirrors the product vision: monthly validation, yearly UPSC cycle,
                 18-month recovery depth, and three-year foundation coverage with transparent discount math.
               </p>
+              <div
+                data-testid="upsc-pricing-launch-boundary"
+                data-commerce-mode={publicCommerceLaunchBoundary.mode}
+                data-ready-for-payment={String(publicCommerceLaunchBoundary.readyForPayment)}
+                className="mt-4 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-sm font-bold leading-6 text-[#31443a]"
+              >
+                <span className="mr-2 rounded bg-[#085041] px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                  {publicCommerceLaunchBoundary.badge}
+                </span>
+                {publicCommerceLaunchBoundary.gateSummary}
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
@@ -163,7 +175,7 @@ export function UpscPricingCommand() {
                       : "bg-[#1a3a2a] text-white hover:bg-[#10291d]"
                   }`}
                 >
-                  Select {plan.title} <ArrowRight className="ml-2 h-4 w-4" />
+                  {pricingPlanIntentLabel(plan.title)} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </article>
             );
@@ -247,7 +259,7 @@ export function UpscPricingCommand() {
                 "Yearly is priced below 12 separate monthly payments for one UPSC cycle.",
                 "18-month plan is the recommended recovery window for prelims-to-mains continuity.",
                 "Three-year plan is the deepest discount for foundation learners.",
-                "Checkout intent is now captured through a local plan handoff; payment gateway can attach later without changing the plan math.",
+                publicCommerceLaunchBoundary.gateSummary,
               ].map((rule) => (
                 <p key={rule} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-semibold leading-6 text-[#31443a]">
                   {rule}
