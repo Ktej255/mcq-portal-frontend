@@ -24,6 +24,9 @@ export type GeographyLaunchReadinessInput = {
   completedTesterCount: number;
   feedbackReceiptCount: number;
   blockedTesterCount: number;
+  liveContinuityComplete?: boolean;
+  liveContinuityReceiptCount?: number;
+  liveContinuityTotal?: number;
 };
 
 export function readGeographyDay1McqLaunchGate(): GeographyLaunchGate & {
@@ -75,6 +78,9 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
     input.feedbackReceiptCount === input.rosterCount &&
     input.blockedTesterCount === 0 &&
     input.openBlockerCount === 0;
+  const liveContinuityTotal = input.liveContinuityTotal ?? 6;
+  const liveContinuityReceiptCount = input.liveContinuityReceiptCount ?? 0;
+  const liveContinuityComplete = Boolean(input.liveContinuityComplete);
 
   const gates: GeographyLaunchGate[] = [
     {
@@ -136,7 +142,8 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
   const publicLaunchReady =
     canShareControlledPilot &&
     geographyDay1MediaAttachment.releaseAssetPairReady &&
-    firstWaveEvidenceComplete;
+    firstWaveEvidenceComplete &&
+    liveContinuityComplete;
   const publicLaunchGates: GeographyLaunchGate[] = [
     {
       id: "controlled-pilot",
@@ -164,6 +171,17 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
         ? "Every first-wave tester has submitted blocker-free feedback."
         : "Keep public launch locked until all first-wave tester receipts are clean.",
       passed: firstWaveEvidenceComplete,
+    },
+    {
+      id: "live-continuity",
+      label: "Live continuity",
+      value: liveContinuityComplete
+        ? "Proved"
+        : `${Math.min(liveContinuityReceiptCount, liveContinuityTotal)}/${liveContinuityTotal}`,
+      detail: liveContinuityComplete
+        ? "Supabase, OAuth, account isolation, and live AI receipt checks are complete."
+        : "Public launch needs the live Supabase, OAuth, AI, and account-isolation receipts, not only local proof.",
+      passed: liveContinuityComplete,
     },
   ];
   const status = publicLaunchReady

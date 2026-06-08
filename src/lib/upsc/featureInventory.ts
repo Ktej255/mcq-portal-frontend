@@ -307,7 +307,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Launch tracker",
         status: "verified",
-        behavior: "Shows honest readiness, pending live steps, controlled tester workflow, a separate public-launch boundary that stays locked until final Day 1 media/transcript and first-wave receipts exist, an operator-only six-receipt live-release boundary, and a live continuity rehearsal packet for Supabase RLS, Talk limiting, server-only AI configuration, deployed OAuth callback, same-account recovery, different-account isolation, and the public-launch hold rule.",
+        behavior: "Shows honest readiness, pending live steps, controlled tester workflow, a separate public-launch boundary that stays locked until final Day 1 media/transcript, first-wave receipts, and live continuity receipts exist, an operator-only six-receipt live-release boundary, and an editable live continuity rehearsal board for Supabase RLS, Talk limiting, server-only AI configuration, deployed OAuth callback, same-account recovery, different-account isolation, and the public-launch hold rule.",
         evidence: "admin-launch-plan-e2e.cjs",
       },
       {

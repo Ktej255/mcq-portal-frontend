@@ -7,6 +7,15 @@ const rosterKey = "sarit-upsc-geography-pilot-roster-v1";
 const waveDecisionKey = "sarit-upsc-geography-pilot-wave-decision-v1";
 const mcqKey = "sarit-upsc-mcq-command-v1";
 const draftKey = "sarit-admin-bulk-question-drafts-v1";
+const liveReceiptKey = "sarit-upsc-live-continuity-receipts-v1";
+const liveReceiptIds = [
+  "learner-state-rls",
+  "talk-limiter",
+  "provider-boundary",
+  "oauth-callback",
+  "account-isolation",
+  "first-wave-hold",
+];
 
 function buildReadyDay1Question(index) {
   return {
@@ -112,9 +121,16 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.addInitScript(() => {
-    window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_admin_launch_plan");
-  });
+  await page.addInitScript(
+    ({ keysToClear }) => {
+      if (!window.sessionStorage.getItem("admin-launch-plan-storage-reset")) {
+        keysToClear.forEach((key) => window.localStorage.removeItem(key));
+        window.sessionStorage.setItem("admin-launch-plan-storage-reset", "true");
+      }
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_admin_launch_plan");
+    },
+    { keysToClear: [feedbackKey, releaseKey, rosterKey, waveDecisionKey, mcqKey, draftKey, liveReceiptKey] },
+  );
 
   await page.goto(`${baseUrl}/admin/launch-plan`, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("admin-launch-plan-page").waitFor({ timeout: 15000 });
@@ -164,6 +180,46 @@ async function run() {
   await continuityRehearsal.getByText("same profile and progress", { exact: false }).waitFor({ timeout: 15000 });
   await continuityRehearsal.getByText("Account B starts clean", { exact: false }).waitFor({ timeout: 15000 });
   await continuityRehearsal.getByText("Any Blocker feedback", { exact: false }).waitFor({ timeout: 15000 });
+  const liveContinuityStatus = page.getByTestId("admin-live-continuity-status");
+  await liveContinuityStatus.getByText("Live continuity locked", { exact: true }).waitFor({ timeout: 15000 });
+  await liveContinuityStatus.getByText("0/6 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
+  if ((await liveContinuityStatus.getAttribute("data-live-continuity-ready")) !== "false") {
+    throw new Error("Live continuity started as ready without proof receipts.");
+  }
+  if (!(await page.getByTestId("live-continuity-complete-learner-state-rls").isDisabled())) {
+    throw new Error("Live continuity receipt can be completed without a proof note.");
+  }
+  await continuityRehearsal
+    .getByLabel("Proof note for Learner state survives only through the authenticated account")
+    .fill("Live Supabase learner-state RLS was applied and same-account recovery was proved.");
+  await page.getByTestId("live-continuity-complete-learner-state-rls").click();
+  await liveContinuityStatus.getByText("1/6 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
+  if ((await continuityRehearsal.locator('[data-live-continuity-receipt="learner-state-rls"]').getAttribute("data-live-continuity-complete")) !== "true") {
+    throw new Error("Learner-state receipt did not persist as complete.");
+  }
+  await page.evaluate(
+    ({ localLiveReceiptKey, receiptIds }) => {
+      const proofNotes = Object.fromEntries(
+        receiptIds.map((id) => [id, `Verified live continuity receipt for ${id} on the deployed UPSC portal.`]),
+      );
+      window.localStorage.setItem(
+        localLiveReceiptKey,
+        JSON.stringify({
+          completedIds: receiptIds,
+          proofNotes,
+          reviewerName: "Founder QA",
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+      window.dispatchEvent(new CustomEvent("upsc-live-continuity-receipts-updated"));
+    },
+    { localLiveReceiptKey: liveReceiptKey, receiptIds: liveReceiptIds },
+  );
+  await liveContinuityStatus.getByText("Live continuity ready", { exact: true }).waitFor({ timeout: 15000 });
+  await liveContinuityStatus.getByText("6/6 receipts complete", { exact: false }).waitFor({ timeout: 15000 });
+  if ((await liveContinuityStatus.getAttribute("data-live-continuity-ready")) !== "true") {
+    throw new Error("Live continuity did not become ready after all receipts were recorded.");
+  }
   const sharePacket = page.getByTestId("admin-share-packet");
   await sharePacket.waitFor({ timeout: 15000 });
   await sharePacket.getByText("/upsc/geography/pilot").waitFor({ timeout: 15000 });
@@ -294,6 +350,8 @@ async function run() {
   await publicLaunchBoundary.waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Public launch still locked", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Final Day 1 media", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Live continuity", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Proved", { exact: true }).waitFor({ timeout: 15000 });
   await publicLaunchBoundary.getByText("Missing", { exact: true }).waitFor({ timeout: 15000 });
   if ((await publicLaunchBoundary.getAttribute("data-public-launch-ready")) !== "false") {
     throw new Error("Public launch boundary unlocked before final Day 1 media and first-wave receipts.");

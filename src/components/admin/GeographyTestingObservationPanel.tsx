@@ -42,6 +42,10 @@ import {
   type GeographyPilotWaveDecisionStatus,
 } from "@/lib/upsc/geographyPilotWaveDecision";
 import { buildGeographyLaunchReadiness } from "@/lib/upsc/geographyLaunchReadiness";
+import {
+  getLiveContinuityReceiptSummary,
+  readLiveContinuityReceipts,
+} from "@/lib/upsc/liveContinuityReceipts";
 import { cn } from "@/lib/utils";
 
 const severityTone: Record<GeographyPilotFeedbackSeverity, string> = {
@@ -57,6 +61,7 @@ export function GeographyTestingObservationPanel() {
   const [releaseDecision, setReleaseDecision] = useState(() => readGeographyPilotRelease());
   const [waveDecision, setWaveDecision] = useState(() => readGeographyPilotWaveDecision());
   const [founderReview, setFounderReview] = useState(() => readGeographyFounderReview());
+  const [liveContinuityState, setLiveContinuityState] = useState(() => readLiveContinuityReceipts());
   const [reviewerName, setReviewerName] = useState(releaseDecision.reviewerName);
   const [releaseNote, setReleaseNote] = useState(releaseDecision.note);
   const [testerName, setTesterName] = useState("");
@@ -70,6 +75,7 @@ export function GeographyTestingObservationPanel() {
   const reloadRelease = () => setReleaseDecision(readGeographyPilotRelease());
   const reloadWaveDecision = () => setWaveDecision(readGeographyPilotWaveDecision());
   const reloadFounderReview = () => setFounderReview(readGeographyFounderReview());
+  const reloadLiveContinuity = () => setLiveContinuityState(readLiveContinuityReceipts());
   const reloadLaunchReadiness = () => setLaunchGateRefresh(Date.now());
 
   useEffect(() => {
@@ -78,30 +84,35 @@ export function GeographyTestingObservationPanel() {
     reloadRelease();
     reloadWaveDecision();
     reloadFounderReview();
+    reloadLiveContinuity();
     reloadLaunchReadiness();
     window.addEventListener("storage", reloadFeedback);
     window.addEventListener("storage", reloadRoster);
     window.addEventListener("storage", reloadRelease);
     window.addEventListener("storage", reloadWaveDecision);
     window.addEventListener("storage", reloadFounderReview);
+    window.addEventListener("storage", reloadLiveContinuity);
     window.addEventListener("storage", reloadLaunchReadiness);
     window.addEventListener("geography-pilot-feedback-updated", reloadFeedback);
     window.addEventListener("geography-pilot-roster-updated", reloadRoster);
     window.addEventListener("geography-pilot-release-updated", reloadRelease);
     window.addEventListener("geography-pilot-wave-decision-updated", reloadWaveDecision);
     window.addEventListener("geography-founder-review-updated", reloadFounderReview);
+    window.addEventListener("upsc-live-continuity-receipts-updated", reloadLiveContinuity);
     return () => {
       window.removeEventListener("storage", reloadFeedback);
       window.removeEventListener("storage", reloadRoster);
       window.removeEventListener("storage", reloadRelease);
       window.removeEventListener("storage", reloadWaveDecision);
       window.removeEventListener("storage", reloadFounderReview);
+      window.removeEventListener("storage", reloadLiveContinuity);
       window.removeEventListener("storage", reloadLaunchReadiness);
       window.removeEventListener("geography-pilot-feedback-updated", reloadFeedback);
       window.removeEventListener("geography-pilot-roster-updated", reloadRoster);
       window.removeEventListener("geography-pilot-release-updated", reloadRelease);
       window.removeEventListener("geography-pilot-wave-decision-updated", reloadWaveDecision);
       window.removeEventListener("geography-founder-review-updated", reloadFounderReview);
+      window.removeEventListener("upsc-live-continuity-receipts-updated", reloadLiveContinuity);
     };
   }, []);
 
@@ -225,6 +236,7 @@ export function GeographyTestingObservationPanel() {
   const founderReviewComplete = isGeographyFounderReviewComplete(founderReview);
   const checkedFounderItems = founderReview.checkedIds.length;
   const nextFounderItem = geographyFounderReviewItems.find((item) => !founderReview.checkedIds.includes(item.id));
+  const liveContinuitySummary = getLiveContinuityReceiptSummary(liveContinuityState);
   const launchReadiness = buildGeographyLaunchReadiness({
     founderReviewComplete,
     releaseApproved: releaseDecision.status === "approved",
@@ -233,6 +245,9 @@ export function GeographyTestingObservationPanel() {
     completedTesterCount: rosterSummary.completed,
     feedbackReceiptCount: feedbackCoverageCount,
     blockedTesterCount: rosterSummary.blocked,
+    liveContinuityComplete: liveContinuitySummary.complete,
+    liveContinuityReceiptCount: liveContinuitySummary.completedCount,
+    liveContinuityTotal: liveContinuitySummary.total,
   });
   void launchGateRefresh;
   const readyToSharePilot = launchReadiness.canShareControlledPilot;
