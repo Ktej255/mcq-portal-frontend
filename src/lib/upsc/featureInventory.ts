@@ -121,7 +121,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Covered-topic current affairs",
         status: "verified",
-        behavior: "Current-affairs hooks are hidden until the linked static topic has local evidence. Geography and later GS subjects use the same subject/day gate so beginners do not see an open-ended news feed.",
+        behavior: "Current-affairs hooks are hidden until the linked static topic has local evidence. Watch, Talk, Lab, MCQ, command confidence, or a solved Question Bank attempt for the same day can unlock only that topic-linked hook. Geography and later GS subjects use the same subject/day gate so beginners do not see an open-ended news feed.",
         evidence: "verify-current-affairs-bridge.cjs",
       },
       {
@@ -133,7 +133,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Adaptive question bank builder",
         status: "verified",
-        behavior: "The learner-facing question bank derives an MCQ readiness level from recall, consistency, marks, solved-ledger accuracy, command days, and recovery penalties. It then prioritizes unresolved AI gaps, weak days, requested difficulty, and repair-first practice instead of showing a generic question dump.",
+        behavior: "The learner-facing question bank derives an MCQ readiness level from recall, consistency, marks, solved-ledger accuracy, command days, and recovery penalties. It supports single-band practice plus custom mixed sets across Easy, Medium, Hard, and PYQ-style questions, then prioritizes unresolved AI gaps, weak days, and repair-first practice instead of showing a generic question dump.",
         evidence: "verify-question-bank-builder.cjs",
       },
     ],
@@ -596,7 +596,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
       "Solved questions should form a ledger, and custom easy/moderate/tough/adaptive MCQ sets should depend on learner level.",
     status: "ready-local",
     currentState:
-      "Question bank derives the evidence level from recall, consistency, marks, solved attempts, command days, and recovery penalties before selecting difficulty.",
+      "Question bank derives the evidence level from recall, consistency, marks, solved attempts, command days, and recovery penalties before selecting difficulty. Mixed custom sets now combine Easy, Medium, Hard, and PYQ-style rows, and solved attempts feed the covered-topic current-affairs gate.",
     evidence: "verify-question-bank-builder.cjs",
     nextAction: "Import founder-approved fresh MCQs before public Geography launch.",
     phase: "Day 2",

@@ -4,6 +4,7 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
+const attemptKey = "sarit-upsc-question-bank-attempts-v1";
 const evidencePath = path.join(__dirname, "verify-current-affairs-bridge-evidence.json");
 
 function progressKey(subjectSlug) {
@@ -26,10 +27,10 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
-async function seedProgress(page, progress, subjectSlug = "geography") {
+async function seedProgress(page, progress, subjectSlug = "geography", questionBankAttempts = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, seededProgress }) => {
+    ({ profileStorageKey, progressStorageKey, attemptStorageKey, seededProgress, seededQuestionBankAttempts }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_current_affairs_bridge");
       window.localStorage.setItem(
         profileStorageKey,
@@ -49,8 +50,18 @@ async function seedProgress(page, progress, subjectSlug = "geography") {
       if (seededProgress) {
         window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
       }
+      window.localStorage.removeItem(attemptStorageKey);
+      if (seededQuestionBankAttempts) {
+        window.localStorage.setItem(attemptStorageKey, JSON.stringify(seededQuestionBankAttempts));
+      }
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey(subjectSlug), seededProgress: progress }
+    {
+      profileStorageKey: profileKey,
+      progressStorageKey: progressKey(subjectSlug),
+      attemptStorageKey: attemptKey,
+      seededProgress: progress,
+      seededQuestionBankAttempts: questionBankAttempts,
+    }
   );
 }
 
@@ -96,6 +107,62 @@ async function run() {
     throw new Error(`initial-locked-state failed: ${JSON.stringify({ activeSubject, initialProof, initialUnlockedCards, initialNextUnlockText, initialLeakedHookCount })}`);
   }
   await assertNoOverflow(page, "current-affairs-initial-desktop", checks);
+
+  await seedProgress(page, null, "geography", {
+    "geo-d02-medium-gis-scale": {
+      questionId: "geo-d02-medium-gis-scale",
+      subjectSlug: "geography",
+      linkedDay: 2,
+      topic: "Earth, Universe, and Location",
+      difficulty: "MEDIUM",
+      source: "REFERENCE_ADVANCED",
+      selectedOption: "A",
+      correctOption: "A",
+      isCorrect: true,
+      solvedAt: new Date().toISOString(),
+    },
+  });
+  await page.goto(`${baseUrl}/upsc/current-affairs`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.getByTestId("upsc-current-affairs-hero").waitFor({ timeout: 15000 });
+  await page.waitForFunction(() => {
+    const proof = document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]');
+    return proof?.getAttribute("data-unlocked-count") === "1";
+  });
+  const questionBankProof = await page.getByTestId("upsc-current-affairs-coverage-proof").evaluate((proof) => ({
+    rule: proof.getAttribute("data-rule"),
+    activeSubject: proof.getAttribute("data-active-subject"),
+    totalHooks: proof.getAttribute("data-total-hooks"),
+    unlockedCount: proof.getAttribute("data-unlocked-count"),
+    lockedCount: proof.getAttribute("data-locked-count"),
+    coveredDays: proof.getAttribute("data-covered-days"),
+    questionBankAttemptCount: proof.getAttribute("data-question-bank-attempt-count"),
+    rows: [...document.querySelectorAll('[data-testid="upsc-current-affairs-proof-row"]')].map((row) => ({
+      day: row.getAttribute("data-linked-day"),
+      status: row.getAttribute("data-gate-status"),
+      signals: row.getAttribute("data-signals"),
+    })),
+  }));
+  const questionBankUnlockedCards = await page.getByTestId("upsc-current-affairs-card").evaluateAll((cards) =>
+    cards.map((card) => ({
+      linkedDay: card.getAttribute("data-linked-day"),
+      unlocked: card.getAttribute("data-unlocked"),
+      text: card.textContent || "",
+    }))
+  );
+  checks.push({ label: "question-bank-attempt-unlocks-linked-current-affairs", questionBankProof, questionBankUnlockedCards });
+  if (
+    questionBankProof.rule !== "covered-static-topic-only" ||
+    questionBankProof.activeSubject !== "geography" ||
+    questionBankProof.unlockedCount !== "1" ||
+    questionBankProof.coveredDays !== "2" ||
+    questionBankProof.questionBankAttemptCount !== "1" ||
+    !questionBankProof.rows.some((row) => row.day === "2" && row.status === "unlocked" && row.signals.includes("Question bank solved")) ||
+    questionBankUnlockedCards.length !== 1 ||
+    questionBankUnlockedCards[0].linkedDay !== "2" ||
+    !questionBankUnlockedCards[0].text.includes("Earth-observation satellites")
+  ) {
+    throw new Error(`question-bank-attempt-unlocks-linked-current-affairs failed: ${JSON.stringify({ questionBankProof, questionBankUnlockedCards })}`);
+  }
 
   await seedProgress(page, {
     5: {

@@ -76,10 +76,13 @@ async function run() {
   await masterPage.getByText("verify-syllabus-pyq-trend-library.cjs and verify-optional-subject-pages.cjs", { exact: true }).first().waitFor();
   await masterPage.getByText("Covered-topic current affairs", { exact: true }).waitFor();
   await masterPage.getByText("verify-current-affairs-bridge.cjs", { exact: true }).first().waitFor();
+  await masterPage.getByText("solved Question Bank attempt for the same day", { exact: false }).waitFor();
   await masterPage.getByText("Reports and growth signal", { exact: true }).waitFor();
   await masterPage.getByText("verify-student-report-system.cjs", { exact: true }).first().waitFor();
   await masterPage.getByText("Adaptive question bank builder", { exact: true }).waitFor();
   await masterPage.getByText("verify-question-bank-builder.cjs", { exact: true }).first().waitFor();
+  await masterPage.getByText("custom mixed sets across Easy, Medium, Hard, and PYQ-style questions", { exact: false }).waitFor();
+  await masterPage.getByText("solved attempts feed the covered-topic current-affairs gate", { exact: false }).waitFor();
   await masterPage.getByText("60-second start check now saves the learner state plus a reset plan", { exact: false }).waitFor();
   await masterPage.getByText("Real Geography Day 1 pack", { exact: true }).first().waitFor();
   await masterPage.getByTestId("admin-corpus-summary").getByText("24,131", { exact: true }).waitFor();

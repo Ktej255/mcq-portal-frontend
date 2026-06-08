@@ -13,10 +13,29 @@ import {
   getCurrentAffairsSubject,
   type CurrentAffairsBridgeItem,
 } from "@/lib/upsc/currentAffairsBridge";
+import {
+  readLocalQuestionBankAttempts,
+  type QuestionBankAttempt,
+} from "@/lib/upsc/questionBankEngine";
 import { useSubjectProgress, type SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
 
-function staticCoverageSignals(progress?: SubjectDayProgress) {
+function questionBankSignals(attempts: QuestionBankAttempt[], linkedDay: number) {
+  const dayAttempts = attempts.filter((attempt) => attempt.linkedDay === linkedDay);
+  if (!dayAttempts.length) return [];
+
+  const correctAttempts = dayAttempts.filter((attempt) => attempt.isCorrect).length;
+  const latestAttempt = dayAttempts[0];
+
+  return [
+    correctAttempts
+      ? `Question bank solved (${correctAttempts}/${dayAttempts.length} correct)`
+      : `Question bank attempted (${dayAttempts.length})`,
+    latestAttempt ? `${latestAttempt.difficulty.replace("_", " ")} practice` : "",
+  ].filter(Boolean);
+}
+
+function staticCoverageSignals(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[], linkedDay: number) {
   const signals: string[] = [];
 
   if (progress?.watched) signals.push("Watch evidence");
@@ -26,12 +45,13 @@ function staticCoverageSignals(progress?: SubjectDayProgress) {
   if (progress?.mcqAttempted) signals.push("MCQ attempted");
   if (progress?.mcqCompleted) signals.push("MCQ completed");
   if (progress?.confidence === "Command") signals.push("Command confidence");
+  signals.push(...questionBankSignals(attempts, linkedDay));
 
   return signals;
 }
 
-function hasCoveredStaticTopic(progress?: SubjectDayProgress) {
-  return staticCoverageSignals(progress).length > 0;
+function hasCoveredStaticTopic(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[], linkedDay: number) {
+  return staticCoverageSignals(progress, attempts, linkedDay).length > 0;
 }
 
 function sourceLabel(status: CurrentAffairsBridgeItem["sourceStatus"]) {
@@ -42,18 +62,31 @@ export function UpscCurrentAffairsBridge() {
   const searchParams = useSearchParams();
   const requestedSubject = searchParams.get("subject") ?? "geography";
   const [subjectSlug, setSubjectSlug] = useState(() => getCurrentAffairsSubject(requestedSubject).slug);
+  const [questionBankAttempts, setQuestionBankAttempts] = useState<QuestionBankAttempt[]>([]);
 
   useEffect(() => {
     setSubjectSlug(getCurrentAffairsSubject(requestedSubject).slug);
   }, [requestedSubject]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQuestionBankAttempts(readLocalQuestionBankAttempts(subjectSlug));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [subjectSlug]);
+
   const selectedSubject = useMemo(() => getCurrentAffairsSubject(subjectSlug), [subjectSlug]);
   const { getDayProgress, isLoaded } = useSubjectProgress(selectedSubject.slug, selectedSubject.sessions);
   const subjectItems = useMemo(() => getCurrentAffairsForSubject(selectedSubject.slug), [selectedSubject.slug]);
-  const unlockedItems = subjectItems.filter((item) => hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
-  const lockedItems = subjectItems.filter((item) => !hasCoveredStaticTopic(getDayProgress(item.linkedDay)));
+  const unlockedItems = subjectItems.filter((item) =>
+    hasCoveredStaticTopic(getDayProgress(item.linkedDay), questionBankAttempts, item.linkedDay)
+  );
+  const lockedItems = subjectItems.filter((item) =>
+    !hasCoveredStaticTopic(getDayProgress(item.linkedDay), questionBankAttempts, item.linkedDay)
+  );
   const coverageEvidence = subjectItems.map((item) => {
-    const signals = staticCoverageSignals(getDayProgress(item.linkedDay));
+    const signals = staticCoverageSignals(getDayProgress(item.linkedDay), questionBankAttempts, item.linkedDay);
 
     return {
       ...item,
@@ -142,6 +175,7 @@ export function UpscCurrentAffairsBridge() {
           data-unlocked-count={isLoaded ? unlockedItems.length : 0}
           data-locked-count={isLoaded ? lockedItems.length : subjectItems.length}
           data-covered-days={coveredDayList}
+          data-question-bank-attempt-count={questionBankAttempts.length}
           className="rounded-lg border border-[#c8ded6] bg-[#eef8f2] p-4 shadow-sm md:p-5"
         >
           <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
@@ -152,7 +186,7 @@ export function UpscCurrentAffairsBridge() {
               <h2 className="mt-1 text-xl font-black tracking-tight">Only covered static topics can open news.</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
                 The locked queue shows the chapter name only. The actual current-affairs hook opens after Watch, Talk,
-                Lab, MCQ, or Command-confidence evidence is saved for that exact day.
+                Lab, MCQ, Question Bank, or Command-confidence evidence is saved for that exact day.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -240,7 +274,8 @@ export function UpscCurrentAffairsBridge() {
               <p className="text-lg font-black tracking-tight">No current-affairs hook is visible yet.</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
                 Start {selectedSubject.title} Day 1 and complete the first Watch or Talk evidence. The portal will then reveal
-                only the linked issue hooks instead of showing a full news feed.
+                only the linked issue hooks instead of showing a full news feed. A solved Question Bank set also counts
+                as topic-contact evidence for the same day.
               </p>
               <Link
                 href={`/upsc/${selectedSubject.slug}?day=1`}
