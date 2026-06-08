@@ -90,6 +90,13 @@ export type QuestionBankSelection = {
   questions: PracticeQuestion[];
 };
 
+export type QuestionBankCustomMix = Record<QuestionDifficulty, number>;
+
+export type QuestionBankCustomSelection = QuestionBankSelection & {
+  mix: QuestionBankCustomMix;
+  requestedTotal: number;
+};
+
 export type QuestionBankCoverageRow = {
   subjectSlug: string;
   subjectTitle: string;
@@ -123,6 +130,13 @@ export type QuestionBankAttemptInput = QuestionBankAttempt[];
 
 export const questionDifficulties: QuestionDifficulty[] = ["EASY", "MEDIUM", "HARD", "PYQ_STYLE"];
 export const questionBankAttemptStorageKey = "sarit-upsc-question-bank-attempts-v1";
+
+export const emptyQuestionBankMix: QuestionBankCustomMix = {
+  EASY: 0,
+  MEDIUM: 0,
+  HARD: 0,
+  PYQ_STYLE: 0,
+};
 
 export const questionBankSubjects: QuestionBankSubject[] = [
   {
@@ -853,6 +867,56 @@ function resolveLearnerLevel(profile?: Pick<StudentProfile, "level"> | null): St
   return profile?.level ?? "beginner";
 }
 
+function normalizeQuestionBankMix(mix: Partial<QuestionBankCustomMix>) {
+  return questionDifficulties.reduce(
+    (normalized, difficulty) => ({
+      ...normalized,
+      [difficulty]: clamp(Math.round(Number(mix[difficulty]) || 0), 0, 20),
+    }),
+    { ...emptyQuestionBankMix }
+  );
+}
+
+function questionBankMixTotal(mix: QuestionBankCustomMix) {
+  return questionDifficulties.reduce((sum, difficulty) => sum + mix[difficulty], 0);
+}
+
+export function buildRecommendedQuestionBankMix(recommendation: Pick<QuestionBankRecommendation, "recommendedDifficulty" | "adaptiveLevel" | "teacherDoubtCount" | "recoveryCount" | "unresolvedIncorrectCount">): QuestionBankCustomMix {
+  if (recommendation.teacherDoubtCount > 0 || recommendation.recoveryCount > 0 || recommendation.unresolvedIncorrectCount > 0) {
+    return {
+      EASY: 4,
+      MEDIUM: 2,
+      HARD: 0,
+      PYQ_STYLE: 1,
+    };
+  }
+
+  if (recommendation.adaptiveLevel === "advanced") {
+    return {
+      EASY: 1,
+      MEDIUM: 2,
+      HARD: recommendation.recommendedDifficulty === "HARD" ? 4 : 2,
+      PYQ_STYLE: recommendation.recommendedDifficulty === "PYQ_STYLE" ? 4 : 3,
+    };
+  }
+
+  if (recommendation.adaptiveLevel === "intermediate") {
+    return {
+      EASY: 2,
+      MEDIUM: 4,
+      HARD: 1,
+      PYQ_STYLE: 2,
+    };
+  }
+
+  return {
+    EASY: 4,
+    MEDIUM: 2,
+    HARD: 0,
+    PYQ_STYLE: 1,
+  };
+}
+
 export function buildQuestionBankRecommendation(
   progress: QuestionBankProgressInput,
   profile?: Pick<StudentProfile, "level"> | null,
@@ -1030,5 +1094,55 @@ export function selectQuestionBankSet({
   return {
     recommendation,
     questions,
+  };
+}
+
+export function selectCustomQuestionBankSet({
+  subjectSlug = "geography",
+  progress,
+  profile,
+  mix,
+  attempts = [],
+}: {
+  subjectSlug?: string;
+  progress: QuestionBankProgressInput;
+  profile?: Pick<StudentProfile, "level"> | null;
+  mix: Partial<QuestionBankCustomMix>;
+  attempts?: QuestionBankAttemptInput;
+}): QuestionBankCustomSelection {
+  const subject = getQuestionBankSubject(subjectSlug);
+  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts);
+  const selectedMix = normalizeQuestionBankMix(mix);
+  const targetDaySet = new Set(recommendation.targetDays);
+  const solvedQuestionIds = new Set(attempts.filter((attempt) => attempt.subjectSlug === subject.slug).map((attempt) => attempt.questionId));
+  const selectedIds = new Set<string>();
+  const questions = questionDifficulties.flatMap((difficulty) => {
+    const requestedCount = selectedMix[difficulty];
+    if (requestedCount <= 0) return [];
+
+    const pool = allPracticeQuestionBank.filter(
+      (question) => question.subjectSlug === subject.slug && question.difficulty === difficulty
+    );
+    const targeted = pool.filter((question) => targetDaySet.has(question.linkedDay));
+    const fallback = pool.filter((question) => !targetDaySet.has(question.linkedDay));
+    const prioritized = [
+      ...targeted.filter((question) => !solvedQuestionIds.has(question.id)),
+      ...fallback.filter((question) => !solvedQuestionIds.has(question.id)),
+      ...targeted.filter((question) => solvedQuestionIds.has(question.id)),
+      ...fallback.filter((question) => solvedQuestionIds.has(question.id)),
+    ];
+
+    return prioritized.filter((question) => {
+      if (selectedIds.has(question.id)) return false;
+      selectedIds.add(question.id);
+      return true;
+    }).slice(0, requestedCount);
+  });
+
+  return {
+    recommendation,
+    questions,
+    mix: selectedMix,
+    requestedTotal: questionBankMixTotal(selectedMix),
   };
 }

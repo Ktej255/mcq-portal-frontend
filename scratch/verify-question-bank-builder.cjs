@@ -53,12 +53,14 @@ async function seedSession(page, { level, subjectSlug = "geography", progress })
   );
 }
 
-async function readQuestionBankState(page, label, checks, subjectSlug = "geography") {
+async function readQuestionBankState(page, label, checks, subjectSlug = "geography", options = {}) {
   const route =
     subjectSlug === "geography"
       ? `${baseUrl}/upsc/question-bank`
       : `${baseUrl}/upsc/question-bank?subject=${subjectSlug}`;
-  await page.goto(route, { waitUntil: "networkidle", timeout: 45000 });
+  if (options.navigate !== false) {
+    await page.goto(route, { waitUntil: "networkidle", timeout: 45000 });
+  }
   await page.getByTestId("upsc-question-bank-hero").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-question-bank-recommendation").waitFor({ timeout: 15000 });
 
@@ -82,6 +84,8 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       activeSubject: hero?.getAttribute("data-active-subject"),
       activeDifficulty: hero?.getAttribute("data-active-difficulty"),
       activeCount: hero?.getAttribute("data-active-count"),
+      customMode: hero?.getAttribute("data-custom-mode"),
+      customMix: hero?.getAttribute("data-custom-mix"),
       recommendedDifficulty: recommendation?.getAttribute("data-recommended-difficulty"),
       recommendedCount: recommendation?.getAttribute("data-recommended-count"),
       aiGapCount: recommendation?.getAttribute("data-ai-gap-count"),
@@ -121,6 +125,9 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
         activeDifficulty: selectionProof?.getAttribute("data-active-difficulty"),
         recommendedDifficulty: selectionProof?.getAttribute("data-recommended-difficulty"),
         manualOverride: selectionProof?.getAttribute("data-manual-override"),
+        customMode: selectionProof?.getAttribute("data-custom-mode"),
+        customRequestedTotal: selectionProof?.getAttribute("data-custom-requested-total"),
+        customMix: selectionProof?.getAttribute("data-custom-mix"),
         adaptiveScore: selectionProof?.getAttribute("data-adaptive-score"),
         adaptiveLevel: selectionProof?.getAttribute("data-adaptive-level"),
         text: selectionProof?.textContent || "",
@@ -131,6 +138,17 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
           text: row.textContent || "",
         })),
       },
+      customMixProof: (() => {
+        const customMix = document.querySelector('[data-testid="upsc-question-bank-custom-mix"]');
+        return {
+          customMode: customMix?.getAttribute("data-custom-mode"),
+          requestedTotal: customMix?.getAttribute("data-requested-total"),
+          displayedTotal: customMix?.getAttribute("data-displayed-total"),
+          customMix: customMix?.getAttribute("data-custom-mix"),
+          displayedMix: customMix?.getAttribute("data-displayed-mix"),
+          text: customMix?.textContent || "",
+        };
+      })(),
       ledgerText: ledger?.textContent || "",
       aiGapText: aiGap?.textContent || "",
       questions,
@@ -155,6 +173,50 @@ function expectDifficultySet(state, expectedDifficulty, minimumQuestions, label,
   if (wrongDifficulty) {
     throw new Error(`${label}: wrong question difficulty found: ${JSON.stringify(wrongDifficulty)}`);
   }
+  const wrongSubject = state.questions.find((question) => question.subjectSlug !== expectedSubject);
+  if (wrongSubject) {
+    throw new Error(`${label}: wrong question subject found: ${JSON.stringify(wrongSubject)}`);
+  }
+}
+
+function parseMix(mix) {
+  return Object.fromEntries(
+    (mix || "")
+      .split("|")
+      .filter(Boolean)
+      .map((entry) => {
+        const [difficulty, count] = entry.split(":");
+        return [difficulty, Number(count)];
+      })
+  );
+}
+
+function expectMixedSet(state, expectedMix, label, expectedSubject = "geography") {
+  const displayedMix = parseMix(state.customMixProof.displayedMix);
+  const requestedMix = parseMix(state.customMixProof.customMix);
+  const requestedTotal = Object.values(expectedMix).reduce((sum, count) => sum + count, 0);
+
+  if (
+    state.activeSubject !== expectedSubject ||
+    state.activeDifficulty !== "CUSTOM_MIX" ||
+    state.customMode !== "true" ||
+    state.selectionProof.activeDifficulty !== "CUSTOM_MIX" ||
+    state.selectionProof.customMode !== "true" ||
+    state.customMixProof.customMode !== "true" ||
+    Number(state.customMixProof.requestedTotal) !== requestedTotal
+  ) {
+    throw new Error(`${label}: custom mode did not activate correctly: ${JSON.stringify(state)}`);
+  }
+
+  for (const [difficulty, count] of Object.entries(expectedMix)) {
+    if (requestedMix[difficulty] !== count) {
+      throw new Error(`${label}: requested ${difficulty} mix mismatch: ${JSON.stringify(state.customMixProof)}`);
+    }
+    if (displayedMix[difficulty] !== count) {
+      throw new Error(`${label}: displayed ${difficulty} mix mismatch: ${JSON.stringify(state.customMixProof)}`);
+    }
+  }
+
   const wrongSubject = state.questions.find((question) => question.subjectSlug !== expectedSubject);
   if (wrongSubject) {
     throw new Error(`${label}: wrong question subject found: ${JSON.stringify(wrongSubject)}`);
@@ -256,6 +318,50 @@ async function run() {
     manualMediumState.questionDifficulties.some((difficulty) => difficulty !== "MEDIUM")
   ) {
     throw new Error(`manual-medium-override failed: ${JSON.stringify(manualMediumState)}`);
+  }
+
+  await page.getByRole("button", { name: "Use adaptive mix" }).click();
+  await page.waitForFunction(() => {
+    const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
+    return (
+      hero?.getAttribute("data-custom-mode") === "true" &&
+      hero?.getAttribute("data-active-difficulty") === "CUSTOM_MIX"
+    );
+  });
+  const recoveryCustomMixState = await readQuestionBankState(page, "recovery-custom-mix", checks, "geography", { navigate: false });
+  expectMixedSet(recoveryCustomMixState, { EASY: 4, MEDIUM: 2, HARD: 0, PYQ_STYLE: 1 }, "recovery-custom-mix");
+  await page.getByTestId("upsc-question-bank-mix-hard").fill("1");
+  await page.waitForFunction(() => {
+    const customMix = document.querySelector('[data-testid="upsc-question-bank-custom-mix"]');
+    return (
+      customMix?.getAttribute("data-custom-mix") === "EASY:4|MEDIUM:2|HARD:1|PYQ_STYLE:1" &&
+      customMix?.getAttribute("data-displayed-mix") === "EASY:4|MEDIUM:2|HARD:1|PYQ_STYLE:1"
+    );
+  });
+  const recoveryEditedCustomMixState = await page.evaluate(() => {
+    const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
+    const customMix = document.querySelector('[data-testid="upsc-question-bank-custom-mix"]');
+    return {
+      activeDifficulty: hero?.getAttribute("data-active-difficulty"),
+      activeCount: hero?.getAttribute("data-active-count"),
+      customMode: hero?.getAttribute("data-custom-mode"),
+      customMix: customMix?.getAttribute("data-custom-mix"),
+      displayedMix: customMix?.getAttribute("data-displayed-mix"),
+      questionDifficulties: [...document.querySelectorAll('[data-testid="upsc-question-bank-question"]')].map((node) =>
+        node.getAttribute("data-question-difficulty")
+      ),
+    };
+  });
+  checks.push({ label: "recovery-edited-custom-mix", recoveryEditedCustomMixState });
+  if (
+    recoveryEditedCustomMixState.activeDifficulty !== "CUSTOM_MIX" ||
+    recoveryEditedCustomMixState.activeCount !== "8" ||
+    recoveryEditedCustomMixState.customMode !== "true" ||
+    recoveryEditedCustomMixState.customMix !== "EASY:4|MEDIUM:2|HARD:1|PYQ_STYLE:1" ||
+    recoveryEditedCustomMixState.displayedMix !== "EASY:4|MEDIUM:2|HARD:1|PYQ_STYLE:1" ||
+    !recoveryEditedCustomMixState.questionDifficulties.includes("HARD")
+  ) {
+    throw new Error(`recovery-edited-custom-mix failed: ${JSON.stringify(recoveryEditedCustomMixState)}`);
   }
 
   await seedSession(page, {

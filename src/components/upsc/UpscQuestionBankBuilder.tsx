@@ -18,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   allPracticeQuestionBank,
+  buildRecommendedQuestionBankMix,
+  emptyQuestionBankMix,
   getQuestionBankSubject,
   questionBankCoverageRows,
   questionBankCoverageSummary,
@@ -26,8 +28,10 @@ import {
   readLocalQuestionBankAttempts,
   readLocalQuestionBankProgress,
   saveLocalQuestionBankAttempt,
+  selectCustomQuestionBankSet,
   selectQuestionBankSet,
   type QuestionBankAttempt,
+  type QuestionBankCustomMix,
   type QuestionBankProgressInput,
   type QuestionDifficulty,
   type PracticeQuestion,
@@ -57,6 +61,8 @@ export function UpscQuestionBankBuilder() {
   const [attempts, setAttempts] = useState<QuestionBankAttempt[]>([]);
   const [difficulty, setDifficulty] = useState<QuestionDifficulty | null>(null);
   const [count, setCount] = useState<number | null>(null);
+  const [customMode, setCustomMode] = useState(false);
+  const [customMix, setCustomMix] = useState<QuestionBankCustomMix>(emptyQuestionBankMix);
   const [displayQuestionIds, setDisplayQuestionIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -64,6 +70,8 @@ export function UpscQuestionBankBuilder() {
     setSubjectSlug(nextSubjectSlug);
     setDifficulty(null);
     setCount(null);
+    setCustomMode(false);
+    setCustomMix(emptyQuestionBankMix);
   }, [requestedSubject]);
 
   useEffect(() => {
@@ -82,17 +90,36 @@ export function UpscQuestionBankBuilder() {
   );
   const activeDifficulty = difficulty ?? recommended.recommendation.recommendedDifficulty;
   const activeCount = count ?? recommended.recommendation.recommendedCount;
+  const recommendedMix = useMemo(
+    () => buildRecommendedQuestionBankMix(recommended.recommendation),
+    [recommended.recommendation]
+  );
+  const effectiveCustomMix = useMemo(
+    () => (customMode ? customMix : recommendedMix),
+    [customMix, customMode, recommendedMix]
+  );
   const selection = useMemo(
-    () =>
-      selectQuestionBankSet({
+    () => {
+      if (customMode) {
+        return selectCustomQuestionBankSet({
+          subjectSlug: selectedSubject.slug,
+          progress,
+          profile,
+          attempts,
+          mix: customMix,
+        });
+      }
+
+      return selectQuestionBankSet({
         subjectSlug: selectedSubject.slug,
         progress,
         profile,
         attempts,
         difficulty: activeDifficulty,
         count: activeCount,
-      }),
-    [activeCount, activeDifficulty, attempts, profile, progress, selectedSubject.slug]
+      });
+    },
+    [activeCount, activeDifficulty, attempts, customMix, customMode, profile, progress, selectedSubject.slug]
   );
   const recommendation = selection.recommendation;
   const selectedCoverage = useMemo(
@@ -103,7 +130,7 @@ export function UpscQuestionBankBuilder() {
 
   useEffect(() => {
     setDisplayQuestionIds(selection.questions.map((question) => question.id));
-  }, [activeCount, activeDifficulty, selectedSubject.slug, targetDayKey]);
+  }, [activeCount, activeDifficulty, customMode, effectiveCustomMix.EASY, effectiveCustomMix.HARD, effectiveCustomMix.MEDIUM, effectiveCustomMix.PYQ_STYLE, selectedSubject.slug, targetDayKey]);
 
   const displayedQuestions = useMemo(() => {
     if (!displayQuestionIds.length) return selection.questions;
@@ -119,6 +146,16 @@ export function UpscQuestionBankBuilder() {
 
     return lockedQuestions.length ? lockedQuestions : selection.questions;
   }, [displayQuestionIds, selectedSubject.slug, selection.questions]);
+  const customRequestedTotal = questionDifficulties.reduce((sum, item) => sum + effectiveCustomMix[item], 0);
+  const displayedDifficultyCounts = questionDifficulties.reduce(
+    (counts, item) => ({
+      ...counts,
+      [item]: displayedQuestions.filter((question) => question.difficulty === item).length,
+    }),
+    {} as QuestionBankCustomMix
+  );
+  const customMixLabel = questionDifficulties.map((item) => `${item}:${effectiveCustomMix[item]}`).join("|");
+  const displayedMixLabel = questionDifficulties.map((item) => `${item}:${displayedDifficultyCounts[item]}`).join("|");
 
   const attemptByQuestionId = useMemo(
     () => new Map(attempts.map((attempt) => [attempt.questionId, attempt])),
@@ -179,6 +216,25 @@ export function UpscQuestionBankBuilder() {
       rule: "Active recovery, AI teacher gaps, and incorrect answers block difficulty jumps.",
     },
   ];
+  const enableCustomMix = (mix: QuestionBankCustomMix = effectiveCustomMix) => {
+    setCustomMode(true);
+    setCustomMix({ ...mix });
+    setDifficulty(null);
+    setCount(null);
+  };
+  const updateCustomMix = (item: QuestionDifficulty, value: string) => {
+    const parsedValue = Math.round(Number(value) || 0);
+    const nextValue = Math.max(0, Math.min(20, parsedValue));
+    const baseMix = customMode ? customMix : effectiveCustomMix;
+
+    setCustomMode(true);
+    setCustomMix({
+      ...baseMix,
+      [item]: nextValue,
+    });
+    setDifficulty(null);
+    setCount(null);
+  };
   const markQuestionSolved = (question: PracticeQuestion, selectedOption: QuestionOption) => {
     setAttempts(saveLocalQuestionBankAttempt(question, selectedOption));
   };
@@ -189,8 +245,10 @@ export function UpscQuestionBankBuilder() {
         <section
           data-testid="upsc-question-bank-hero"
           data-active-subject={selectedSubject.slug}
-          data-active-difficulty={activeDifficulty}
-          data-active-count={activeCount}
+          data-active-difficulty={customMode ? "CUSTOM_MIX" : activeDifficulty}
+          data-active-count={customMode ? customRequestedTotal : activeCount}
+          data-custom-mode={customMode ? "true" : "false"}
+          data-custom-mix={customMixLabel}
           data-solved-count={recommendation.solvedCount}
           data-solved-accuracy={recommendation.solvedAccuracyPercent ?? "pending"}
           data-adaptive-level={recommendation.adaptiveLevel}
@@ -285,6 +343,8 @@ export function UpscQuestionBankBuilder() {
                     setSubjectSlug(subject.slug);
                     setDifficulty(null);
                     setCount(null);
+                    setCustomMode(false);
+                    setCustomMix(emptyQuestionBankMix);
                   }}
                   className={cn(
                     "min-h-10 rounded-md border px-3 text-sm font-black transition",
@@ -359,9 +419,12 @@ export function UpscQuestionBankBuilder() {
           <div
             data-testid="upsc-question-bank-selection-proof"
             data-evidence-rule="recall-consistency-marks-ledger-command-recovery"
-            data-active-difficulty={activeDifficulty}
+            data-active-difficulty={customMode ? "CUSTOM_MIX" : activeDifficulty}
             data-recommended-difficulty={recommendation.recommendedDifficulty}
             data-manual-override={difficulty ? "true" : "false"}
+            data-custom-mode={customMode ? "true" : "false"}
+            data-custom-requested-total={customRequestedTotal}
+            data-custom-mix={customMixLabel}
             data-adaptive-score={recommendation.adaptiveReadinessScore}
             data-adaptive-level={recommendation.adaptiveLevel}
             className="mt-5 rounded-lg border border-[#b9d9cd] bg-white/75 p-4"
@@ -376,7 +439,7 @@ export function UpscQuestionBankBuilder() {
                 </h3>
               </div>
               <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
-                {activeDifficulty.replace("_", " ")}
+                {customMode ? "Custom mix" : activeDifficulty.replace("_", " ")}
               </Badge>
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -446,7 +509,10 @@ export function UpscQuestionBankBuilder() {
                     key={item}
                     type="button"
                     aria-pressed={isActive}
-                    onClick={() => setDifficulty(item)}
+                    onClick={() => {
+                      setCustomMode(false);
+                      setDifficulty(item);
+                    }}
                     className={cn(
                       "min-h-12 rounded-md border px-3 text-sm font-black transition",
                       isActive
@@ -471,7 +537,10 @@ export function UpscQuestionBankBuilder() {
                   key={item}
                   type="button"
                   aria-pressed={activeCount === item}
-                  onClick={() => setCount(item)}
+                  onClick={() => {
+                    setCustomMode(false);
+                    setCount(item);
+                  }}
                   className={cn(
                     "min-h-12 rounded-md border text-sm font-black transition",
                     activeCount === item
@@ -483,6 +552,85 @@ export function UpscQuestionBankBuilder() {
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-question-bank-custom-mix"
+          data-custom-mode={customMode ? "true" : "false"}
+          data-requested-total={customRequestedTotal}
+          data-displayed-total={displayedQuestions.length}
+          data-custom-mix={customMixLabel}
+          data-displayed-mix={displayedMixLabel}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Mixed practice
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight">Build a balanced MCQ set</h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                Use this when one student needs basics, traps, and PYQ-style checks in the same sitting. The adaptive
+                mix stays tied to the same recall, marks, recovery, and command evidence.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                aria-pressed={customMode}
+                onClick={() => enableCustomMix(recommendedMix)}
+                className={cn(
+                  "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                  customMode
+                    ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                    : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                )}
+              >
+                Use adaptive mix
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustomMix(recommendedMix)}
+                className="min-h-10 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+              >
+                Load recommended mix
+              </button>
+              <button
+                type="button"
+                aria-pressed={!customMode}
+                onClick={() => setCustomMode(false)}
+                className={cn(
+                  "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                  !customMode
+                    ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                    : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                )}
+              >
+                Use single band
+              </button>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            {questionDifficulties.map((item) => (
+              <label key={item} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                  {item.replace("_", " ")}
+                </span>
+                <input
+                  data-testid={`upsc-question-bank-mix-${item.toLowerCase()}`}
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={effectiveCustomMix[item]}
+                  onChange={(event) => updateCustomMix(item, event.target.value)}
+                  className="mt-2 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-base font-black text-[#13251d] outline-none transition focus:border-[#1d9e75]"
+                />
+                <span className="mt-2 block text-xs font-bold text-[#5d675f]">
+                  Showing {displayedDifficultyCounts[item]} of {effectiveCustomMix[item]}
+                </span>
+              </label>
+            ))}
           </div>
         </section>
 
@@ -506,7 +654,12 @@ export function UpscQuestionBankBuilder() {
           ))}
         </section>
 
-        <section data-testid="upsc-question-bank-set" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+        <section
+          data-testid="upsc-question-bank-set"
+          data-custom-mode={customMode ? "true" : "false"}
+          data-question-mix={displayedMixLabel}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Selected set</p>
