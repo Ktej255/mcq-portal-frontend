@@ -202,14 +202,30 @@ async function run() {
       "UPSC Previous Question Papers Index",
       "Reject",
     ]),
+    csvRow([
+      2024,
+      "Prelims",
+      "geography",
+      "General Studies Paper I",
+      "Q3",
+      "This row should fail because the source URL is not an official UPSC domain.",
+      "Indian geography and mapping",
+      "geo-india",
+      "map|source",
+      "geo-map-process",
+      "https://example.com/non-official-upsc-paper.pdf",
+      "Non-official mirror",
+      "Reject",
+    ]),
   ].join("\n");
 
   await page.getByTestId("admin-pyq-import-textarea").fill(csv);
   await page.getByTestId("admin-pyq-import-run").click();
   await page.getByTestId("admin-pyq-import-result").waitFor({ timeout: 15000 });
   await page.getByText("Accepted rows: 2", { exact: true }).waitFor({ timeout: 15000 });
-  await page.getByText("Rejected rows: 1", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByText("Rejected rows: 2", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByText("Subject slug is not present", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("Official source URL must use the upsc.gov.in domain", { exact: false }).waitFor({ timeout: 15000 });
   await page.waitForFunction(() => {
     const contract = document.querySelector('[data-testid="admin-pyq-import-readiness-contract"]');
     return contract?.getAttribute("data-exact-question-text-rows") === "2";

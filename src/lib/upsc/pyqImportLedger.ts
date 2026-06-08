@@ -172,6 +172,7 @@ export function parsePyqImportRecord(input: unknown): PyqImportRecord | null {
     !parsed.questionText ||
     !parsed.syllabusArea ||
     !parsed.sourceHref ||
+    !isOfficialUpscSourceHref(parsed.sourceHref) ||
     !parsed.importedAt
   ) {
     return null;
@@ -294,6 +295,16 @@ function normalizeTopicTags(value: string) {
     .split(/[|,;]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+export function isOfficialUpscSourceHref(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (hostname === "upsc.gov.in" || hostname.endsWith(".upsc.gov.in"));
+  } catch {
+    return false;
+  }
 }
 
 function sourcePackForSlug(slug: string) {
@@ -608,6 +619,15 @@ export function buildPyqImportRecordsFromCsvRows(rows: PyqImportCsvRow[]): PyqIm
       rejected.push({
         rowNumber,
         reason: "Paper, question number, question text, syllabus area, and source URL are required.",
+        row,
+      });
+      return;
+    }
+
+    if (!isOfficialUpscSourceHref(sourceHref)) {
+      rejected.push({
+        rowNumber,
+        reason: "Official source URL must use the upsc.gov.in domain.",
         row,
       });
       return;
