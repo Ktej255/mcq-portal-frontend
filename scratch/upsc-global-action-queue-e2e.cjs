@@ -283,14 +283,17 @@ async function run() {
   await dailyQueue.getByText("Question Bank ledger has 1 incorrect answer in Space technology basics", { exact: false }).waitFor({
     timeout: 15000,
   });
+  await dailyQueue.getByText("Spaced revision due", { exact: false }).first().waitFor({ timeout: 15000 });
   const dailyQueueCards = await dailyQueue.locator("a").evaluateAll((cards) =>
     cards.map((card) => ({
       href: card.getAttribute("href"),
       text: card.textContent || "",
     }))
   );
+  const dailyDueCards = dailyQueueCards.filter((card) => card.text.includes("Spaced revision due"));
   let pageMetrics = await metrics(page);
-  checks.push({ route: "daily-command-queue", metrics: pageMetrics, cards: dailyQueueCards });
+  checks.push({ route: "daily-command-queue", metrics: pageMetrics, cards: dailyQueueCards, dueCards: dailyDueCards });
+  if (!dailyDueCards.length) throw new Error(`Daily queue missing spaced revision due card: ${JSON.stringify(dailyQueueCards)}`);
   if (pageMetrics.hasHorizontalOverflow) throw new Error(`Daily queue overflow: ${JSON.stringify(pageMetrics)}`);
 
   await page.goto(`${baseUrl}/upsc/readiness-audit`, { waitUntil: "networkidle" });
@@ -300,14 +303,17 @@ async function run() {
   await auditQueue.getByText("Revisit required", { exact: false }).waitFor({ timeout: 15000 });
   await auditQueue.getByText("Science and Tech", { exact: false }).waitFor({ timeout: 15000 });
   await auditQueue.getByText("Question Bank trap", { exact: false }).waitFor({ timeout: 15000 });
+  await auditQueue.getByText("Spaced revision due", { exact: false }).first().waitFor({ timeout: 15000 });
   const auditQueueCards = await auditQueue.locator("a").evaluateAll((cards) =>
     cards.map((card) => ({
       href: card.getAttribute("href"),
       text: card.textContent || "",
     }))
   );
+  const auditDueCards = auditQueueCards.filter((card) => card.text.includes("Spaced revision due"));
   pageMetrics = await metrics(page);
-  checks.push({ route: "readiness-audit-queue", metrics: pageMetrics, cards: auditQueueCards });
+  checks.push({ route: "readiness-audit-queue", metrics: pageMetrics, cards: auditQueueCards, dueCards: auditDueCards });
+  if (!auditDueCards.length) throw new Error(`Readiness queue missing spaced revision due card: ${JSON.stringify(auditQueueCards)}`);
   if (pageMetrics.hasHorizontalOverflow) throw new Error(`Readiness queue overflow: ${JSON.stringify(pageMetrics)}`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
@@ -332,6 +338,9 @@ async function run() {
     timeout: 15000,
   });
   await mobilePage.getByTestId("global-next-action-queue").getByText("Question Bank trap", { exact: false }).waitFor({
+    timeout: 15000,
+  });
+  await mobilePage.getByTestId("global-next-action-queue").getByText("Spaced revision due", { exact: false }).first().waitFor({
     timeout: 15000,
   });
   pageMetrics = await metrics(mobilePage);

@@ -146,6 +146,14 @@ function getIncorrectQuestionBankAttempts(attempts: QuestionBankAttempt[]) {
   return attempts.filter((attempt) => !attempt.isCorrect);
 }
 
+function getQuestionBankSignal(attempts: QuestionBankAttempt[]) {
+  return {
+    hasEvidence: attempts.length > 0,
+    hasIncorrect: attempts.some((attempt) => !attempt.isCorrect),
+    isCommand: attempts.length > 0 && attempts.every((attempt) => attempt.isCorrect),
+  };
+}
+
 function questionBankTrapDetail(attempts: QuestionBankAttempt[]) {
   const incorrectAttempts = getIncorrectQuestionBankAttempts(attempts);
   const topics = Array.from(new Set(incorrectAttempts.map((attempt) => attempt.topic).filter(Boolean))).slice(0, 2);
@@ -153,6 +161,47 @@ function questionBankTrapDetail(attempts: QuestionBankAttempt[]) {
   return `Question Bank ledger has ${incorrectAttempts.length} incorrect answer${
     incorrectAttempts.length === 1 ? "" : "s"
   }${topicText}. Repair before retesting.`;
+}
+
+function hasQueueEvidence(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[]) {
+  return Boolean(
+    progress?.watched ||
+      progress?.reflection?.trim() ||
+      progress?.baselineSavedAt ||
+      typeof progress?.talkScore === "number" ||
+      progress?.labCompleted ||
+      progress?.mcqAttempted ||
+      progress?.mcqCompleted ||
+      attempts.length
+  );
+}
+
+function hasQueueCommandEvidence(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[]) {
+  if (getQuestionBankSignal(attempts).hasIncorrect) return false;
+  return Boolean(
+    progress?.confidence === "Command" ||
+      progress?.talkBand === "Command" ||
+      progress?.mcqOutcome === "Command" ||
+      (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75) ||
+      getQuestionBankSignal(attempts).isCommand
+  );
+}
+
+function isSpacedRevisionCleared(progress?: SubjectDayProgress) {
+  return Boolean(progress?.revisitQueued === false && progress?.activePromptLabel === "Revisit");
+}
+
+function getLatestEvidenceDay(
+  subject: QueueSubject,
+  progress: Record<string, SubjectDayProgress>,
+  questionBankAttempts: QuestionBankAttempt[]
+) {
+  return subject.sessions.reduce((latest, session) => {
+    const attempts = questionBankAttempts.filter(
+      (attempt) => attempt.subjectSlug === subject.slug && attempt.linkedDay === session.day
+    );
+    return hasQueueEvidence(progress[String(session.day)], attempts) ? Math.max(latest, session.day) : latest;
+  }, 0);
 }
 
 function buildItem(
@@ -179,7 +228,8 @@ function getActionForDay(
   progress: SubjectDayProgress | undefined,
   content: ContentState | undefined,
   mcq: McqState | undefined,
-  questionBankAttempts: QuestionBankAttempt[] = []
+  questionBankAttempts: QuestionBankAttempt[] = [],
+  latestEvidenceDay = 0
 ) {
   const watchCompletion = getSubjectWatchCompletion(progress);
   const labCompletion = getLabCompletion(subject, progress);
@@ -219,6 +269,25 @@ function getActionForDay(
       detail: questionBankTrapDetail(incorrectQuestionBankAttempts),
       badge: "QB Trap",
       tone: "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
+    });
+  }
+
+  const dueDay = Math.min(session.day + 2, subject.sessions.length);
+  const dueSession = subject.sessions.find((item) => item.day === dueDay) ?? session;
+  if (
+    hasQueueCommandEvidence(progress, questionBankAttempts) &&
+    !isSpacedRevisionCleared(progress) &&
+    latestEvidenceDay >= dueDay
+  ) {
+    return buildItem(subject, session, {
+      priority: 2,
+      href: `${subject.href}/revisit?day=${session.day}`,
+      room: "Revisit",
+      actionLabel: "Revise now",
+      statusLabel: "Spaced revision due",
+      detail: `${session.title} cleared earlier and is due for recall before ${dueSession.title} stays stable.`,
+      badge: "Due",
+      tone: "border-[#dcd5c7] bg-[#fdfaf3] text-[#34453b]",
     });
   }
 
@@ -326,6 +395,7 @@ export function buildUpscActionQueue(limit = 10, includeReady = false, itemsPerS
   return upscActionSubjects
     .flatMap((subject) => {
       const progress = readJson<Record<string, SubjectDayProgress>>(progressStorageKey(subject.slug), {});
+      const latestEvidenceDay = getLatestEvidenceDay(subject, progress, questionBankAttempts);
 
       const subjectItems = subject.sessions
         .map((session) =>
@@ -337,7 +407,8 @@ export function buildUpscActionQueue(limit = 10, includeReady = false, itemsPerS
             mcqStates[batchCode(subject, session)],
             questionBankAttempts.filter(
               (attempt) => attempt.subjectSlug === subject.slug && attempt.linkedDay === session.day
-            )
+            ),
+            latestEvidenceDay
           )
         )
         .filter((item) => includeReady || item.room !== "Track")

@@ -42,13 +42,22 @@ type SubjectSummary = RevisionSubject & {
   revisitCount: number;
   questionBankTrapCount: number;
   questionBankTrapDays: number;
+  spacedRevisionCount: number;
   completionPercent: number;
   watchPercent: number;
   progress: Record<string, SubjectDayProgress>;
   questionBankAttempts: QuestionBankAttempt[];
+  latestEvidenceDay: number;
+  spacedRevisionItems: SpacedRevisionItem[];
   nextSession: SubjectSession;
   nextHref: string;
   nextLabel: string;
+};
+
+type SpacedRevisionItem = {
+  session: SubjectSession;
+  dueSession: SubjectSession;
+  dueDay: number;
 };
 
 const revisionSubjects: RevisionSubject[] = [
@@ -107,6 +116,13 @@ function getQuestionBankTrapAttempts(attempts: QuestionBankAttempt[]) {
   return attempts.filter((attempt) => !attempt.isCorrect);
 }
 
+function getQuestionBankSignal(attempts: QuestionBankAttempt[]) {
+  return {
+    hasIncorrect: attempts.some((attempt) => !attempt.isCorrect),
+    isCommand: attempts.length > 0 && attempts.every((attempt) => attempt.isCorrect),
+  };
+}
+
 function hasQuestionBankTrap(attempts: QuestionBankAttempt[], session: SubjectSession) {
   return getQuestionBankTrapAttempts(getQuestionBankAttemptsForSession(attempts, session)).length > 0;
 }
@@ -118,6 +134,65 @@ function questionBankTrapDetail(attempts: QuestionBankAttempt[]) {
   return `Question Bank ledger has ${wrongAttempts.length} incorrect answer${
     wrongAttempts.length === 1 ? "" : "s"
   }${topicText}. Repair before retesting.`;
+}
+
+function hasRevisionEvidence(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[]) {
+  return Boolean(
+    progress?.watched ||
+      progress?.reflection?.trim() ||
+      progress?.baselineSavedAt ||
+      typeof progress?.talkScore === "number" ||
+      progress?.labCompleted ||
+      progress?.mcqAttempted ||
+      progress?.mcqCompleted ||
+      attempts.length
+  );
+}
+
+function hasRevisionCommandEvidence(progress: SubjectDayProgress | undefined, attempts: QuestionBankAttempt[]) {
+  if (getQuestionBankSignal(attempts).hasIncorrect) return false;
+  return Boolean(
+    progress?.confidence === "Command" ||
+      progress?.talkBand === "Command" ||
+      progress?.mcqOutcome === "Command" ||
+      (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75) ||
+      getQuestionBankSignal(attempts).isCommand
+  );
+}
+
+function isSpacedRevisionCleared(progress?: SubjectDayProgress) {
+  return Boolean(progress?.revisitQueued === false && progress?.activePromptLabel === "Revisit");
+}
+
+function getLatestEvidenceDay(
+  subject: RevisionSubject,
+  progress: Record<string, SubjectDayProgress>,
+  questionBankAttempts: QuestionBankAttempt[]
+) {
+  return subject.sessions.reduce((latest, session) => {
+    const attempts = getQuestionBankAttemptsForSession(questionBankAttempts, session);
+    return hasRevisionEvidence(getSessionProgress(progress, session), attempts) ? Math.max(latest, session.day) : latest;
+  }, 0);
+}
+
+function getSpacedRevisionItems(
+  subject: RevisionSubject,
+  progress: Record<string, SubjectDayProgress>,
+  questionBankAttempts: QuestionBankAttempt[],
+  latestEvidenceDay: number
+): SpacedRevisionItem[] {
+  return subject.sessions
+    .map((session) => {
+      const item = getSessionProgress(progress, session);
+      const attempts = getQuestionBankAttemptsForSession(questionBankAttempts, session);
+      const dueDay = Math.min(session.day + 2, subject.sessions.length);
+      const dueSession = subject.sessions.find((candidate) => candidate.day === dueDay) ?? session;
+      if (!hasRevisionCommandEvidence(item, attempts) || isSpacedRevisionCleared(item) || latestEvidenceDay < dueDay) {
+        return null;
+      }
+      return { session, dueSession, dueDay };
+    })
+    .filter((item): item is SpacedRevisionItem => Boolean(item));
 }
 
 function hasTeacherDoubtSignal(progress?: SubjectDayProgress) {
@@ -150,7 +225,8 @@ function teacherDoubtHref(subject: RevisionSubject, session: SubjectSession, pro
 function getNextFocus(
   subject: RevisionSubject,
   progress: Record<string, SubjectDayProgress>,
-  questionBankAttempts: QuestionBankAttempt[]
+  questionBankAttempts: QuestionBankAttempt[],
+  spacedRevisionItems: SpacedRevisionItem[]
 ) {
   const teacherDoubt = subject.sessions.find((session) => hasActiveTeacherDoubt(getSessionProgress(progress, session)));
   if (teacherDoubt) {
@@ -189,6 +265,15 @@ function getNextFocus(
     };
   }
 
+  const spacedRevision = spacedRevisionItems[0];
+  if (spacedRevision) {
+    return {
+      session: spacedRevision.session,
+      href: `${subject.href}/revisit?day=${spacedRevision.session.day}`,
+      label: "Spaced revision due",
+    };
+  }
+
   const unfinished = subject.sessions.find((session) => !getSessionProgress(progress, session)?.reflection?.trim());
   if (unfinished) {
     return {
@@ -209,6 +294,8 @@ function getNextFocus(
 function buildSummary(subject: RevisionSubject): SubjectSummary {
   const progress = readProgress(subject.slug);
   const questionBankAttempts = readLocalQuestionBankAttempts(subject.slug);
+  const latestEvidenceDay = getLatestEvidenceDay(subject, progress, questionBankAttempts);
+  const spacedRevisionItems = getSpacedRevisionItems(subject, progress, questionBankAttempts, latestEvidenceDay);
   const watchedDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.watched);
   const reflectedDays = subject.sessions.filter((session) =>
     Boolean(getSessionProgress(progress, session)?.reflection?.trim())
@@ -219,7 +306,7 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
   const revisitDays = subject.sessions.filter((session) => getSessionProgress(progress, session)?.revisitQueued);
   const questionBankTrapAttempts = getQuestionBankTrapAttempts(questionBankAttempts);
   const questionBankTrapDays = subject.sessions.filter((session) => hasQuestionBankTrap(questionBankAttempts, session));
-  const nextFocus = getNextFocus(subject, progress, questionBankAttempts);
+  const nextFocus = getNextFocus(subject, progress, questionBankAttempts, spacedRevisionItems);
 
   return {
     ...subject,
@@ -231,10 +318,13 @@ function buildSummary(subject: RevisionSubject): SubjectSummary {
     revisitCount: revisitDays.length,
     questionBankTrapCount: questionBankTrapAttempts.length,
     questionBankTrapDays: questionBankTrapDays.length,
+    spacedRevisionCount: spacedRevisionItems.length,
     completionPercent: Math.round((reflectedDays.length / subject.sessions.length) * 100),
     watchPercent: Math.round((watchedDays.length / subject.sessions.length) * 100),
     progress,
     questionBankAttempts,
+    latestEvidenceDay,
+    spacedRevisionItems,
     nextSession: nextFocus.session,
     nextHref: nextFocus.href,
     nextLabel: nextFocus.label,
@@ -278,6 +368,7 @@ export function UpscRevisionCommandRoom({
     const shaky = summaries.reduce((sum, subject) => sum + subject.shakyCount, 0);
     const revisit = summaries.reduce((sum, subject) => sum + subject.revisitCount, 0);
     const questionBankTrap = summaries.reduce((sum, subject) => sum + subject.questionBankTrapCount, 0);
+    const spacedRevision = summaries.reduce((sum, subject) => sum + subject.spacedRevisionCount, 0);
 
     return {
       totalDays,
@@ -288,6 +379,7 @@ export function UpscRevisionCommandRoom({
       shaky,
       revisit,
       questionBankTrap,
+      spacedRevision,
       completionPercent: totalDays ? Math.round((reflected / totalDays) * 100) : 0,
       watchPercent: totalDays ? Math.round((watched / totalDays) * 100) : 0,
     };
@@ -304,7 +396,19 @@ export function UpscRevisionCommandRoom({
               const questionBankAttempts = getQuestionBankAttemptsForSession(subject.questionBankAttempts, session);
               const questionBankTrapAttempts = getQuestionBankTrapAttempts(questionBankAttempts);
               const isQuestionBankTrap = questionBankTrapAttempts.length > 0;
-              if (!isAiGap && !isQuestionBankTrap && !item?.revisitQueued && item?.confidence !== "Shaky") return null;
+              const spacedRevisionItem = subject.spacedRevisionItems.find(
+                (revision) => revision.session.day === session.day
+              );
+              const isSpacedRevision = Boolean(spacedRevisionItem);
+              if (
+                !isAiGap &&
+                !isQuestionBankTrap &&
+                !isSpacedRevision &&
+                !item?.revisitQueued &&
+                item?.confidence !== "Shaky"
+              ) {
+                return null;
+              }
               return {
                 subject,
                 session,
@@ -313,6 +417,8 @@ export function UpscRevisionCommandRoom({
                   ? "ai-teacher"
                   : isQuestionBankTrap
                     ? "question-bank"
+                    : isSpacedRevision
+                      ? "spaced-revision"
                     : item?.revisitQueued
                       ? "revisit"
                       : "shaky",
@@ -320,6 +426,8 @@ export function UpscRevisionCommandRoom({
                   ? "AI teacher gap"
                   : isQuestionBankTrap
                     ? "Question Bank trap"
+                    : isSpacedRevision
+                      ? "Spaced revision due"
                     : item?.revisitQueued
                       ? "Revisit queued"
                       : "Shaky confidence",
@@ -327,6 +435,8 @@ export function UpscRevisionCommandRoom({
                   ? item?.teacherDoubtRepairAction?.trim() || "Repair the AI-identified gap before new testing."
                   : isQuestionBankTrap
                     ? questionBankTrapDetail(questionBankTrapAttempts)
+                  : isSpacedRevision && spacedRevisionItem
+                    ? `${session.title} cleared earlier and is due for recall before ${spacedRevisionItem.dueSession.title} stays stable.`
                   : item?.revisitQueued
                     ? "Revisit queued from local progress."
                     : "Shaky confidence from local progress.",
@@ -334,6 +444,8 @@ export function UpscRevisionCommandRoom({
                 href: isAiGap
                   ? teacherDoubtHref(subject, session, item)
                   : isQuestionBankTrap
+                    ? `${subject.href}/revisit?day=${session.day}`
+                  : isSpacedRevision
                     ? `${subject.href}/revisit?day=${session.day}`
                   : item?.revisitQueued
                     ? `${subject.href}/revisit?day=${session.day}`
@@ -357,11 +469,16 @@ export function UpscRevisionCommandRoom({
       : [];
   const targetQuestionBankTrapAttempts = getQuestionBankTrapAttempts(targetQuestionBankAttempts);
   const targetHasQuestionBankTrap = targetQuestionBankTrapAttempts.length > 0;
+  const targetSpacedRevision = targetSummary?.spacedRevisionItems.find(
+    (revision) => revision.session.day === targetSession?.day
+  );
   const targetHref =
     targetSummary && targetSession
       ? hasActiveTeacherDoubt(targetProgress)
         ? teacherDoubtHref(targetSummary, targetSession, targetProgress)
         : targetHasQuestionBankTrap
+          ? `${targetSummary.href}/revisit?day=${targetSession.day}`
+        : targetSpacedRevision
           ? `${targetSummary.href}/revisit?day=${targetSession.day}`
         : targetProgress?.revisitQueued
         ? `${targetSummary.href}/revisit?day=${targetSession.day}`
@@ -373,6 +490,8 @@ export function UpscRevisionCommandRoom({
       ? `AI teacher gap: ${teacherDoubtCategory(targetProgress)}`
     : targetHasQuestionBankTrap
       ? "Question Bank trap"
+    : targetSpacedRevision
+      ? `Spaced revision due: Day ${targetSpacedRevision.dueDay}`
     : targetProgress?.revisitQueued
       ? "Revisit queued"
       : targetProgress?.confidence === "Shaky"
@@ -420,7 +539,7 @@ export function UpscRevisionCommandRoom({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
             {[
               { label: "Total days", value: totals.totalDays, icon: Compass },
               { label: "Watched", value: totals.watched, icon: PlayCircle },
@@ -428,6 +547,7 @@ export function UpscRevisionCommandRoom({
               { label: "Command", value: totals.command, icon: CheckCircle2 },
               { label: "AI gaps", value: totals.aiGap, icon: CircleAlert },
               { label: "QB traps", value: totals.questionBankTrap, icon: CircleAlert },
+              { label: "Due", value: totals.spacedRevision, icon: TimerReset },
               { label: "Revisit", value: totals.revisit, icon: RefreshCcw },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
@@ -456,6 +576,7 @@ export function UpscRevisionCommandRoom({
                 <div
                   key={summary.slug}
                   data-question-bank-traps={summary.questionBankTrapCount}
+                  data-spaced-revision-due={summary.spacedRevisionCount}
                   className={cn("rounded-lg border p-4 shadow-sm", subjectTone(summary))}
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
@@ -468,13 +589,14 @@ export function UpscRevisionCommandRoom({
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-6 gap-2 text-center">
+                  <div className="grid grid-cols-7 gap-2 text-center">
                     {[
                       ["Watch", summary.watchedCount],
                       ["Talk", summary.reflectedCount],
                       ["Cmd", summary.commandCount],
                       ["AI", summary.aiGapCount],
                       ["QB", summary.questionBankTrapCount],
+                      ["Due", summary.spacedRevisionCount],
                       ["Fix", summary.revisitCount],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-md bg-white/75 px-2 py-3">
@@ -512,6 +634,7 @@ export function UpscRevisionCommandRoom({
               <div
                 data-testid="revision-target-focus"
                 data-question-bank-traps={targetQuestionBankTrapAttempts.length}
+                data-spaced-revision-due={targetSpacedRevision ? "true" : "false"}
                 className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-5 shadow-sm"
               >
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-[#1d9e75] text-white">
@@ -547,14 +670,14 @@ export function UpscRevisionCommandRoom({
                   <TimerReset className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-[#13251d]">Global repair queue</p>
-                  <p className="text-xs font-semibold text-[#746f66]">Revisit and shaky days from all subjects</p>
+                  <p className="text-sm font-black text-[#13251d]">Global revision queue</p>
+                  <p className="text-xs font-semibold text-[#746f66]">Repair, due, and shaky days from all subjects</p>
                 </div>
               </div>
 
               {focusQueue.length === 0 ? (
                 <div className="rounded-md border border-dashed border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold leading-6 text-[#746f66]">
-                  No shaky or revisit days saved yet. As Talk rooms are used, weak days will collect here automatically.
+                  No shaky, due, or revisit days saved yet. As study evidence grows, revision work will collect here automatically.
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -595,8 +718,8 @@ export function UpscRevisionCommandRoom({
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Revision rule</p>
               <h2 className="mt-2 text-xl font-black text-[#085041]">Repair before new testing.</h2>
               <p className="mt-3 text-sm font-semibold leading-6 text-[#41645a]">
-                The command phase should cycle through AI teacher gaps first, then queued revisits, then shaky explanations,
-                then unfinished classes, and finally mixed MCQ drills.
+                The command phase should cycle through AI teacher gaps first, then wrong Question Bank traps, queued revisits,
+                shaky explanations, due spaced revision, unfinished classes, and finally mixed MCQ drills.
               </p>
             </div>
           </div>

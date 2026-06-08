@@ -81,6 +81,14 @@ async function seedProgress(page) {
           revisitQueued: false,
           updatedAt: new Date().toISOString(),
         },
+        4: {
+          day: 4,
+          watched: true,
+          watchState: "Watched",
+          confidence: "Working",
+          reflection: "Banking basics started, so Day 2 is due for spaced recall.",
+          updatedAt: new Date().toISOString(),
+        },
       })
     );
     window.localStorage.setItem(
@@ -122,7 +130,7 @@ async function run() {
   await seedProgress(page);
   await page.goto(`${baseUrl}/upsc/revision-command`, { waitUntil: "networkidle" });
   await page.getByText("One dashboard for every subject queue.", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Global repair queue", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Global revision queue", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Geography / Day 3", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Environment / Day 2", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("AI teacher gap: Concept chain", { exact: false }).first().waitFor({ timeout: 15000 });
@@ -131,6 +139,9 @@ async function run() {
   await page.getByText("Science and Tech / Day 2", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Question Bank trap", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Question Bank ledger has 1 incorrect answer in Space technology basics", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Economy / Day 2", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("Spaced revision due", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("National Income and GDP cleared earlier and is due for recall before Money, Inflation and Business Cycle stays stable", { exact: false }).first().waitFor({ timeout: 15000 });
   await page.getByText("Economy", { exact: true }).first().waitFor({ timeout: 15000 });
   const aiGapState = await page.evaluate(() => {
     const cards = [...document.querySelectorAll("a")].map((link) => ({
@@ -141,9 +152,13 @@ async function run() {
     return {
       hasAiGapTotal: document.body.textContent?.includes("AI gaps") ?? false,
       hasQuestionBankTrapTotal: document.body.textContent?.includes("QB traps") ?? false,
+      hasDueTotal: document.body.textContent?.includes("Due") ?? false,
       environmentRepairLinks: cards.filter((card) => card.href === "/upsc/environment/watch?day=2"),
       questionBankRepairLinks: cards.filter(
         (card) => card.href === "/upsc/science-tech/revisit?day=2" && card.source === "question-bank"
+      ),
+      dueRevisionLinks: cards.filter(
+        (card) => card.href === "/upsc/economy/revisit?day=2" && card.source === "spaced-revision"
       ),
     };
   });
@@ -151,10 +166,12 @@ async function run() {
   if (
     !aiGapState.hasAiGapTotal ||
     !aiGapState.hasQuestionBankTrapTotal ||
+    !aiGapState.hasDueTotal ||
     !aiGapState.environmentRepairLinks.some(
       (link) => link.text.includes("AI teacher gap") || link.text.includes("AI Concept chain repair")
     ) ||
-    !aiGapState.questionBankRepairLinks.some((link) => link.text.includes("Question Bank ledger has 1 incorrect answer"))
+    !aiGapState.questionBankRepairLinks.some((link) => link.text.includes("Question Bank ledger has 1 incorrect answer")) ||
+    !aiGapState.dueRevisionLinks.some((link) => link.source === "spaced-revision" || link.text.includes("Spaced revision due"))
   ) {
     throw new Error(`revision-command-ai-gap-state failed: ${JSON.stringify(aiGapState)}`);
   }
@@ -188,6 +205,27 @@ async function run() {
     !questionBankTarget.text.includes("Question Bank trap")
   ) {
     throw new Error(`revision-command-question-bank-direct-target failed: ${JSON.stringify(questionBankTarget)}`);
+  }
+
+  await page.goto(`${baseUrl}/upsc/revision-command?subject=economy&day=2`, { waitUntil: "networkidle" });
+  await page.getByTestId("revision-target-focus").waitFor({ timeout: 15000 });
+  await page.getByText("Spaced revision due: Day 4", { exact: false }).first().waitFor({ timeout: 15000 });
+  const spacedRevisionTarget = await page.evaluate(() => {
+    const target = document.querySelector('[data-testid="revision-target-focus"]');
+    const link = document.querySelector('[data-testid="revision-target-route"]');
+    return {
+      due: target?.getAttribute("data-spaced-revision-due"),
+      targetHref: link?.getAttribute("href"),
+      text: target?.textContent || "",
+    };
+  });
+  checks.push({ label: "revision-command-spaced-revision-direct-target", spacedRevisionTarget });
+  if (
+    spacedRevisionTarget.due !== "true" ||
+    spacedRevisionTarget.targetHref !== "/upsc/economy/revisit?day=2" ||
+    !spacedRevisionTarget.text.includes("Spaced revision due")
+  ) {
+    throw new Error(`revision-command-spaced-revision-direct-target failed: ${JSON.stringify(spacedRevisionTarget)}`);
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
