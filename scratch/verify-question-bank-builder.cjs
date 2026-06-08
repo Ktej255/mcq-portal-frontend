@@ -506,6 +506,15 @@ async function run() {
     textStatus: "EXACT_VERIFIED",
     importedAt: new Date().toISOString(),
   };
+  const poisonedGeographyPyqRecord = {
+    ...exactGeographyPyqRecord,
+    id: "2025-prelims-geography-general-studies-paper-i-q99-poisoned",
+    questionNumber: "Q99",
+    questionText:
+      "This poisoned local row should never enter practice because its source is not the official UPSC domain.",
+    sourceHref: "https://example.com/fake-upsc-question-paper.pdf",
+    officialSourceTitle: "Non-official mirror",
+  };
 
   await seedSession(page, {
     level: "advanced",
@@ -541,9 +550,18 @@ async function run() {
         updatedAt: new Date().toISOString(),
       },
     },
-    pyqRecords: [exactGeographyPyqRecord],
+    pyqRecords: [exactGeographyPyqRecord, poisonedGeographyPyqRecord],
   });
   const exactBridgeInitialState = await readQuestionBankState(page, "exact-pyq-bridge-loaded", checks);
+  const sanitizedLedgerState = await page.evaluate((storageKey) => {
+    const rows = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    return {
+      rowCount: rows.length,
+      ids: rows.map((row) => row.id),
+      sourceHrefs: rows.map((row) => row.sourceHref),
+    };
+  }, pyqLedgerKey);
+  checks.push({ label: "local-pyq-ledger-sanitizes-non-official-source", sanitizedLedgerState });
   if (
     exactBridgeInitialState.importedExactQuestionRows !== "1" ||
     exactBridgeInitialState.activeSubjectImportedExactRows !== "1" ||
@@ -552,9 +570,18 @@ async function run() {
     exactBridgeInitialState.exactPyqBridge.totalImportedExactQuestions !== "1" ||
     exactBridgeInitialState.exactPyqBridge.activeSubjectExactQuestions !== "1" ||
     exactBridgeInitialState.exactPyqBridge.rows.length !== 1 ||
-    !exactBridgeInitialState.exactPyqBridge.text.includes("answer-key claim honest")
+    !exactBridgeInitialState.exactPyqBridge.text.includes("answer-key claim honest") ||
+    sanitizedLedgerState.rowCount !== 1 ||
+    !sanitizedLedgerState.ids.includes(exactGeographyPyqRecord.id) ||
+    sanitizedLedgerState.ids.includes(poisonedGeographyPyqRecord.id) ||
+    sanitizedLedgerState.sourceHrefs.some((href) => !String(href).startsWith("https://upsc.gov.in/"))
   ) {
-    throw new Error(`Exact PYQ bridge did not load: ${JSON.stringify(exactBridgeInitialState.exactPyqBridge)}`);
+    throw new Error(
+      `Exact PYQ bridge did not sanitize local source rows: ${JSON.stringify({
+        exactBridge: exactBridgeInitialState.exactPyqBridge,
+        sanitizedLedgerState,
+      })}`
+    );
   }
 
   await page.getByRole("button", { name: "PYQ STYLE" }).click();

@@ -679,7 +679,11 @@ export function readLocalPyqImportRecords(): PyqImportRecord[] {
 
   try {
     const parsed = JSON.parse(window.localStorage.getItem(PYQ_IMPORT_LEDGER_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    const safeRecords = parsePyqImportRecords(parsed);
+    if (Array.isArray(parsed) && parsed.length !== safeRecords.length) {
+      window.localStorage.setItem(PYQ_IMPORT_LEDGER_KEY, JSON.stringify(safeRecords));
+    }
+    return safeRecords;
   } catch {
     return [];
   }
@@ -687,11 +691,11 @@ export function readLocalPyqImportRecords(): PyqImportRecord[] {
 
 export function writeLocalPyqImportRecords(records: PyqImportRecord[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PYQ_IMPORT_LEDGER_KEY, JSON.stringify(dedupePyqImportRecords(records)));
+  window.localStorage.setItem(PYQ_IMPORT_LEDGER_KEY, JSON.stringify(parsePyqImportRecords(records)));
 }
 
 export function appendLocalPyqImportRecords(records: PyqImportRecord[]) {
-  const next = dedupePyqImportRecords([...readLocalPyqImportRecords(), ...records]);
+  const next = parsePyqImportRecords([...readLocalPyqImportRecords(), ...records]);
   writeLocalPyqImportRecords(next);
   return next;
 }
