@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   allPracticeQuestionBank,
+  buildQuestionBankQuestionsFromPyqImports,
   buildRecommendedQuestionBankMix,
   emptyQuestionBankMix,
   getQuestionBankSubject,
@@ -37,6 +38,7 @@ import {
   type PracticeQuestion,
   type QuestionOption,
 } from "@/lib/upsc/questionBankEngine";
+import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +66,7 @@ export function UpscQuestionBankBuilder() {
   const [customMode, setCustomMode] = useState(false);
   const [customMix, setCustomMix] = useState<QuestionBankCustomMix>(emptyQuestionBankMix);
   const [displayQuestionIds, setDisplayQuestionIds] = useState<string[]>([]);
+  const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
 
   useEffect(() => {
     const nextSubjectSlug = getQuestionBankSubject(requestedSubject).slug;
@@ -79,14 +82,31 @@ export function UpscQuestionBankBuilder() {
       setProfile(readStudentProfile());
       setProgress(readLocalQuestionBankProgress(subjectSlug));
       setAttempts(readLocalQuestionBankAttempts(subjectSlug));
+      setPyqRecords(readLocalPyqImportRecords());
     }, 0);
     return () => window.clearTimeout(timer);
   }, [subjectSlug]);
 
   const selectedSubject = useMemo(() => getQuestionBankSubject(subjectSlug), [subjectSlug]);
+  const exactPyqQuestions = useMemo(() => buildQuestionBankQuestionsFromPyqImports(pyqRecords), [pyqRecords]);
+  const combinedQuestionBank = useMemo(
+    () => [...exactPyqQuestions, ...allPracticeQuestionBank],
+    [exactPyqQuestions]
+  );
+  const selectedExactPyqQuestions = useMemo(
+    () => exactPyqQuestions.filter((question) => question.subjectSlug === selectedSubject.slug),
+    [exactPyqQuestions, selectedSubject.slug]
+  );
   const recommended = useMemo(
-    () => selectQuestionBankSet({ subjectSlug: selectedSubject.slug, progress, profile, attempts }),
-    [attempts, profile, progress, selectedSubject.slug]
+    () =>
+      selectQuestionBankSet({
+        subjectSlug: selectedSubject.slug,
+        progress,
+        profile,
+        attempts,
+        questionBank: combinedQuestionBank,
+      }),
+    [attempts, combinedQuestionBank, profile, progress, selectedSubject.slug]
   );
   const activeDifficulty = difficulty ?? recommended.recommendation.recommendedDifficulty;
   const activeCount = count ?? recommended.recommendation.recommendedCount;
@@ -107,6 +127,7 @@ export function UpscQuestionBankBuilder() {
           profile,
           attempts,
           mix: customMix,
+          questionBank: combinedQuestionBank,
         });
       }
 
@@ -117,9 +138,10 @@ export function UpscQuestionBankBuilder() {
         attempts,
         difficulty: activeDifficulty,
         count: activeCount,
+        questionBank: combinedQuestionBank,
       });
     },
-    [activeCount, activeDifficulty, attempts, customMix, customMode, profile, progress, selectedSubject.slug]
+    [activeCount, activeDifficulty, attempts, combinedQuestionBank, customMix, customMode, profile, progress, selectedSubject.slug]
   );
   const recommendation = selection.recommendation;
   const selectedCoverage = useMemo(
@@ -136,7 +158,7 @@ export function UpscQuestionBankBuilder() {
     if (!displayQuestionIds.length) return selection.questions;
 
     const subjectQuestionMap = new Map(
-      allPracticeQuestionBank
+      combinedQuestionBank
         .filter((question) => question.subjectSlug === selectedSubject.slug)
         .map((question) => [question.id, question])
     );
@@ -145,7 +167,7 @@ export function UpscQuestionBankBuilder() {
       .filter((question): question is PracticeQuestion => Boolean(question));
 
     return lockedQuestions.length ? lockedQuestions : selection.questions;
-  }, [displayQuestionIds, selectedSubject.slug, selection.questions]);
+  }, [combinedQuestionBank, displayQuestionIds, selectedSubject.slug, selection.questions]);
   const customRequestedTotal = questionDifficulties.reduce((sum, item) => sum + effectiveCustomMix[item], 0);
   const displayedDifficultyCounts = questionDifficulties.reduce(
     (counts, item) => ({
@@ -156,6 +178,9 @@ export function UpscQuestionBankBuilder() {
   );
   const customMixLabel = questionDifficulties.map((item) => `${item}:${effectiveCustomMix[item]}`).join("|");
   const displayedMixLabel = questionDifficulties.map((item) => `${item}:${displayedDifficultyCounts[item]}`).join("|");
+  const displayedExactPyqCount = displayedQuestions.filter((question) => question.isExactPyqImport).length;
+  const totalVisibleQuestions = questionBankCoverageSummary.totalQuestions + exactPyqQuestions.length;
+  const activeSubjectVisibleQuestions = (selectedCoverage?.totalQuestions ?? 0) + selectedExactPyqQuestions.length;
 
   const attemptByQuestionId = useMemo(
     () => new Map(attempts.map((attempt) => [attempt.questionId, attempt])),
@@ -254,6 +279,9 @@ export function UpscQuestionBankBuilder() {
           data-adaptive-level={recommendation.adaptiveLevel}
           data-adaptive-score={recommendation.adaptiveReadinessScore}
           data-total-question-rows={questionBankCoverageSummary.totalQuestions}
+          data-visible-question-rows={totalVisibleQuestions}
+          data-imported-exact-question-rows={exactPyqQuestions.length}
+          data-active-subject-imported-exact-rows={selectedExactPyqQuestions.length}
           data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
           data-expected-difficulty-slots={questionBankCoverageSummary.expectedDifficultySlots}
           data-full-coverage-subjects={questionBankCoverageSummary.fullCoverageSubjects}
@@ -299,6 +327,8 @@ export function UpscQuestionBankBuilder() {
           data-subject-count={questionBankCoverageSummary.subjectCount}
           data-total-days={questionBankCoverageSummary.totalDays}
           data-total-question-rows={questionBankCoverageSummary.totalQuestions}
+          data-visible-question-rows={totalVisibleQuestions}
+          data-imported-exact-question-rows={exactPyqQuestions.length}
           data-curated-question-rows={questionBankCoverageSummary.curatedQuestions}
           data-generated-question-rows={questionBankCoverageSummary.generatedQuestions}
           data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
@@ -307,6 +337,8 @@ export function UpscQuestionBankBuilder() {
           data-active-subject={selectedCoverage?.subjectSlug}
           data-active-subject-days={selectedCoverage?.totalDays}
           data-active-subject-questions={selectedCoverage?.totalQuestions}
+          data-active-subject-visible-questions={activeSubjectVisibleQuestions}
+          data-active-subject-imported-exact-rows={selectedExactPyqQuestions.length}
           data-active-subject-slots={selectedCoverage?.coveredDifficultySlots}
           data-active-subject-expected-slots={selectedCoverage?.expectedDifficultySlots}
           data-active-subject-full-coverage={selectedCoverage?.fullCoverage ? "true" : "false"}
@@ -316,8 +348,9 @@ export function UpscQuestionBankBuilder() {
             {[
               ["Full subjects", `${questionBankCoverageSummary.fullCoverageSubjects}/${questionBankCoverageSummary.subjectCount}`],
               ["Day slots", `${questionBankCoverageSummary.coveredDifficultySlots}/${questionBankCoverageSummary.expectedDifficultySlots}`],
-              ["Question rows", questionBankCoverageSummary.totalQuestions],
-              ["Active subject", selectedCoverage ? `${selectedCoverage.totalQuestions} rows` : "Pending"],
+              ["Question rows", totalVisibleQuestions],
+              ["Exact imports", exactPyqQuestions.length],
+              ["Active subject", selectedCoverage ? `${activeSubjectVisibleQuestions} rows` : "Pending"],
             ].map(([label, value]) => (
               <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -325,6 +358,71 @@ export function UpscQuestionBankBuilder() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section
+          data-testid="upsc-question-bank-exact-pyq-bridge"
+          data-proof-rule="mapped-exact-pyq-imports-become-demand-drills"
+          data-total-imported-exact-questions={exactPyqQuestions.length}
+          data-active-subject={selectedSubject.slug}
+          data-active-subject-exact-questions={selectedExactPyqQuestions.length}
+          data-displayed-exact-questions={displayedExactPyqCount}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                Exact PYQ bridge
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                Imported PYQs can now enter the PYQ-style practice lane.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
+                Mapped exact rows from the admin import room are shown as demand-reading drills. The portal keeps the
+                answer-key claim honest until official options and keys are imported separately.
+              </p>
+            </div>
+            <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+              {selectedExactPyqQuestions.length} active
+            </Badge>
+          </div>
+
+          {selectedExactPyqQuestions.length > 0 ? (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {selectedExactPyqQuestions.slice(0, 4).map((question) => (
+                <article
+                  key={question.id}
+                  data-testid="upsc-question-bank-exact-pyq-row"
+                  data-question-id={question.id}
+                  data-subject-slug={question.subjectSlug}
+                  data-source-year={question.sourceYear}
+                  data-question-number={question.questionNumber}
+                  className="rounded-md border border-[#b9d9cd] bg-white/80 p-4"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                    {question.sourceYear} / {question.questionNumber} / Day {question.linkedDay}
+                  </p>
+                  <h3 className="mt-2 text-sm font-black leading-6 text-[#13251d]">{question.stem}</h3>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#49675e]">
+                    Demand: {question.answerDemand || "Review answer demand"}.
+                  </p>
+                  {question.sourceHref ? (
+                    <a
+                      href={question.sourceHref}
+                      className="mt-3 inline-flex text-xs font-black text-[#085041] underline underline-offset-4"
+                    >
+                      Official source
+                    </a>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-md border border-dashed border-[#b9d9cd] bg-white/70 p-4 text-sm font-bold leading-6 text-[#49675e]">
+              No mapped exact PYQ rows are available for {selectedSubject.title} yet. Import rows in the admin PYQ room,
+              then return here and choose PYQ STYLE.
+            </div>
+          )}
         </section>
 
         <section
@@ -658,6 +756,7 @@ export function UpscQuestionBankBuilder() {
           data-testid="upsc-question-bank-set"
           data-custom-mode={customMode ? "true" : "false"}
           data-question-mix={displayedMixLabel}
+          data-displayed-exact-pyq-count={displayedExactPyqCount}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -688,6 +787,10 @@ export function UpscQuestionBankBuilder() {
                   data-subject-slug={question.subjectSlug}
                   data-question-difficulty={question.difficulty}
                   data-linked-day={question.linkedDay}
+                  data-question-source={question.source}
+                  data-exact-pyq-import={question.isExactPyqImport ? "true" : "false"}
+                  data-source-year={question.sourceYear ?? ""}
+                  data-question-number={question.questionNumber ?? ""}
                   data-solved-state={attempt ? (attempt.isCorrect ? "correct" : "incorrect") : "unsolved"}
                   className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
                 >
@@ -714,6 +817,12 @@ export function UpscQuestionBankBuilder() {
                     </span>
                   </div>
                   <h3 className="text-lg font-black leading-7 tracking-tight">{question.stem}</h3>
+                  {question.isExactPyqImport ? (
+                    <div className="mt-3 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-xs font-bold leading-5 text-[#085041]">
+                      Exact PYQ demand drill: official text and source are imported, but official answer options/key are
+                      not claimed here.
+                    </div>
+                  ) : null}
                   <div className="mt-4 grid gap-2 md:grid-cols-2">
                     {Object.entries(question.options).map(([option, text]) => (
                       <button
@@ -759,6 +868,14 @@ export function UpscQuestionBankBuilder() {
                     <p className="mt-2 rounded-md bg-[#fff4df] p-3 text-xs font-bold leading-5 text-[#6f4a12]">
                       Trap: {question.trap}
                     </p>
+                    {question.sourceHref ? (
+                      <a
+                        href={question.sourceHref}
+                        className="mt-3 inline-flex text-xs font-black text-[#085041] underline underline-offset-4"
+                      >
+                        Official source
+                      </a>
+                    ) : null}
                   </details>
                 </article>
                 );

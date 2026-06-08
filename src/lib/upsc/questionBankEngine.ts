@@ -1,10 +1,16 @@
 import { geographySessions } from "@/lib/upsc/plan";
+import type { PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 import type { StudentLevel, StudentProfile } from "@/lib/upsc/studentProfile";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 
 export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD" | "PYQ_STYLE";
-export type QuestionSource = "NCERT_BASE" | "REFERENCE_ADVANCED" | "PYQ_PATTERN" | "CURRENT_AFFAIRS_BRIDGE";
+export type QuestionSource =
+  | "NCERT_BASE"
+  | "REFERENCE_ADVANCED"
+  | "PYQ_PATTERN"
+  | "CURRENT_AFFAIRS_BRIDGE"
+  | "EXACT_PYQ_IMPORT";
 export type QuestionOption = "A" | "B" | "C" | "D";
 
 export type QuestionBankSession = {
@@ -36,6 +42,12 @@ export type PracticeQuestion = {
   explanation: string;
   trap: string;
   source: QuestionSource;
+  sourceHref?: string;
+  officialSourceTitle?: string;
+  sourceYear?: number;
+  questionNumber?: string;
+  answerDemand?: string;
+  isExactPyqImport?: boolean;
 };
 
 export type QuestionBankAttempt = {
@@ -703,6 +715,67 @@ export function getQuestionBankForSubject(subjectSlug: string) {
   return allPracticeQuestionBank.filter((question) => question.subjectSlug === subjectSlug);
 }
 
+function normalizeMatchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function resolvePyqLinkedDay(subject: QuestionBankSubject, record: PyqImportRecord) {
+  const searchNeedles = [
+    record.syllabusArea,
+    record.syllabusNodeId ?? "",
+    record.answerDemand ?? "",
+    ...record.topicTags,
+  ]
+    .map(normalizeMatchText)
+    .filter(Boolean);
+
+  const matchedSession = subject.sessions.find((session) => {
+    const haystack = normalizeMatchText(`${session.title} ${session.chapter} ${session.anchor}`);
+    return searchNeedles.some((needle) => haystack.includes(needle) || needle.includes(haystack));
+  });
+
+  return matchedSession?.day ?? subject.sessions[0]?.day ?? 1;
+}
+
+export function buildQuestionBankQuestionsFromPyqImports(records: PyqImportRecord[]): PracticeQuestion[] {
+  return records
+    .filter((record) => record.textStatus === "EXACT_VERIFIED" && record.importStatus === "MAPPED")
+    .map((record): PracticeQuestion | null => {
+      const subject = questionBankSubjects.find((item) => item.slug === record.subjectSlug);
+      if (!subject) return null;
+
+      const linkedDay = resolvePyqLinkedDay(subject, record);
+      const tags = record.topicTags.length ? record.topicTags.join(", ") : "untagged";
+
+      return {
+        id: `exact-pyq-${record.id}`,
+        subjectSlug: record.subjectSlug,
+        subjectTitle: record.subjectTitle,
+        linkedDay,
+        topic: record.syllabusArea,
+        difficulty: "PYQ_STYLE" as const,
+        stem: `Official PYQ (${record.year} ${record.paper} ${record.questionNumber}): ${record.questionText}`,
+        options: {
+          A: "Identify syllabus demand, topic tags, answer demand, and source before attempting the answer",
+          B: "Treat the question as an isolated fact and skip the syllabus area",
+          C: "Answer only from a current-affairs headline without static linkage",
+          D: "Ignore the official source and practice it as an unverified memory item",
+        },
+        correctOption: "A" as const,
+        explanation: `This is an exact verified PYQ row staged from the admin import ledger. Use ${record.syllabusArea}, tags (${tags}), and answer demand (${record.answerDemand || "demand not specified"}) before writing or selecting an answer.`,
+        trap: "This drill verifies PYQ demand-reading. It does not claim an official answer key until options and key are separately imported.",
+        source: "EXACT_PYQ_IMPORT" as const,
+        sourceHref: record.sourceHref,
+        officialSourceTitle: record.officialSourceTitle,
+        sourceYear: record.year,
+        questionNumber: record.questionNumber,
+        answerDemand: record.answerDemand,
+        isExactPyqImport: true,
+      };
+    })
+    .filter((question): question is PracticeQuestion => Boolean(question));
+}
+
 export function readLocalQuestionBankProgress(subjectSlug: string): QuestionBankProgressInput {
   if (typeof window === "undefined") return {};
 
@@ -921,7 +994,8 @@ export function buildQuestionBankRecommendation(
   progress: QuestionBankProgressInput,
   profile?: Pick<StudentProfile, "level"> | null,
   subjectSlug = "geography",
-  attempts: QuestionBankAttemptInput = []
+  attempts: QuestionBankAttemptInput = [],
+  questionBank: PracticeQuestion[] = allPracticeQuestionBank
 ): QuestionBankRecommendation {
   const subject = getQuestionBankSubject(subjectSlug);
   const subjectAttempts = attempts.filter((attempt) => attempt.subjectSlug === subject.slug);
@@ -1032,7 +1106,7 @@ export function buildQuestionBankRecommendation(
         : adaptiveLevel === "intermediate"
           ? 8
           : 5;
-  const availableQuestionCount = allPracticeQuestionBank.filter(
+  const availableQuestionCount = questionBank.filter(
     (question) => question.subjectSlug === subject.slug && question.difficulty === recommendedDifficulty
   ).length;
   const recommendedCount = Math.min(baseRecommendedCount, availableQuestionCount || baseRecommendedCount);
@@ -1059,6 +1133,13 @@ export function buildQuestionBankRecommendation(
   };
 }
 
+function exactImportFirst(questions: PracticeQuestion[]) {
+  return [...questions].sort((left, right) => {
+    if (left.isExactPyqImport !== right.isExactPyqImport) return left.isExactPyqImport ? -1 : 1;
+    return left.id.localeCompare(right.id);
+  });
+}
+
 export function selectQuestionBankSet({
   subjectSlug = "geography",
   progress,
@@ -1066,6 +1147,7 @@ export function selectQuestionBankSet({
   difficulty,
   count,
   attempts = [],
+  questionBank = allPracticeQuestionBank,
 }: {
   subjectSlug?: string;
   progress: QuestionBankProgressInput;
@@ -1073,19 +1155,22 @@ export function selectQuestionBankSet({
   difficulty?: QuestionDifficulty;
   count?: number;
   attempts?: QuestionBankAttemptInput;
+  questionBank?: PracticeQuestion[];
 }): QuestionBankSelection {
   const subject = getQuestionBankSubject(subjectSlug);
-  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts);
+  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts, questionBank);
   const selectedDifficulty = difficulty ?? recommendation.recommendedDifficulty;
   const selectedCount = count ?? recommendation.recommendedCount;
   const targetDaySet = new Set(recommendation.targetDays);
   const solvedQuestionIds = new Set(attempts.filter((attempt) => attempt.subjectSlug === subject.slug).map((attempt) => attempt.questionId));
-  const questionPool = allPracticeQuestionBank.filter(
+  const questionPool = questionBank.filter(
     (question) => question.subjectSlug === subject.slug && question.difficulty === selectedDifficulty
   );
-  const targeted = questionPool.filter((question) => targetDaySet.has(question.linkedDay));
-  const fallback = questionPool.filter((question) => !targetDaySet.has(question.linkedDay));
-  const prioritized = [...targeted, ...fallback];
+  const exactImports = questionPool.filter((question) => question.isExactPyqImport);
+  const nonExactPool = questionPool.filter((question) => !question.isExactPyqImport);
+  const targeted = nonExactPool.filter((question) => targetDaySet.has(question.linkedDay));
+  const fallback = nonExactPool.filter((question) => !targetDaySet.has(question.linkedDay));
+  const prioritized = [...exactImportFirst(exactImports), ...targeted, ...fallback];
   const questions = [
     ...prioritized.filter((question) => !solvedQuestionIds.has(question.id)),
     ...prioritized.filter((question) => solvedQuestionIds.has(question.id)),
@@ -1103,15 +1188,17 @@ export function selectCustomQuestionBankSet({
   profile,
   mix,
   attempts = [],
+  questionBank = allPracticeQuestionBank,
 }: {
   subjectSlug?: string;
   progress: QuestionBankProgressInput;
   profile?: Pick<StudentProfile, "level"> | null;
   mix: Partial<QuestionBankCustomMix>;
   attempts?: QuestionBankAttemptInput;
+  questionBank?: PracticeQuestion[];
 }): QuestionBankCustomSelection {
   const subject = getQuestionBankSubject(subjectSlug);
-  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts);
+  const recommendation = buildQuestionBankRecommendation(progress, profile, subject.slug, attempts, questionBank);
   const selectedMix = normalizeQuestionBankMix(mix);
   const targetDaySet = new Set(recommendation.targetDays);
   const solvedQuestionIds = new Set(attempts.filter((attempt) => attempt.subjectSlug === subject.slug).map((attempt) => attempt.questionId));
@@ -1120,14 +1207,18 @@ export function selectCustomQuestionBankSet({
     const requestedCount = selectedMix[difficulty];
     if (requestedCount <= 0) return [];
 
-    const pool = allPracticeQuestionBank.filter(
+    const pool = questionBank.filter(
       (question) => question.subjectSlug === subject.slug && question.difficulty === difficulty
     );
-    const targeted = pool.filter((question) => targetDaySet.has(question.linkedDay));
-    const fallback = pool.filter((question) => !targetDaySet.has(question.linkedDay));
+    const exactImports = pool.filter((question) => question.isExactPyqImport);
+    const nonExactPool = pool.filter((question) => !question.isExactPyqImport);
+    const targeted = nonExactPool.filter((question) => targetDaySet.has(question.linkedDay));
+    const fallback = nonExactPool.filter((question) => !targetDaySet.has(question.linkedDay));
     const prioritized = [
+      ...exactImportFirst(exactImports.filter((question) => !solvedQuestionIds.has(question.id))),
       ...targeted.filter((question) => !solvedQuestionIds.has(question.id)),
       ...fallback.filter((question) => !solvedQuestionIds.has(question.id)),
+      ...exactImportFirst(exactImports.filter((question) => solvedQuestionIds.has(question.id))),
       ...targeted.filter((question) => solvedQuestionIds.has(question.id)),
       ...fallback.filter((question) => solvedQuestionIds.has(question.id)),
     ];

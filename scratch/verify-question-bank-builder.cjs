@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const profileKey = "sarit-upsc-student-profile-v1";
 const attemptKey = "sarit-upsc-question-bank-attempts-v1";
+const pyqLedgerKey = "sarit-upsc-pyq-import-ledger-v1";
 const evidencePath = path.join(__dirname, "verify-question-bank-builder-evidence.json");
 
 function progressKey(subjectSlug) {
@@ -27,12 +28,13 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
-async function seedSession(page, { level, subjectSlug = "geography", progress }) {
+async function seedSession(page, { level, subjectSlug = "geography", progress, pyqRecords = [] }) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, learnerLevel, seededProgress }) => {
+    ({ profileStorageKey, progressStorageKey, learnerLevel, seededProgress, pyqImportStorageKey, seededPyqRecords }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_question_bank_builder");
       window.localStorage.removeItem("sarit-upsc-question-bank-attempts-v1");
+      window.localStorage.setItem(pyqImportStorageKey, JSON.stringify(seededPyqRecords));
       window.localStorage.setItem(
         profileStorageKey,
         JSON.stringify({
@@ -49,7 +51,14 @@ async function seedSession(page, { level, subjectSlug = "geography", progress })
       );
       window.localStorage.setItem(progressStorageKey, JSON.stringify(seededProgress));
     },
-    { profileStorageKey: profileKey, progressStorageKey: progressKey(subjectSlug), learnerLevel: level, seededProgress: progress }
+    {
+      profileStorageKey: profileKey,
+      progressStorageKey: progressKey(subjectSlug),
+      learnerLevel: level,
+      seededProgress: progress,
+      pyqImportStorageKey: pyqLedgerKey,
+      seededPyqRecords: pyqRecords,
+    }
   );
 }
 
@@ -75,6 +84,10 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       id: node.getAttribute("data-question-id"),
       difficulty: node.getAttribute("data-question-difficulty"),
       linkedDay: node.getAttribute("data-linked-day"),
+      source: node.getAttribute("data-question-source"),
+      exactPyqImport: node.getAttribute("data-exact-pyq-import"),
+      sourceYear: node.getAttribute("data-source-year"),
+      questionNumber: node.getAttribute("data-question-number"),
       solvedState: node.getAttribute("data-solved-state"),
       text: node.textContent || "",
     }));
@@ -95,6 +108,9 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
       unresolvedIncorrectCount: recommendation?.getAttribute("data-unresolved-incorrect-count"),
       adaptiveLevel: recommendation?.getAttribute("data-adaptive-level"),
       adaptiveScore: recommendation?.getAttribute("data-adaptive-score"),
+      visibleQuestionRows: hero?.getAttribute("data-visible-question-rows"),
+      importedExactQuestionRows: hero?.getAttribute("data-imported-exact-question-rows"),
+      activeSubjectImportedExactRows: hero?.getAttribute("data-active-subject-imported-exact-rows"),
       recallPoints: recommendation?.getAttribute("data-recall-points"),
       consistencyPoints: recommendation?.getAttribute("data-consistency-points"),
       mcqPoints: recommendation?.getAttribute("data-mcq-points"),
@@ -113,6 +129,8 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
         activeSubject: coverageProof?.getAttribute("data-active-subject"),
         activeSubjectDays: coverageProof?.getAttribute("data-active-subject-days"),
         activeSubjectQuestions: coverageProof?.getAttribute("data-active-subject-questions"),
+        activeSubjectVisibleQuestions: coverageProof?.getAttribute("data-active-subject-visible-questions"),
+        activeSubjectImportedExactRows: coverageProof?.getAttribute("data-active-subject-imported-exact-rows"),
         activeSubjectSlots: coverageProof?.getAttribute("data-active-subject-slots"),
         activeSubjectExpectedSlots: coverageProof?.getAttribute("data-active-subject-expected-slots"),
         activeSubjectFullCoverage: coverageProof?.getAttribute("data-active-subject-full-coverage"),
@@ -147,6 +165,24 @@ async function readQuestionBankState(page, label, checks, subjectSlug = "geograp
           customMix: customMix?.getAttribute("data-custom-mix"),
           displayedMix: customMix?.getAttribute("data-displayed-mix"),
           text: customMix?.textContent || "",
+        };
+      })(),
+      exactPyqBridge: (() => {
+        const bridge = document.querySelector('[data-testid="upsc-question-bank-exact-pyq-bridge"]');
+        return {
+          proofRule: bridge?.getAttribute("data-proof-rule"),
+          totalImportedExactQuestions: bridge?.getAttribute("data-total-imported-exact-questions"),
+          activeSubject: bridge?.getAttribute("data-active-subject"),
+          activeSubjectExactQuestions: bridge?.getAttribute("data-active-subject-exact-questions"),
+          displayedExactQuestions: bridge?.getAttribute("data-displayed-exact-questions"),
+          text: bridge?.textContent || "",
+          rows: [...document.querySelectorAll('[data-testid="upsc-question-bank-exact-pyq-row"]')].map((row) => ({
+            id: row.getAttribute("data-question-id"),
+            subjectSlug: row.getAttribute("data-subject-slug"),
+            year: row.getAttribute("data-source-year"),
+            questionNumber: row.getAttribute("data-question-number"),
+            text: row.textContent || "",
+          })),
         };
       })(),
       ledgerText: ledger?.textContent || "",
@@ -446,6 +482,128 @@ async function run() {
     !commandState.selectionProof.rows.some((row) => row.id === "recovery" && row.points === "0")
   ) {
     throw new Error(`command adaptive level failed: ${JSON.stringify(commandState)}`);
+  }
+
+  const exactGeographyPyqRecord = {
+    id: "2025-prelims-geography-general-studies-paper-i-q42",
+    year: 2025,
+    stage: "Prelims",
+    kind: "GS_PRELIMS",
+    subjectSlug: "geography",
+    subjectTitle: "Geography",
+    paper: "General Studies Paper I",
+    questionNumber: "Q42",
+    questionText:
+      "Which location-process link best explains why a monsoon question must be solved through map logic and atmospheric mechanism together?",
+    syllabusArea: "Indian monsoon and map reasoning",
+    syllabusNodeId: "geo-climate",
+    topicTags: ["monsoon", "map", "atmospheric mechanism"],
+    trendInsightId: "geo-map-process",
+    sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202025",
+    officialSourceTitle: "Civil Services Preliminary Examination 2025 Question Papers",
+    answerDemand: "Prelims map-process elimination",
+    importStatus: "MAPPED",
+    textStatus: "EXACT_VERIFIED",
+    importedAt: new Date().toISOString(),
+  };
+
+  await seedSession(page, {
+    level: "advanced",
+    progress: {
+      3: {
+        day: 3,
+        watched: true,
+        talkScore: 96,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 86,
+        updatedAt: new Date().toISOString(),
+      },
+      8: {
+        day: 8,
+        watched: true,
+        talkScore: 98,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 88,
+        updatedAt: new Date().toISOString(),
+      },
+      13: {
+        day: 13,
+        watched: true,
+        talkScore: 95,
+        talkBand: "Command",
+        confidence: "Command",
+        mcqCompleted: true,
+        mcqScorePercent: 90,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    pyqRecords: [exactGeographyPyqRecord],
+  });
+  const exactBridgeInitialState = await readQuestionBankState(page, "exact-pyq-bridge-loaded", checks);
+  if (
+    exactBridgeInitialState.importedExactQuestionRows !== "1" ||
+    exactBridgeInitialState.activeSubjectImportedExactRows !== "1" ||
+    exactBridgeInitialState.coverage.activeSubjectImportedExactRows !== "1" ||
+    exactBridgeInitialState.exactPyqBridge.proofRule !== "mapped-exact-pyq-imports-become-demand-drills" ||
+    exactBridgeInitialState.exactPyqBridge.totalImportedExactQuestions !== "1" ||
+    exactBridgeInitialState.exactPyqBridge.activeSubjectExactQuestions !== "1" ||
+    exactBridgeInitialState.exactPyqBridge.rows.length !== 1 ||
+    !exactBridgeInitialState.exactPyqBridge.text.includes("answer-key claim honest")
+  ) {
+    throw new Error(`Exact PYQ bridge did not load: ${JSON.stringify(exactBridgeInitialState.exactPyqBridge)}`);
+  }
+
+  await page.getByRole("button", { name: "PYQ STYLE" }).click();
+  await page.waitForFunction(() => {
+    const hero = document.querySelector('[data-testid="upsc-question-bank-hero"]');
+    const firstQuestion = document.querySelector('[data-testid="upsc-question-bank-question"]');
+    return (
+      hero?.getAttribute("data-active-difficulty") === "PYQ_STYLE" &&
+      firstQuestion?.getAttribute("data-question-source") === "EXACT_PYQ_IMPORT"
+    );
+  });
+  const exactPyqPracticeState = await readQuestionBankState(page, "exact-pyq-practice-visible", checks, "geography", {
+    navigate: false,
+  });
+  const firstExactQuestion = exactPyqPracticeState.questions[0];
+  if (
+    exactPyqPracticeState.activeDifficulty !== "PYQ_STYLE" ||
+    exactPyqPracticeState.exactPyqBridge.displayedExactQuestions !== "1" ||
+    firstExactQuestion?.id !== `exact-pyq-${exactGeographyPyqRecord.id}` ||
+    firstExactQuestion?.source !== "EXACT_PYQ_IMPORT" ||
+    firstExactQuestion?.exactPyqImport !== "true" ||
+    firstExactQuestion?.sourceYear !== "2025" ||
+    firstExactQuestion?.questionNumber !== "Q42" ||
+    !firstExactQuestion.text.includes("Exact PYQ demand drill") ||
+    !firstExactQuestion.text.includes("official answer options/key are not claimed")
+  ) {
+    throw new Error(`Exact PYQ practice card failed: ${JSON.stringify(exactPyqPracticeState)}`);
+  }
+  await page
+    .locator('[data-testid="upsc-question-bank-question"]')
+    .first()
+    .getByTestId("upsc-question-bank-option")
+    .filter({ hasText: /^A\./ })
+    .click();
+  await page.getByTestId("upsc-question-bank-solved-proof").first().getByText("Correct evidence saved", { exact: false }).waitFor({ timeout: 15000 });
+  const storedExactAttempt = await page.evaluate(
+    ({ storageKey, questionId }) => JSON.parse(window.localStorage.getItem(storageKey) || "{}")[questionId],
+    { storageKey: attemptKey, questionId: `exact-pyq-${exactGeographyPyqRecord.id}` }
+  );
+  checks.push({ label: "exact-pyq-demand-drill-ledger-storage", storedExactAttempt });
+  if (
+    storedExactAttempt?.questionId !== `exact-pyq-${exactGeographyPyqRecord.id}` ||
+    storedExactAttempt?.subjectSlug !== "geography" ||
+    storedExactAttempt?.difficulty !== "PYQ_STYLE" ||
+    storedExactAttempt?.source !== "EXACT_PYQ_IMPORT" ||
+    storedExactAttempt?.selectedOption !== "A" ||
+    storedExactAttempt?.isCorrect !== true
+  ) {
+    throw new Error(`Exact PYQ attempt did not persist correctly: ${JSON.stringify(storedExactAttempt)}`);
   }
 
   await seedSession(page, {
