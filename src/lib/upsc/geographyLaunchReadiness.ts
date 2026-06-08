@@ -137,6 +137,35 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
     canShareControlledPilot &&
     geographyDay1MediaAttachment.releaseAssetPairReady &&
     firstWaveEvidenceComplete;
+  const publicLaunchGates: GeographyLaunchGate[] = [
+    {
+      id: "controlled-pilot",
+      label: "Controlled pilot",
+      value: canShareControlledPilot ? "Ready" : "Locked",
+      detail: canShareControlledPilot
+        ? "The small tester link can be used inside the controlled window."
+        : "Do not widen before the controlled pilot gate is green.",
+      passed: canShareControlledPilot,
+    },
+    {
+      id: "approved-media-pair",
+      label: "Final Day 1 media",
+      value: geographyDay1MediaAttachment.releaseAssetPairReady ? "Attached" : "Missing",
+      detail: geographyDay1MediaAttachment.releaseAssetPairReady
+        ? "Approved recording and transcript are attached."
+        : "Public launch needs the final approved recording plus transcript, not only the portal-native fallback.",
+      passed: geographyDay1MediaAttachment.releaseAssetPairReady,
+    },
+    {
+      id: "first-wave-receipts",
+      label: "First-wave receipts",
+      value: `${input.feedbackReceiptCount}/${input.rosterCount || 3}`,
+      detail: firstWaveEvidenceComplete
+        ? "Every first-wave tester has submitted blocker-free feedback."
+        : "Keep public launch locked until all first-wave tester receipts are clean.",
+      passed: firstWaveEvidenceComplete,
+    },
+  ];
   const status = publicLaunchReady
     ? "Public launch ready"
     : canShareControlledPilot
@@ -152,6 +181,7 @@ export function buildGeographyLaunchReadiness(input: GeographyLaunchReadinessInp
     canShareControlledPilot,
     firstWaveEvidenceComplete,
     publicLaunchReady,
+    publicLaunchGates,
     mediaStatus: geographyDay1MediaAttachment.status,
     releaseAssetPairReady: geographyDay1MediaAttachment.releaseAssetPairReady,
   };

@@ -276,9 +276,23 @@ async function run() {
   await seedReadyDay1Mcqs(page);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
   await page.getByTestId("admin-geography-launch-readiness").getByText("25/25 ready", { exact: false }).waitFor({ timeout: 15000 });
+  const publicLaunchBoundary = page.getByTestId("admin-geography-public-launch-boundary");
+  await publicLaunchBoundary.waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Public launch still locked", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Final Day 1 media", { exact: true }).waitFor({ timeout: 15000 });
+  await publicLaunchBoundary.getByText("Missing", { exact: true }).waitFor({ timeout: 15000 });
+  if ((await publicLaunchBoundary.getAttribute("data-public-launch-ready")) !== "false") {
+    throw new Error("Public launch boundary unlocked before final Day 1 media and first-wave receipts.");
+  }
   await page.getByTestId("admin-pre-share-gate-status").getByText("Do not share yet", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("admin-pilot-approve").click();
   await page.getByTestId("admin-pre-share-gate-status").getByText("Safe to share with controlled testers", { exact: true }).waitFor({ timeout: 15000 });
+  if ((await publicLaunchBoundary.getAttribute("data-controlled-pilot-ready")) !== "true") {
+    throw new Error("Public boundary did not reflect the now-ready controlled pilot gate.");
+  }
+  if ((await publicLaunchBoundary.getAttribute("data-public-launch-ready")) !== "false") {
+    throw new Error("Public launch unlocked even though final Day 1 media is still missing.");
+  }
   await preShareGate.getByText("Approved", { exact: true }).waitFor({ timeout: 15000 });
   await sharePacket.getByText("Share approved", { exact: true }).waitFor({ timeout: 15000 });
   checks.push(await assertNoOverflow(page, "admin-launch-plan-desktop"));

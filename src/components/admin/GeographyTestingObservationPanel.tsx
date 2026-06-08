@@ -506,6 +506,65 @@ export function GeographyTestingObservationPanel() {
       </div>
 
       <div
+        data-testid="admin-geography-public-launch-boundary"
+        data-public-launch-ready={launchReadiness.publicLaunchReady ? "true" : "false"}
+        data-controlled-pilot-ready={launchReadiness.canShareControlledPilot ? "true" : "false"}
+        data-release-asset-pair-ready={launchReadiness.releaseAssetPairReady ? "true" : "false"}
+        data-first-wave-evidence-complete={launchReadiness.firstWaveEvidenceComplete ? "true" : "false"}
+        className={cn(
+          "mt-5 rounded-md border p-4 shadow-sm",
+          launchReadiness.publicLaunchReady
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20"
+            : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-zinc-600 dark:text-zinc-300">
+              Public launch boundary
+            </p>
+            <h3 className="mt-2 text-lg font-black text-zinc-950 dark:text-zinc-50">
+              {launchReadiness.publicLaunchReady ? "Public launch ready" : "Public launch still locked"}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+              Controlled tester sharing is not the same as public student launch. Public launch needs the controlled
+              pilot gate, final Day 1 media and transcript, and clean first-wave receipts.
+            </p>
+          </div>
+          <span
+            className={cn(
+              "rounded-md border px-3 py-2 text-xs font-black uppercase tracking-[0.14em]",
+              launchReadiness.publicLaunchReady
+                ? "border-emerald-200 bg-emerald-100 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+                : "border-amber-200 bg-amber-100 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100",
+            )}
+          >
+            {launchReadiness.publicLaunchReady ? "Ready" : "Do not widen"}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {launchReadiness.publicLaunchGates.map((gate) => (
+            <div
+              key={gate.id}
+              data-public-launch-gate={gate.id}
+              data-passed={gate.passed ? "true" : "false"}
+              className={cn(
+                "rounded-md border bg-white p-3 dark:bg-zinc-950",
+                gate.passed ? "border-emerald-200 dark:border-emerald-900" : "border-amber-200 dark:border-amber-900",
+              )}
+            >
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+                {gate.label}
+              </p>
+              <p className="mt-2 text-sm font-black text-zinc-950 dark:text-zinc-50">{gate.value}</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-zinc-600 dark:text-zinc-300">{gate.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
         data-testid="admin-pre-share-gate"
         className={cn(
           "mt-5 rounded-md border p-4 shadow-sm",
