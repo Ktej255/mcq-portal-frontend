@@ -67,8 +67,31 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     nextRoute: node.getAttribute("data-next-route"),
     evidenceSummary: node.getAttribute("data-evidence-summary"),
     adjustmentRule: node.getAttribute("data-adjustment-rule"),
+    evidenceCount: node.getAttribute("data-adaptive-evidence-count"),
     text: node.textContent || "",
   }));
+  const adaptiveEvidence = await page.locator('[data-testid="upsc-adaptive-evidence-chip"]').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      label: node.getAttribute("data-evidence-label"),
+      status: node.getAttribute("data-evidence-status"),
+      text: node.textContent || "",
+    }))
+  );
+  const yesterdayProof = await page.getByTestId("upsc-yesterday-proof").evaluate((node) => ({
+    status: node.getAttribute("data-origin-status"),
+    sourceDay: node.getAttribute("data-source-day"),
+    targetDay: node.getAttribute("data-target-day"),
+    route: node.getAttribute("data-origin-route"),
+    evidenceCount: node.getAttribute("data-origin-evidence-count"),
+    text: node.textContent || "",
+  }));
+  const yesterdayEvidence = await page.locator('[data-testid="upsc-yesterday-evidence-chip"]').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      label: node.getAttribute("data-evidence-label"),
+      status: node.getAttribute("data-evidence-status"),
+      text: node.textContent || "",
+    }))
+  );
   const dashboardVisibleMode = await page.getByTestId("upsc-simple-dashboard").getAttribute("data-visible-mode");
   const planningDrawerOpen = await page.getByTestId("upsc-planning-drawer").evaluate((node) =>
     node instanceof HTMLDetailsElement ? node.open : false
@@ -90,6 +113,9 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     mainPathStrip,
     oneActionRuleText,
     afterThisStep,
+    adaptiveEvidence,
+    yesterdayProof,
+    yesterdayEvidence,
     dashboardVisibleMode,
     planningDrawerOpen,
     meTimeStatus,
@@ -142,9 +168,33 @@ async function assertDashboardSurfaceIsSimple(page, checks, label) {
     !afterThisStep.targetDay ||
     !afterThisStep.nextRoute ||
     !afterThisStep.evidenceSummary ||
-    !afterThisStep.adjustmentRule
+    !afterThisStep.adjustmentRule ||
+    afterThisStep.evidenceCount !== "5"
   ) {
     throw new Error(`${label}: after-this dynamic planner proof missing: ${JSON.stringify(afterThisStep)}`);
+  }
+  const adaptiveLabels = adaptiveEvidence.map((item) => item.label).join("|");
+  const adaptiveStatuses = adaptiveEvidence.map((item) => item.status).join("|");
+  if (
+    adaptiveEvidence.length !== 5 ||
+    !adaptiveLabels.includes("Mind-state") ||
+    !adaptiveLabels.includes("Recall") ||
+    !adaptiveLabels.includes("Class") ||
+    !adaptiveLabels.includes("Practice") ||
+    !adaptiveLabels.includes("Consistency") ||
+    !adaptiveStatuses.match(/used|missing|blocked/)
+  ) {
+    throw new Error(`${label}: adaptive evidence chips are incomplete: ${JSON.stringify(adaptiveEvidence)}`);
+  }
+  if (
+    !yesterdayProof.status ||
+    !yesterdayProof.sourceDay ||
+    !yesterdayProof.targetDay ||
+    !yesterdayProof.route ||
+    Number(yesterdayProof.evidenceCount) < 3 ||
+    yesterdayEvidence.length !== Number(yesterdayProof.evidenceCount)
+  ) {
+    throw new Error(`${label}: yesterday evidence proof is incomplete: ${JSON.stringify({ yesterdayProof, yesterdayEvidence })}`);
   }
   if (planningDrawerOpen) {
     throw new Error(`${label}: optional planning drawer should start closed`);

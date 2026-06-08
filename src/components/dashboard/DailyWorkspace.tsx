@@ -72,6 +72,12 @@ const optionClass = (active: boolean) =>
     ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
     : "border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]";
 
+function evidenceTone(status: "used" | "missing" | "blocked") {
+  if (status === "used") return "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]";
+  if (status === "blocked") return "border-[#ef9f27]/50 bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-white text-[#5d675f]";
+}
+
 const preparationOptions: Array<{
   value: PreparationStage;
   level: "Beginner" | "Intermediate" | "Advanced";
@@ -506,10 +512,30 @@ export const DailyWorkspace = () => {
                       data-next-route={activeMissionDecision.tomorrowAdjustment.href}
                       data-evidence-summary={activeMissionDecision.nextSessionProof.evidenceSummary}
                       data-adjustment-rule={activeMissionDecision.nextSessionProof.adjustmentRule}
-                      className="mt-3 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                      data-adaptive-evidence-count={activeMissionDecision.nextSessionProof.evidence.length}
+                      className="mt-3 rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-3 text-xs font-bold leading-5 text-[#49675e]"
                     >
                       <span className="font-black uppercase tracking-[0.12em] text-[#085041]">After this: </span>
                       {activeMissionDecision.tomorrowAdjustment.title}
+                      <div
+                        data-testid="upsc-adaptive-evidence-strip"
+                        className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5"
+                      >
+                        {activeMissionDecision.nextSessionProof.evidence.map((item) => (
+                          <div
+                            key={item.label}
+                            data-testid="upsc-adaptive-evidence-chip"
+                            data-evidence-label={item.label}
+                            data-evidence-status={item.status}
+                            className={`min-h-16 rounded-md border px-2 py-2 ${evidenceTone(item.status)}`}
+                          >
+                            <span className="block text-[10px] font-black uppercase tracking-[0.12em]">
+                              {item.label}
+                            </span>
+                            <span className="mt-1 block text-[11px] font-bold leading-4">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div
                       data-testid="upsc-yesterday-proof"
@@ -517,10 +543,30 @@ export const DailyWorkspace = () => {
                       data-source-day={activeMissionDecision.todayOriginProof.sourceDay}
                       data-target-day={activeMissionDecision.todayOriginProof.targetDay}
                       data-origin-route={activeMissionDecision.todayOriginProof.href}
-                      className="mt-3 rounded-md border border-[#dcd5c7] bg-white/75 px-3 py-2 text-xs font-bold leading-5 text-[#49675e]"
+                      data-origin-evidence-count={activeMissionDecision.todayOriginProof.evidence.length}
+                      className="mt-3 rounded-md border border-[#dcd5c7] bg-white/75 px-3 py-3 text-xs font-bold leading-5 text-[#49675e]"
                     >
                       <span className="font-black uppercase tracking-[0.12em] text-[#085041]">Why today: </span>
                       {activeMissionDecision.todayOriginProof.title}. {activeMissionDecision.todayOriginProof.evidenceSummary}
+                      <div
+                        data-testid="upsc-yesterday-evidence-strip"
+                        className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+                      >
+                        {activeMissionDecision.todayOriginProof.evidence.map((item) => (
+                          <div
+                            key={item.label}
+                            data-testid="upsc-yesterday-evidence-chip"
+                            data-evidence-label={item.label}
+                            data-evidence-status={item.status}
+                            className={`min-h-16 rounded-md border px-2 py-2 ${evidenceTone(item.status)}`}
+                          >
+                            <span className="block text-[10px] font-black uppercase tracking-[0.12em]">
+                              {item.label}
+                            </span>
+                            <span className="mt-1 block text-[11px] font-bold leading-4">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <Link
