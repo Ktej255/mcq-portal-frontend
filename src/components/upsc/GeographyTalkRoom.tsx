@@ -572,6 +572,9 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
             data-primary-action-href={primaryActionHref}
             data-mcq-ready={mcqReady ? "true" : "false"}
             data-visible-mode="one-question-one-answer"
+            data-signal-model="talk-four-signal-one-answer"
+            data-essential-signal-count="4"
+            data-essential-signals="teacher-question|recall-gap|repair-focus|next-route"
             className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
           >
             <div className="mb-4">
@@ -684,6 +687,98 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
             </div>
             </div>
             </div>
+
+            <section
+              data-testid="talk-four-signal-grid"
+              data-signal-count="4"
+              data-flow-state={talkState}
+              data-recall-target={GEOGRAPHY_RECALL_TARGET}
+              data-visible-recall-score={visibleRecallScore}
+              data-next-action-route={primaryActionHref}
+              data-next-action-label={primaryActionLabel}
+              className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+            >
+              <div
+                data-testid="talk-signal-teacher-question"
+                data-signal="teacher-question"
+                className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-3"
+              >
+                <MessageCircle className="h-5 w-5 text-[#1d9e75]" />
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  Teacher question
+                </p>
+                <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{talkLevelCopy.question}</p>
+              </div>
+
+              <div
+                data-testid="talk-signal-recall-gap"
+                data-signal="recall-gap"
+                data-score={visibleRecallScore}
+                data-gap={recallGap}
+                className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+              >
+                <Gauge className="h-5 w-5 text-[#1d9e75]" />
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  Recall gap
+                </p>
+                <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">
+                  {visibleRecallScore >= GEOGRAPHY_RECALL_TARGET
+                    ? "Target cleared"
+                    : visibleRecallScore > 0
+                      ? `${recallGap}% more needed`
+                      : "Answer once"}
+                </p>
+              </div>
+
+              <div
+                data-testid="talk-signal-repair-focus"
+                data-signal="repair-focus"
+                data-gap-category={teacherGapCategory}
+                data-teacher-status={teacherStatus}
+                className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+              >
+                <Lightbulb className="h-5 w-5 text-[#1d9e75]" />
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                  Repair focus
+                </p>
+                <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{teacherGapCategory}</p>
+                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#66736b]">{teacherRepairAction}</p>
+              </div>
+
+              {route ? (
+                <Link
+                  href={route.href}
+                  data-testid="talk-signal-next-route"
+                  data-signal="next-route"
+                  data-next-action-route={route.href}
+                  data-next-action-label={route.label}
+                  className="rounded-lg border border-[#1d9e75] bg-[#e7f5ee] p-3 transition hover:border-[#1a3a2a] hover:bg-white"
+                >
+                  <ArrowRight className="h-5 w-5 text-[#1d9e75]" />
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    Next route
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{route.label}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{route.title}</p>
+                </Link>
+              ) : (
+                <div
+                  data-testid="talk-signal-next-route"
+                  data-signal="next-route"
+                  data-next-action-route=""
+                  data-next-action-label={primaryActionLabel}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                >
+                  <ArrowRight className="h-5 w-5 text-[#1d9e75]" />
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    Next route
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">
+                    Submit answer first
+                  </p>
+                </div>
+              )}
+            </section>
 
             <details
               data-testid="talk-recall-loop-strip"

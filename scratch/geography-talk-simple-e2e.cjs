@@ -26,6 +26,86 @@ async function assertNoOverflow(page, label, checks) {
   }
 }
 
+async function assertTalkFourSignalContract(page, expected, checks) {
+  const panel = page.getByTestId("geography-talk-simple-panel");
+  const grid = page.getByTestId("talk-four-signal-grid");
+  await grid.waitFor({ timeout: 15000 });
+
+  const panelContract = await panel.evaluate((node) => ({
+    signalModel: node.getAttribute("data-signal-model"),
+    signalCount: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    flowState: node.getAttribute("data-flow-state"),
+    visibleScore: node.getAttribute("data-visible-recall-score"),
+    recallGap: node.getAttribute("data-recall-gap"),
+    primaryActionHref: node.getAttribute("data-primary-action-href"),
+    primaryActionLabel: node.getAttribute("data-primary-action-label"),
+  }));
+
+  const gridContract = await grid.evaluate((node) => ({
+    signalCount: node.getAttribute("data-signal-count"),
+    flowState: node.getAttribute("data-flow-state"),
+    recallTarget: node.getAttribute("data-recall-target"),
+    visibleScore: node.getAttribute("data-visible-recall-score"),
+    nextActionRoute: node.getAttribute("data-next-action-route"),
+    nextActionLabel: node.getAttribute("data-next-action-label"),
+    text: node.textContent || "",
+  }));
+
+  const signals = await grid.locator("[data-testid^='talk-signal-']").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      id: node.getAttribute("data-testid"),
+      signal: node.getAttribute("data-signal"),
+      href: node.getAttribute("href"),
+      nextRoute: node.getAttribute("data-next-action-route"),
+      nextLabel: node.getAttribute("data-next-action-label"),
+      score: node.getAttribute("data-score"),
+      gap: node.getAttribute("data-gap"),
+      gapCategory: node.getAttribute("data-gap-category"),
+      teacherStatus: node.getAttribute("data-teacher-status"),
+      text: node.textContent || "",
+    }))
+  );
+
+  checks.push({ label: expected.label, panelContract, gridContract, signals });
+
+  const signalIds = signals.map((signal) => signal.id);
+  const requiredSignals = [
+    "talk-signal-teacher-question",
+    "talk-signal-recall-gap",
+    "talk-signal-repair-focus",
+    "talk-signal-next-route",
+  ];
+  const recallSignal = signals.find((signal) => signal.id === "talk-signal-recall-gap");
+  const repairSignal = signals.find((signal) => signal.id === "talk-signal-repair-focus");
+  const nextRouteSignal = signals.find((signal) => signal.id === "talk-signal-next-route");
+
+  if (
+    panelContract.signalModel !== "talk-four-signal-one-answer" ||
+    panelContract.signalCount !== "4" ||
+    panelContract.signals !== "teacher-question|recall-gap|repair-focus|next-route" ||
+    gridContract.signalCount !== "4" ||
+    gridContract.recallTarget !== "95" ||
+    signals.length !== 4 ||
+    !requiredSignals.every((id) => signalIds.includes(id)) ||
+    !gridContract.text.includes("Teacher question") ||
+    !gridContract.text.includes("Recall gap") ||
+    !gridContract.text.includes("Repair focus") ||
+    !gridContract.text.includes("Next route") ||
+    (expected.flowState && gridContract.flowState !== expected.flowState) ||
+    (expected.score && gridContract.visibleScore !== expected.score) ||
+    (expected.nextRoute !== undefined && gridContract.nextActionRoute !== expected.nextRoute) ||
+    (expected.nextLabel && gridContract.nextActionLabel !== expected.nextLabel) ||
+    (expected.nextRoute !== undefined && nextRouteSignal?.nextRoute !== expected.nextRoute) ||
+    (expected.nextRoute && nextRouteSignal?.href !== expected.nextRoute) ||
+    (expected.gapCategory && repairSignal?.gapCategory !== expected.gapCategory) ||
+    (expected.teacherStatus && repairSignal?.teacherStatus !== expected.teacherStatus) ||
+    (expected.score && recallSignal?.score !== expected.score)
+  ) {
+    throw new Error(`Talk four-signal contract failed: ${JSON.stringify({ expected, panelContract, gridContract, signals }, null, 2)}`);
+  }
+}
+
 async function seedProfile(page, level, progress = null) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
@@ -112,6 +192,19 @@ async function run() {
   if (advancedLoopStripOpen) {
     throw new Error("Talk process strip should stay folded on the student screen.");
   }
+  await assertTalkFourSignalContract(
+    page,
+    {
+      label: "talk-four-signal-before-answer",
+      flowState: "answer-required",
+      score: "0",
+      nextRoute: "",
+      nextLabel: "Send to AI teacher",
+      gapCategory: "Pending",
+      teacherStatus: "answer-required",
+    },
+    checks
+  );
 
   const baselineContainerCount = await page.getByTestId("geography-talk-baseline").count();
   const baselineInputCount = await page.getByTestId("geography-talk-baseline-draft").count();
@@ -151,6 +244,17 @@ async function run() {
   if (repairLessonHref !== "/upsc/geography/watch?day=1" || rawDecisionLabels !== 0) {
     throw new Error(`Experienced diagnosis did not open the repair lesson: ${repairLessonHref}`);
   }
+  await assertTalkFourSignalContract(
+    page,
+    {
+      label: "talk-four-signal-repair-route",
+      flowState: "route-ready",
+      nextRoute: "/upsc/geography/watch?day=1",
+      nextLabel: "Open repair lesson",
+      teacherStatus: "repair-required",
+    },
+    checks
+  );
   await assertNoOverflow(page, "talk-advanced-diagnosis-desktop", checks);
 
   await seedProfile(page, "intermediate");
@@ -228,6 +332,17 @@ async function run() {
   if (directMcqHref !== "/upsc/geography/mcq-readiness?day=1" || clearedMasteryPlanCount !== 0) {
     throw new Error(`Repaired discussion did not open MCQ directly: ${directMcqHref}`);
   }
+  await assertTalkFourSignalContract(
+    page,
+    {
+      label: "talk-four-signal-mcq-route",
+      flowState: "route-ready",
+      nextRoute: "/upsc/geography/mcq-readiness?day=1",
+      nextLabel: "Open MCQ",
+      teacherStatus: "mcq-ready",
+    },
+    checks
+  );
   await assertNoOverflow(page, "talk-repaired-desktop", checks);
 
   const progress = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["1"], progressKey);
