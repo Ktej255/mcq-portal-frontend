@@ -55,6 +55,16 @@ export type LiveReleaseGate = {
   proofReceipt: string;
 };
 
+export type LiveContinuityReceipt = {
+  id: string;
+  title: string;
+  area: string;
+  status: DeliveryStatus;
+  consoleAction: string;
+  browserProof: string;
+  failureRule: string;
+};
+
 export const launchReadinessMetrics: DeliveryMetric[] = [
   {
     label: "Geography local funnel",
@@ -829,5 +839,80 @@ export const liveReleaseBoundary: LiveReleaseGate[] = [
     operatorAction:
       "Invite no more than three checked-in testers through /upsc/geography/pilot and pause immediately when a blocker is reported.",
     proofReceipt: "Each tester leaves one feedback receipt and every blocker is reviewed before the second wave is unlocked.",
+  },
+];
+
+export const liveContinuityRehearsal: LiveContinuityReceipt[] = [
+  {
+    id: "learner-state-rls",
+    title: "Learner state survives only through the authenticated account",
+    area: "Supabase tables and RLS",
+    status: "pending",
+    consoleAction:
+      "Apply 20260531_upsc_learner_state.sql and run 20260531_upsc_learner_state_checks.sql in the live Supabase SQL Editor.",
+    browserProof:
+      "Sign in on the deployed URL, complete profile intake plus Geography Day 1 progress, then recover the same profile and progress in a second browser profile.",
+    failureRule:
+      "If progress disappears, leaks into another account, or writes without auth.uid() ownership, keep the production invite locked.",
+  },
+  {
+    id: "talk-limiter",
+    title: "AI teacher cannot run without the live limiter",
+    area: "Supabase RPC and Vercel secret",
+    status: "pending",
+    consoleAction:
+      "Apply 20260531_upsc_adaptive_teacher_rate_limit.sql, verify the restricted RPC, and set SUPABASE_SECRET_KEY only as a server-side Vercel variable.",
+    browserProof:
+      "Trigger more than the allowed Talk checks from one account and confirm the route throttles without exposing any sb_secret_ value in browser source or network payloads.",
+    failureRule:
+      "If the limiter is missing, permissive, or the secret appears client-side, live Talk remains disabled for students.",
+  },
+  {
+    id: "provider-boundary",
+    title: "Live AI teacher is provider-backed but still safe",
+    area: "Vercel server function",
+    status: "pending",
+    consoleAction:
+      "Set GEMINI_API_KEY as a server-only Vercel variable and deploy a preview before promoting to production.",
+    browserProof:
+      "Run one authenticated Talk evaluation and confirm providerConfigured true, structured scoring, timeout handling, and no key exposure in the browser bundle.",
+    failureRule:
+      "If the provider fails, returns malformed data, or exposes a secret, keep local fallback guidance and do not market live AI language.",
+  },
+  {
+    id: "oauth-callback",
+    title: "Google login returns to the deployed portal",
+    area: "Supabase Auth and Vercel URL",
+    status: "pending",
+    consoleAction:
+      "Whitelist the deployed site URL and callback URL in Supabase Auth, then confirm Vercel has the same NEXT_PUBLIC_SUPABASE_URL and publishable key.",
+    browserProof:
+      "Use a real Google account from the production URL, complete the callback, and land back inside the UPSC learner path without local mock tokens.",
+    failureRule:
+      "If login loops, lands on the wrong route, or depends on localhost bypass, do not share the link outside the team.",
+  },
+  {
+    id: "account-isolation",
+    title: "Different learners cannot see each other's state",
+    area: "Identity continuity",
+    status: "pending",
+    consoleAction:
+      "Use two separate Google accounts after the live RLS migration is applied; do not seed localStorage manually during this proof.",
+    browserProof:
+      "Account A recovers its profile and Geography progress, Account B starts clean, and logout/account-switch cleanup removes learner-only local state.",
+    failureRule:
+      "If account switching leaves mixed profile, progress, or report evidence, pause the pilot and repair learnerPersistence before inviting testers.",
+  },
+  {
+    id: "first-wave-hold",
+    title: "Public launch stays locked after controlled testing",
+    area: "Launch tracker",
+    status: "risk",
+    consoleAction:
+      "After live continuity passes, invite no more than three testers through /upsc/geography/pilot and record one feedback receipt per tester.",
+    browserProof:
+      "The admin launch tracker keeps public launch locked until final Day 1 media, transcript, fresh MCQs, complete tester receipts, and zero open blockers are visible together.",
+    failureRule:
+      "Any Blocker feedback, missing receipt, or incomplete Day 1 content keeps widening locked even if the controlled pilot gate is green.",
   },
 ];

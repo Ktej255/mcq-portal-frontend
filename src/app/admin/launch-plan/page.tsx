@@ -20,6 +20,7 @@ import {
   launchFocusAreas,
   launchReadinessMetrics,
   launchVerdictCards,
+  liveContinuityRehearsal,
   liveReleaseBoundary,
   may24Plan,
   may25Plan,
@@ -262,6 +263,62 @@ export default function AdminLaunchPlanPage() {
                 <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{gate.proofReceipt}</p>
               </div>
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section
+        data-testid="admin-live-continuity-rehearsal"
+        className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
+            <h2 className="flex items-center gap-2 text-xl font-black text-zinc-950 dark:text-zinc-50">
+              <ShieldCheck className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+              Live Continuity Rehearsal Packet
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+              Use this as the exact proof sheet after Supabase and Vercel are configured. A local pass is not enough for these items.
+            </p>
+          </div>
+          <Badge variant="outline" className="h-7 rounded-md border-blue-200 bg-blue-50 px-2 font-bold text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100">
+            Live browser proof
+          </Badge>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-2">
+          {liveContinuityRehearsal.map((receipt) => (
+            <article
+              key={receipt.id}
+              data-live-continuity-receipt={receipt.id}
+              className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
+                    {receipt.area}
+                  </p>
+                  <h3 className="mt-2 text-sm font-black text-zinc-950 dark:text-zinc-50">{receipt.title}</h3>
+                </div>
+                <StatusBadge status={receipt.status} />
+              </div>
+              <div className="mt-4 grid gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">Console action</p>
+                  <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{receipt.consoleAction}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">Browser proof</p>
+                  <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{receipt.browserProof}</p>
+                </div>
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-800 dark:text-amber-200">
+                    Failure rule
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-amber-900 dark:text-amber-100">{receipt.failureRule}</p>
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       </section>
