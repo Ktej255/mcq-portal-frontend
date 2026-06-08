@@ -160,22 +160,23 @@ export function UpscPyqImportCommand() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const hydratePersistence = useCallback(async () => {
-    const localRecords = readLocalPyqImportRecords();
-    setRecords(localRecords);
+    const initialLocalRecords = readLocalPyqImportRecords();
+    setRecords(initialLocalRecords);
     setPersistence(defaultPersistenceState);
 
     try {
       const payload = await requestPyqPersistence();
       const nextPersistence = stateFromPersistencePayload(payload);
+      const latestLocalRecords = readLocalPyqImportRecords();
 
       if (payload.mode === "supabase" && Array.isArray(payload.records)) {
-        let nextRecords = dedupePyqImportRecords([...payload.records, ...localRecords]);
+        let nextRecords = dedupePyqImportRecords([...payload.records, ...latestLocalRecords]);
         let nextState = {
           ...nextPersistence,
           savedCount: nextRecords.length,
         };
 
-        if (localRecords.length > 0) {
+        if (latestLocalRecords.length > 0) {
           const syncPayload = await requestPyqPersistence(nextRecords);
           nextState = stateFromPersistencePayload(syncPayload);
           if (syncPayload.mode === "supabase" && Array.isArray(syncPayload.records)) {
@@ -194,16 +195,17 @@ export function UpscPyqImportCommand() {
 
       setPersistence({
         ...nextPersistence,
-        savedCount: localRecords.length,
+        savedCount: latestLocalRecords.length,
       });
     } catch (error) {
+      const latestLocalRecords = readLocalPyqImportRecords();
       setPersistence({
         mode: "unavailable",
         message:
           error instanceof Error
             ? `PYQ persistence check failed: ${error.message}. Browser-local staging remains available.`
             : "PYQ persistence check failed. Browser-local staging remains available.",
-        savedCount: localRecords.length,
+        savedCount: latestLocalRecords.length,
         checkedAt: new Date().toISOString(),
       });
     }

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookMarked,
@@ -22,7 +25,11 @@ import {
   type ImportStatus,
   type SourceReadinessStatus,
 } from "@/lib/upsc/syllabusPyqRegistry";
-import { buildExactPyqImportReadiness } from "@/lib/upsc/pyqImportLedger";
+import {
+  buildExactPyqImportReadiness,
+  readLocalPyqImportRecords,
+  type PyqImportRecord,
+} from "@/lib/upsc/pyqImportLedger";
 
 function statusLabel(status: ImportStatus) {
   if (status === "source-indexed") return "Source indexed";
@@ -57,14 +64,45 @@ function exactStageTone(status: string) {
 }
 
 export function UpscSyllabusPyqLibrary() {
+  const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+
+  useEffect(() => {
+    setPyqRecords(readLocalPyqImportRecords());
+  }, []);
+
   const [firstSubject] = subjectSourcePacks;
   const [firstOptional] = optionalSourcePacks;
-  const exactPyqReadiness = buildExactPyqImportReadiness([]);
+  const exactPyqReadiness = useMemo(() => buildExactPyqImportReadiness(pyqRecords), [pyqRecords]);
   const directPaperPreviewRows = officialPaperIndexRows
     .filter((row) => row.status === "direct-paper-page-linked")
     .slice(0, 6);
-  const studentReadyRows = sourceReadinessMatrix.filter((row) => row.studentReady).length;
-  const importPendingRows = sourceReadinessMatrix.filter((row) => row.status === "import-pending").length;
+  const exactVerifiedRows = pyqRecords.filter((record) => record.textStatus === "EXACT_VERIFIED");
+  const recentExactRows = exactVerifiedRows.slice(0, 6);
+  const sourceReadinessRows = useMemo(
+    () =>
+      sourceReadinessMatrix.map((row) => {
+        if (row.id !== "exact-pyq-question-text") return row;
+        if (exactPyqReadiness.exactQuestionTextRows === 0) return row;
+
+        return {
+          ...row,
+          status: exactPyqReadiness.studentReady ? ("student-route-ready" as const) : ("partial-mapping" as const),
+          studentReady: exactPyqReadiness.studentReady,
+          countValue: exactPyqReadiness.exactQuestionTextRows,
+          proof: `${exactPyqReadiness.exactQuestionTextRows} exact verified PYQ row${
+            exactPyqReadiness.exactQuestionTextRows === 1 ? "" : "s"
+          } are staged in the import ledger; ${exactPyqReadiness.mappedExactQuestionRows} are mapped.`,
+          productUse:
+            "Imported exact PYQs are visible as admin-staged evidence and can feed planner, revision, reports, and question-bank wiring after review.",
+          remainingWork: exactPyqReadiness.studentReady
+            ? "Connect the verified bank to student-facing drills with route-level review receipts."
+            : "Continue official-paper extraction until the queue is substantially mapped; unreviewed rows remain admin-staged.",
+        };
+      }),
+    [exactPyqReadiness]
+  );
+  const studentReadyRows = sourceReadinessRows.filter((row) => row.studentReady).length;
+  const importPendingRows = sourceReadinessRows.filter((row) => row.status === "import-pending").length;
   const totalLoopStages = subjectSourcePacks.reduce((sum, subject) => sum + subject.dailyLoop.stageCount, 0);
   const averageRecallTarget = Math.round(
     subjectSourcePacks.reduce((sum, subject) => sum + subject.dailyLoop.targetRecallPercent, 0) /
@@ -144,7 +182,7 @@ export function UpscSyllabusPyqLibrary() {
 
         <section
           data-testid="upsc-source-readiness-matrix"
-          data-total-rows={sourceReadinessMatrix.length}
+          data-total-rows={sourceReadinessRows.length}
           data-student-ready-rows={studentReadyRows}
           data-import-pending-rows={importPendingRows}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
@@ -165,7 +203,7 @@ export function UpscSyllabusPyqLibrary() {
             <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {sourceReadinessMatrix.map((row) => (
+            {sourceReadinessRows.map((row) => (
               <article
                 key={row.id}
                 data-testid="upsc-source-readiness-row"
@@ -236,7 +274,7 @@ export function UpscSyllabusPyqLibrary() {
           data-total-paper-index-rows={officialPaperIndexSummary.totalPaperIndexRows}
           data-direct-linked-paper-rows={officialPaperIndexSummary.directLinkedPaperRows}
           data-index-page-paper-rows={officialPaperIndexSummary.indexPagePaperRows}
-          data-exact-question-text-rows={officialPaperIndexSummary.exactQuestionTextRows}
+          data-exact-question-text-rows={exactPyqReadiness.exactQuestionTextRows}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -248,7 +286,11 @@ export function UpscSyllabusPyqLibrary() {
                 Paper sources are loaded before exact question import.
               </h2>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                {officialPaperIndexSummary.exactImportRule} {officialPaperIndexSummary.nextAction}
+                {exactPyqReadiness.exactQuestionTextRows > 0
+                  ? `${exactPyqReadiness.exactQuestionTextRows} exact verified question row${
+                      exactPyqReadiness.exactQuestionTextRows === 1 ? "" : "s"
+                    } are staged from the admin import ledger. ${exactPyqReadiness.nextQueueRule}`
+                  : `${officialPaperIndexSummary.exactImportRule} ${officialPaperIndexSummary.nextAction}`}
               </p>
             </div>
             <ClipboardList className="h-6 w-6 text-[#1a3a2a]" />
@@ -260,7 +302,7 @@ export function UpscSyllabusPyqLibrary() {
             <AuditMetric label="Total papers" value={officialPaperIndexSummary.totalPaperIndexRows} />
             <AuditMetric label="Direct linked" value={officialPaperIndexSummary.directLinkedPaperRows} />
             <AuditMetric label="Index linked" value={officialPaperIndexSummary.indexPagePaperRows} />
-            <AuditMetric label="Exact text rows" value={officialPaperIndexSummary.exactQuestionTextRows} />
+            <AuditMetric label="Exact text rows" value={exactPyqReadiness.exactQuestionTextRows} />
             <AuditMetric label="Window" value={officialPaperIndexSummary.yearWindow} />
           </div>
           <div className="mt-4 grid gap-2 lg:grid-cols-2">
@@ -366,6 +408,78 @@ export function UpscSyllabusPyqLibrary() {
               </a>
             ))}
           </div>
+        </section>
+
+        <section
+          data-testid="upsc-exact-pyq-import-preview"
+          data-proof-rule="local-exact-pyq-ledger-to-source-library"
+          data-imported-record-count={pyqRecords.length}
+          data-exact-record-count={exactPyqReadiness.exactQuestionTextRows}
+          data-mapped-record-count={exactPyqReadiness.mappedExactQuestionRows}
+          data-needs-review-count={exactPyqReadiness.needsReviewRows}
+          data-student-ready={String(exactPyqReadiness.studentReady)}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Imported exact PYQ preview
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Verified rows now travel from import room to source library.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                The source page no longer stays blind after admin import. It shows staged exact rows, while still
+                keeping student drills gated until the official queue is mapped enough for release.
+              </p>
+            </div>
+            <ShieldCheck className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+
+          {recentExactRows.length > 0 ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {recentExactRows.map((record) => (
+                <article
+                  key={record.id}
+                  data-testid="upsc-exact-pyq-preview-row"
+                  data-record-id={record.id}
+                  data-subject-slug={record.subjectSlug}
+                  data-stage={record.stage}
+                  data-kind={record.kind}
+                  data-text-status={record.textStatus}
+                  data-import-status={record.importStatus}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                >
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-md border border-[#b9d9cd] bg-[#e7f5ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">
+                      {record.textStatus.replaceAll("_", " ")}
+                    </span>
+                    <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#34453b]">
+                      {record.year} / {record.questionNumber}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                    {record.subjectTitle} / {record.stage} / {record.paper}
+                  </p>
+                  <h3 className="mt-2 text-sm font-black leading-6 text-[#13251d]">{record.questionText}</h3>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">
+                    {record.syllabusArea} · {record.topicTags.join(", ")}
+                  </p>
+                  <a
+                    href={record.sourceHref}
+                    className="mt-3 inline-flex text-xs font-black text-[#085041] underline underline-offset-4"
+                  >
+                    Official source
+                  </a>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-[#ef9f27]/50 bg-[#fff4df] p-4 text-sm font-bold leading-6 text-[#6f4a12]">
+              No exact verified question rows are staged yet. Use the admin PYQ import room to paste official
+              question text with source URL, paper, question number, syllabus area, and topic tags.
+            </div>
+          )}
         </section>
 
         <section data-testid="upsc-subject-source-packs" className="grid gap-3 xl:grid-cols-2">

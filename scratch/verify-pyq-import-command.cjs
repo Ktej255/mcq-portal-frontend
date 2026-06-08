@@ -52,7 +52,10 @@ async function run() {
 
   await page.addInitScript(({ localLedgerKey, studentProfileKey }) => {
     window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_admin_pyq_import");
-    window.localStorage.removeItem(localLedgerKey);
+    if (!window.localStorage.getItem("verify-pyq-import-seeded")) {
+      window.localStorage.removeItem(localLedgerKey);
+      window.localStorage.setItem("verify-pyq-import-seeded", "true");
+    }
     window.localStorage.setItem(
       studentProfileKey,
       JSON.stringify({
@@ -302,34 +305,108 @@ async function run() {
   ) {
     throw new Error(`Recent/summary import evidence missing: ${JSON.stringify(importState)}`);
   }
+  await page.waitForFunction(
+    (localLedgerKey) => {
+      const records = JSON.parse(window.localStorage.getItem(localLedgerKey) || "[]");
+      const persistence = document.querySelector('[data-testid="admin-pyq-import-persistence"]');
+      return (
+        records.length === 2 &&
+        persistence?.getAttribute("data-sync-mode") !== "checking" &&
+        (persistence?.textContent || "").includes("2 exact rows visible")
+      );
+    },
+    ledgerKey,
+    { timeout: 15000 }
+  );
+  await page.waitForTimeout(1000);
 
-  await page.goto(`${baseUrl}/upsc/source-library`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.goto(`${baseUrl}/upsc/source-library`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByTestId("upsc-official-paper-index-proof").waitFor({ timeout: 15000 });
-  const sourceTruthState = await page.evaluate(() => {
+  await page.getByTestId("upsc-exact-pyq-import-preview").waitFor({ timeout: 15000 });
+  await page.waitForTimeout(1000);
+  try {
+    await page.waitForFunction((localLedgerKey) => {
+      const records = JSON.parse(window.localStorage.getItem(localLedgerKey) || "[]");
+      const paperIndex = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
+      const preview = document.querySelector('[data-testid="upsc-exact-pyq-import-preview"]');
+      return (
+        records.length === 2 &&
+        paperIndex?.getAttribute("data-exact-question-text-rows") === "2" &&
+        preview?.getAttribute("data-exact-record-count") === "2"
+      );
+    }, ledgerKey, { timeout: 30000 });
+  } catch (error) {
+    const debugState = await page.evaluate((localLedgerKey) => {
+      const records = JSON.parse(window.localStorage.getItem(localLedgerKey) || "[]");
+      const paperIndex = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
+      const preview = document.querySelector('[data-testid="upsc-exact-pyq-import-preview"]');
+      return {
+        localLedgerRows: records.length,
+        localLedgerSubjects: records.map((record) => record.subjectSlug),
+        paperExactRows: paperIndex?.getAttribute("data-exact-question-text-rows"),
+        previewExactRows: preview?.getAttribute("data-exact-record-count"),
+        previewImportedRows: preview?.getAttribute("data-imported-record-count"),
+        previewText: preview?.textContent || "",
+      };
+    }, ledgerKey);
+    throw new Error(`Source library import reflection did not settle: ${JSON.stringify(debugState)}`);
+  }
+  const sourceTruthState = await page.evaluate((localLedgerKey) => {
     const paperIndex = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
     const exactRow = [...document.querySelectorAll('[data-testid="upsc-source-readiness-row"]')].find(
       (row) => row.getAttribute("data-readiness-id") === "exact-pyq-question-text"
     );
+    const preview = document.querySelector('[data-testid="upsc-exact-pyq-import-preview"]');
+    const previewRows = [...document.querySelectorAll('[data-testid="upsc-exact-pyq-preview-row"]')].map((row) => ({
+      id: row.getAttribute("data-record-id"),
+      subjectSlug: row.getAttribute("data-subject-slug"),
+      stage: row.getAttribute("data-stage"),
+      kind: row.getAttribute("data-kind"),
+      textStatus: row.getAttribute("data-text-status"),
+      importStatus: row.getAttribute("data-import-status"),
+      text: row.textContent || "",
+    }));
 
     return {
+      localLedgerRows: JSON.parse(window.localStorage.getItem(localLedgerKey) || "[]").length,
       exactQuestionTextRows: paperIndex?.getAttribute("data-exact-question-text-rows"),
       proofText: paperIndex?.textContent || "",
       exactRowStatus: exactRow?.getAttribute("data-status"),
       exactRowStudentReady: exactRow?.getAttribute("data-student-ready"),
       exactRowCount: exactRow?.getAttribute("data-count-value"),
       exactRowText: exactRow?.textContent || "",
+      preview: {
+        proofRule: preview?.getAttribute("data-proof-rule"),
+        importedRecordCount: preview?.getAttribute("data-imported-record-count"),
+        exactRecordCount: preview?.getAttribute("data-exact-record-count"),
+        mappedRecordCount: preview?.getAttribute("data-mapped-record-count"),
+        needsReviewCount: preview?.getAttribute("data-needs-review-count"),
+        studentReady: preview?.getAttribute("data-student-ready"),
+        text: preview?.textContent || "",
+        rows: previewRows,
+      },
     };
-  });
-  checks.push({ label: "source-library-still-honest-after-admin-import", sourceTruthState });
+  }, ledgerKey);
+  checks.push({ label: "source-library-reflects-admin-import", sourceTruthState });
 
   if (
-    readNumber(sourceTruthState.exactQuestionTextRows, "source library exact rows") !== 0 ||
-    sourceTruthState.exactRowStatus !== "import-pending" ||
+    readNumber(sourceTruthState.exactQuestionTextRows, "source library exact rows") !== 2 ||
+    sourceTruthState.exactRowStatus !== "partial-mapping" ||
     sourceTruthState.exactRowStudentReady !== "false" ||
-    readNumber(sourceTruthState.exactRowCount, "source readiness exact row count") !== 0 ||
-    !sourceTruthState.proofText.includes("No exact question-text claim")
+    readNumber(sourceTruthState.exactRowCount, "source readiness exact row count") !== 2 ||
+    !sourceTruthState.proofText.includes("2 exact verified question rows") ||
+    sourceTruthState.preview.proofRule !== "local-exact-pyq-ledger-to-source-library" ||
+    readNumber(sourceTruthState.preview.importedRecordCount, "source preview imported count") !== 2 ||
+    readNumber(sourceTruthState.preview.exactRecordCount, "source preview exact count") !== 2 ||
+    readNumber(sourceTruthState.preview.mappedRecordCount, "source preview mapped count") !== 2 ||
+    readNumber(sourceTruthState.preview.needsReviewCount, "source preview review count") !== 0 ||
+    sourceTruthState.preview.studentReady !== "false" ||
+    sourceTruthState.preview.rows.length !== 2 ||
+    !sourceTruthState.preview.text.includes("Verified rows now travel") ||
+    !sourceTruthState.preview.text.includes("Anthropology") ||
+    !sourceTruthState.preview.text.includes("EXACT VERIFIED")
   ) {
-    throw new Error(`Source library made a false exact-PYQ claim: ${JSON.stringify(sourceTruthState)}`);
+    throw new Error(`Source library exact-PYQ import bridge failed: ${JSON.stringify(sourceTruthState)}`);
   }
 
   await page.goto(`${baseUrl}/admin/dashboard`, { waitUntil: "domcontentloaded", timeout: 45000 });
