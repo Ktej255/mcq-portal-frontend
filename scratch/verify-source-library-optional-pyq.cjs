@@ -54,11 +54,13 @@ async function readSourceLibraryState(page) {
   await page.getByTestId("upsc-source-library-hero").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-source-readiness-matrix").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-official-paper-index-proof").waitFor({ timeout: 15000 });
+  await page.getByTestId("upsc-pyq-extraction-priority-queue").waitFor({ timeout: 15000 });
   await page.getByTestId("upsc-optional-source-packs").waitFor({ timeout: 15000 });
 
   return page.evaluate(() => {
     const preload = document.querySelector('[data-testid="upsc-syllabus-pyq-preload-proof"]');
     const paperIndex = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
+    const extractionQueue = document.querySelector('[data-testid="upsc-pyq-extraction-priority-queue"]');
     const matrix = document.querySelector('[data-testid="upsc-source-readiness-matrix"]');
     const readinessRows = [...document.querySelectorAll('[data-testid="upsc-source-readiness-row"]')].map((row) => ({
       id: row.getAttribute("data-readiness-id"),
@@ -85,6 +87,18 @@ async function readSourceLibraryState(page) {
       href: link.getAttribute("href"),
       text: link.textContent || "",
     }));
+    const extractionQueueRows = [...document.querySelectorAll('[data-testid="upsc-pyq-extraction-queue-row"]')].map(
+      (row) => ({
+        queueIndex: row.getAttribute("data-queue-index"),
+        stage: row.getAttribute("data-stage"),
+        year: row.getAttribute("data-year"),
+        status: row.getAttribute("data-status"),
+        extractionPriority: row.getAttribute("data-extraction-priority"),
+        subjectSlug: row.getAttribute("data-subject-slug"),
+        href: row.getAttribute("href"),
+        text: row.textContent || "",
+      })
+    );
 
     return {
       preload: {
@@ -110,6 +124,14 @@ async function readSourceLibraryState(page) {
         indexPagePaperRows: paperIndex?.getAttribute("data-index-page-paper-rows"),
         exactQuestionTextRows: paperIndex?.getAttribute("data-exact-question-text-rows"),
         text: paperIndex?.textContent || "",
+      },
+      extractionQueue: {
+        proofRule: extractionQueue?.getAttribute("data-proof-rule"),
+        queueRowCount: extractionQueue?.getAttribute("data-queue-row-count"),
+        directHighPriorityRows: extractionQueue?.getAttribute("data-direct-high-priority-rows"),
+        highPriorityPaperRows: extractionQueue?.getAttribute("data-high-priority-paper-rows"),
+        nextQueueRule: extractionQueue?.getAttribute("data-next-queue-rule"),
+        rows: extractionQueueRows,
       },
       matrix: {
         totalRows: matrix?.getAttribute("data-total-rows"),
@@ -202,6 +224,25 @@ async function run() {
     !sourceState.paperIndex.text.includes("No exact question-text claim")
   ) {
     throw new Error(`Official paper index proof failed: ${JSON.stringify(sourceState.paperIndex)}`);
+  }
+
+  if (
+    sourceState.extractionQueue.proofRule !== "high-priority-official-paper-extraction-queue" ||
+    readNumber(sourceState.extractionQueue.queueRowCount, "extraction queue shown rows") !== 12 ||
+    readNumber(sourceState.extractionQueue.directHighPriorityRows, "direct high-priority rows") !== 9 ||
+    readNumber(sourceState.extractionQueue.highPriorityPaperRows, "total high-priority paper rows") !== 55 ||
+    !sourceState.extractionQueue.nextQueueRule.includes("Extract direct-linked 2024/2025 GS papers first") ||
+    sourceState.extractionQueue.rows.length !== 12 ||
+    sourceState.extractionQueue.rows.some(
+      (row, index) =>
+        row.queueIndex !== String(index + 1) ||
+        row.extractionPriority !== "high" ||
+        (index < 9 ? row.status !== "direct-paper-page-linked" : row.status !== "official-index-linked") ||
+        !row.href?.startsWith("https://upsc.gov.in/") ||
+        !row.text.includes("Next:")
+    )
+  ) {
+    throw new Error(`Extraction queue proof failed: ${JSON.stringify(sourceState.extractionQueue)}`);
   }
 
   const exactTextRow = sourceState.matrix.rows.find((row) => row.id === "exact-pyq-question-text");

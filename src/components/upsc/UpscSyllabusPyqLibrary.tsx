@@ -76,6 +76,15 @@ export function UpscSyllabusPyqLibrary() {
   const directPaperPreviewRows = officialPaperIndexRows
     .filter((row) => row.status === "direct-paper-page-linked")
     .slice(0, 6);
+  const highPriorityImportQueueRows = officialPaperIndexRows
+    .filter((row) => row.extractionPriority === "high")
+    .sort((left, right) => {
+      const leftDirect = left.status === "direct-paper-page-linked" ? 0 : 1;
+      const rightDirect = right.status === "direct-paper-page-linked" ? 0 : 1;
+      return leftDirect - rightDirect || right.year - left.year || left.paper.localeCompare(right.paper);
+    })
+    .slice(0, 12);
+  const directHighPriorityRows = highPriorityImportQueueRows.filter((row) => row.status === "direct-paper-page-linked").length;
   const exactVerifiedRows = pyqRecords.filter((record) => record.textStatus === "EXACT_VERIFIED");
   const recentExactRows = exactVerifiedRows.slice(0, 6);
   const sourceReadinessRows = useMemo(
@@ -321,6 +330,67 @@ export function UpscSyllabusPyqLibrary() {
                 </p>
                 <h3 className="mt-1 text-sm font-black">{row.paper}</h3>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.nextAction}</p>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-pyq-extraction-priority-queue"
+          data-proof-rule="high-priority-official-paper-extraction-queue"
+          data-queue-row-count={highPriorityImportQueueRows.length}
+          data-direct-high-priority-rows={directHighPriorityRows}
+          data-high-priority-paper-rows={exactPyqReadiness.highPriorityPaperRows}
+          data-next-queue-rule={exactPyqReadiness.nextQueueRule}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Exact PYQ extraction queue
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Start from direct official paper pages, then work backward.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                {exactPyqReadiness.nextQueueRule} This queue is admin-facing evidence; it does not claim exact
+                question coverage until verified text rows enter the import ledger.
+              </p>
+            </div>
+            <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <AuditMetric label="Queue shown" value={highPriorityImportQueueRows.length} />
+            <AuditMetric label="Direct paper pages" value={directHighPriorityRows} />
+            <AuditMetric label="High priority total" value={exactPyqReadiness.highPriorityPaperRows} />
+          </div>
+          <div className="mt-4 grid gap-2 lg:grid-cols-2">
+            {highPriorityImportQueueRows.map((row, index) => (
+              <a
+                key={row.id}
+                href={row.sourceHref}
+                data-testid="upsc-pyq-extraction-queue-row"
+                data-queue-index={index + 1}
+                data-stage={row.stage}
+                data-year={row.year}
+                data-status={row.status}
+                data-extraction-priority={row.extractionPriority}
+                data-subject-slug={row.subjectSlug ?? ""}
+                className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+              >
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                    {String(index + 1).padStart(2, "0")} / {row.year} / {row.stage}
+                  </p>
+                  <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${statusTone(row.status === "direct-paper-page-linked" ? "source-indexed" : "text-import-pending")}`}>
+                    {row.status === "direct-paper-page-linked" ? "Direct source" : "Index source"}
+                  </span>
+                </div>
+                <h3 className="text-sm font-black leading-5 text-[#13251d]">{row.paper}</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.studentUse}</p>
+                <p className="mt-2 rounded-md bg-[#fff4df] p-2 text-[11px] font-bold leading-4 text-[#6f4a12]">
+                  Next: {row.nextAction}
+                </p>
               </a>
             ))}
           </div>
