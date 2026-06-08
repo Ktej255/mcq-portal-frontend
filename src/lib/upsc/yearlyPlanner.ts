@@ -192,15 +192,15 @@ export const productEngineFeatures: ProductEngineFeature[] = [
   },
   {
     title: "Recall-first gap analysis",
-    status: "building",
-    ownerSurface: "Talk rooms",
-    studentOutcome: "Before a lesson starts, the student explains what they know and receives one precise gap.",
+    status: "ready",
+    ownerSurface: "Watch and Talk rooms",
+    studentOutcome: "Before a lesson starts, the student saves a baseline recall note or explains to Talk; the saved gap drives repair.",
   },
   {
     title: "Revision system",
-    status: "building",
-    ownerSurface: "/revision",
-    studentOutcome: "Weak topics and spaced-revision items return automatically instead of relying on student memory.",
+    status: "ready",
+    ownerSurface: "/revision and /upsc/revision-command",
+    studentOutcome: "Weak topics, AI gaps, question-bank traps, and spaced-revision items return automatically instead of relying on student memory.",
   },
   {
     title: "Report system",

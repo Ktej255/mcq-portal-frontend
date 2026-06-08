@@ -81,15 +81,16 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const activeSession = plan.sessions.find((session) => session.day === activeDay) ?? plan.sessions[0];
   const activeDayProgress = getDayProgress(activeSession.day);
   const recallScore = activeDayProgress?.talkScore;
-  const savedRecall = activeDayProgress?.reflection?.trim() || baselineKnowledge.trim();
+  const savedRecall = activeDayProgress?.reflection?.trim() || activeDayProgress?.baselineKnowledge?.trim();
   const hasSavedRecall = Boolean(savedRecall) || typeof recallScore === "number";
   const isBeginner = learnerLevel === "beginner";
+  const needsBeginnerBaseline = isBeginner && !hasSavedRecall && watchState !== "Watched";
   const isHydratedForActiveDay = hydratedDay === activeDay;
   const hasTalkAssessment = typeof recallScore === "number";
   const isPracticeReady =
     (hasTalkAssessment && (recallScore ?? 0) >= SUBJECT_RECALL_TARGET) || activeDayProgress?.talkUnlockStage === "mcq";
   const hasRepairDiagnosis = !isBeginner && hasTalkAssessment && !isPracticeReady;
-  const canUseWatchContent = isBeginner || hasRepairDiagnosis || hasSavedRecall;
+  const canUseWatchContent = !needsBeginnerBaseline && (isBeginner || hasRepairDiagnosis || hasSavedRecall || watchState === "Watched");
   const durationMinutes = FOCUSED_TOPIC_DURATION_MINUTES;
   const weekSessions = useMemo(
     () => plan.sessions.filter((session) => session.week === activeSession.week),
@@ -110,12 +111,16 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       }
     : isBeginner
       ? {
-          badge: "Guided lesson",
-          headline: "Watch one focused topic",
-          intro: "Beginner path: finish this 10-15 minute topic, discuss it with the AI teacher, then unlock fresh MCQs.",
-          nextTitle: "Finish lesson -> AI discussion",
-          nextDetail: "Do not choose the next step manually. Complete the lesson and the app sends you to Talk.",
-          playerPrompt: "Use the lesson player below",
+          badge: needsBeginnerBaseline ? "60-sec recall" : "Guided lesson",
+          headline: needsBeginnerBaseline ? "Tell what you already know first" : "Watch one focused topic",
+          intro: needsBeginnerBaseline
+            ? "Write a short recall note before the class opens. This becomes the baseline for gap analysis, revision, and reports."
+            : "Beginner path: finish this 10-15 minute topic, discuss it with the AI teacher, then unlock fresh MCQs.",
+          nextTitle: needsBeginnerBaseline ? "Save recall to unlock lesson" : "Finish lesson -> AI discussion",
+          nextDetail: needsBeginnerBaseline
+            ? "The lesson player opens after one honest baseline note. No perfect answer is needed."
+            : "Do not choose the next step manually. Complete the lesson and the app sends you to Talk.",
+          playerPrompt: needsBeginnerBaseline ? "Save recall first" : "Use the lesson player below",
         }
       : hasSavedRecall
         ? {
@@ -365,6 +370,17 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
 
   const saveClassNote = () => {
     persistWatch({ watchNote });
+    setSavedNote(true);
+  };
+
+  const saveBaselineRecall = () => {
+    const nextBaseline = baselineKnowledge.trim();
+    if (!nextBaseline) return;
+    setBaselineKnowledge(nextBaseline);
+    persistWatch({
+      baselineKnowledge: nextBaseline,
+      baselineSavedAt: new Date().toISOString(),
+    });
     setSavedNote(true);
   };
 
@@ -650,6 +666,13 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                 >
                   {watchModeCopy.playerPrompt}
                 </div>
+              ) : needsBeginnerBaseline ? (
+                <div
+                  data-testid="watch-save-recall-first"
+                  className="mt-4 rounded-md border border-[var(--subject-border)] bg-white/65 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--subject-dark)]"
+                >
+                  Save recall below
+                </div>
               ) : !hasSavedRecall ? (
                 <Link
                   href={`${basePath}/talk?day=${activeSession.day}`}
@@ -662,6 +685,62 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             </div>
           </div>
         </section>
+
+        {needsBeginnerBaseline && (
+          <section
+            data-testid="subject-pre-lesson-recall-gate"
+            data-subject={plan.slug}
+            data-day={activeSession.day}
+            data-required="true"
+            data-status="baseline-missing"
+            data-can-open-lesson="false"
+            data-current-action="save-baseline"
+            className="order-2 rounded-lg border border-[#ef9f27]/60 bg-[#fff8ed] p-4 shadow-sm md:p-5"
+          >
+            <div className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+              <div>
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-white text-[#6f4a12]">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6f4a12]">
+                  Pre-lesson recall
+                </p>
+                <h2 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">
+                  What do you already know about Day {activeSession.day}?
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                  One honest baseline is enough. The lesson opens after this note is saved.
+                </p>
+              </div>
+              <div className="rounded-lg border border-[#e8d2a8] bg-white p-3">
+                <textarea
+                  data-testid="subject-baseline-draft"
+                  value={baselineKnowledge}
+                  onChange={(event) => setBaselineKnowledge(event.target.value)}
+                  placeholder={`Write what you already know about ${activeSession.title}.`}
+                  className="min-h-28 w-full resize-y rounded-md border border-[#dcd5c7] bg-[#fffdf8] p-3 text-sm font-semibold leading-6 text-[#13251d] outline-none transition focus:border-[#1d9e75]"
+                />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <span
+                    data-testid="subject-baseline-draft-count"
+                    className="text-xs font-black uppercase tracking-[0.14em] text-[#6f4a12]"
+                  >
+                    {baselineKnowledge.trim().length} chars
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="subject-save-baseline"
+                    onClick={saveBaselineRecall}
+                    disabled={!baselineKnowledge.trim()}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Save className="h-4 w-4" /> Save recall
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <details data-testid="subject-baseline-check" className="group order-3 rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] shadow-sm">
           <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

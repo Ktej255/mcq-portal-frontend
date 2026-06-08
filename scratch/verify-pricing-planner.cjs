@@ -270,14 +270,27 @@ async function run() {
     pricingCards: document.querySelectorAll('[data-testid="upsc-pricing-ladder"] article').length,
     timelineRows: document.querySelectorAll('[data-testid="upsc-yearly-timeline"] a').length,
     gsCoverageCards: document.querySelectorAll('[data-testid="upsc-gs-coverage"] article').length,
+    productFeatures: [...document.querySelectorAll('[data-testid="upsc-product-engine-feature"]')].map((feature) => ({
+      title: feature.getAttribute("data-feature-title"),
+      status: feature.getAttribute("data-feature-status"),
+      ownerSurface: feature.getAttribute("data-owner-surface"),
+      text: feature.textContent || "",
+    })),
     optionalText: document.querySelector('[data-testid="upsc-optional-summary"]')?.textContent || "",
     sourceLibraryText: document.querySelector('[data-testid="upsc-source-library-link"]')?.textContent || "",
   }));
   checks.push({ label: "yearly-planner-state", plannerState });
+  const featureStatus = Object.fromEntries(plannerState.productFeatures.map((feature) => [feature.title, feature]));
   if (
     plannerState.pricingCards !== 4 ||
     plannerState.timelineRows !== 9 ||
     plannerState.gsCoverageCards !== 8 ||
+    plannerState.productFeatures.length !== 9 ||
+    featureStatus["Recall-first gap analysis"]?.status !== "ready" ||
+    featureStatus["Revision system"]?.status !== "ready" ||
+    featureStatus["AI discussion and doubt solving"]?.status !== "building" ||
+    !featureStatus["Recall-first gap analysis"]?.ownerSurface?.includes("Watch") ||
+    !featureStatus["Revision system"]?.ownerSurface?.includes("/revision") ||
     !plannerState.optionalText.includes("All optional pages are seeded") ||
     !plannerState.sourceLibraryText.includes("Syllabus and PYQ preload ledger")
   ) {

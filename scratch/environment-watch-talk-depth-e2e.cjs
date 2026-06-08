@@ -4,6 +4,7 @@ const { chromium } = require("@playwright/test");
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const progressKey = "sarit-upsc-environment-progress-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "environment-watch-talk-depth-e2e-evidence.json");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
 
@@ -42,17 +43,72 @@ async function run() {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(
+    ({ profileStorageKey }) => {
+      window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_MASTER_environment_watch_recall_gate");
+      window.localStorage.setItem(
+        profileStorageKey,
+        JSON.stringify({
+          level: "beginner",
+          preparationStage: "not-started",
+          studyWindow: "90",
+          learningStyle: "mixed",
+          weakSignal: "retention",
+          studyTime: "morning",
+          attemptHistory: "no-attempt",
+          learningPattern: "deep-work",
+          mindState: "calm",
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    },
+    { profileStorageKey: profileKey }
+  );
 
   await page.goto(`${baseUrl}/upsc/environment/watch?day=5`, { waitUntil: "networkidle" });
   await page.evaluate((key) => window.localStorage.removeItem(key), progressKey);
   await page.reload({ waitUntil: "networkidle" });
 
-  await page.getByTestId("environment-watch-teacher-pack").waitFor({ timeout: 15000 });
-  await page.getByText("Map-linked biodiversity", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Kaziranga floodplain", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Cause chain", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("subject-pre-lesson-recall-gate").waitFor({ timeout: 15000 });
+  const initialGate = await page.getByTestId("subject-pre-lesson-recall-gate").evaluate((node) => ({
+    subject: node.getAttribute("data-subject"),
+    day: node.getAttribute("data-day"),
+    required: node.getAttribute("data-required"),
+    status: node.getAttribute("data-status"),
+    canOpenLesson: node.getAttribute("data-can-open-lesson"),
+    currentAction: node.getAttribute("data-current-action"),
+    playerPresent: Boolean(document.querySelector('[data-testid="subject-watch-topic-player"]')),
+  }));
+  if (
+    initialGate.subject !== "environment" ||
+    initialGate.day !== "5" ||
+    initialGate.required !== "true" ||
+    initialGate.status !== "baseline-missing" ||
+    initialGate.canOpenLesson !== "false" ||
+    initialGate.currentAction !== "save-baseline" ||
+    initialGate.playerPresent
+  ) {
+    throw new Error(`Pre-lesson recall gate should block the class before baseline: ${JSON.stringify(initialGate)}`);
+  }
+  await page
+    .getByTestId("subject-baseline-draft")
+    .fill("Protected areas connect biodiversity, habitat, legal categories, maps, species threats and conservation governance.");
+  await page.getByTestId("subject-save-baseline").click();
+  await page.getByTestId("subject-watch-topic-player").waitFor({ timeout: 15000 });
+
+  await page.getByTestId("environment-watch-teacher-pack").waitFor({ state: "attached", timeout: 15000 });
+  const teacherPackText = await page.getByTestId("environment-watch-teacher-pack").evaluate((node) => node.textContent || "");
+  if (
+    !teacherPackText.includes("Map-linked biodiversity") ||
+    !teacherPackText.includes("Kaziranga floodplain") ||
+    !teacherPackText.includes("Cause chain")
+  ) {
+    throw new Error(`Environment watch teacher pack is incomplete: ${teacherPackText}`);
+  }
   await assertNoOverflow(page, "environment-watch-depth-desktop", checks);
 
+  await page.locator('[data-testid="subject-watch-scene-engine"] > summary').click();
+  await page.getByTestId("subject-watch-scene-complete").waitFor({ timeout: 15000 });
   for (let index = 0; index < 5; index += 1) {
     await page.getByTestId("subject-watch-scene-complete").click();
   }
@@ -60,6 +116,8 @@ async function run() {
   const watchedProgress = await getDayProgress(page, 5);
   if (
     !watchedProgress?.watched ||
+    !watchedProgress?.baselineKnowledge ||
+    !watchedProgress?.baselineSavedAt ||
     watchedProgress.watchSceneCompletedIds?.length !== 5 ||
     !watchedProgress.watchSceneCompletedIds.includes("5-environment-handoff")
   ) {
@@ -67,17 +125,26 @@ async function run() {
   }
 
   await page.goto(`${baseUrl}/upsc/environment/talk?day=5`, { waitUntil: "networkidle" });
-  await page.getByTestId("environment-talk-teacher-pack").waitFor({ timeout: 15000 });
-  await page.getByText("Environment oral rubric", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Peer challenge bank", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("environment-talk-teacher-pack").waitFor({ state: "attached", timeout: 15000 });
+  const talkTeacherPackText = await page.getByTestId("environment-talk-teacher-pack").evaluate((node) => node.textContent || "");
+  if (!talkTeacherPackText.includes("Environment oral rubric") || !talkTeacherPackText.includes("Map-linked biodiversity")) {
+    throw new Error(`Environment talk teacher pack is incomplete: ${talkTeacherPackText}`);
+  }
 
-  await page.getByPlaceholder("Write the explanation in your own words. Start with concept, then mechanism, then example.").fill(
+  await page.getByTestId("talk-answer-draft").fill(
     "Protected Areas must be explained through location, habitat, species, legal category, threat and institution. Compare national parks, wildlife sanctuaries, biosphere reserves and conservation reserves because protected-area rules are not identical. In a Kaziranga floodplain example, floods renew grassland habitat but also create corridor and human-wildlife conflict questions. A Great Indian Bustard grassland case proves biodiversity is not forest-only protection. The mechanism is habitat fragmentation causing species pressure, then conservation response through corridors, IUCN status, protected area rules, sanctuary or biosphere categories and monitoring. The UPSC trap is assuming all protected areas have identical restrictions or that hotspot means only high species richness without endemism and threat."
   );
-  await page.getByRole("button", { name: /Assess explanation/i }).click();
-  await page.getByTestId("subject-maic-discussion-turns").waitFor({ timeout: 15000 });
-  await page.getByText("Use the Environment chain", { exact: false }).first().waitFor({ timeout: 15000 });
-  await page.getByText("Challenge through Map-linked biodiversity", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-assess-answer").click();
+  await page.getByTestId("subject-maic-discussion-turns").waitFor({ state: "attached", timeout: 15000 });
+  const maicDiscussionText = await page.getByTestId("subject-maic-discussion-turns").evaluate((node) => node.textContent || "");
+  if (
+    !maicDiscussionText.includes("AI Teacher") ||
+    !maicDiscussionText.includes("Peer Challenger") ||
+    !maicDiscussionText.includes("UPSC Examiner") ||
+    !maicDiscussionText.includes("Score gate")
+  ) {
+    throw new Error(`MAIC discussion depth is incomplete: ${maicDiscussionText}`);
+  }
   await page.getByTestId("talk-route-gate").waitFor({ timeout: 15000 });
 
   const talkProgress = await getDayProgress(page, 5);
@@ -93,7 +160,7 @@ async function run() {
   await assertNoOverflow(page, "environment-talk-depth-desktop", checks);
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto(`${baseUrl}/upsc/environment/talk?day=5`, { waitUntil: "networkidle" });
-  await page.getByTestId("environment-talk-teacher-pack").waitFor({ timeout: 15000 });
+  await page.getByTestId("environment-talk-teacher-pack").waitFor({ state: "attached", timeout: 15000 });
   await assertNoOverflow(page, "environment-talk-depth-mobile", checks);
 
   const blockingConsoleErrors = consoleErrors.filter(
@@ -103,6 +170,10 @@ async function run() {
     allowedConsoleErrorFragments,
     baseUrl,
     checks,
+    initialGate,
+    teacherPackText,
+    talkTeacherPackText,
+    maicDiscussionText,
     watchedProgress,
     talkScore: talkProgress?.talkScore,
     routeHref,

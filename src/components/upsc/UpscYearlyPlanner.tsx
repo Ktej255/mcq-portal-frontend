@@ -172,7 +172,14 @@ export function UpscYearlyPlanner() {
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {productEngineFeatures.map((feature) => (
-              <article key={feature.title} className={`rounded-lg border p-4 ${statusTone(feature.status)}`}>
+              <article
+                key={feature.title}
+                data-testid="upsc-product-engine-feature"
+                data-feature-title={feature.title}
+                data-feature-status={feature.status}
+                data-owner-surface={feature.ownerSurface}
+                className={`rounded-lg border p-4 ${statusTone(feature.status)}`}
+              >
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <CheckCircle2 className="h-4 w-4" />
                   <span className="text-[10px] font-black uppercase tracking-[0.14em]">{feature.status}</span>
