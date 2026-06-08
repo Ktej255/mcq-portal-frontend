@@ -1,5 +1,5 @@
-import { DailyWorkspace } from "@/components/dashboard/DailyWorkspace";
+import { UpscDailyMissionControl } from "@/components/upsc/UpscDailyMissionControl";
 
 export default function UpscPortalPage() {
-  return <DailyWorkspace />;
+  return <UpscDailyMissionControl />;
 }

@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
         const params = new URLSearchParams(window.location.search);
         const redirectPath = params.get("redirect") || "/dashboard";
-        devLogin("validator@upsc.local", "local-dev-validator", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
+        devLogin("student@upsc.local", "local-dev-student", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
         return;
       }
     }
@@ -118,8 +118,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = savedToken;
         
         // Derive user identity from token if possible
-        let email = "validator@upsc.local";
-        let uid = "dev-validator-id";
+        let email = "student@upsc.local";
+        let uid = "dev-student-id";
         
         if (savedToken.includes("_sim_")) {
           const persona = savedToken.split("_sim_")[1];
