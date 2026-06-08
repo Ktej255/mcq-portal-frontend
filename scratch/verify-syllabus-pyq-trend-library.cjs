@@ -63,6 +63,7 @@ async function run() {
   const libraryState = await page.evaluate(() => {
     const preloadProof = document.querySelector('[data-testid="upsc-syllabus-pyq-preload-proof"]');
     const paperIndexProof = document.querySelector('[data-testid="upsc-official-paper-index-proof"]');
+    const exactPyqGate = document.querySelector('[data-testid="upsc-exact-pyq-readiness-gate"]');
     const packs = [...document.querySelectorAll('[data-testid="upsc-subject-source-pack"]')];
     const geographyPack = document.querySelector('[data-testid="upsc-subject-source-pack"][data-subject-slug="geography"]');
     const trendInsights = [...document.querySelectorAll('[data-testid="upsc-pyq-trend-insight"]')];
@@ -71,6 +72,7 @@ async function run() {
     const paperIndexRows = [...document.querySelectorAll('[data-testid="upsc-official-paper-index-row"]')];
     const loopSummary = document.querySelector('[data-testid="upsc-daily-loop-contract-summary"]');
     const loopContracts = [...document.querySelectorAll('[data-testid="upsc-subject-loop-contract"]')];
+    const exactPyqStages = [...document.querySelectorAll('[data-testid="upsc-exact-pyq-pipeline-stage"]')];
 
     return {
       subjectPackCount: packs.length,
@@ -107,6 +109,26 @@ async function run() {
         exactQuestionTextRows: paperIndexProof?.getAttribute("data-exact-question-text-rows"),
         text: paperIndexProof?.textContent || "",
       },
+      exactPyqGate: {
+        proofRule: exactPyqGate?.getAttribute("data-proof-rule"),
+        localRecordMode: exactPyqGate?.getAttribute("data-local-record-mode"),
+        officialPaperIndexRows: exactPyqGate?.getAttribute("data-official-paper-index-rows"),
+        directLinkedOfficialPapers: exactPyqGate?.getAttribute("data-direct-linked-official-papers"),
+        indexLinkedOfficialPapers: exactPyqGate?.getAttribute("data-index-linked-official-papers"),
+        highPriorityPaperRows: exactPyqGate?.getAttribute("data-high-priority-paper-rows"),
+        exactQuestionTextRows: exactPyqGate?.getAttribute("data-exact-question-text-rows"),
+        mappedExactQuestionRows: exactPyqGate?.getAttribute("data-mapped-exact-question-rows"),
+        needsReviewRows: exactPyqGate?.getAttribute("data-needs-review-rows"),
+        strictCoveragePercent: exactPyqGate?.getAttribute("data-strict-coverage-percent"),
+        studentReady: exactPyqGate?.getAttribute("data-student-ready"),
+        text: exactPyqGate?.textContent || "",
+      },
+      exactPyqStages: exactPyqStages.map((stage) => ({
+        id: stage.getAttribute("data-stage-id"),
+        status: stage.getAttribute("data-stage-status"),
+        rowCount: stage.getAttribute("data-row-count"),
+        text: stage.textContent || "",
+      })),
       paperIndexPreviewCount: paperIndexRows.length,
       paperIndexPreviewRows: paperIndexRows.map((row) => ({
         stage: row.getAttribute("data-stage"),
@@ -177,6 +199,19 @@ async function run() {
     indexPagePaperRows: "929",
     exactQuestionTextRows: "0",
   };
+  const expectedExactPyqGate = {
+    proofRule: "admin-exact-pyq-import-before-student-drills",
+    localRecordMode: "static-source-library-baseline",
+    officialPaperIndexRows: "1133",
+    directLinkedOfficialPapers: "204",
+    indexLinkedOfficialPapers: "929",
+    highPriorityPaperRows: "55",
+    exactQuestionTextRows: "0",
+    mappedExactQuestionRows: "0",
+    needsReviewRows: "0",
+    strictCoveragePercent: "0",
+    studentReady: "false",
+  };
 
   if (libraryState.subjectPackCount !== 8) {
     throw new Error(`Expected 8 GS source packs, got ${libraryState.subjectPackCount}`);
@@ -209,6 +244,11 @@ async function run() {
       throw new Error(`Paper index proof ${key} mismatch: ${JSON.stringify({ expected, actual: libraryState.paperIndexProof[key], paperIndexProof: libraryState.paperIndexProof })}`);
     }
   }
+  for (const [key, expected] of Object.entries(expectedExactPyqGate)) {
+    if (libraryState.exactPyqGate[key] !== expected) {
+      throw new Error(`Exact PYQ gate ${key} mismatch: ${JSON.stringify({ expected, actual: libraryState.exactPyqGate[key], exactPyqGate: libraryState.exactPyqGate })}`);
+    }
+  }
   if (
     !libraryState.preloadProof.text.includes("GS and optional source rows are counted from one registry") ||
     !libraryState.preloadProof.text.includes("PDF text extraction and topic mapping")
@@ -222,6 +262,30 @@ async function run() {
     libraryState.paperIndexPreviewRows.some((row) => row.status !== "direct-paper-page-linked")
   ) {
     throw new Error(`Paper index proof missing visible contract: ${JSON.stringify(libraryState.paperIndexProof)}`);
+  }
+  const expectedExactStageRows = {
+    "source-indexed": { status: "complete", rowCount: "1133" },
+    "text-extraction": { status: "pending", rowCount: "0" },
+    "review-verification": { status: "pending", rowCount: "0" },
+    "topic-tagging": { status: "pending", rowCount: "0" },
+    "planner-bank-connection": { status: "pending", rowCount: "0" },
+  };
+  if (libraryState.exactPyqStages.length !== 5) {
+    throw new Error(`Expected 5 exact PYQ pipeline stages: ${JSON.stringify(libraryState.exactPyqStages)}`);
+  }
+  for (const [id, expected] of Object.entries(expectedExactStageRows)) {
+    const stage = libraryState.exactPyqStages.find((item) => item.id === id);
+    if (!stage || stage.status !== expected.status || stage.rowCount !== expected.rowCount) {
+      throw new Error(`Exact PYQ stage failed for ${id}: ${JSON.stringify({ expected, stage, exactPyqStages: libraryState.exactPyqStages })}`);
+    }
+  }
+  if (
+    !libraryState.exactPyqGate.text.includes("Official index is ready; exact question drills stay gated") ||
+    !libraryState.exactPyqGate.text.includes("Not student-ready") ||
+    !libraryState.exactPyqGate.text.includes("Open exact import room") ||
+    !libraryState.exactPyqGate.text.includes("Exact PYQ claims stay off until text rows are imported and reviewed")
+  ) {
+    throw new Error(`Exact PYQ gate missing visible honesty language: ${libraryState.exactPyqGate.text}`);
   }
   if (
     libraryState.subjectPackRows.some(
@@ -290,7 +354,10 @@ async function run() {
     "Fresh MCQ command",
     "Revisit and report",
     "Official paper index",
+    "Exact PYQ student gate",
+    "exact question drills stay gated",
     "Exact text rows",
+    "Strict coverage",
     "Use trend signals to choose watch areas",
     "full PDF text extraction and exact topic tagging continue next",
   ]) {

@@ -22,6 +22,7 @@ import {
   type ImportStatus,
   type SourceReadinessStatus,
 } from "@/lib/upsc/syllabusPyqRegistry";
+import { buildExactPyqImportReadiness } from "@/lib/upsc/pyqImportLedger";
 
 function statusLabel(status: ImportStatus) {
   if (status === "source-indexed") return "Source indexed";
@@ -49,9 +50,16 @@ function readinessStatusTone(status: SourceReadinessStatus) {
   return "border-[#ffb6b6] bg-[#fff0f0] text-[#8a1111]";
 }
 
+function exactStageTone(status: string) {
+  if (status === "complete") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
+  if (status === "active") return "border-[#8ab6ff] bg-[#eef5ff] text-[#12366c]";
+  return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
+}
+
 export function UpscSyllabusPyqLibrary() {
   const [firstSubject] = subjectSourcePacks;
   const [firstOptional] = optionalSourcePacks;
+  const exactPyqReadiness = buildExactPyqImportReadiness([]);
   const directPaperPreviewRows = officialPaperIndexRows
     .filter((row) => row.status === "direct-paper-page-linked")
     .slice(0, 6);
@@ -272,6 +280,72 @@ export function UpscSyllabusPyqLibrary() {
                 <h3 className="mt-1 text-sm font-black">{row.paper}</h3>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.nextAction}</p>
               </a>
+            ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-exact-pyq-readiness-gate"
+          data-proof-rule={exactPyqReadiness.proofRule}
+          data-local-record-mode="static-source-library-baseline"
+          data-official-paper-index-rows={exactPyqReadiness.officialPaperIndexRows}
+          data-direct-linked-official-papers={exactPyqReadiness.directLinkedOfficialPapers}
+          data-index-linked-official-papers={exactPyqReadiness.indexLinkedOfficialPapers}
+          data-high-priority-paper-rows={exactPyqReadiness.highPriorityPaperRows}
+          data-exact-question-text-rows={exactPyqReadiness.exactQuestionTextRows}
+          data-mapped-exact-question-rows={exactPyqReadiness.mappedExactQuestionRows}
+          data-needs-review-rows={exactPyqReadiness.needsReviewRows}
+          data-strict-coverage-percent={exactPyqReadiness.strictCoveragePercent}
+          data-student-ready={String(exactPyqReadiness.studentReady)}
+          className="rounded-lg border border-[#ef9f27] bg-[#fff4df] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6f4a12]">
+                Exact PYQ student gate
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                Official index is ready; exact question drills stay gated.
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d3a05]">
+                {exactPyqReadiness.studentReadyLabel} {exactPyqReadiness.nextQueueRule}
+              </p>
+              <Link
+                href="/admin/pyq-import"
+                className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                Open exact import room <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <AuditMetric label="Official queue" value={exactPyqReadiness.officialPaperIndexRows} />
+              <AuditMetric label="Direct links" value={exactPyqReadiness.directLinkedOfficialPapers} />
+              <AuditMetric label="High priority" value={exactPyqReadiness.highPriorityPaperRows} />
+              <AuditMetric label="Exact imported" value={exactPyqReadiness.exactQuestionTextRows} />
+              <AuditMetric label="Mapped exact" value={exactPyqReadiness.mappedExactQuestionRows} />
+              <AuditMetric label="Strict coverage" value={`${exactPyqReadiness.strictCoveragePercent}%`} />
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-5">
+            {exactPyqReadiness.stages.map((stage) => (
+              <article
+                key={stage.id}
+                data-testid="upsc-exact-pyq-pipeline-stage"
+                data-stage-id={stage.id}
+                data-stage-status={stage.status}
+                data-row-count={stage.rowCount}
+                className={`rounded-lg border p-4 ${exactStageTone(stage.status)}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-md border border-current/20 bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]">
+                    {stage.status}
+                  </span>
+                  <span className="font-mono text-sm font-black">{stage.rowCount}</span>
+                </div>
+                <h3 className="mt-3 text-sm font-black tracking-tight">{stage.title}</h3>
+                <p className="mt-2 text-xs font-semibold leading-5">{stage.proof}</p>
+                <p className="mt-2 text-xs font-bold leading-5 opacity-80">{stage.studentImpact}</p>
+              </article>
             ))}
           </div>
         </section>
