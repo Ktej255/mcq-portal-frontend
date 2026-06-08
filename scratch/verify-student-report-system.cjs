@@ -85,9 +85,24 @@ async function seedProfileAndProgress(page) {
             topic: "Indian monsoon and map reasoning",
             difficulty: "PYQ_STYLE",
             source: "EXACT_PYQ_IMPORT",
+            sourceHref: "https://upsc.gov.in/sites/default/files/qp-csp-2025-gs-paper-i.pdf",
+            officialSourceTitle: "Civil Services Preliminary Examination 2025 General Studies Paper I",
             selectedOption: "B",
             correctOption: "A",
             isCorrect: false,
+            solvedAt: new Date().toISOString(),
+          },
+          "poison-exact-pyq-local-row": {
+            questionId: "poison-exact-pyq-local-row",
+            subjectSlug: "geography",
+            linkedDay: 1,
+            topic: "Fake exact PYQ row that must not affect reports",
+            difficulty: "PYQ_STYLE",
+            source: "EXACT_PYQ_IMPORT",
+            sourceHref: "https://example.com/fake-upsc-paper.pdf",
+            selectedOption: "A",
+            correctOption: "A",
+            isCorrect: true,
             solvedAt: new Date().toISOString(),
           },
         })
@@ -408,6 +423,14 @@ async function run() {
   const geographyCardText = await page
     .locator('[data-testid="upsc-subject-report-card"][data-subject-slug="geography"]')
     .innerText();
+  const sanitizedAttemptLedger = await page.evaluate((attemptStorageKey) => {
+    const parsed = JSON.parse(window.localStorage.getItem(attemptStorageKey) || "{}");
+    return {
+      ids: Object.keys(parsed).sort(),
+      exactRows: Object.values(parsed).filter((attempt) => attempt?.source === "EXACT_PYQ_IMPORT").length,
+      hasPoisonRow: Boolean(parsed["poison-exact-pyq-local-row"]),
+    };
+  }, questionBankAttemptKey);
 
   checks.push({
     label: "report-system-content",
@@ -437,6 +460,7 @@ async function run() {
     monthlyText,
     growthProof,
     growthText,
+    sanitizedAttemptLedger,
   });
 
   if (href !== "/upsc/geography/revisit?day=1") {
@@ -478,6 +502,9 @@ async function run() {
     readNumber(studentSummaryProof.totalDays, "studentSummaryProof.totalDays") <= 200 ||
     readNumber(studentSummaryProof.growthPercent, "studentSummaryProof.growthPercent") < 1 ||
     studentSummaryCards.length !== 4 ||
+    sanitizedAttemptLedger.hasPoisonRow ||
+    sanitizedAttemptLedger.exactRows !== 1 ||
+    sanitizedAttemptLedger.ids.length !== 2 ||
     studentSummaryCards.map((card) => card.cardId).join("|") !== "gap-now|revise-next|growth|report-action" ||
     !/Four signals decide the next study move/i.test(studentSummaryProof.text) ||
     !/1 AI gap active/i.test(studentSummaryProof.text) ||

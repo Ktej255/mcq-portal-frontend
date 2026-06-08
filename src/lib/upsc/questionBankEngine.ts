@@ -1,5 +1,9 @@
 import { geographySessions } from "@/lib/upsc/plan";
-import type { PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
+import {
+  isOfficialUpscSourceHref,
+  readLocalPyqImportRecords,
+  type PyqImportRecord,
+} from "@/lib/upsc/pyqImportLedger";
 import type { StudentLevel, StudentProfile } from "@/lib/upsc/studentProfile";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
@@ -57,6 +61,8 @@ export type QuestionBankAttempt = {
   topic: string;
   difficulty: QuestionDifficulty;
   source: QuestionSource;
+  sourceHref?: string;
+  officialSourceTitle?: string;
   selectedOption: QuestionOption;
   correctOption: QuestionOption;
   isCorrect: boolean;
@@ -141,6 +147,14 @@ export type QuestionBankProgressInput = Record<string, QuestionBankProgress | un
 export type QuestionBankAttemptInput = QuestionBankAttempt[];
 
 export const questionDifficulties: QuestionDifficulty[] = ["EASY", "MEDIUM", "HARD", "PYQ_STYLE"];
+export const questionSources: QuestionSource[] = [
+  "NCERT_BASE",
+  "REFERENCE_ADVANCED",
+  "PYQ_PATTERN",
+  "CURRENT_AFFAIRS_BRIDGE",
+  "EXACT_PYQ_IMPORT",
+];
+export const questionOptions: QuestionOption[] = ["A", "B", "C", "D"];
 export const questionBankAttemptStorageKey = "sarit-upsc-question-bank-attempts-v1";
 
 export const emptyQuestionBankMix: QuestionBankCustomMix = {
@@ -796,10 +810,126 @@ function readStoredQuestionBankAttempts() {
     const raw = window.localStorage.getItem(questionBankAttemptStorageKey);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, QuestionBankAttempt>) : {};
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const officialPyqRecords = readLocalPyqImportRecords();
+    const safeAttempts = Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .map(([key, value]) => [key, parseQuestionBankAttempt(value, officialPyqRecords)] as const)
+        .filter((entry): entry is readonly [string, QuestionBankAttempt] => Boolean(entry[1]))
+    );
+
+    if (Object.keys(safeAttempts).length !== Object.keys(parsed as Record<string, unknown>).length) {
+      window.localStorage.setItem(questionBankAttemptStorageKey, JSON.stringify(safeAttempts));
+    }
+
+    return safeAttempts;
   } catch {
     return {};
   }
+}
+
+function requiredAttemptText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isQuestionDifficulty(value: unknown): value is QuestionDifficulty {
+  return questionDifficulties.includes(value as QuestionDifficulty);
+}
+
+function isQuestionSource(value: unknown): value is QuestionSource {
+  return questionSources.includes(value as QuestionSource);
+}
+
+function isQuestionOption(value: unknown): value is QuestionOption {
+  return questionOptions.includes(value as QuestionOption);
+}
+
+function questionSubjectHasDay(subjectSlug: string, linkedDay: number) {
+  return Boolean(
+    questionBankSubjects
+      .find((subject) => subject.slug === subjectSlug)
+      ?.sessions.some((session) => session.day === linkedDay)
+  );
+}
+
+function exactPyqAttemptHasOfficialSource(
+  attempt: Pick<QuestionBankAttempt, "questionId" | "source" | "sourceHref" | "subjectSlug">,
+  officialPyqRecords: PyqImportRecord[] = []
+) {
+  if (attempt.source !== "EXACT_PYQ_IMPORT") return true;
+  if (attempt.sourceHref && isOfficialUpscSourceHref(attempt.sourceHref)) return true;
+
+  return officialPyqRecords.some(
+    (record) =>
+      attempt.questionId === `exact-pyq-${record.id}` &&
+      record.subjectSlug === attempt.subjectSlug &&
+      record.importStatus === "MAPPED" &&
+      record.textStatus === "EXACT_VERIFIED"
+  );
+}
+
+export function parseQuestionBankAttempt(
+  input: unknown,
+  officialPyqRecords: PyqImportRecord[] = []
+): QuestionBankAttempt | null {
+  if (!input || typeof input !== "object") return null;
+  const record = input as Record<string, unknown>;
+  const subjectSlug = requiredAttemptText(record.subjectSlug).toLowerCase();
+  const linkedDay = Number(record.linkedDay);
+  const difficulty = record.difficulty;
+  const source = record.source;
+  const selectedOption = record.selectedOption;
+  const correctOption = record.correctOption;
+  const solvedAt = requiredAttemptText(record.solvedAt);
+  const sourceHref = requiredAttemptText(record.sourceHref);
+  const officialSourceTitle = requiredAttemptText(record.officialSourceTitle);
+
+  if (
+    !requiredAttemptText(record.questionId) ||
+    !subjectSlug ||
+    !requiredAttemptText(record.topic) ||
+    !Number.isInteger(linkedDay) ||
+    !questionSubjectHasDay(subjectSlug, linkedDay) ||
+    !isQuestionDifficulty(difficulty) ||
+    !isQuestionSource(source) ||
+    !isQuestionOption(selectedOption) ||
+    !isQuestionOption(correctOption) ||
+    !solvedAt ||
+    Number.isNaN(Date.parse(solvedAt))
+  ) {
+    return null;
+  }
+
+  const parsed: QuestionBankAttempt = {
+    questionId: requiredAttemptText(record.questionId),
+    subjectSlug,
+    linkedDay,
+    topic: requiredAttemptText(record.topic),
+    difficulty,
+    source,
+    ...(sourceHref ? { sourceHref } : {}),
+    ...(officialSourceTitle ? { officialSourceTitle } : {}),
+    selectedOption,
+    correctOption,
+    isCorrect: selectedOption === correctOption,
+    solvedAt,
+  };
+
+  if (!exactPyqAttemptHasOfficialSource(parsed, officialPyqRecords)) return null;
+
+  return parsed;
+}
+
+export function sanitizeQuestionBankAttempts(
+  attempts: unknown,
+  officialPyqRecords: PyqImportRecord[] = typeof window === "undefined" ? [] : readLocalPyqImportRecords()
+): QuestionBankAttempt[] {
+  if (!Array.isArray(attempts)) return [];
+
+  return attempts
+    .map((attempt) => parseQuestionBankAttempt(attempt, officialPyqRecords))
+    .filter((attempt): attempt is QuestionBankAttempt => Boolean(attempt));
 }
 
 export function readLocalQuestionBankAttempts(subjectSlug?: string): QuestionBankAttempt[] {
@@ -822,6 +952,8 @@ export function buildQuestionBankAttempt(
     topic: question.topic,
     difficulty: question.difficulty,
     source: question.source,
+    ...(question.sourceHref ? { sourceHref: question.sourceHref } : {}),
+    ...(question.officialSourceTitle ? { officialSourceTitle: question.officialSourceTitle } : {}),
     selectedOption,
     correctOption: question.correctOption,
     isCorrect: selectedOption === question.correctOption,

@@ -1,6 +1,9 @@
 import { getCurrentAffairsForSubject } from "@/lib/upsc/currentAffairsBridge";
 import { geographySessions } from "@/lib/upsc/plan";
-import type { QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
+import {
+  sanitizeQuestionBankAttempts,
+  type QuestionBankAttempt,
+} from "@/lib/upsc/questionBankEngine";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
@@ -15,7 +18,7 @@ export type StudentReportQuestionBankAttempt = Pick<
   QuestionBankAttempt,
   "subjectSlug" | "linkedDay" | "difficulty" | "isCorrect" | "solvedAt"
 > &
-  Partial<Pick<QuestionBankAttempt, "source">>;
+  Partial<Pick<QuestionBankAttempt, "source" | "sourceHref" | "officialSourceTitle">>;
 export type StudentReportQuestionBankAttemptMap = Record<string, StudentReportQuestionBankAttempt[] | undefined>;
 
 export type StudentReportSubject = {
@@ -163,6 +166,10 @@ function attemptsForDay(attempts: StudentReportQuestionBankAttempt[] = [], day: 
   return attempts.filter((attempt) => attempt.linkedDay === day);
 }
 
+function sanitizeReportAttempts(attempts: StudentReportQuestionBankAttempt[] = []) {
+  return sanitizeQuestionBankAttempts(attempts) as StudentReportQuestionBankAttempt[];
+}
+
 function questionBankAccuracy(correct: number, total: number) {
   return total ? Math.round((correct / total) * 100) : null;
 }
@@ -279,8 +286,9 @@ function currentAffairsUnlocked(
   progress: StudentReportProgressMap,
   questionBankAttempts: StudentReportQuestionBankAttempt[] = []
 ) {
+  const safeQuestionBankAttempts = sanitizeReportAttempts(questionBankAttempts);
   return getCurrentAffairsForSubject(subject.slug).filter((item) =>
-    hasStarted(progress[String(item.linkedDay)], attemptsForDay(questionBankAttempts, item.linkedDay))
+    hasStarted(progress[String(item.linkedDay)], attemptsForDay(safeQuestionBankAttempts, item.linkedDay))
   ).length;
 }
 
@@ -300,12 +308,15 @@ function buildReportWindow(
   }>
 ): StudentReportWindow {
   const dayRows = subjectSessions.flatMap(({ subject, sessions, progress, questionBankAttempts = [] }) =>
-    sessions.map((session) => ({
-      subject,
-      session,
-      progress: progress[String(session.day)],
-      questionBankAttempts: attemptsForDay(questionBankAttempts, session.day),
-    }))
+    {
+      const safeQuestionBankAttempts = sanitizeReportAttempts(questionBankAttempts);
+      return sessions.map((session) => ({
+        subject,
+        session,
+        progress: progress[String(session.day)],
+        questionBankAttempts: attemptsForDay(safeQuestionBankAttempts, session.day),
+      }));
+    }
   );
   const startedDays = dayRows.filter((row) => hasStarted(row.progress, row.questionBankAttempts)).length;
   const watchedDays = dayRows.filter((row) => row.progress?.watched).length;
@@ -464,10 +475,11 @@ export function buildStudentSubjectReport(
   progress: StudentReportProgressMap,
   questionBankAttempts: StudentReportQuestionBankAttempt[] = []
 ): StudentSubjectReport {
+  const safeQuestionBankAttempts = sanitizeReportAttempts(questionBankAttempts);
   const rows = subject.sessions.map((session) => ({
     session,
     progress: progress[String(session.day)],
-    questionBankAttempts: attemptsForDay(questionBankAttempts, session.day),
+    questionBankAttempts: attemptsForDay(safeQuestionBankAttempts, session.day),
   }));
   const states = rows.map((row) => row.progress);
   const startedDays = rows.filter((row) => hasStarted(row.progress, row.questionBankAttempts)).length;
@@ -546,7 +558,7 @@ export function buildStudentSubjectReport(
     meTimeChecks,
     ...teacherDoubtSignal,
     ...meTimeSignal,
-    currentAffairsUnlocked: currentAffairsUnlocked(subject, progress, questionBankAttempts),
+    currentAffairsUnlocked: currentAffairsUnlocked(subject, progress, safeQuestionBankAttempts),
     weeklyWindowsGenerated: weeklyWindowCount(subject),
     monthlyVerdict,
     nextAction,
