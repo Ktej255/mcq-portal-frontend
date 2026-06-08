@@ -29,7 +29,11 @@ import {
 } from "@/lib/upsc/dailyPlannerEngine";
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
 import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
-import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
+import {
+  buildRecommendedQuestionBankMix,
+  readLocalQuestionBankAttempts,
+  selectQuestionBankSet,
+} from "@/lib/upsc/questionBankEngine";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
@@ -215,6 +219,12 @@ function checklistTone(status: "done" | "pending" | "repair") {
   return "border-[#dcd5c7] bg-white text-[#5d675f]";
 }
 
+function operatingContractTone(status: "ready" | "pending" | "repair") {
+  if (status === "ready") return "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]";
+  if (status === "repair") return "border-[#ef9f27]/60 bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]";
+}
+
 function proofTone(status: "used" | "missing" | "blocked") {
   if (status === "used") return "border-[#b9d9cd] bg-white text-[#085041]";
   if (status === "blocked") return "border-[#ef9f27]/50 bg-white text-[#6f4a12]";
@@ -316,6 +326,24 @@ export function UpscDailyMissionControl() {
       }),
     [activeProgressMap, activeQuestionBankAttempts, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
   );
+  const questionBankSelection = useMemo(
+    () =>
+      selectQuestionBankSet({
+        subjectSlug: activeSubject.slug,
+        progress: activeProgressMap,
+        profile: studentProfile,
+        attempts: activeQuestionBankAttempts,
+      }),
+    [activeProgressMap, activeQuestionBankAttempts, activeSubject.slug, studentProfile]
+  );
+  const questionBankRecommendation = questionBankSelection.recommendation;
+  const questionBankMix = useMemo(
+    () => buildRecommendedQuestionBankMix(questionBankRecommendation),
+    [questionBankRecommendation]
+  );
+  const questionBankMixLabel = Object.entries(questionBankMix)
+    .map(([difficulty, amount]) => `${difficulty}:${amount}`)
+    .join("|");
   const activeMeTimeOption = activeProgress?.meTimeMood
     ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
     : null;
@@ -351,6 +379,52 @@ export function UpscDailyMissionControl() {
       detail: dailyPlanner.revision.title,
     },
   ];
+  const dailyOperatingContractRows = [
+    {
+      id: "me-time",
+      label: "Start check",
+      status: activeProgress?.meTimeCompletedAt ? "ready" : "pending",
+      proof: activeProgress?.meTimeMood
+        ? `Mind-state saved as ${activeProgress.meTimeMood}.`
+        : "Mind-state is collected before the first action opens.",
+      href: "#daily-me-time-checkin",
+    },
+    {
+      id: "recall-gap",
+      label: "Recall gap",
+      status: dailyPlanner.learningGap.tone === "repair" ? "repair" : dailyPlanner.learningGap.tone === "good" ? "ready" : "pending",
+      proof: `${dailyPlanner.learningGap.title}: ${dailyPlanner.learningGap.scoreLabel}.`,
+      href: dailyPlanner.sessionReadiness.href,
+    },
+    {
+      id: "class-discussion",
+      label: "Class and talk",
+      status: dailyPlanner.sessionReadiness.tone === "repair" ? "repair" : dailyPlanner.sessionReadiness.scorePercent >= 40 ? "ready" : "pending",
+      proof: `${dailyPlanner.sessionReadiness.statusLabel} opens ${dailyPlanner.sessionReadiness.actionLabel}.`,
+      href: dailyPlanner.sessionReadiness.href,
+    },
+    {
+      id: "adaptive-mcq",
+      label: "Adaptive MCQ",
+      status: questionBankRecommendation.unresolvedIncorrectCount ? "repair" : "ready",
+      proof: `${questionBankRecommendation.recommendedDifficulty.replace("_", " ")} set, ${questionBankRecommendation.recommendedCount} questions, ${questionBankRecommendation.adaptiveLevel} level.`,
+      href: `/upsc/question-bank?subject=${activeSubject.slug}`,
+    },
+    {
+      id: "revision-report",
+      label: "Revision and report",
+      status: dailyPlanner.revision.urgent ? "repair" : "ready",
+      proof: `${dailyPlanner.revision.dueLabel}; weekly and monthly reports use the same evidence.`,
+      href: "/reports",
+    },
+    {
+      id: "next-day",
+      label: "Next day",
+      status: dailyPlanner.nextSessionProof.decision.includes("repair") ? "repair" : "ready",
+      proof: `Day ${dailyPlanner.nextSessionProof.sourceDay} evidence chose Day ${dailyPlanner.nextSessionProof.targetDay}.`,
+      href: dailyPlanner.tomorrowAdjustment.href,
+    },
+  ] as const;
 
   const saveDailyState = (patch: Partial<DailyState>) => {
     const next = {
@@ -536,6 +610,63 @@ export function UpscDailyMissionControl() {
                 <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{step.title}</h3>
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{step.detail}</p>
               </article>
+            ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="daily-new-day-operating-contract"
+          data-contract-rule="me-time-recall-gap-class-discussion-mcq-revision-report-next-day"
+          data-row-count={dailyOperatingContractRows.length}
+          data-active-subject={activeSubject.slug}
+          data-active-day={activeSession.day}
+          data-question-bank-difficulty={questionBankRecommendation.recommendedDifficulty}
+          data-question-bank-count={questionBankRecommendation.recommendedCount}
+          data-question-bank-level={questionBankRecommendation.adaptiveLevel}
+          data-question-bank-score={questionBankRecommendation.adaptiveReadinessScore}
+          data-question-bank-mix={questionBankMixLabel}
+          data-report-href="/reports"
+          data-next-day-route={dailyPlanner.tomorrowAdjustment.href}
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                New-day operating contract
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                The portal chooses the next action from evidence.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                One chain connects mind-state, recall gap, class/discussion, MCQ difficulty, revision reports, and tomorrow&apos;s adjustment.
+              </p>
+            </div>
+            <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">
+              {questionBankRecommendation.recommendedDifficulty.replace("_", " ")}
+            </Badge>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {dailyOperatingContractRows.map((row, index) => (
+              <Link
+                key={row.id}
+                href={row.href}
+                data-testid="daily-operating-contract-row"
+                data-contract-id={row.id}
+                data-status={row.status}
+                data-href={row.href}
+                className={cn("min-h-28 rounded-md border p-3 transition hover:-translate-y-0.5", operatingContractTone(row.status))}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">
+                      {index + 1}. {row.label}
+                    </p>
+                    <h3 className="mt-2 text-sm font-black uppercase tracking-[0.12em]">{row.status}</h3>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </div>
+                <p className="mt-2 text-xs font-bold leading-5 opacity-85">{row.proof}</p>
+              </Link>
             ))}
           </div>
         </section>
