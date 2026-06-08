@@ -32,10 +32,13 @@ import {
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
 import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
 import {
+  allPracticeQuestionBank,
+  buildQuestionBankQuestionsFromPyqImports,
   buildRecommendedQuestionBankMix,
   readLocalQuestionBankAttempts,
   selectQuestionBankSet,
 } from "@/lib/upsc/questionBankEngine";
+import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
@@ -248,10 +251,12 @@ export function UpscDailyMissionControl() {
   const [meTimeSaved, setMeTimeSaved] = useState(false);
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
   const [autoHandoffSavedAt, setAutoHandoffSavedAt] = useState("");
+  const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDailyState(getInitialDailyState());
+      setPyqRecords(readLocalPyqImportRecords());
       setIsLoaded(true);
     }, 0);
 
@@ -329,6 +334,19 @@ export function UpscDailyMissionControl() {
       }),
     [activeProgressMap, activeQuestionBankAttempts, activeSession.day, activeSubject.sessions, activeSubject.slug, studentProfile]
   );
+  const exactPyqQuestions = useMemo(() => buildQuestionBankQuestionsFromPyqImports(pyqRecords), [pyqRecords]);
+  const combinedQuestionBank = useMemo(
+    () => [...exactPyqQuestions, ...allPracticeQuestionBank],
+    [exactPyqQuestions]
+  );
+  const activeSubjectExactPyqs = useMemo(
+    () => exactPyqQuestions.filter((question) => question.subjectSlug === activeSubject.slug),
+    [activeSubject.slug, exactPyqQuestions]
+  );
+  const activeDayExactPyqs = useMemo(
+    () => activeSubjectExactPyqs.filter((question) => question.linkedDay === activeSession.day),
+    [activeSession.day, activeSubjectExactPyqs]
+  );
   const questionBankSelection = useMemo(
     () =>
       selectQuestionBankSet({
@@ -336,8 +354,9 @@ export function UpscDailyMissionControl() {
         progress: activeProgressMap,
         profile: studentProfile,
         attempts: activeQuestionBankAttempts,
+        questionBank: combinedQuestionBank,
       }),
-    [activeProgressMap, activeQuestionBankAttempts, activeSubject.slug, studentProfile]
+    [activeProgressMap, activeQuestionBankAttempts, activeSubject.slug, combinedQuestionBank, studentProfile]
   );
   const questionBankRecommendation = questionBankSelection.recommendation;
   const questionBankMix = useMemo(
@@ -347,6 +366,7 @@ export function UpscDailyMissionControl() {
   const questionBankMixLabel = Object.entries(questionBankMix)
     .map(([difficulty, amount]) => `${difficulty}:${amount}`)
     .join("|");
+  const selectedExactPyqCount = questionBankSelection.questions.filter((question) => question.isExactPyqImport).length;
   const automaticHandoff = dailyPlanner.automaticSessionHandoff;
 
   useEffect(() => {
@@ -427,7 +447,7 @@ export function UpscDailyMissionControl() {
       id: "adaptive-mcq",
       label: "Adaptive MCQ",
       status: questionBankRecommendation.unresolvedIncorrectCount ? "repair" : "ready",
-      proof: `${questionBankRecommendation.recommendedDifficulty.replace("_", " ")} set, ${questionBankRecommendation.recommendedCount} questions, ${questionBankRecommendation.adaptiveLevel} level.`,
+      proof: `${questionBankRecommendation.recommendedDifficulty.replace("_", " ")} set, ${questionBankRecommendation.recommendedCount} questions, ${questionBankRecommendation.adaptiveLevel} level; ${activeSubjectExactPyqs.length} exact PYQ import row${activeSubjectExactPyqs.length === 1 ? "" : "s"} ready for this subject.`,
       href: `/upsc/question-bank?subject=${activeSubject.slug}`,
     },
     {
@@ -645,6 +665,10 @@ export function UpscDailyMissionControl() {
           data-question-bank-level={questionBankRecommendation.adaptiveLevel}
           data-question-bank-score={questionBankRecommendation.adaptiveReadinessScore}
           data-question-bank-mix={questionBankMixLabel}
+          data-exact-pyq-total-rows={exactPyqQuestions.length}
+          data-exact-pyq-active-subject-rows={activeSubjectExactPyqs.length}
+          data-exact-pyq-active-day-rows={activeDayExactPyqs.length}
+          data-exact-pyq-selected-rows={selectedExactPyqCount}
           data-report-href="/reports"
           data-next-day-route={dailyPlanner.tomorrowAdjustment.href}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
@@ -688,6 +712,53 @@ export function UpscDailyMissionControl() {
                 <p className="mt-2 text-xs font-bold leading-5 opacity-85">{row.proof}</p>
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="daily-exact-pyq-readiness"
+          data-proof-rule="daily-command-uses-mapped-exact-pyq-imports"
+          data-active-subject={activeSubject.slug}
+          data-active-day={activeSession.day}
+          data-total-exact-pyq-rows={exactPyqQuestions.length}
+          data-active-subject-exact-pyq-rows={activeSubjectExactPyqs.length}
+          data-active-day-exact-pyq-rows={activeDayExactPyqs.length}
+          data-selected-exact-pyq-rows={selectedExactPyqCount}
+          data-question-bank-href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
+        >
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                Exact PYQ readiness
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                Daily MCQs now read the verified import bank.
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                Only rows marked exact verified and mapped can enter today&apos;s practice. If the count is zero, the
+                student still receives PYQ-style pattern practice without any false exact-PYQ claim.
+              </p>
+              <Link
+                href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+              >
+                Open PYQ practice lane <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ["All exact rows", exactPyqQuestions.length],
+                [`${activeSubject.title} exact rows`, activeSubjectExactPyqs.length],
+                [`Day ${activeSession.day} exact rows`, activeDayExactPyqs.length],
+                ["Selected in set", selectedExactPyqCount],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/80 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                  <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

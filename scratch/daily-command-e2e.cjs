@@ -93,6 +93,33 @@ async function seedMissionState(page) {
         },
       })
     );
+    window.localStorage.setItem(
+      "sarit-upsc-pyq-import-ledger-v1",
+      JSON.stringify([
+        {
+          id: "2024-prelims-geography-general-studies-paper-i-q-plate-movement",
+          year: 2024,
+          stage: "Prelims",
+          kind: "GS_PRELIMS",
+          subjectSlug: "geography",
+          subjectTitle: "Geography",
+          paper: "General Studies Paper I",
+          questionNumber: "Q-Plate-Movement",
+          questionText:
+            "Which statement best explains why earthquake and volcanic zones broadly follow plate-boundary patterns?",
+          syllabusArea: "Interior of Earth and Plate Movement",
+          syllabusNodeId: "geo-physical",
+          topicTags: ["plate movement", "earthquakes", "volcanoes", "tectonics"],
+          trendInsightId: "geo-map-process",
+          sourceHref: "https://upsc.gov.in/examinations/Civil%20Services%20%28Preliminary%29%20Examination%2C%202024",
+          officialSourceTitle: "Civil Services Preliminary Examination 2024 Question Papers",
+          answerDemand: "Prelims process and map logic",
+          importStatus: "MAPPED",
+          textStatus: "EXACT_VERIFIED",
+          importedAt: new Date().toISOString(),
+        },
+      ])
+    );
   });
 }
 
@@ -225,6 +252,50 @@ async function assertLearningFunnel(page, expected, checks, label) {
   }
 }
 
+async function assertExactPyqReadiness(page, expected, checks, label) {
+  await page.getByTestId("daily-exact-pyq-readiness").waitFor({ timeout: 15000 });
+  const readiness = await page.getByTestId("daily-exact-pyq-readiness").evaluate((node) => ({
+    proofRule: node.getAttribute("data-proof-rule"),
+    subject: node.getAttribute("data-active-subject"),
+    day: node.getAttribute("data-active-day"),
+    totalExactRows: node.getAttribute("data-total-exact-pyq-rows"),
+    subjectExactRows: node.getAttribute("data-active-subject-exact-pyq-rows"),
+    dayExactRows: node.getAttribute("data-active-day-exact-pyq-rows"),
+    selectedExactRows: node.getAttribute("data-selected-exact-pyq-rows"),
+    questionBankHref: node.getAttribute("data-question-bank-href"),
+    text: node.textContent || "",
+  }));
+  const contract = await page.getByTestId("daily-new-day-operating-contract").evaluate((node) => ({
+    totalExactRows: node.getAttribute("data-exact-pyq-total-rows"),
+    subjectExactRows: node.getAttribute("data-exact-pyq-active-subject-rows"),
+    dayExactRows: node.getAttribute("data-exact-pyq-active-day-rows"),
+    selectedExactRows: node.getAttribute("data-exact-pyq-selected-rows"),
+    text: node.textContent || "",
+  }));
+
+  checks.push({ label, readiness, contract });
+
+  if (
+    readiness.proofRule !== "daily-command-uses-mapped-exact-pyq-imports" ||
+    readiness.subject !== expected.subject ||
+    readiness.day !== expected.day ||
+    readiness.totalExactRows !== expected.totalExactRows ||
+    readiness.subjectExactRows !== expected.subjectExactRows ||
+    readiness.dayExactRows !== expected.dayExactRows ||
+    readiness.selectedExactRows !== expected.selectedExactRows ||
+    readiness.questionBankHref !== `/upsc/question-bank?subject=${expected.subject}` ||
+    contract.totalExactRows !== expected.totalExactRows ||
+    contract.subjectExactRows !== expected.subjectExactRows ||
+    contract.dayExactRows !== expected.dayExactRows ||
+    contract.selectedExactRows !== expected.selectedExactRows ||
+    !readiness.text.includes("Daily MCQs now read the verified import bank") ||
+    !readiness.text.includes("Only rows marked exact verified and mapped") ||
+    !contract.text.includes(expected.contractText)
+  ) {
+    throw new Error(`${label}: exact PYQ readiness failed: ${JSON.stringify({ readiness, contract }, null, 2)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -291,6 +362,20 @@ async function run() {
     },
     checks,
     "daily-learning-funnel-repair-lock"
+  );
+  await assertExactPyqReadiness(
+    page,
+    {
+      subject: "geography",
+      day: "3",
+      totalExactRows: "1",
+      subjectExactRows: "1",
+      dayExactRows: "1",
+      selectedExactRows: "0",
+      contractText: "1 exact PYQ import row ready for this subject",
+    },
+    checks,
+    "daily-exact-pyq-geography-repair-lock"
   );
   await assertTodayOriginProof(
     page,
@@ -489,6 +574,20 @@ async function run() {
     },
     checks,
     "daily-learning-funnel-fresh-history"
+  );
+  await assertExactPyqReadiness(
+    page,
+    {
+      subject: "history",
+      day: "4",
+      totalExactRows: "1",
+      subjectExactRows: "0",
+      dayExactRows: "0",
+      selectedExactRows: "0",
+      contractText: "0 exact PYQ import rows ready for this subject",
+    },
+    checks,
+    "daily-exact-pyq-history-fresh-day"
   );
   await assertTodayOriginProof(
     page,
