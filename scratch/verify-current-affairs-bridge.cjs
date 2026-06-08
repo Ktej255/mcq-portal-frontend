@@ -91,8 +91,25 @@ async function run() {
   }));
   const initialUnlockedCards = await page.getByTestId("upsc-current-affairs-card").count();
   const initialNextUnlockText = await page.getByTestId("upsc-current-affairs-next-unlock").innerText();
+  const initialNextUnlockHref = await page.getByTestId("upsc-current-affairs-next-unlock").locator("a").getAttribute("href");
+  const initialLockedLinks = await page.getByTestId("upsc-current-affairs-locked-topic-link").evaluateAll((links) =>
+    links.slice(0, 3).map((link) => ({
+      day: link.getAttribute("data-linked-day"),
+      href: link.getAttribute("href"),
+      text: link.textContent || "",
+    }))
+  );
   const initialLeakedHookCount = await page.getByText("Monsoon variability", { exact: false }).count();
-  checks.push({ label: "initial-locked-state", activeSubject, initialProof, initialUnlockedCards, initialNextUnlockText, initialLeakedHookCount });
+  checks.push({
+    label: "initial-locked-state",
+    activeSubject,
+    initialProof,
+    initialUnlockedCards,
+    initialNextUnlockText,
+    initialNextUnlockHref,
+    initialLockedLinks,
+    initialLeakedHookCount,
+  });
   if (
     activeSubject !== "geography" ||
     initialProof.rule !== "covered-static-topic-only" ||
@@ -102,9 +119,22 @@ async function run() {
     initialProof.coveredDays !== "" ||
     initialUnlockedCards !== 0 ||
     initialLeakedHookCount !== 0 ||
-    !initialNextUnlockText.includes("Day 2")
+    !initialNextUnlockText.includes("Day 2") ||
+    initialNextUnlockHref !== "/upsc/geography/watch?day=2" ||
+    initialLockedLinks.length < 3 ||
+    initialLockedLinks.some((link) => link.href !== `/upsc/geography/watch?day=${link.day}`)
   ) {
-    throw new Error(`initial-locked-state failed: ${JSON.stringify({ activeSubject, initialProof, initialUnlockedCards, initialNextUnlockText, initialLeakedHookCount })}`);
+    throw new Error(
+      `initial-locked-state failed: ${JSON.stringify({
+        activeSubject,
+        initialProof,
+        initialUnlockedCards,
+        initialNextUnlockText,
+        initialNextUnlockHref,
+        initialLockedLinks,
+        initialLeakedHookCount,
+      })}`
+    );
   }
   await assertNoOverflow(page, "current-affairs-initial-desktop", checks);
 
@@ -244,6 +274,8 @@ async function run() {
         unlockedCount: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-unlocked-count"),
         coveredDays: document.querySelector('[data-testid="upsc-current-affairs-coverage-proof"]')?.getAttribute("data-covered-days"),
       },
+      nextUnlockHref: document.querySelector('[data-testid="upsc-current-affairs-next-unlock"] a')?.getAttribute("href"),
+      firstLockedHref: document.querySelector('[data-testid="upsc-current-affairs-locked-topic-link"]')?.getAttribute("href"),
       cards,
     };
   });
@@ -254,6 +286,8 @@ async function run() {
     environmentState.proof.activeSubject !== "environment" ||
     environmentState.proof.unlockedCount !== "1" ||
     environmentState.proof.coveredDays !== "1" ||
+    environmentState.nextUnlockHref !== "/upsc/environment/watch?day=2" ||
+    environmentState.firstLockedHref !== "/upsc/environment/watch?day=2" ||
     environmentState.cards.length !== 1 ||
     environmentState.cards.some((card) => card.subjectSlug !== "environment" || card.linkedDay !== "1" || card.unlocked !== "true")
   ) {

@@ -58,6 +58,10 @@ function sourceLabel(status: CurrentAffairsBridgeItem["sourceStatus"]) {
   return status === "ready-for-class" ? "Topic bridge ready" : "Daily source pending";
 }
 
+function staticTopicHref(subjectSlug: string, day: number) {
+  return `/upsc/${subjectSlug}/watch?day=${day}`;
+}
+
 export function UpscCurrentAffairsBridge() {
   const searchParams = useSearchParams();
   const requestedSubject = searchParams.get("subject") ?? "geography";
@@ -245,7 +249,7 @@ export function UpscCurrentAffairsBridge() {
                 </p>
               </div>
               <Link
-                href={`/upsc/${selectedSubject.slug}?day=${nextLocked.linkedDay}`}
+                href={staticTopicHref(selectedSubject.slug, nextLocked.linkedDay)}
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
               >
                 Open topic <ArrowRight className="ml-2 h-4 w-4" />
@@ -278,7 +282,7 @@ export function UpscCurrentAffairsBridge() {
                 as topic-contact evidence for the same day.
               </p>
               <Link
-                href={`/upsc/${selectedSubject.slug}?day=1`}
+                href={staticTopicHref(selectedSubject.slug, 1)}
                 className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
               >
                 Open Day 1
@@ -299,7 +303,9 @@ export function UpscCurrentAffairsBridge() {
             {lockedItems.map((item) => (
               <Link
                 key={item.id}
-                href={`/upsc/${selectedSubject.slug}?day=${item.linkedDay}`}
+                href={staticTopicHref(selectedSubject.slug, item.linkedDay)}
+                data-testid="upsc-current-affairs-locked-topic-link"
+                data-linked-day={item.linkedDay}
                 className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 transition hover:border-[#1d9e75]"
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
