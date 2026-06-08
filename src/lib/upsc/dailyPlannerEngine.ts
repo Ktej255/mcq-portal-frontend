@@ -93,6 +93,28 @@ export type DailyPlannerDecision = {
       status: "used" | "missing" | "blocked";
     }>;
   };
+  automaticSessionHandoff: {
+    id: string;
+    subjectSlug: string;
+    sourceDay: number;
+    targetDay: number;
+    targetTitle: string;
+    statusLabel: string;
+    href: string;
+    actionLabel: string;
+    canAdvance: boolean;
+    evidenceUsed: number;
+    evidenceMissing: number;
+    blockers: number;
+    readinessStatus: string;
+    readinessScorePercent: number;
+    learningGapTitle: string;
+    revisionDueLabel: string;
+    studentInstruction: string;
+    reportHref: string;
+    questionBankHref: string;
+    proofRule: string;
+  };
 };
 
 type PlannerInput = {
@@ -1015,40 +1037,104 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
   };
 }
 
+function buildAutomaticSessionHandoff({
+  input,
+  learningGap,
+  revision,
+  sessionReadiness,
+  tomorrowAdjustment,
+  nextSessionProof,
+}: {
+  input: PlannerInput;
+  learningGap: DailyPlannerDecision["learningGap"];
+  revision: DailyPlannerDecision["revision"];
+  sessionReadiness: DailyPlannerDecision["sessionReadiness"];
+  tomorrowAdjustment: DailyPlannerDecision["tomorrowAdjustment"];
+  nextSessionProof: DailyPlannerDecision["nextSessionProof"];
+}): DailyPlannerDecision["automaticSessionHandoff"] {
+  const evidenceUsed = nextSessionProof.evidence.filter((item) => item.status === "used").length;
+  const evidenceMissing = nextSessionProof.evidence.filter((item) => item.status === "missing").length;
+  const blockers = nextSessionProof.evidence.filter((item) => item.status === "blocked").length;
+  const canAdvance = tomorrowAdjustment.statusLabel === "Advance" && blockers === 0 && evidenceMissing === 0;
+  const targetSession = findSession(input.sessions, nextSessionProof.targetDay);
+  const normalizedStatus = tomorrowAdjustment.statusLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+  return {
+    id: `${input.subjectSlug}-d${nextSessionProof.sourceDay}-to-d${nextSessionProof.targetDay}-${normalizedStatus}`,
+    subjectSlug: input.subjectSlug,
+    sourceDay: nextSessionProof.sourceDay,
+    targetDay: nextSessionProof.targetDay,
+    targetTitle: targetSession.title,
+    statusLabel: tomorrowAdjustment.statusLabel,
+    href: tomorrowAdjustment.href,
+    actionLabel: canAdvance ? `Open Day ${nextSessionProof.targetDay}` : sessionReadiness.actionLabel,
+    canAdvance,
+    evidenceUsed,
+    evidenceMissing,
+    blockers,
+    readinessStatus: sessionReadiness.statusLabel,
+    readinessScorePercent: sessionReadiness.scorePercent,
+    learningGapTitle: learningGap.title,
+    revisionDueLabel: revision.dueLabel,
+    studentInstruction: canAdvance
+      ? `Next session is ready: Day ${nextSessionProof.targetDay} opens because the required evidence is clear.`
+      : blockers > 0
+        ? `Do not open new load yet. Clear ${blockers} blocker${blockers === 1 ? "" : "s"} before moving ahead.`
+        : evidenceMissing > 0
+          ? `Complete ${evidenceMissing} missing evidence signal${evidenceMissing === 1 ? "" : "s"} before the next session changes.`
+          : "Continue the current route until the planner records a clean advance.",
+    reportHref: "/reports",
+    questionBankHref: `/upsc/question-bank?subject=${input.subjectSlug}`,
+    proofRule: "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report",
+  };
+}
+
 export function buildDailyPlannerDecision(input: PlannerInput): DailyPlannerDecision {
   const revisionDue = findRevisionDue(input);
   const teacherDoubt = findTeacherDoubtDue(input);
   const fallbackRevisionDay = Math.min(input.selectedDay + 2, input.sessions.length);
   const fallbackRevision = findSession(input.sessions, fallbackRevisionDay);
   const tomorrowAdjustment = buildTomorrowAdjustment(input, teacherDoubt);
+  const learningGap = buildGap(input, revisionDue, teacherDoubt);
+  const revision: DailyPlannerDecision["revision"] = revisionDue
+    ? {
+        title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Revise Day ${revisionDue.source.day}`,
+        detail: teacherDoubt ? teacherDoubt.masteryCheck : `${revisionDue.source.title} is due before ${revisionDue.due.title}.`,
+        href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
+        dueLabel: teacherDoubt
+          ? "AI gap"
+          : needsRecovery(revisionDue.progress, revisionDue.attempts)
+            ? "Due now"
+            : `Day ${revisionDue.dueDay}`,
+        urgent: Boolean(teacherDoubt) || needsRecovery(revisionDue.progress, revisionDue.attempts),
+      }
+    : {
+        title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Next revision Day ${fallbackRevision.day}`,
+        detail: teacherDoubt?.masteryCheck ?? fallbackRevision.title,
+        href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", fallbackRevision.day),
+        dueLabel: teacherDoubt ? "AI gap" : `Day ${fallbackRevisionDay}`,
+        urgent: Boolean(teacherDoubt),
+      };
+  const sessionReadiness = buildSessionReadiness(input, teacherDoubt);
+  const nextSessionProof = buildNextSessionProof(input, tomorrowAdjustment, teacherDoubt);
 
   return {
     teacherDoubt,
-    learningGap: buildGap(input, revisionDue, teacherDoubt),
-    revision: revisionDue
-      ? {
-          title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Revise Day ${revisionDue.source.day}`,
-          detail: teacherDoubt ? teacherDoubt.masteryCheck : `${revisionDue.source.title} is due before ${revisionDue.due.title}.`,
-          href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
-          dueLabel: teacherDoubt
-            ? "AI gap"
-            : needsRecovery(revisionDue.progress, revisionDue.attempts)
-              ? "Due now"
-              : `Day ${revisionDue.dueDay}`,
-          urgent: Boolean(teacherDoubt) || needsRecovery(revisionDue.progress, revisionDue.attempts),
-        }
-      : {
-          title: teacherDoubt ? `Mastery check Day ${teacherDoubt.day}` : `Next revision Day ${fallbackRevision.day}`,
-          detail: teacherDoubt?.masteryCheck ?? fallbackRevision.title,
-          href: teacherDoubt?.href ?? routeFor(input.subjectSlug, "revisit", fallbackRevision.day),
-          dueLabel: teacherDoubt ? "AI gap" : `Day ${fallbackRevisionDay}`,
-          urgent: Boolean(teacherDoubt),
-        },
+    learningGap,
+    revision,
     todayTask: buildTodayTask(input, revisionDue, teacherDoubt),
     growth: buildGrowth(input),
-    sessionReadiness: buildSessionReadiness(input, teacherDoubt),
+    sessionReadiness,
     tomorrowAdjustment,
-    nextSessionProof: buildNextSessionProof(input, tomorrowAdjustment, teacherDoubt),
+    nextSessionProof,
     todayOriginProof: buildTodayOriginProof(input),
+    automaticSessionHandoff: buildAutomaticSessionHandoff({
+      input,
+      learningGap,
+      revision,
+      sessionReadiness,
+      tomorrowAdjustment,
+      nextSessionProof,
+    }),
   };
 }

@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   buildDailyPlannerDecision,
+  type DailyPlannerDecision,
   type DailyPlannerProgress,
 } from "@/lib/upsc/dailyPlannerEngine";
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
@@ -67,6 +68,12 @@ type DailyState = {
   updatedAt?: string;
 };
 
+type AutoSessionHandoffRecord = DailyPlannerDecision["automaticSessionHandoff"] & {
+  generatedAt: string;
+  selectedDay: number;
+  selectedSubjectSlug: string;
+};
+
 const dailySubjects: DailySubject[] = [
   {
     slug: "geography",
@@ -93,6 +100,7 @@ const dailySubjects: DailySubject[] = [
 ];
 
 const dailyStorageKey = "sarit-upsc-daily-command-v1";
+const autoSessionHandoffStorageKey = "sarit-upsc-auto-session-handoff-v1";
 const contentStorageKey = "sarit-upsc-content-command-v1";
 const mcqStorageKey = "sarit-upsc-mcq-command-v1";
 const defaultMcqState: McqState = { planned: 25, drafted: 0, status: "DRAFT" };
@@ -245,6 +253,7 @@ export function UpscDailyMissionControl() {
   const [saved, setSaved] = useState(false);
   const [meTimeSaved, setMeTimeSaved] = useState(false);
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
+  const [autoHandoffSavedAt, setAutoHandoffSavedAt] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -344,6 +353,23 @@ export function UpscDailyMissionControl() {
   const questionBankMixLabel = Object.entries(questionBankMix)
     .map(([difficulty, amount]) => `${difficulty}:${amount}`)
     .join("|");
+  const automaticHandoff = dailyPlanner.automaticSessionHandoff;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const generatedAt = new Date().toISOString();
+    const record: AutoSessionHandoffRecord = {
+      ...automaticHandoff,
+      generatedAt,
+      selectedDay: activeSession.day,
+      selectedSubjectSlug: activeSubject.slug,
+    };
+
+    writeJson(autoSessionHandoffStorageKey, record);
+    setAutoHandoffSavedAt(generatedAt);
+  }, [activeSession.day, activeSubject.slug, automaticHandoff, isLoaded]);
+
   const activeMeTimeOption = activeProgress?.meTimeMood
     ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
     : null;
@@ -957,6 +983,90 @@ export function UpscDailyMissionControl() {
                   <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          data-testid="daily-auto-session-handoff"
+          data-proof-rule={automaticHandoff.proofRule}
+          data-handoff-id={automaticHandoff.id}
+          data-subject-slug={automaticHandoff.subjectSlug}
+          data-source-day={automaticHandoff.sourceDay}
+          data-target-day={automaticHandoff.targetDay}
+          data-target-title={automaticHandoff.targetTitle}
+          data-status-label={automaticHandoff.statusLabel}
+          data-href={automaticHandoff.href}
+          data-action-label={automaticHandoff.actionLabel}
+          data-can-advance={String(automaticHandoff.canAdvance)}
+          data-evidence-used={automaticHandoff.evidenceUsed}
+          data-evidence-missing={automaticHandoff.evidenceMissing}
+          data-blockers={automaticHandoff.blockers}
+          data-readiness-status={automaticHandoff.readinessStatus}
+          data-readiness-score={automaticHandoff.readinessScorePercent}
+          data-learning-gap={automaticHandoff.learningGapTitle}
+          data-revision-due={automaticHandoff.revisionDueLabel}
+          data-report-href={automaticHandoff.reportHref}
+          data-question-bank-href={automaticHandoff.questionBankHref}
+          data-saved-at={autoHandoffSavedAt}
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
+        >
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
+                <Save className="h-5 w-5" />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Auto-created next session
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                {automaticHandoff.canAdvance
+                  ? `Day ${automaticHandoff.targetDay} is ready to open`
+                  : `Stay on ${automaticHandoff.statusLabel}`}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                {automaticHandoff.studentInstruction}
+              </p>
+              <p className="mt-3 rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#31443a]">
+                Saved handoff: {automaticHandoff.id}
+                {autoHandoffSavedAt ? ` at ${new Date(autoHandoffSavedAt).toLocaleTimeString("en-IN")}` : ""}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["Target", `Day ${automaticHandoff.targetDay}: ${automaticHandoff.targetTitle}`],
+                ["Evidence", `${automaticHandoff.evidenceUsed} used / ${automaticHandoff.evidenceMissing} missing`],
+                ["Blockers", automaticHandoff.blockers],
+                ["Readiness", `${automaticHandoff.readinessStatus} / ${automaticHandoff.readinessScorePercent}%`],
+                ["Gap", automaticHandoff.learningGapTitle],
+                ["Revision", automaticHandoff.revisionDueLabel],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/75 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                  <p className="mt-1 text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                </div>
+              ))}
+              <Link
+                href={automaticHandoff.href}
+                data-testid="daily-auto-session-handoff-action"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                {automaticHandoff.actionLabel} <ArrowRight className="h-4 w-4" />
+              </Link>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Link
+                  href={automaticHandoff.reportHref}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-white"
+                >
+                  Reports <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <Link
+                  href={automaticHandoff.questionBankHref}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-white"
+                >
+                  MCQ bank <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
           </div>
         </section>

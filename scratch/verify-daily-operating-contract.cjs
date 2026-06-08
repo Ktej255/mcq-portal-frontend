@@ -8,6 +8,7 @@ const profileKey = "sarit-upsc-student-profile-v1";
 const progressKey = "sarit-upsc-geography-progress-v1";
 const dailyCommandKey = "sarit-upsc-daily-command-v1";
 const questionBankAttemptKey = "sarit-upsc-question-bank-attempts-v1";
+const autoSessionHandoffKey = "sarit-upsc-auto-session-handoff-v1";
 
 async function assertNoOverflow(page, label, checks) {
   const metrics = await page.evaluate(() => ({
@@ -28,7 +29,7 @@ async function assertNoOverflow(page, label, checks) {
 async function seedLocalSession(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.evaluate(
-    ({ profileStorageKey, progressStorageKey, dailyStorageKey, attemptStorageKey }) => {
+    ({ profileStorageKey, progressStorageKey, dailyStorageKey, attemptStorageKey, handoffStorageKey }) => {
       window.localStorage.setItem("MOCK_TOKEN", "MOCK_TOKEN_daily_operating_contract");
       window.localStorage.setItem(
         profileStorageKey,
@@ -47,12 +48,14 @@ async function seedLocalSession(page) {
       window.localStorage.setItem(dailyStorageKey, JSON.stringify({ subjectSlug: "geography", day: 1 }));
       window.localStorage.removeItem(progressStorageKey);
       window.localStorage.removeItem(attemptStorageKey);
+      window.localStorage.removeItem(handoffStorageKey);
     },
     {
       profileStorageKey: profileKey,
       progressStorageKey: progressKey,
       dailyStorageKey: dailyCommandKey,
       attemptStorageKey: questionBankAttemptKey,
+      handoffStorageKey: autoSessionHandoffKey,
     }
   );
 }
@@ -61,6 +64,8 @@ async function readContractState(page, label, checks) {
   await page.getByTestId("daily-new-day-operating-contract").waitFor({ timeout: 15000 });
   const state = await page.evaluate(() => {
     const contract = document.querySelector('[data-testid="daily-new-day-operating-contract"]');
+    const handoff = document.querySelector('[data-testid="daily-auto-session-handoff"]');
+    const storedHandoff = JSON.parse(window.localStorage.getItem("sarit-upsc-auto-session-handoff-v1") || "null");
     const rows = [...document.querySelectorAll('[data-testid="daily-operating-contract-row"]')].map((row) => ({
       id: row.getAttribute("data-contract-id"),
       status: row.getAttribute("data-status"),
@@ -106,6 +111,30 @@ async function readContractState(page, label, checks) {
         nextRoute: funnel?.getAttribute("data-next-route"),
         decision: funnel?.getAttribute("data-decision"),
       },
+      handoff: {
+        proofRule: handoff?.getAttribute("data-proof-rule"),
+        id: handoff?.getAttribute("data-handoff-id"),
+        subjectSlug: handoff?.getAttribute("data-subject-slug"),
+        sourceDay: handoff?.getAttribute("data-source-day"),
+        targetDay: handoff?.getAttribute("data-target-day"),
+        targetTitle: handoff?.getAttribute("data-target-title"),
+        statusLabel: handoff?.getAttribute("data-status-label"),
+        href: handoff?.getAttribute("data-href"),
+        actionLabel: handoff?.getAttribute("data-action-label"),
+        canAdvance: handoff?.getAttribute("data-can-advance"),
+        evidenceUsed: handoff?.getAttribute("data-evidence-used"),
+        evidenceMissing: handoff?.getAttribute("data-evidence-missing"),
+        blockers: handoff?.getAttribute("data-blockers"),
+        readinessStatus: handoff?.getAttribute("data-readiness-status"),
+        readinessScore: handoff?.getAttribute("data-readiness-score"),
+        learningGap: handoff?.getAttribute("data-learning-gap"),
+        revisionDue: handoff?.getAttribute("data-revision-due"),
+        reportHref: handoff?.getAttribute("data-report-href"),
+        questionBankHref: handoff?.getAttribute("data-question-bank-href"),
+        savedAt: handoff?.getAttribute("data-saved-at"),
+        text: handoff?.textContent || "",
+        stored: storedHandoff,
+      },
     };
   });
 
@@ -149,6 +178,29 @@ function requireContractShell(state, label) {
   }
 }
 
+function requireHandoffShell(state, label) {
+  if (
+    state.handoff.proofRule !==
+      "automatic-new-day-handoff-from-me-time-recall-class-discussion-mcq-revision-report" ||
+    state.handoff.subjectSlug !== "geography" ||
+    state.handoff.sourceDay !== "1" ||
+    state.handoff.targetDay !== "1" ||
+    state.handoff.statusLabel !== "Same topic" ||
+    state.handoff.href !== "/upsc/geography/watch?day=1" ||
+    state.handoff.canAdvance !== "false" ||
+    state.handoff.reportHref !== "/reports" ||
+    state.handoff.questionBankHref !== "/upsc/question-bank?subject=geography" ||
+    !state.handoff.id?.startsWith("geography-d1-to-d1-") ||
+    !state.handoff.savedAt ||
+    state.handoff.stored?.id !== state.handoff.id ||
+    state.handoff.stored?.proofRule !== state.handoff.proofRule ||
+    state.handoff.stored?.selectedDay !== 1 ||
+    state.handoff.stored?.selectedSubjectSlug !== "geography"
+  ) {
+    throw new Error(`${label}: automatic handoff shell failed: ${JSON.stringify(state.handoff)}`);
+  }
+}
+
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
@@ -165,6 +217,7 @@ async function run() {
   await page.goto(`${baseUrl}/upsc/daily-command`, { waitUntil: "networkidle", timeout: 45000 });
   const initialState = await readContractState(page, "initial-contract", checks);
   requireContractShell(initialState, "initial-contract");
+  requireHandoffShell(initialState, "initial-contract");
 
   const initialRows = new Map(initialState.rows.map((row) => [row.id, row]));
   if (
@@ -172,7 +225,14 @@ async function run() {
     initialState.meTime.completed !== "false" ||
     initialState.focus.readinessStatus !== "Mind-state first" ||
     initialState.focus.readinessScore !== "0" ||
-    initialState.funnel.stepCount !== "4"
+    initialState.funnel.stepCount !== "4" ||
+    initialState.handoff.actionLabel !== "Choose me-time" ||
+    initialState.handoff.evidenceUsed !== "0" ||
+    initialState.handoff.evidenceMissing !== "5" ||
+    initialState.handoff.blockers !== "0" ||
+    initialState.handoff.readinessStatus !== "Mind-state first" ||
+    initialState.handoff.readinessScore !== "0" ||
+    !initialState.handoff.text.includes("Complete 5 missing evidence signals")
   ) {
     throw new Error(`initial-contract state failed: ${JSON.stringify(initialState)}`);
   }
@@ -192,6 +252,7 @@ async function run() {
 
   const focusedState = await readContractState(page, "focused-contract", checks);
   requireContractShell(focusedState, "focused-contract");
+  requireHandoffShell(focusedState, "focused-contract");
   const focusedRows = new Map(focusedState.rows.map((row) => [row.id, row]));
   if (
     focusedRows.get("me-time")?.status !== "ready" ||
@@ -199,7 +260,14 @@ async function run() {
     focusedState.meTime.completed !== "true" ||
     focusedState.focus.readinessStatus !== "Recall first" ||
     focusedState.focus.readinessScore !== "20" ||
-    !focusedRows.get("recall-gap")?.text.includes("Recall baseline pending")
+    !focusedRows.get("recall-gap")?.text.includes("Recall baseline pending") ||
+    focusedState.handoff.actionLabel !== "Start recall" ||
+    focusedState.handoff.evidenceUsed !== "1" ||
+    focusedState.handoff.evidenceMissing !== "4" ||
+    focusedState.handoff.blockers !== "0" ||
+    focusedState.handoff.readinessStatus !== "Recall first" ||
+    focusedState.handoff.readinessScore !== "20" ||
+    !focusedState.handoff.text.includes("Complete 4 missing evidence signals")
   ) {
     throw new Error(`focused-contract state failed: ${JSON.stringify(focusedState)}`);
   }
