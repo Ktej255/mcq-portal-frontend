@@ -26,7 +26,7 @@ import { pricingPlanIntentLabel, publicCommerceLaunchBoundary } from "@/lib/upsc
 import { syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
 
 function money(value: number) {
-  return `Rs ${value.toLocaleString("en-IN")}`;
+  return `₹${value.toLocaleString("en-IN")}`;
 }
 
 const planHighlights: Record<string, string[]> = {
@@ -81,7 +81,7 @@ export function UpscPricingCommand() {
                 UPSC pricing command
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">
-                Simple plans built from Rs 399 per month.
+                Simple plans built from ₹399 per month.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
                 The commercial layer now mirrors the product vision: monthly validation, yearly UPSC cycle,
@@ -139,7 +139,7 @@ export function UpscPricingCommand() {
                     <BadgeIndianRupee className="h-4 w-4" />
                   </div>
                   <Badge className={`rounded-md px-2 py-1 ${isRecommended ? "bg-[#085041]" : "bg-[#1a3a2a]"} text-white`}>
-                    {isRecommended ? "Recommended" : `${plan.discountPercent}% off`}
+                    {isRecommended ? "Recommended" : plan.discountPercent > 0 ? `${plan.discountPercent}% off` : "Base plan"}
                   </Badge>
                 </div>
                 <div className="mt-4">
@@ -192,7 +192,7 @@ export function UpscPricingCommand() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Discount proof</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">Every package is calculated from Rs 399 monthly</h2>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Every package is calculated from ₹399 monthly</h2>
             </div>
             <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">Transparent ladder</Badge>
           </div>
@@ -219,7 +219,8 @@ export function UpscPricingCommand() {
                   Pay {money(plan.launchPrice)} / save {money(plan.savings)}
                 </span>
                 <span>
-                  {plan.discountPercent}% off, {money(plan.effectiveMonthly)} monthly
+                  {plan.discountPercent > 0 ? `${plan.discountPercent}% off` : "Base price"},{" "}
+                  {money(plan.effectiveMonthly)} monthly
                 </span>
               </div>
             ))}
@@ -255,7 +256,7 @@ export function UpscPricingCommand() {
             </div>
             <div className="grid gap-3">
               {[
-                "Monthly remains Rs 399 for low-friction testing.",
+                "Monthly remains ₹399 for low-friction testing.",
                 "Yearly is priced below 12 separate monthly payments for one UPSC cycle.",
                 "18-month plan is the recommended recovery window for prelims-to-mains continuity.",
                 "Three-year plan is the deepest discount for foundation learners.",

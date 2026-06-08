@@ -26,7 +26,7 @@ function expectedPlanMath(plan) {
 }
 
 function money(value) {
-  return `Rs ${value.toLocaleString("en-IN")}`;
+  return `₹${value.toLocaleString("en-IN")}`;
 }
 
 async function assertNoOverflow(page, label, checks) {
@@ -206,6 +206,9 @@ async function run() {
     !pricingState.readinessText.includes("Optional PYQ rows") ||
     pricingState.launchBoundary.mode !== "pilot-plan-intent" ||
     pricingState.launchBoundary.readyForPayment !== "false" ||
+    !pricingState.bodyText.includes("Simple plans built from ₹399 per month.") ||
+    !pricingState.bodyText.includes("Base plan") ||
+    pricingState.discountProof.text.includes("0% off") ||
     !pricingState.launchBoundary.text.includes("Payments open only after") ||
     !pricingState.bodyText.includes("Record intent for 18 Month")
   ) {
@@ -253,6 +256,7 @@ async function run() {
     checkoutState.proofRule !== "monthly-base-times-duration-minus-launch-price" ||
     !checkoutState.proofText.includes(money(expectedMonthlyBase)) ||
     !checkoutState.proofText.includes(money(threeYearMath.savings)) ||
+    !checkoutState.text.includes("₹8,999") ||
     checkoutState.paymentBoundary.mode !== "pilot-plan-intent" ||
     checkoutState.paymentBoundary.readyForPayment !== "false" ||
     !checkoutState.paymentBoundary.text.includes("No payment collected today") ||
@@ -278,6 +282,7 @@ async function run() {
     })),
     optionalText: document.querySelector('[data-testid="upsc-optional-summary"]')?.textContent || "",
     sourceLibraryText: document.querySelector('[data-testid="upsc-source-library-link"]')?.textContent || "",
+    bodyText: document.body.textContent || "",
   }));
   checks.push({ label: "yearly-planner-state", plannerState });
   const featureStatus = Object.fromEntries(plannerState.productFeatures.map((feature) => [feature.title, feature]));
@@ -291,8 +296,10 @@ async function run() {
     featureStatus["AI discussion and doubt solving"]?.status !== "building" ||
     !featureStatus["Recall-first gap analysis"]?.ownerSurface?.includes("Watch") ||
     !featureStatus["Revision system"]?.ownerSurface?.includes("/revision") ||
+    !plannerState.sourceLibraryText.includes("Syllabus and PYQ preload ledger") ||
     !plannerState.optionalText.includes("All optional pages are seeded") ||
-    !plannerState.sourceLibraryText.includes("Syllabus and PYQ preload ledger")
+    !plannerState.bodyText.includes(money(expectedMonthlyBase)) ||
+    !plannerState.bodyText.includes("Base plan")
   ) {
     throw new Error(`Yearly planner state failed: ${JSON.stringify(plannerState)}`);
   }

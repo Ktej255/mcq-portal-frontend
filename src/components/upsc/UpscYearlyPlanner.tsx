@@ -32,6 +32,10 @@ function statusTone(status: string) {
   return "border-[#dcd5c7] bg-[#f8f2e8] text-[#34453b]";
 }
 
+function money(value: number) {
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
 export function UpscYearlyPlanner() {
   const monthly = productPricingPlans[0];
   const optionalGroups = optionalSubjects.reduce<Record<string, number>>((groups, subject) => {
@@ -66,7 +70,7 @@ export function UpscYearlyPlanner() {
               {[
                 ["GS subjects", coreSubjectBlueprints.length],
                 ["Optional pages", optionalSubjects.length],
-                ["Monthly base", `Rs ${monthly.launchPrice}`],
+                ["Monthly base", money(monthly.launchPrice)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -85,13 +89,13 @@ export function UpscYearlyPlanner() {
                   <BadgeIndianRupee className="h-4 w-4" />
                 </div>
                 <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
-                  {plan.discountPercent}% off
+                  {plan.discountPercent > 0 ? `${plan.discountPercent}% off` : "Base plan"}
                 </Badge>
               </div>
               <h2 className="mt-4 text-xl font-black tracking-tight">{plan.title}</h2>
-              <p className="mt-1 text-3xl font-black">Rs {plan.launchPrice}</p>
+              <p className="mt-1 text-3xl font-black">{money(plan.launchPrice)}</p>
               <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#746f66]">
-                List Rs {plan.listPrice} / Rs {plan.effectiveMonthly} effective monthly
+                List {money(plan.listPrice)} / {money(plan.effectiveMonthly)} effective monthly
               </p>
               <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{plan.audience}</p>
               <p className="mt-2 text-xs font-bold leading-5 text-[#31443a]">{plan.promise}</p>

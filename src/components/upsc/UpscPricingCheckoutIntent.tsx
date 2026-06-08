@@ -12,7 +12,7 @@ import {
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 
 function money(value: number) {
-  return `Rs ${value.toLocaleString("en-IN")}`;
+  return `₹${value.toLocaleString("en-IN")}`;
 }
 
 export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }) {
