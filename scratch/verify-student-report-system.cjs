@@ -78,6 +78,18 @@ async function seedProfileAndProgress(page) {
             isCorrect: true,
             solvedAt: new Date().toISOString(),
           },
+          "exact-pyq-2025-prelims-geography-general-studies-paper-i-q42": {
+            questionId: "exact-pyq-2025-prelims-geography-general-studies-paper-i-q42",
+            subjectSlug: "geography",
+            linkedDay: 1,
+            topic: "Indian monsoon and map reasoning",
+            difficulty: "PYQ_STYLE",
+            source: "EXACT_PYQ_IMPORT",
+            selectedOption: "B",
+            correctOption: "A",
+            isCorrect: false,
+            solvedAt: new Date().toISOString(),
+          },
         })
       );
       window.localStorage.setItem(
@@ -232,6 +244,9 @@ async function run() {
     questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
     questionBankCorrect: node.getAttribute("data-question-bank-correct"),
     questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
+    exactPyqAttempts: node.getAttribute("data-exact-pyq-attempts"),
+    exactPyqCorrect: node.getAttribute("data-exact-pyq-correct"),
+    exactPyqAccuracy: node.getAttribute("data-exact-pyq-accuracy"),
     text: node.textContent || "",
   }));
   const studentSummaryActionHref = await page.getByTestId("upsc-student-report-summary-action").getAttribute("href");
@@ -284,6 +299,9 @@ async function run() {
     questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
     questionBankCorrect: node.getAttribute("data-question-bank-correct"),
     questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
+    exactPyqAttempts: node.getAttribute("data-exact-pyq-attempts"),
+    exactPyqCorrect: node.getAttribute("data-exact-pyq-correct"),
+    exactPyqAccuracy: node.getAttribute("data-exact-pyq-accuracy"),
     growthPercent: node.getAttribute("data-growth-percent"),
   }));
   const autoReportProof = await page.getByTestId("upsc-auto-report-proof").evaluate((node) => ({
@@ -310,6 +328,9 @@ async function run() {
       questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
       questionBankCorrect: node.getAttribute("data-question-bank-correct"),
       questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
+      exactPyqAttempts: node.getAttribute("data-exact-pyq-attempts"),
+      exactPyqCorrect: node.getAttribute("data-exact-pyq-correct"),
+      exactPyqAccuracy: node.getAttribute("data-exact-pyq-accuracy"),
       verdict: node.getAttribute("data-verdict"),
     }))
   );
@@ -324,6 +345,9 @@ async function run() {
     questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
     questionBankCorrect: node.getAttribute("data-question-bank-correct"),
     questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
+    exactPyqAttempts: node.getAttribute("data-exact-pyq-attempts"),
+    exactPyqCorrect: node.getAttribute("data-exact-pyq-correct"),
+    exactPyqAccuracy: node.getAttribute("data-exact-pyq-accuracy"),
     aiGapCount: node.getAttribute("data-ai-gap-count"),
     meTimeChecks: node.getAttribute("data-me-time-checks"),
     currentAffairsUnlocked: node.getAttribute("data-current-affairs-unlocked"),
@@ -343,6 +367,9 @@ async function run() {
       questionBankAttempts: node.getAttribute("data-question-bank-attempts"),
       questionBankCorrect: node.getAttribute("data-question-bank-correct"),
       questionBankAccuracy: node.getAttribute("data-question-bank-accuracy"),
+      exactPyqAttempts: node.getAttribute("data-exact-pyq-attempts"),
+      exactPyqCorrect: node.getAttribute("data-exact-pyq-correct"),
+      exactPyqAccuracy: node.getAttribute("data-exact-pyq-accuracy"),
       recoveryItems: node.getAttribute("data-recovery-items"),
       commandDays: node.getAttribute("data-command-days"),
       aiGapCount: node.getAttribute("data-ai-gap-count"),
@@ -422,7 +449,8 @@ async function run() {
     readinessReport.score !== "60" ||
     readinessHref !== "/upsc/geography/talk?day=1" ||
     !/current session readiness/i.test(readinessReport.text) ||
-    !/because-chain/i.test(readinessReport.text)
+    !/because-chain/i.test(readinessReport.text) ||
+    !/Exact PYQ 1 solved \/ 0 clear/i.test(readinessReport.text)
   ) {
     throw new Error(`Current readiness report is not synced with Daily Mission: ${JSON.stringify({ readinessReport, readinessHref })}`);
   }
@@ -441,9 +469,12 @@ async function run() {
     studentSummaryProof.recoveryItems !== "1" ||
     studentSummaryProof.meTimeChecks !== "3" ||
     studentSummaryProof.currentAffairsUnlocked !== "4" ||
-    studentSummaryProof.questionBankAttempts !== "1" ||
+    studentSummaryProof.questionBankAttempts !== "2" ||
     studentSummaryProof.questionBankCorrect !== "1" ||
-    studentSummaryProof.questionBankAccuracy !== "100" ||
+    studentSummaryProof.questionBankAccuracy !== "50" ||
+    studentSummaryProof.exactPyqAttempts !== "1" ||
+    studentSummaryProof.exactPyqCorrect !== "0" ||
+    studentSummaryProof.exactPyqAccuracy !== "0" ||
     readNumber(studentSummaryProof.totalDays, "studentSummaryProof.totalDays") <= 200 ||
     readNumber(studentSummaryProof.growthPercent, "studentSummaryProof.growthPercent") < 1 ||
     studentSummaryCards.length !== 4 ||
@@ -510,9 +541,12 @@ async function run() {
     allSubjectProof.currentAffairsUnlocked !== "4" ||
     allSubjectProof.averageRecall !== "90" ||
     allSubjectProof.averageMcq !== "77" ||
-    allSubjectProof.questionBankAttempts !== "1" ||
+    allSubjectProof.questionBankAttempts !== "2" ||
     allSubjectProof.questionBankCorrect !== "1" ||
-    allSubjectProof.questionBankAccuracy !== "100" ||
+    allSubjectProof.questionBankAccuracy !== "50" ||
+    allSubjectProof.exactPyqAttempts !== "1" ||
+    allSubjectProof.exactPyqCorrect !== "0" ||
+    allSubjectProof.exactPyqAccuracy !== "0" ||
     readNumber(allSubjectProof.totalDays, "allSubjectProof.totalDays") <= 200 ||
     readNumber(allSubjectProof.weeklyWindowsGenerated, "allSubjectProof.weeklyWindowsGenerated") < 25 ||
     readNumber(allSubjectProof.growthPercent, "allSubjectProof.growthPercent") < 1
@@ -522,8 +556,9 @@ async function run() {
   const compactAllSubjectText = allSubjectText.replace(/\s+/g, " ");
   if (
     !/current affairs\s+4/i.test(compactAllSubjectText) ||
-    !/question bank\s+1/i.test(compactAllSubjectText) ||
-    !/qb accuracy\s+100%/i.test(compactAllSubjectText) ||
+    !/question bank\s+2/i.test(compactAllSubjectText) ||
+    !/qb accuracy\s+50%/i.test(compactAllSubjectText) ||
+    !/exact pyq\s+1/i.test(compactAllSubjectText) ||
     !/me-time\s+3/i.test(compactAllSubjectText) ||
     !/ai gaps\s+1/i.test(compactAllSubjectText)
   ) {
@@ -536,8 +571,9 @@ async function run() {
     !/AI gaps\s+1/i.test(compactWindowText) ||
     !/Me-time\s+3/i.test(compactWindowText) ||
     !/News\s+4/i.test(compactWindowText) ||
-    !/QB\s+1/i.test(compactWindowText) ||
-    !/QB accuracy\s+100%/i.test(compactWindowText)
+    !/QB\s+2/i.test(compactWindowText) ||
+    !/QB accuracy\s+50%/i.test(compactWindowText) ||
+    !/Exact PYQ\s+1/i.test(compactWindowText)
   ) {
     throw new Error(`All-subject report windows missing generated evidence: ${allSubjectWindowText}`);
   }
@@ -548,9 +584,12 @@ async function run() {
     allSubjectMonthlyProof.startedDays !== "5" ||
     allSubjectMonthlyProof.averageRecall !== "86" ||
     allSubjectMonthlyProof.averageMcq !== "75" ||
-    allSubjectMonthlyProof.questionBankAttempts !== "1" ||
+    allSubjectMonthlyProof.questionBankAttempts !== "2" ||
     allSubjectMonthlyProof.questionBankCorrect !== "1" ||
-    allSubjectMonthlyProof.questionBankAccuracy !== "100" ||
+    allSubjectMonthlyProof.questionBankAccuracy !== "50" ||
+    allSubjectMonthlyProof.exactPyqAttempts !== "1" ||
+    allSubjectMonthlyProof.exactPyqCorrect !== "0" ||
+    allSubjectMonthlyProof.exactPyqAccuracy !== "0" ||
     allSubjectMonthlyProof.aiGapCount !== "1" ||
     allSubjectMonthlyProof.meTimeChecks !== "3" ||
     allSubjectMonthlyProof.currentAffairsUnlocked !== "4" ||
@@ -567,9 +606,12 @@ async function run() {
     allSubjectWeeklyProofs[0].aiGapCount !== "1" ||
     allSubjectWeeklyProofs[0].meTimeChecks !== "3" ||
     allSubjectWeeklyProofs[0].currentAffairsUnlocked !== "4" ||
-    allSubjectWeeklyProofs[0].questionBankAttempts !== "1" ||
+    allSubjectWeeklyProofs[0].questionBankAttempts !== "2" ||
     allSubjectWeeklyProofs[0].questionBankCorrect !== "1" ||
-    allSubjectWeeklyProofs[0].questionBankAccuracy !== "100" ||
+    allSubjectWeeklyProofs[0].questionBankAccuracy !== "50" ||
+    allSubjectWeeklyProofs[0].exactPyqAttempts !== "1" ||
+    allSubjectWeeklyProofs[0].exactPyqCorrect !== "0" ||
+    allSubjectWeeklyProofs[0].exactPyqAccuracy !== "0" ||
     allSubjectWeeklyProofs[0].verdict !== "AI repair active"
   ) {
     throw new Error(`All-subject weekly proof attributes failed: ${JSON.stringify(allSubjectWeeklyProofs)}`);
@@ -583,9 +625,12 @@ async function run() {
     geographyProof.averageRecall !== "82" ||
     geographyProof.mcqSets !== "2" ||
     geographyProof.averageMcq !== "70" ||
-    geographyProof.questionBankAttempts !== "1" ||
+    geographyProof.questionBankAttempts !== "2" ||
     geographyProof.questionBankCorrect !== "1" ||
-    geographyProof.questionBankAccuracy !== "100" ||
+    geographyProof.questionBankAccuracy !== "50" ||
+    geographyProof.exactPyqAttempts !== "1" ||
+    geographyProof.exactPyqCorrect !== "0" ||
+    geographyProof.exactPyqAccuracy !== "0" ||
     geographyProof.recoveryItems !== "1" ||
     geographyProof.commandDays !== "1" ||
     geographyProof.aiGapCount !== "1" ||

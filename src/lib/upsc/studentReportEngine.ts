@@ -14,7 +14,8 @@ export type StudentReportProgressMap = Record<string, StudentReportProgress | un
 export type StudentReportQuestionBankAttempt = Pick<
   QuestionBankAttempt,
   "subjectSlug" | "linkedDay" | "difficulty" | "isCorrect" | "solvedAt"
->;
+> &
+  Partial<Pick<QuestionBankAttempt, "source">>;
 export type StudentReportQuestionBankAttemptMap = Record<string, StudentReportQuestionBankAttempt[] | undefined>;
 
 export type StudentReportSubject = {
@@ -40,6 +41,9 @@ export type StudentSubjectReport = {
   questionBankAttempts: number;
   questionBankCorrect: number;
   questionBankAccuracyPercent: number | null;
+  exactPyqAttempts: number;
+  exactPyqCorrect: number;
+  exactPyqAccuracyPercent: number | null;
   recoveryItems: number;
   commandDays: number;
   meTimeChecks: number;
@@ -70,6 +74,9 @@ export type StudentReportWindow = {
   questionBankAttempts: number;
   questionBankCorrect: number;
   questionBankAccuracyPercent: number | null;
+  exactPyqAttempts: number;
+  exactPyqCorrect: number;
+  exactPyqAccuracyPercent: number | null;
   recoveryItems: number;
   commandDays: number;
   teacherDoubtCount: number;
@@ -109,6 +116,9 @@ export type UpscStudentReportSnapshot = {
     questionBankAttempts: number;
     questionBankCorrect: number;
     questionBankAccuracyPercent: number | null;
+    exactPyqAttempts: number;
+    exactPyqCorrect: number;
+    exactPyqAccuracyPercent: number | null;
     growthPercent: number;
   };
   growth: {
@@ -157,6 +167,22 @@ function questionBankAccuracy(correct: number, total: number) {
   return total ? Math.round((correct / total) * 100) : null;
 }
 
+function exactPyqAttempts(attempts: StudentReportQuestionBankAttempt[] = []) {
+  return attempts.filter((attempt) => attempt.source === "EXACT_PYQ_IMPORT");
+}
+
+function exactPyqSignal(attempts: StudentReportQuestionBankAttempt[] = []) {
+  const exactAttempts = exactPyqAttempts(attempts);
+  const correct = exactAttempts.filter((attempt) => attempt.isCorrect).length;
+
+  return {
+    count: exactAttempts.length,
+    correct,
+    accuracyPercent: questionBankAccuracy(correct, exactAttempts.length),
+    hasIncorrect: exactAttempts.some((attempt) => !attempt.isCorrect),
+  };
+}
+
 function hasStarted(progress?: StudentReportProgress, questionBankAttempts: StudentReportQuestionBankAttempt[] = []) {
   return Boolean(
     progress?.watched ||
@@ -179,6 +205,13 @@ function needsRecovery(progress?: StudentReportProgress) {
   );
 }
 
+function needsRecoveryFromReportRow(
+  progress?: StudentReportProgress,
+  questionBankAttempts: StudentReportQuestionBankAttempt[] = []
+) {
+  return needsRecovery(progress) || questionBankAttempts.some((attempt) => !attempt.isCorrect);
+}
+
 function hasTeacherDoubt(progress?: StudentReportProgress) {
   return Boolean(
     progress?.teacherDoubtCategory &&
@@ -188,9 +221,9 @@ function hasTeacherDoubt(progress?: StudentReportProgress) {
   );
 }
 
-function hasCommand(progress?: StudentReportProgress) {
+function hasCommand(progress?: StudentReportProgress, questionBankAttempts: StudentReportQuestionBankAttempt[] = []) {
   return Boolean(
-    !needsRecovery(progress) &&
+    !needsRecoveryFromReportRow(progress, questionBankAttempts) &&
       (progress?.confidence === "Command" ||
         progress?.mcqOutcome === "Command" ||
         (progress?.mcqCompleted && (progress?.mcqScorePercent ?? 0) >= 75))
@@ -282,15 +315,28 @@ function buildReportWindow(
   const mcqScores = dayRows
     .map((row) => row.progress?.mcqScorePercent)
     .filter((score): score is number => typeof score === "number");
-  const recoveryItems = dayRows.filter((row) => needsRecovery(row.progress)).length;
-  const commandDays = dayRows.filter((row) => hasCommand(row.progress)).length;
-  const teacherDoubtCount = dayRows.filter((row) => hasTeacherDoubt(row.progress) && !hasCommand(row.progress)).length;
+  const recoveryItems = dayRows.filter((row) =>
+    needsRecoveryFromReportRow(row.progress, row.questionBankAttempts)
+  ).length;
+  const commandDays = dayRows.filter((row) => hasCommand(row.progress, row.questionBankAttempts)).length;
+  const teacherDoubtCount = dayRows.filter(
+    (row) => hasTeacherDoubt(row.progress) && !hasCommand(row.progress, row.questionBankAttempts)
+  ).length;
   const meTimeChecks = dayRows.filter((row) => row.progress?.meTimeCompletedAt).length;
   const questionBankAttemptsCount = dayRows.reduce((sum, row) => sum + row.questionBankAttempts.length, 0);
   const questionBankCorrect = dayRows.reduce(
     (sum, row) => sum + row.questionBankAttempts.filter((attempt) => attempt.isCorrect).length,
     0
   );
+  const exactPyqAttemptsCount = dayRows.reduce(
+    (sum, row) => sum + exactPyqAttempts(row.questionBankAttempts).length,
+    0
+  );
+  const exactPyqCorrect = dayRows.reduce(
+    (sum, row) => sum + exactPyqAttempts(row.questionBankAttempts).filter((attempt) => attempt.isCorrect).length,
+    0
+  );
+  const hasIncorrectExactPyq = dayRows.some((row) => exactPyqSignal(row.questionBankAttempts).hasIncorrect);
   const currentAffairsUnlocked = subjectSessions.reduce((sum, { subject, sessions, progress, questionBankAttempts = [] }) => {
     const daySet = new Set(sessions.map((session) => session.day));
     return (
@@ -310,6 +356,8 @@ function buildReportWindow(
       ? "No evidence yet"
       : teacherDoubtCount > 0
         ? "AI repair active"
+        : hasIncorrectExactPyq
+          ? "Exact PYQ repair active"
         : recoveryItems > 0
           ? "Recovery active"
           : commandDays > 0 && completionRatio >= 0.35
@@ -318,6 +366,8 @@ function buildReportWindow(
   const nextAction =
     teacherDoubtCount > 0
       ? "Clear the latest AI teacher gap before increasing difficulty."
+      : hasIncorrectExactPyq
+        ? "Repair the missed exact PYQ demand before adding new load."
       : recoveryItems > 0
         ? "Clear one recovery item before adding new load."
         : startedDays === 0
@@ -343,6 +393,9 @@ function buildReportWindow(
     questionBankAttempts: questionBankAttemptsCount,
     questionBankCorrect,
     questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttemptsCount),
+    exactPyqAttempts: exactPyqAttemptsCount,
+    exactPyqCorrect,
+    exactPyqAccuracyPercent: questionBankAccuracy(exactPyqCorrect, exactPyqAttemptsCount),
     recoveryItems,
     commandDays,
     teacherDoubtCount,
@@ -425,8 +478,8 @@ export function buildStudentSubjectReport(
   const mcqScores = states
     .map((state) => state?.mcqScorePercent)
     .filter((score): score is number => typeof score === "number");
-  const recoveryItems = states.filter(needsRecovery).length;
-  const commandDays = states.filter(hasCommand).length;
+  const recoveryItems = rows.filter((row) => needsRecoveryFromReportRow(row.progress, row.questionBankAttempts)).length;
+  const commandDays = rows.filter((row) => hasCommand(row.progress, row.questionBankAttempts)).length;
   const mcqSets = states.filter((state) => state?.mcqCompleted).length;
   const meTimeChecks = states.filter((state) => state?.meTimeCompletedAt).length;
   const questionBankAttemptsCount = rows.reduce((sum, row) => sum + row.questionBankAttempts.length, 0);
@@ -434,6 +487,12 @@ export function buildStudentSubjectReport(
     (sum, row) => sum + row.questionBankAttempts.filter((attempt) => attempt.isCorrect).length,
     0
   );
+  const exactPyqAttemptsCount = rows.reduce((sum, row) => sum + exactPyqAttempts(row.questionBankAttempts).length, 0);
+  const exactPyqCorrect = rows.reduce(
+    (sum, row) => sum + exactPyqAttempts(row.questionBankAttempts).filter((attempt) => attempt.isCorrect).length,
+    0
+  );
+  const hasIncorrectExactPyq = rows.some((row) => exactPyqSignal(row.questionBankAttempts).hasIncorrect);
   const teacherDoubtSignal = latestTeacherDoubtSignal(states);
   const meTimeSignal = latestMeTimeSignal(states);
   const averageRecall = average(recallScores);
@@ -442,6 +501,8 @@ export function buildStudentSubjectReport(
   const monthlyVerdict =
     startedDays === 0
       ? "No evidence yet"
+      : hasIncorrectExactPyq
+        ? "Exact PYQ repair"
       : recoveryItems > 0
         ? "Repair active"
         : commandDays > 0 && completionRatio >= 0.35
@@ -450,6 +511,8 @@ export function buildStudentSubjectReport(
   const nextAction =
     teacherDoubtSignal.teacherDoubtCount > 0 && teacherDoubtSignal.latestTeacherDoubtAction
       ? teacherDoubtSignal.latestTeacherDoubtAction
+      : hasIncorrectExactPyq
+        ? "Repair the missed exact PYQ demand before opening the next day."
       : recoveryItems > 0
       ? "Clear the first recovery item before adding new load."
       : startedDays === 0
@@ -475,6 +538,9 @@ export function buildStudentSubjectReport(
     questionBankAttempts: questionBankAttemptsCount,
     questionBankCorrect,
     questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttemptsCount),
+    exactPyqAttempts: exactPyqAttemptsCount,
+    exactPyqCorrect,
+    exactPyqAccuracyPercent: questionBankAccuracy(exactPyqCorrect, exactPyqAttemptsCount),
     recoveryItems,
     commandDays,
     meTimeChecks,
@@ -512,6 +578,8 @@ export function buildUpscStudentReportSnapshot(
   const teacherDoubtCount = subjects.reduce((sum, subject) => sum + subject.teacherDoubtCount, 0);
   const questionBankAttempts = subjects.reduce((sum, subject) => sum + subject.questionBankAttempts, 0);
   const questionBankCorrect = subjects.reduce((sum, subject) => sum + subject.questionBankCorrect, 0);
+  const exactPyqAttemptsCount = subjects.reduce((sum, subject) => sum + subject.exactPyqAttempts, 0);
+  const exactPyqCorrect = subjects.reduce((sum, subject) => sum + subject.exactPyqCorrect, 0);
   const startedSubjects = subjects.filter((subject) => subject.startedDays > 0);
   const strongestSubject =
     [...startedSubjects].sort(
@@ -547,7 +615,7 @@ export function buildUpscStudentReportSnapshot(
       monthlyReportId: monthly.id,
       cadence: "Weekly report rebuilds from each active subject week; monthly report rebuilds from the full UPSC plan.",
       evidenceRule:
-        "Only saved learning evidence is counted: recall, MCQ, question-bank solved ledger, recovery, AI teacher gaps, me-time, and covered-topic current affairs.",
+        "Only saved learning evidence is counted: recall, MCQ, question-bank solved ledger, exact imported PYQ demand drills, recovery, AI teacher gaps, me-time, and covered-topic current affairs.",
       growthBaseline,
       growthNow,
       nextWeeklyAction: weeklyFocus?.nextAction ?? "Start one subject day to generate the first weekly report row.",
@@ -569,6 +637,9 @@ export function buildUpscStudentReportSnapshot(
       questionBankAttempts,
       questionBankCorrect,
       questionBankAccuracyPercent: questionBankAccuracy(questionBankCorrect, questionBankAttempts),
+      exactPyqAttempts: exactPyqAttemptsCount,
+      exactPyqCorrect,
+      exactPyqAccuracyPercent: questionBankAccuracy(exactPyqCorrect, exactPyqAttemptsCount),
       growthPercent: totalDays ? Math.round((startedDays / totalDays) * 100) : 0,
     },
     growth: {

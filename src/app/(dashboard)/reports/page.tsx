@@ -89,9 +89,10 @@ export default function ReportsPage() {
         sessions: activeReportSubject.sessions,
         selectedDay: activeReportDay,
         progress: (progressBySubject[activeReportSubject.slug] ?? {}) as Record<string, DailyPlannerProgress | undefined>,
+        questionBankAttempts: questionBankAttemptsBySubject[activeReportSubject.slug] ?? [],
         profile: readStudentProfile(),
       }).sessionReadiness,
-    [activeReportDay, activeReportSubject.sessions, activeReportSubject.slug, progressBySubject]
+    [activeReportDay, activeReportSubject.sessions, activeReportSubject.slug, progressBySubject, questionBankAttemptsBySubject]
   );
   const headline = overview.hasUrgentRecovery
     ? `${overview.metrics.revisitCount} recovery item${overview.metrics.revisitCount === 1 ? "" : "s"} need attention`
@@ -232,6 +233,9 @@ export default function ReportsPage() {
           data-question-bank-attempts={allSubjectReport.totals.questionBankAttempts}
           data-question-bank-correct={allSubjectReport.totals.questionBankCorrect}
           data-question-bank-accuracy={allSubjectReport.totals.questionBankAccuracyPercent ?? "no-attempts"}
+          data-exact-pyq-attempts={allSubjectReport.totals.exactPyqAttempts}
+          data-exact-pyq-correct={allSubjectReport.totals.exactPyqCorrect}
+          data-exact-pyq-accuracy={allSubjectReport.totals.exactPyqAccuracyPercent ?? "no-attempts"}
           className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -369,6 +373,9 @@ export default function ReportsPage() {
           data-question-bank-attempts={allSubjectReport.totals.questionBankAttempts}
           data-question-bank-correct={allSubjectReport.totals.questionBankCorrect}
           data-question-bank-accuracy={allSubjectReport.totals.questionBankAccuracyPercent ?? "no-attempts"}
+          data-exact-pyq-attempts={allSubjectReport.totals.exactPyqAttempts}
+          data-exact-pyq-correct={allSubjectReport.totals.exactPyqCorrect}
+          data-exact-pyq-accuracy={allSubjectReport.totals.exactPyqAccuracyPercent ?? "no-attempts"}
           data-growth-percent={allSubjectReport.totals.growthPercent}
           className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
@@ -402,6 +409,7 @@ export default function ReportsPage() {
                     ? "No attempts"
                     : `${allSubjectReport.totals.questionBankAccuracyPercent}%`,
                 ],
+                ["Exact PYQ", allSubjectReport.totals.exactPyqAttempts],
                 ["Me-time", allSubjectReport.totals.meTimeChecks],
                 ["Current affairs", allSubjectReport.totals.currentAffairsUnlocked],
               ].map(([label, value]) => (
@@ -429,6 +437,9 @@ export default function ReportsPage() {
                 data-question-bank-attempts={subject.questionBankAttempts}
                 data-question-bank-correct={subject.questionBankCorrect}
                 data-question-bank-accuracy={subject.questionBankAccuracyPercent ?? "no-attempts"}
+                data-exact-pyq-attempts={subject.exactPyqAttempts}
+                data-exact-pyq-correct={subject.exactPyqCorrect}
+                data-exact-pyq-accuracy={subject.exactPyqAccuracyPercent ?? "no-attempts"}
                 data-recovery-items={subject.recoveryItems}
                 data-command-days={subject.commandDays}
                 data-ai-gap-count={subject.teacherDoubtCount}
@@ -460,10 +471,16 @@ export default function ReportsPage() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   <div className="rounded-md border border-[#d7e8df] bg-white/80 p-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">Readiness</p>
                     <p className="mt-1 text-xs font-black leading-4 text-[#13251d]">{subject.readinessSignal}</p>
+                  </div>
+                  <div className="rounded-md border border-[#d7e8df] bg-white/80 p-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">Exact PYQ</p>
+                    <p className="mt-1 text-xs font-black leading-4 text-[#13251d]">
+                      {subject.exactPyqAttempts} drill{subject.exactPyqAttempts === 1 ? "" : "s"}
+                    </p>
                   </div>
                   <div className="rounded-md border border-[#d7e8df] bg-white/80 p-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#657066]">Covered News</p>
@@ -703,6 +720,9 @@ function AllSubjectReportWindowCard({
       data-question-bank-attempts={report.questionBankAttempts}
       data-question-bank-correct={report.questionBankCorrect}
       data-question-bank-accuracy={report.questionBankAccuracyPercent ?? "no-attempts"}
+      data-exact-pyq-attempts={report.exactPyqAttempts}
+      data-exact-pyq-correct={report.exactPyqCorrect}
+      data-exact-pyq-accuracy={report.exactPyqAccuracyPercent ?? "no-attempts"}
       data-ai-gap-count={report.teacherDoubtCount}
       data-me-time-checks={report.meTimeChecks}
       data-current-affairs-unlocked={report.currentAffairsUnlocked}
@@ -730,6 +750,7 @@ function AllSubjectReportWindowCard({
             "QB accuracy",
             report.questionBankAccuracyPercent === null ? "No attempts" : `${report.questionBankAccuracyPercent}%`,
           ],
+          ["Exact PYQ", report.exactPyqAttempts],
           ["AI gaps", report.teacherDoubtCount],
           ["Me-time", report.meTimeChecks],
           ["News", report.currentAffairsUnlocked],
