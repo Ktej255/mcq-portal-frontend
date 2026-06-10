@@ -60,7 +60,7 @@ async function assertSupabaseAuthReachable() {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (redirectPath?: string) => Promise<void>;
   sendEmailOtp: (email: string, redirectPath?: string) => Promise<void>;
   verifyEmailOtp: (email: string, token: string, redirectPath?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -98,6 +98,18 @@ const mapSupabaseUser = (supabaseUser: SupabaseUser, accessToken?: string): Auth
     return sessionResult.data.session?.access_token ?? accessToken ?? "";
   },
 });
+
+function normalizeInternalRedirectPath(redirectPath = "/dashboard") {
+  if (!redirectPath.startsWith("/") || redirectPath.startsWith("//")) return "/dashboard";
+
+  try {
+    const url = new URL(redirectPath, window.location.origin);
+    if (url.origin !== window.location.origin) return "/dashboard";
+    return `${url.pathname}${url.search}${url.hash}` || "/dashboard";
+  } catch {
+    return "/dashboard";
+  }
+}
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -256,7 +268,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [devLogin, router]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (redirectPath = "/dashboard") => {
     if (authDebug) console.info("AUTH | signInWithGoogle triggered");
     if (activeAuthProvider === "supabase") {
       if (!supabase) {
@@ -264,7 +276,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       await assertSupabaseAuthReachable();
-      const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined;
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${normalizeInternalRedirectPath(redirectPath)}`
+          : undefined;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo },
@@ -300,7 +315,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await assertSupabaseAuthReachable();
 
     const emailRedirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}${redirectPath}` : undefined;
+      typeof window !== "undefined"
+        ? `${window.location.origin}${normalizeInternalRedirectPath(redirectPath)}`
+        : undefined;
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -332,7 +349,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     reconcileLocalUpscLearnerIdentity(data.user?.id);
     setUser(data.user ? mapSupabaseUser(data.user, data.session?.access_token) : null);
     setLoading(false);
-    router.replace(redirectPath);
+    router.replace(normalizeInternalRedirectPath(redirectPath));
   };
 
   const logout = async () => {

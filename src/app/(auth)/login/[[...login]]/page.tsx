@@ -107,7 +107,7 @@ export default function LoginPage() {
     setGoogleChecking(true);
 
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(redirectPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google login could not start right now.";
       unlockAuthFallback();
