@@ -12,7 +12,7 @@ import {
 import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { resolveToken } from "../auth/token-strategy";
-import { clearLocalMockToken, isLocalTestingHost, readLocalMockToken } from "../auth/local-testing";
+import { canUsePreviewAuth, clearLocalMockToken, isLocalTestingHost, readLocalMockToken } from "../auth/local-testing";
 import { activeAuthProvider, env, missingFirebaseEnvVars, missingSupabaseEnvVars } from "@/env";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -31,6 +31,26 @@ type AuthUser = User | {
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const mockAuthEnabled = env.NEXT_PUBLIC_USE_MOCK_AUTH === "true";
+
+async function assertSupabaseAuthReachable() {
+  if (!env.NEXT_PUBLIC_SUPABASE_URL) return;
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 3500);
+
+  try {
+    const healthUrl = new URL("/auth/v1/health", env.NEXT_PUBLIC_SUPABASE_URL).toString();
+    await fetch(healthUrl, {
+      cache: "no-store",
+      mode: "no-cors",
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error("Supabase auth is unreachable right now. Please use Student Preview while Google login is being restored.");
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -76,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   const devLogin = useCallback((email: string, uid: string, redirectPath?: string) => {
-    if (!isLocalTestingHost()) return;
+    if (!canUsePreviewAuth()) return;
     if (authDebug) console.info("AUTH | DEV LOGIN TRIGGERED | Email:", email);
     const token = `MOCK_TOKEN_local_${uid}`;
     const mockUser = {
@@ -234,6 +254,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error(`AUTH | Supabase auth is not initialized in signInWithGoogle. Missing: ${missingSupabaseEnvVars.join(", ")}`);
         return;
       }
+      await assertSupabaseAuthReachable();
       const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

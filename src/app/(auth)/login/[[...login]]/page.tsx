@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, BookOpenCheck, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { env } from "@/env";
-import { isLocalTestingHost } from "@/lib/auth/local-testing";
+import { canUsePreviewAuth, isLocalTestingHost, unlockAuthFallback } from "@/lib/auth/local-testing";
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const studentPreviewRoutes = ["/dashboard", "/upsc", "/reports", "/revision", "/history", "/tests"];
@@ -22,11 +22,15 @@ export default function LoginPage() {
   const redirectPath = searchParams.get("redirect") || "/dashboard";
   const [previewMode, setPreviewMode] = useState(false);
   const [localTestingHost, setLocalTestingHost] = useState(false);
+  const [googleChecking, setGoogleChecking] = useState(false);
+  const [authIssue, setAuthIssue] = useState("");
+  const [fallbackAvailable, setFallbackAvailable] = useState(false);
 
   useEffect(() => {
     const isLocalHost = isLocalTestingHost();
     setLocalTestingHost(isLocalHost);
     setPreviewMode(isLocalHost && isStudentPreviewRoute(redirectPath));
+    setFallbackAvailable(canUsePreviewAuth());
   }, [redirectPath]);
 
   useEffect(() => {
@@ -53,6 +57,28 @@ export default function LoginPage() {
       devLogin(email, uid, redirectPath);
     }
   }, [searchParams, devLogin, authLoading, user, redirectPath]);
+
+  const handlePreviewLogin = () => {
+    unlockAuthFallback();
+    setFallbackAvailable(true);
+    devLogin("student-preview@upsc.local", "student-preview", redirectPath);
+  };
+
+  const handleGoogleLogin = async () => {
+    setAuthIssue("");
+    setGoogleChecking(true);
+
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Google login could not start right now.";
+      unlockAuthFallback();
+      setFallbackAvailable(true);
+      setAuthIssue(message);
+    } finally {
+      setGoogleChecking(false);
+    }
+  };
 
   if (previewMode) {
     return (
@@ -115,18 +141,31 @@ export default function LoginPage() {
           </p>
 
           <div className="mt-6 space-y-3">
+            {authIssue ? (
+              <div className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-4 text-[#6f4a12]">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-black">Google login is temporarily unavailable</p>
+                    <p className="mt-1 text-sm font-semibold leading-6">
+                      {authIssue} Use Student Preview to continue testing while the live auth service is restored.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <Button
-              onClick={signInWithGoogle}
-              disabled={authLoading}
+              onClick={handleGoogleLogin}
+              disabled={authLoading || googleChecking}
               className="h-12 w-full rounded-md bg-[#1a3a2a] text-sm font-black text-white hover:bg-[#10291d]"
             >
-              Connect with Google <ArrowRight className="ml-2 h-4 w-4" />
+              {googleChecking ? "Checking Google login..." : "Connect with Google"} <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            {localTestingHost ? (
+            {localTestingHost || fallbackAvailable || authIssue ? (
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => devLogin("student-preview@upsc.local", "student-preview", redirectPath)}
+                onClick={handlePreviewLogin}
                 className="h-12 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
               >
                 Continue as Student Preview
