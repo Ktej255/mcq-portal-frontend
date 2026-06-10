@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2, KeyRound, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { env } from "@/env";
 import { canUsePreviewAuth, isLocalTestingHost, unlockAuthFallback } from "@/lib/auth/local-testing";
@@ -17,12 +18,17 @@ const isStudentPreviewRoute = (path: string) => {
 };
 
 export default function LoginPage() {
-  const { signInWithGoogle, devLogin, user, loading: authLoading } = useAuth();
+  const { signInWithGoogle, sendEmailOtp, verifyEmailOtp, devLogin, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/dashboard";
   const [previewMode, setPreviewMode] = useState(false);
   const [localTestingHost, setLocalTestingHost] = useState(false);
   const [googleChecking, setGoogleChecking] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [email, setEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [emailNotice, setEmailNotice] = useState("");
   const [authIssue, setAuthIssue] = useState("");
   const [fallbackAvailable, setFallbackAvailable] = useState(false);
 
@@ -62,6 +68,38 @@ export default function LoginPage() {
     unlockAuthFallback();
     setFallbackAvailable(true);
     devLogin("student-preview@upsc.local", "student-preview", redirectPath);
+  };
+
+  const handleEmailLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthIssue("");
+    setEmailNotice("");
+    setEmailSending(true);
+
+    try {
+      await sendEmailOtp(email.trim(), redirectPath);
+      setEmailNotice("Check your email for the login link. If you received a code, enter it below.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Email login could not start right now.";
+      setAuthIssue(message);
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleOtpVerify = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthIssue("");
+    setOtpVerifying(true);
+
+    try {
+      await verifyEmailOtp(email.trim(), otpCode.trim(), redirectPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "This code could not be verified.";
+      setAuthIssue(message);
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -136,28 +174,91 @@ export default function LoginPage() {
           <h2 className="mt-2 text-2xl font-black tracking-tight">Continue to UPSC Command</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
             {localTestingHost
-              ? "Google login will be used for real student accounts. Local study routes can open directly for testing."
-              : "Use your Google account to open your personal study workspace and synchronized learning progress."}
+              ? "Email login is the primary student path. Local study routes can still open directly for testing."
+              : "Enter your email to receive a secure login link and open your personal study workspace."}
           </p>
 
           <div className="mt-6 space-y-3">
+            <form onSubmit={handleEmailLogin} className="space-y-3">
+              <label className="block text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]" htmlFor="login-email">
+                Email login
+              </label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5d675f]" />
+                <Input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  placeholder="student@example.com"
+                  className="h-12 rounded-md border-[#cfc6b6] bg-white pl-10 text-sm font-bold text-[#13251d]"
+                  autoComplete="email"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={authLoading || emailSending || !email.trim()}
+                className="h-12 w-full rounded-md bg-[#1a3a2a] text-sm font-black text-white hover:bg-[#10291d]"
+              >
+                {emailSending ? "Sending login link..." : "Send email login link"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </form>
+
+            {emailNotice ? (
+              <div className="rounded-lg border border-[#1d9e75]/30 bg-[#eefaf4] p-4 text-sm font-bold leading-6 text-[#164633]">
+                {emailNotice}
+              </div>
+            ) : null}
+
+            {emailNotice ? (
+              <form onSubmit={handleOtpVerify} className="space-y-3 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                <label className="block text-xs font-black uppercase tracking-[0.16em] text-[#5d675f]" htmlFor="login-code">
+                  Optional OTP code
+                </label>
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5d675f]" />
+                  <Input
+                    id="login-code"
+                    value={otpCode}
+                    onChange={(event) => setOtpCode(event.target.value)}
+                    placeholder="6-digit code"
+                    className="h-12 rounded-md border-[#cfc6b6] bg-white pl-10 text-sm font-bold text-[#13251d]"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={authLoading || otpVerifying || !email.trim() || !otpCode.trim()}
+                  className="h-11 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
+                >
+                  {otpVerifying ? "Verifying code..." : "Verify code"}
+                </Button>
+              </form>
+            ) : null}
+
             {authIssue ? (
               <div className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-4 text-[#6f4a12]">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                   <div>
-                    <p className="text-sm font-black">Google login is temporarily unavailable</p>
+                    <p className="text-sm font-black">Login needs attention</p>
                     <p className="mt-1 text-sm font-semibold leading-6">
-                      {authIssue} Use Student Preview to continue testing while the live auth service is restored.
+                      {authIssue} Use Student Preview to continue testing if the live auth service is being restored.
                     </p>
                   </div>
                 </div>
               </div>
             ) : null}
             <Button
+              type="button"
               onClick={handleGoogleLogin}
               disabled={authLoading || googleChecking}
-              className="h-12 w-full rounded-md bg-[#1a3a2a] text-sm font-black text-white hover:bg-[#10291d]"
+              variant="outline"
+              className="h-12 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
             >
               {googleChecking ? "Checking Google login..." : "Connect with Google"} <ArrowRight className="ml-2 h-4 w-4" />
             </Button>

@@ -56,6 +56,8 @@ interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  sendEmailOtp: (email: string, redirectPath?: string) => Promise<void>;
+  verifyEmailOtp: (email: string, token: string, redirectPath?: string) => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
   devLogin: (email: string, uid: string, redirectPath?: string) => void;
@@ -65,6 +67,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signInWithGoogle: async () => {},
+  sendEmailOtp: async () => {},
+  verifyEmailOtp: async () => {},
   logout: async () => {},
   getToken: async () => null,
   devLogin: () => {},
@@ -279,6 +283,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const sendEmailOtp = async (email: string, redirectPath = "/dashboard") => {
+    if (activeAuthProvider !== "supabase") {
+      throw new Error("Email login is available after Supabase auth is enabled.");
+    }
+
+    if (!supabase) {
+      throw new Error(`Supabase auth is not initialized. Missing: ${missingSupabaseEnvVars.join(", ")}`);
+    }
+
+    await assertSupabaseAuthReachable();
+
+    const emailRedirectTo =
+      typeof window !== "undefined" ? `${window.location.origin}${redirectPath}` : undefined;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo,
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) throw error;
+  };
+
+  const verifyEmailOtp = async (email: string, token: string, redirectPath = "/dashboard") => {
+    if (activeAuthProvider !== "supabase") {
+      throw new Error("Email login is available after Supabase auth is enabled.");
+    }
+
+    if (!supabase) {
+      throw new Error(`Supabase auth is not initialized. Missing: ${missingSupabaseEnvVars.join(", ")}`);
+    }
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+
+    if (error) throw error;
+
+    reconcileLocalUpscLearnerIdentity(data.user?.id);
+    setUser(data.user ? mapSupabaseUser(data.user, data.session?.access_token) : null);
+    setLoading(false);
+    router.replace(redirectPath);
+  };
+
   const logout = async () => {
     if (authDebug) console.info("AUTH | logout triggered");
     if (readLocalMockToken()) {
@@ -325,7 +376,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, logout, getToken, devLogin }}>
+    <AuthContext.Provider
+      value={{ user, loading, signInWithGoogle, sendEmailOtp, verifyEmailOtp, logout, getToken, devLogin }}
+    >
       {children}
     </AuthContext.Provider>
   );
