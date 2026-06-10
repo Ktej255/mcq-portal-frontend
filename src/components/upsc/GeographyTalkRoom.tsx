@@ -124,8 +124,14 @@ function progressLearnerLevelLabel(learnerLevel: StudentLevel) {
   return "Beginner";
 }
 
+type SpeechRecognitionResultLike = {
+  readonly isFinal?: boolean;
+  0?: { transcript?: string };
+};
+
 type SpeechRecognitionEventLike = {
-  results: ArrayLike<{ 0: { transcript: string } }>;
+  resultIndex?: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
 };
 
 type SpeechRecognitionErrorEventLike = {
@@ -178,6 +184,38 @@ function getSpeechErrorMessage(error?: string) {
   return "Voice capture stopped before recording. Allow microphone access or type your answer here.";
 }
 
+function appendSpeechTranscript(current: string, transcript: string) {
+  const cleanedTranscript = transcript.replace(/\s+/g, " ").trim();
+  if (!cleanedTranscript) return current;
+  return `${current}${current.trim() ? " " : ""}${cleanedTranscript}`.trim();
+}
+
+function collectSpeechTranscripts(event: SpeechRecognitionEventLike) {
+  const startIndex =
+    typeof event.resultIndex === "number"
+      ? Math.max(0, Math.min(event.resultIndex, event.results.length))
+      : 0;
+  const finalSegments: string[] = [];
+  const interimSegments: string[] = [];
+
+  for (let index = startIndex; index < event.results.length; index += 1) {
+    const result = event.results[index];
+    const transcript = result?.[0]?.transcript?.replace(/\s+/g, " ").trim();
+    if (!transcript) continue;
+
+    if (result.isFinal === false) {
+      interimSegments.push(transcript);
+    } else {
+      finalSegments.push(transcript);
+    }
+  }
+
+  return {
+    finalTranscript: finalSegments.join(" ").trim(),
+    interimTranscript: interimSegments.join(" ").trim(),
+  };
+}
+
 async function requestMicrophonePermission() {
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -216,6 +254,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const [speechRecognition, setSpeechRecognition] = useState<SpeechRecognitionLike | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const [speechMessage, setSpeechMessage] = useState("");
+  const [speechInterimDraft, setSpeechInterimDraft] = useState("");
   const [audioNoteUrl, setAudioNoteUrl] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
@@ -524,6 +563,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   };
 
   const startAudioFallbackRecording = async (reason: string) => {
+    setSpeechInterimDraft("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setSpeechState("unsupported");
       setSpeechMessage(`${reason} Audio-note recording is unavailable in this browser. Type your answer here.`);
@@ -586,11 +626,13 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       speechRecognition.stop();
       setSpeechRecognition(null);
       setSpeechState("idle");
+      setSpeechInterimDraft("");
       setSpeechMessage("Recording stopped.");
       return;
     }
 
     setSpeechMessage("");
+    setSpeechInterimDraft("");
     clearAudioNote();
     const Recognition = getSpeechRecognitionConstructor();
     if (!Recognition) {
@@ -610,38 +652,47 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     const recognition = new Recognition();
     let stoppedByError = false;
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = "en-IN";
     recognition.onstart = () => {
       setSpeechRecognition(recognition);
       setSpeechState("listening");
+      setSpeechInterimDraft("");
       setSpeechMessage("Listening now. Speak your full answer in one flow.");
     };
     recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map((result) => result[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-      if (!transcript) return;
-      setAnswerDraft((current) => `${current}${current.trim() ? " " : ""}${transcript}`.trim());
-      clearAudioNote();
-      setSpeechMessage("Speech captured. You can continue speaking or stop recording.");
-      setAssessment(null);
-      setDiscussion(null);
-      setSaved(false);
+      const { finalTranscript, interimTranscript } = collectSpeechTranscripts(event);
+      setSpeechInterimDraft(interimTranscript);
+
+      if (interimTranscript && !finalTranscript) {
+        setSpeechMessage("Transcribing live. Keep speaking, then pause for the final text.");
+      }
+
+      if (finalTranscript) {
+        setAnswerDraft((current) => appendSpeechTranscript(current, finalTranscript));
+        clearAudioNote();
+        setSpeechMessage("Speech captured as text. You can continue speaking or stop recording.");
+        setAssessment(null);
+        setDiscussion(null);
+        setSaved(false);
+      }
     };
     recognition.onend = () => {
       setSpeechRecognition(null);
+      setSpeechInterimDraft("");
       if (!stoppedByError) {
         setSpeechState("idle");
         setSpeechMessage((current) =>
-          current && !current.startsWith("Listening") ? current : "Recording stopped. If no text appeared, try again or type the answer."
+          current && !current.startsWith("Listening") && !current.startsWith("Transcribing")
+            ? current
+            : "Recording stopped. If no text appeared, try again or type the answer."
         );
       }
     };
     recognition.onerror = (event) => {
       stoppedByError = true;
       setSpeechRecognition(null);
+      setSpeechInterimDraft("");
       if (event.error === "network") {
         void startAudioFallbackRecording("Browser speech recognition could not reach its speech service.");
         return;
@@ -654,6 +705,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     } catch {
       setSpeechRecognition(null);
       setSpeechState("error");
+      setSpeechInterimDraft("");
       setSpeechMessage("Voice capture could not start. Refresh once or type your answer here.");
     }
   };
@@ -863,6 +915,15 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                   )}
                 >
                   {speechMessage}
+                </span>
+              ) : null}
+              {speechInterimDraft ? (
+                <span
+                  aria-live="polite"
+                  data-testid="talk-speech-interim"
+                  className="w-full max-w-full rounded-md border border-[#cfc6b6] bg-white px-3 py-2 text-xs font-bold leading-5 text-[#2d4f40]"
+                >
+                  Transcribing: {speechInterimDraft}
                 </span>
               ) : null}
               {audioNoteUrl ? (
