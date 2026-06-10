@@ -107,16 +107,24 @@ type SpeechRecognitionEventLike = {
   results: ArrayLike<{ 0: { transcript: string } }>;
 };
 
+type SpeechRecognitionErrorEventLike = {
+  error?: string;
+  message?: string;
+};
+
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   start: () => void;
   stop: () => void;
 };
+
+type SpeechState = "idle" | "listening" | "unsupported" | "blocked" | "error";
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
@@ -127,6 +135,32 @@ function getSpeechRecognitionConstructor() {
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   };
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
+function getSpeechErrorMessage(error?: string) {
+  if (error === "not-allowed" || error === "service-not-allowed") {
+    return "Microphone permission is blocked. Allow microphone access for this site, then try again.";
+  }
+
+  if (error === "audio-capture") {
+    return "No working microphone was detected. Check the input device, then try again.";
+  }
+
+  if (error === "network") {
+    return "Browser speech recognition could not reach its speech service. Type the answer or try Chrome with microphone access.";
+  }
+
+  if (error === "no-speech") {
+    return "No speech was heard. Click Speak answer again and start speaking immediately.";
+  }
+
+  return "Voice capture stopped before recording. Allow microphone access or type your answer here.";
+}
+
+async function requestMicrophonePermission() {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getTracks().forEach((track) => track.stop());
 }
 
 function readSavedDoubtDiagnosis(progress?: SubjectDayProgress): AdaptiveTeacherDoubtDiagnosis | null {
@@ -165,7 +199,8 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
   const [submittedInCurrentVisit, setSubmittedInCurrentVisit] = useState(false);
   const [speechRecognition, setSpeechRecognition] = useState<SpeechRecognitionLike | null>(null);
-  const [speechState, setSpeechState] = useState<"idle" | "listening" | "unsupported">("idle");
+  const [speechState, setSpeechState] = useState<SpeechState>("idle");
+  const [speechMessage, setSpeechMessage] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
   const teacherRequestId = useRef(0);
@@ -510,6 +545,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     setSubmittedInCurrentVisit(false);
     setSpeechRecognition(null);
     setSpeechState("idle");
+    setSpeechMessage("");
     router.replace(`${basePath}/talk?day=${boundedDay}`, { scroll: false });
   };
 
@@ -695,24 +731,42 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       });
   };
 
-  const toggleSpeechCapture = () => {
+  const toggleSpeechCapture = async () => {
     if (speechState === "listening" && speechRecognition) {
       speechRecognition.stop();
       setSpeechRecognition(null);
       setSpeechState("idle");
+      setSpeechMessage("Recording stopped.");
       return;
     }
 
+    setSpeechMessage("");
     const Recognition = getSpeechRecognitionConstructor();
     if (!Recognition) {
       setSpeechState("unsupported");
+      setSpeechMessage("Voice capture is unavailable in this browser. Type your answer here.");
+      return;
+    }
+
+    try {
+      await requestMicrophonePermission();
+    } catch {
+      setSpeechRecognition(null);
+      setSpeechState("blocked");
+      setSpeechMessage("Microphone permission is blocked. Allow microphone access for this site, then try again.");
       return;
     }
 
     const recognition = new Recognition();
+    let stoppedByError = false;
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = "en-IN";
+    recognition.onstart = () => {
+      setSpeechRecognition(recognition);
+      setSpeechState("listening");
+      setSpeechMessage("Listening now. Speak your full answer in one flow.");
+    };
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
         .map((result) => result[0]?.transcript ?? "")
@@ -720,6 +774,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         .trim();
       if (!transcript) return;
       setAnswerDraft((current) => `${current}${current.trim() ? " " : ""}${transcript}`.trim());
+      setSpeechMessage("Speech captured. You can continue speaking or stop recording.");
       setChallengeDraft("");
       setDiscussionStep("explain");
       setAssessment(null);
@@ -732,15 +787,26 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     };
     recognition.onend = () => {
       setSpeechRecognition(null);
-      setSpeechState("idle");
+      if (!stoppedByError) {
+        setSpeechState("idle");
+        setSpeechMessage((current) =>
+          current && !current.startsWith("Listening") ? current : "Recording stopped. If no text appeared, try again or type the answer."
+        );
+      }
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      stoppedByError = true;
       setSpeechRecognition(null);
-      setSpeechState("idle");
+      setSpeechState(event.error === "not-allowed" || event.error === "service-not-allowed" ? "blocked" : "error");
+      setSpeechMessage(getSpeechErrorMessage(event.error));
     };
-    recognition.start();
-    setSpeechRecognition(recognition);
-    setSpeechState("listening");
+    try {
+      recognition.start();
+    } catch {
+      setSpeechRecognition(null);
+      setSpeechState("error");
+      setSpeechMessage("Voice capture could not start. Refresh once or type your answer here.");
+    }
   };
 
   if (!isLoaded || !isHydratedForActiveDay) {
@@ -928,9 +994,17 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                 >
                   <Gauge className="h-4 w-4" /> {teacherConnection === "checking" ? "Checking answer..." : "Check answer"}
                 </button>
-                {speechState === "unsupported" ? (
-                  <span className="flex min-h-11 items-center text-xs font-bold text-[#756f64]">
-                    Voice capture is unavailable in this browser. Type your answer here.
+                {speechMessage ? (
+                  <span
+                    aria-live="polite"
+                    className={cn(
+                      "flex min-h-11 items-center text-xs font-bold",
+                      speechState === "blocked" || speechState === "error" || speechState === "unsupported"
+                        ? "text-[#9a4b0f]"
+                        : "text-[#756f64]"
+                    )}
+                  >
+                    {speechMessage}
                   </span>
                 ) : null}
               </div>
