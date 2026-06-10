@@ -33,20 +33,25 @@ const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const mockAuthEnabled = env.NEXT_PUBLIC_USE_MOCK_AUTH === "true";
 
 async function assertSupabaseAuthReachable() {
-  if (!env.NEXT_PUBLIC_SUPABASE_URL) return;
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return;
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 3500);
 
   try {
-    const healthUrl = new URL("/auth/v1/health", env.NEXT_PUBLIC_SUPABASE_URL).toString();
-    await fetch(healthUrl, {
+    const settingsUrl = new URL("/auth/v1/settings", env.NEXT_PUBLIC_SUPABASE_URL).toString();
+    const response = await fetch(settingsUrl, {
       cache: "no-store",
-      mode: "no-cors",
+      headers: {
+        apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      },
       signal: controller.signal,
     });
+    if (!response.ok) {
+      throw new Error("Supabase auth key was rejected.");
+    }
   } catch {
-    throw new Error("Supabase auth is unreachable right now. Please use Student Preview while Google login is being restored.");
+    throw new Error("Supabase auth is unreachable or the public API key is invalid right now. Please use Student Preview while auth is being restored.");
   } finally {
     window.clearTimeout(timeout);
   }
