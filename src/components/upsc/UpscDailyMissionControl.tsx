@@ -1489,8 +1489,9 @@ export function UpscDailyMissionControl() {
             </div>
             <Gauge className="h-6 w-6 text-[#085041]" />
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-4">
             {[
+              ["Prelims Showcase", "/upsc/prelims-2026-showcase"],
               ["Content Command", "/upsc/content-command"],
               ["MCQ Command", "/upsc/mcq-command"],
               ["Revision Command", "/upsc/revision-command"],

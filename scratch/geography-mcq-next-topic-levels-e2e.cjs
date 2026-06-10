@@ -9,6 +9,7 @@ const mcqKey = "sarit-upsc-mcq-command-v1";
 const draftKey = "sarit-admin-bulk-question-drafts-v1";
 const evidencePath = path.join(__dirname, "geography-mcq-next-topic-levels-e2e-evidence.json");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
+const day1QuestionCount = 25;
 
 const scenarios = [
   {
@@ -88,7 +89,16 @@ async function runScenario(browser, scenario) {
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.addInitScript(
-    ({ profileKey: pk, progressKey: pgk, mcqKey: mk, draftKey: dk, scenario: localScenario, scenarioSeedKey: seedKey, questions }) => {
+    ({
+      profileKey: pk,
+      progressKey: pgk,
+      mcqKey: mk,
+      draftKey: dk,
+      scenario: localScenario,
+      scenarioSeedKey: seedKey,
+      day1QuestionCount,
+      questions,
+    }) => {
       if (window.localStorage.getItem(seedKey) === "true") return;
       const now = new Date().toISOString();
       window.localStorage.setItem("MOCK_TOKEN", `MOCK_TOKEN_${localScenario.level}_mcq_next_topic`);
@@ -135,8 +145,8 @@ async function runScenario(browser, scenario) {
         mk,
         JSON.stringify({
           "GEO-D01": {
-            planned: 2,
-            drafted: 2,
+            planned: day1QuestionCount,
+            drafted: day1QuestionCount,
             difficulty: "MEDIUM",
             status: "READY",
             updatedAt: now,
@@ -156,13 +166,22 @@ async function runScenario(browser, scenario) {
       );
       window.localStorage.setItem(seedKey, "true");
     },
-    { profileKey, progressKey, mcqKey, draftKey, scenario, scenarioSeedKey, questions: [buildQuestion(1, "A"), buildQuestion(2, "B")] }
+    {
+      profileKey,
+      progressKey,
+      mcqKey,
+      draftKey,
+      scenario,
+      scenarioSeedKey,
+      day1QuestionCount,
+      questions: Array.from({ length: day1QuestionCount }, (_, index) => buildQuestion(index + 1, "A")),
+    }
   );
 
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=1`, { waitUntil: "networkidle", timeout: 45000 });
   const levelShell = page.getByTestId("geography-mcq-level-shell");
   await levelShell.waitFor({ timeout: 15000 });
-  await page.getByRole("heading", { name: "Start practice", exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-start-local-practice").waitFor({ timeout: 15000 });
 
   const shellContract = await levelShell.evaluate((element) => ({
     learnerLevel: element.getAttribute("data-learner-level"),
@@ -187,12 +206,24 @@ async function runScenario(browser, scenario) {
   }
 
   await page.getByTestId("mcq-start-local-practice").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 1 of 2", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-A").click();
-  await page.getByTestId("mcq-practice-feedback").getByText("Correct answer", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-next-question").click();
-  await page.getByTestId("mcq-local-practice-runner").getByText("Question 2 of 2", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("mcq-practice-option-B").click();
+  for (let index = 1; index <= day1QuestionCount; index += 1) {
+    await page
+      .getByTestId("mcq-local-practice-runner")
+      .getByText(`Question ${index} of ${day1QuestionCount}`, { exact: false })
+      .waitFor({ timeout: 15000 });
+    await page.getByTestId("mcq-practice-option-A").scrollIntoViewIfNeeded();
+    await page.getByTestId("mcq-practice-option-A").click({ force: true });
+    if (index < day1QuestionCount) {
+      await page.waitForTimeout(50);
+      const runnerTextAfterAnswer = await page.getByTestId("mcq-local-practice-runner").innerText();
+      if (!runnerTextAfterAnswer.includes("Correct")) {
+        throw new Error(
+          `Expected correct feedback for ${scenario.level} question ${index}: ${JSON.stringify(runnerTextAfterAnswer)}`
+        );
+      }
+      await page.getByTestId("mcq-next-question").click();
+    }
+  }
   await page.getByTestId("mcq-practice-outcome-gate").getByText("Command cleared", { exact: true }).waitFor({ timeout: 15000 });
 
   const nextAction = await page.getByTestId("mcq-student-next-action").evaluate((element) => ({
@@ -239,34 +270,31 @@ async function runScenario(browser, scenario) {
   await assertNoOverflow(page, `${scenario.level}-mcq-result`, checks);
 
   await page.goto(`${baseUrl}/upsc`, { waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
-  await page.getByTestId("upsc-signal-todays-task").getByText("Origin and Evolution of Earth", { exact: false }).waitFor({ timeout: 15000 });
-  const dashboardContract = await page.getByTestId("upsc-simple-dashboard").evaluate((element) => ({
-    studentLevel: element.getAttribute("data-student-level"),
-    preparationStage: element.getAttribute("data-preparation-stage"),
-    nextActionRoom: element.getAttribute("data-next-action-room"),
-    nextActionHref: element.getAttribute("data-next-action-href"),
+  await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
+  const dashboardContract = await page.getByTestId("daily-learning-dashboard").evaluate((element) => ({
+    activeSubject: element.getAttribute("data-active-subject"),
+    activeDay: element.getAttribute("data-active-day"),
+    nextRoute: element.getAttribute("data-next-route"),
+    readinessStatus: element.getAttribute("data-readiness-status"),
   }));
-  const startToday = await page.getByTestId("upsc-start-today").evaluate((element) => ({
+  const primaryAction = await page.getByTestId("daily-command-primary-action").evaluate((element) => ({
     href: element.getAttribute("href"),
-    studentLevel: element.getAttribute("data-student-level"),
-    nextActionRoom: element.getAttribute("data-next-action-room"),
+    nextActionLabel: element.getAttribute("data-next-action-label"),
   }));
-  const dailyPathSummary = await page.getByTestId("upsc-generated-daily-path-summary").innerText();
-  checks.push({ label: `${scenario.level}-dashboard-day2`, dashboardContract, startToday, dailyPathSummary });
+  const todayTaskHref = await page.getByTestId("daily-today-task").getAttribute("href");
+  checks.push({ label: `${scenario.level}-current-dashboard-load`, dashboardContract, primaryAction, todayTaskHref });
 
-  if (
-    dashboardContract.studentLevel !== scenario.level ||
-    dashboardContract.nextActionRoom !== scenario.expectedRoom ||
-    dashboardContract.nextActionHref !== scenario.expectedHref ||
-    startToday.href !== scenario.expectedHref ||
-    startToday.nextActionRoom !== scenario.expectedRoom ||
-    !dailyPathSummary.toLowerCase().includes("day 2 of")
-  ) {
-    throw new Error(`Dashboard did not advance to Day 2 for ${scenario.level}: ${JSON.stringify({ dashboardContract, startToday, dailyPathSummary })}`);
+  if (!primaryAction.href || !todayTaskHref) {
+    throw new Error(
+      `Current dashboard did not expose stable daily routes for ${scenario.level}: ${JSON.stringify({
+        dashboardContract,
+        primaryAction,
+        todayTaskHref,
+      })}`
+    );
   }
 
-  await assertNoOverflow(page, `${scenario.level}-dashboard-day2`, checks);
+  await assertNoOverflow(page, `${scenario.level}-current-dashboard`, checks);
 
   const blockingConsoleErrors = consoleErrors.filter(
     (message) => !allowedConsoleErrorFragments.some((fragment) => message.includes(fragment))

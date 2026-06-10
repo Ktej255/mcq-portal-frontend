@@ -257,13 +257,44 @@ function hasStarted(progress?: DailyPlannerProgress, questionBankAttempts: Daily
   );
 }
 
+function correctedTalkHref(progress?: DailyPlannerProgress) {
+  const recoveryProgress = progress as
+    | (DailyPlannerProgress & {
+        recoveryCompleted?: boolean;
+        recoveryStatus?: string;
+        recoveryNextRoute?: string;
+      })
+    | undefined;
+  const href = progress?.mcqNextRoute ?? recoveryProgress?.recoveryNextRoute ?? "";
+  const isCorrectedTalkReady = Boolean(
+    progress?.mcqOutcome === "Revisit" &&
+      progress?.revisitQueued === false &&
+      recoveryProgress?.recoveryCompleted &&
+      recoveryProgress.recoveryStatus === "talk-ready" &&
+      href.includes("/talk")
+  );
+
+  return isCorrectedTalkReady ? href : null;
+}
+
+function correctedTalkActionLabel(progress?: DailyPlannerProgress) {
+  const recoveryProgress = progress as
+    | (DailyPlannerProgress & {
+        recoveryNextActionLabel?: string;
+      })
+    | undefined;
+
+  return progress?.mcqNextActionLabel ?? recoveryProgress?.recoveryNextActionLabel ?? "Explain corrected answer";
+}
+
 function needsRecovery(progress?: DailyPlannerProgress, questionBankAttempts: DailyPlannerQuestionBankAttempt[] = []) {
   return Boolean(
-    progress?.revisitQueued ||
+    !correctedTalkHref(progress) &&
+      (progress?.revisitQueued ||
       progress?.talkBand === "Revisit" ||
       progress?.mcqOutcome === "Revisit" ||
       progress?.confidence === "Shaky" ||
-      questionBankPracticeSignal(questionBankAttempts).hasIncorrect
+      questionBankPracticeSignal(questionBankAttempts).hasIncorrect)
   );
 }
 
@@ -323,6 +354,24 @@ function routeFor(subjectSlug: string, room: "watch" | "talk" | "mcq-readiness" 
 
 function findSession(sessions: SubjectSession[], day: number) {
   return sessions.find((session) => session.day === day) ?? sessions[0];
+}
+
+function findCorrectedTalkDue(input: PlannerInput) {
+  return input.sessions
+    .map((session) => {
+      const progress = input.progress[String(session.day)];
+      const href = correctedTalkHref(progress);
+      if (!progress || !href) return null;
+      return {
+        session,
+        progress,
+        attempts: attemptsForDay(input, session.day),
+        href,
+        actionLabel: correctedTalkActionLabel(progress),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => left.session.day - right.session.day)[0];
 }
 
 function findRevisionDue(input: PlannerInput) {
@@ -416,6 +465,16 @@ function buildGap(
     };
   }
 
+  const correctedTalkDue = findCorrectedTalkDue(input);
+  if (correctedTalkDue) {
+    return {
+      title: correctedTalkDue.actionLabel,
+      detail: `Day ${correctedTalkDue.session.day}: short revision is saved. Explain the corrected answer before any fresh load opens.`,
+      scoreLabel: "Repair saved",
+      tone: "neutral",
+    };
+  }
+
   const active = input.progress[String(input.selectedDay)];
   const previous = input.progress[String(input.selectedDay - 1)];
   const activeAttempts = attemptsForDay(input, input.selectedDay);
@@ -425,6 +484,16 @@ function buildGap(
   const referenceAttempts =
     revisionDue?.attempts ?? (activeHasUnfinishedEvidence ? activeAttempts : previous ? previousAttempts : activeAttempts);
   const weakSkill = weakSkillLabel(reference);
+  const referenceCorrectedTalkHref = correctedTalkHref(reference);
+
+  if (referenceCorrectedTalkHref) {
+    return {
+      title: correctedTalkActionLabel(reference),
+      detail: "Short revision is saved. The next step is to explain the corrected answer before any fresh load opens.",
+      scoreLabel: "Repair saved",
+      tone: "neutral",
+    };
+  }
 
   if (needsRecovery(reference, referenceAttempts)) {
     const score =
@@ -495,6 +564,8 @@ function buildTodayTask(
   const active = input.progress[String(input.selectedDay)];
   const activeAttempts = attemptsForDay(input, input.selectedDay);
   const activeQuestionBankSignal = questionBankPracticeSignal(activeAttempts);
+  const activeCorrectedTalkHref = correctedTalkHref(active);
+  const correctedTalkDue = findCorrectedTalkDue(input);
 
   if (teacherDoubt) {
     return {
@@ -511,6 +582,24 @@ function buildTodayTask(
       detail: revisionDue.source.title,
       href: routeFor(input.subjectSlug, "revisit", revisionDue.source.day),
       actionLabel: "Open revisit",
+    };
+  }
+
+  if (correctedTalkDue) {
+    return {
+      title: `Talk Day ${correctedTalkDue.session.day}`,
+      detail: "Short revision is complete. Explain the corrected answer to close the MCQ repair cleanly.",
+      href: correctedTalkDue.href,
+      actionLabel: correctedTalkDue.actionLabel,
+    };
+  }
+
+  if (activeCorrectedTalkHref) {
+    return {
+      title: `Talk Day ${input.selectedDay}`,
+      detail: "Short revision is complete. Explain the corrected answer to close the MCQ repair cleanly.",
+      href: activeCorrectedTalkHref,
+      actionLabel: correctedTalkActionLabel(active),
     };
   }
 
@@ -618,13 +707,17 @@ function buildSessionReadiness(
   input: PlannerInput,
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["sessionReadiness"] {
-  const active = input.progress[String(input.selectedDay)];
-  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const correctedTalkDue = findCorrectedTalkDue(input);
+  const effectiveDay = correctedTalkDue?.session.day ?? input.selectedDay;
+  const active = correctedTalkDue?.progress ?? input.progress[String(effectiveDay)];
+  const activeAttempts = correctedTalkDue?.attempts ?? attemptsForDay(input, effectiveDay);
   const questionBankSignal = questionBankPracticeSignal(activeAttempts);
   const questionBankLabel = questionBankPracticeLabel(activeAttempts);
   const meTimeReady = Boolean(active?.meTimeCompletedAt);
   const recallReady = hasRecallBaseline(active);
   const watchReady = Boolean(active?.watched);
+  const activeCorrectedTalkHref = correctedTalkHref(active);
+  const activeCorrectedTalkLabel = correctedTalkActionLabel(active);
   const talkReady = typeof active?.talkScore === "number" && active.talkScore >= recallTarget;
   const mcqReady = Boolean(
     (active?.mcqCompleted && active.mcqOutcome !== "Pending") ||
@@ -655,12 +748,20 @@ function buildSessionReadiness(
       label: "Practice evidence",
       detail: mcqReady
         ? questionBankLabel ?? `${active?.mcqScorePercent ?? 0}% MCQ evidence saved.`
+        : activeCorrectedTalkHref
+          ? "Repair proof is saved. Corrected talk should run before fresh practice is retried."
         : questionBankSignal.hasIncorrect
           ? questionBankSignal.hasIncorrectExactPyq
             ? `${questionBankLabel}: repair exact PYQ trap.`
             : `${questionBankLabel}: repair incorrect trap.`
           : "Fresh MCQ evidence is still pending.",
-      status: mcqReady ? "done" : active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect ? "repair" : "pending",
+      status: mcqReady
+        ? "done"
+        : activeCorrectedTalkHref
+          ? "pending"
+          : active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect
+            ? "repair"
+            : "pending",
     },
   ];
   const scorePercent = Math.round(
@@ -680,15 +781,28 @@ function buildSessionReadiness(
     };
   }
 
+  if (activeCorrectedTalkHref) {
+    return {
+      title: activeCorrectedTalkLabel,
+      detail: "The MCQ repair note is saved. The student should now explain the corrected answer with the AI teacher.",
+      href: activeCorrectedTalkHref,
+      actionLabel: activeCorrectedTalkLabel,
+      statusLabel: "Corrected talk",
+      scorePercent,
+      tone: "neutral",
+      checklist,
+    };
+  }
+
   if (needsRecovery(active, activeAttempts)) {
     return {
-      title: `Recovery is active for Day ${input.selectedDay}`,
+      title: `Recovery is active for Day ${effectiveDay}`,
       detail: questionBankSignal.hasIncorrectExactPyq
         ? "The solved-question ledger has an incorrect exact PYQ trap, so the next session should stay inside revisit."
         : questionBankSignal.hasIncorrect
         ? "The solved-question ledger has an incorrect trap, so the next session should stay inside revisit."
         : "The next session should stay inside revisit until the weak signal is resolved.",
-      href: routeFor(input.subjectSlug, "revisit", input.selectedDay),
+      href: routeFor(input.subjectSlug, "revisit", effectiveDay),
       actionLabel: "Open revisit",
       statusLabel: "Recovery lock",
       scorePercent,
@@ -714,7 +828,7 @@ function buildSessionReadiness(
     return {
       title: "Recall baseline is pending",
       detail: "The student should first explain what is already known so the gap is measured before content opens.",
-      href: routeFor(input.subjectSlug, "talk", input.selectedDay),
+      href: routeFor(input.subjectSlug, "talk", effectiveDay),
       actionLabel: "Start recall",
       statusLabel: "Recall first",
       scorePercent,
@@ -727,7 +841,7 @@ function buildSessionReadiness(
     return {
       title: "Class can start now",
       detail: "Mind-state and known-points evidence exist. Open the focused lesson or repair class for this day.",
-      href: routeFor(input.subjectSlug, "watch", input.selectedDay),
+      href: routeFor(input.subjectSlug, "watch", effectiveDay),
       actionLabel: "Open class",
       statusLabel: "Class ready",
       scorePercent,
@@ -740,7 +854,7 @@ function buildSessionReadiness(
     return {
       title: "Discussion is the next gate",
       detail: "Class evidence exists. The next proof is a 95 percent recall explanation with the AI teacher.",
-      href: routeFor(input.subjectSlug, "talk", input.selectedDay),
+      href: routeFor(input.subjectSlug, "talk", effectiveDay),
       actionLabel: "Open talk",
       statusLabel: "Talk gate",
       scorePercent,
@@ -753,7 +867,7 @@ function buildSessionReadiness(
     return {
       title: "Fresh MCQ evidence is next",
       detail: "Recall is strong enough. Complete the day-specific MCQ set before advancing.",
-      href: routeFor(input.subjectSlug, "mcq-readiness", input.selectedDay),
+      href: routeFor(input.subjectSlug, "mcq-readiness", effectiveDay),
       actionLabel: "Open MCQs",
       statusLabel: "Practice ready",
       scorePercent,
@@ -765,7 +879,7 @@ function buildSessionReadiness(
   return {
     title: "Session is command-ready",
     detail: "Mind-state, recall, class proof, discussion, and practice evidence are all saved for this day.",
-    href: routeFor(input.subjectSlug, "track", input.selectedDay),
+    href: routeFor(input.subjectSlug, "track", effectiveDay),
     actionLabel: "Open track",
     statusLabel: "Cleared",
     scorePercent,
@@ -778,12 +892,15 @@ function buildTomorrowAdjustment(
   input: PlannerInput,
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["tomorrowAdjustment"] {
-  const active = input.progress[String(input.selectedDay)];
-  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const correctedTalkDue = findCorrectedTalkDue(input);
+  const effectiveDay = correctedTalkDue?.session.day ?? input.selectedDay;
+  const active = correctedTalkDue?.progress ?? input.progress[String(effectiveDay)];
+  const activeAttempts = correctedTalkDue?.attempts ?? attemptsForDay(input, effectiveDay);
   const questionBankSignal = questionBankPracticeSignal(activeAttempts);
-  const currentSession = findSession(input.sessions, input.selectedDay);
-  const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
+  const currentSession = findSession(input.sessions, effectiveDay);
+  const nextDay = Math.min(effectiveDay + 1, input.sessions.length);
   const nextSession = findSession(input.sessions, nextDay);
+  const activeCorrectedTalkHref = correctedTalkDue?.href ?? correctedTalkHref(active);
 
   if (teacherDoubt) {
     return {
@@ -791,6 +908,15 @@ function buildTomorrowAdjustment(
       detail: `Tomorrow starts with the AI teacher's ${teacherDoubt.category} gap before any new topic opens.`,
       href: teacherDoubt.href,
       statusLabel: "Repair first",
+    };
+  }
+
+  if (activeCorrectedTalkHref) {
+    return {
+      title: `Return Day ${currentSession.day} to corrected Talk`,
+      detail: "Short revision is complete, but the corrected answer still needs one AI discussion before the next topic opens.",
+      href: activeCorrectedTalkHref,
+      statusLabel: "Corrected talk",
     };
   }
 
@@ -869,14 +995,17 @@ function buildNextSessionProof(
   tomorrowAdjustment: DailyPlannerDecision["tomorrowAdjustment"],
   teacherDoubt: DailyPlannerDecision["teacherDoubt"]
 ): DailyPlannerDecision["nextSessionProof"] {
-  const active = input.progress[String(input.selectedDay)];
-  const activeAttempts = attemptsForDay(input, input.selectedDay);
+  const correctedTalkDue = findCorrectedTalkDue(input);
+  const effectiveDay = correctedTalkDue?.session.day ?? input.selectedDay;
+  const active = correctedTalkDue?.progress ?? input.progress[String(effectiveDay)];
+  const activeAttempts = correctedTalkDue?.attempts ?? attemptsForDay(input, effectiveDay);
   const questionBankSignal = questionBankPracticeSignal(activeAttempts);
   const questionBankLabel = questionBankPracticeLabel(activeAttempts);
-  const currentSession = findSession(input.sessions, input.selectedDay);
-  const nextDay = Math.min(input.selectedDay + 1, input.sessions.length);
+  const currentSession = findSession(input.sessions, effectiveDay);
+  const nextDay = Math.min(effectiveDay + 1, input.sessions.length);
   const targetDay = tomorrowAdjustment.statusLabel === "Advance" ? nextDay : currentSession.day;
-  const recentWindow = input.sessions.slice(Math.max(0, input.selectedDay - 7), input.selectedDay);
+  const activeCorrectedTalkHref = correctedTalkHref(active);
+  const recentWindow = input.sessions.slice(Math.max(0, effectiveDay - 7), effectiveDay);
   const recentStarted = recentWindow.filter((session) =>
     hasStarted(input.progress[String(session.day)], attemptsForDay(input, session.day))
   ).length;
@@ -896,7 +1025,7 @@ function buildNextSessionProof(
         ? "used"
         : "missing";
   const practiceStatus =
-    active?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect
+    (!activeCorrectedTalkHref && active?.mcqOutcome === "Revisit") || questionBankSignal.hasIncorrect
       ? "blocked"
       : (active?.mcqCompleted && active.mcqOutcome !== "Pending") || questionBankSignal.hasEvidence
         ? "used"
@@ -975,6 +1104,7 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
   const sourceAttempts = attemptsForDay(input, sourceDay);
   const questionBankSignal = questionBankPracticeSignal(sourceAttempts);
   const questionBankLabel = questionBankPracticeLabel(sourceAttempts);
+  const sourceCorrectedTalkHref = correctedTalkHref(progress);
   const sourceDoubt =
     progress && hasTeacherDoubt(progress)
       ? {
@@ -1004,7 +1134,7 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
   const practiceStatus =
     commandReady
       ? "used"
-      : progress?.mcqOutcome === "Revisit" || questionBankSignal.hasIncorrect
+      : (!sourceCorrectedTalkHref && progress?.mcqOutcome === "Revisit") || questionBankSignal.hasIncorrect
       ? "blocked"
       : (progress?.mcqCompleted && progress.mcqOutcome !== "Pending") || questionBankSignal.hasEvidence
         ? "used"
@@ -1070,6 +1200,19 @@ function buildTodayOriginProof(input: PlannerInput): DailyPlannerDecision["today
       href: sourceDoubt.href,
       statusLabel: "Yesterday repair",
       evidenceSummary: `Yesterday produced an AI ${sourceDoubt.category} gap, so new work should wait.`,
+      evidence,
+    };
+  }
+
+  if (sourceCorrectedTalkHref) {
+    return {
+      sourceDay,
+      targetDay: sourceDay,
+      title: `Day ${sourceDay} corrected Talk is next`,
+      detail: correctedTalkActionLabel(progress),
+      href: sourceCorrectedTalkHref,
+      statusLabel: "Yesterday corrected talk",
+      evidenceSummary: "Yesterday's short revision is saved, so the next route is corrected explanation, not another repair loop.",
       evidence,
     };
   }

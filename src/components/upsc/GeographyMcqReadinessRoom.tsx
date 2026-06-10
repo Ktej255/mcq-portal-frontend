@@ -216,6 +216,19 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
             : "Result decides route",
     },
   ];
+  const freshSetState = isReady || hasPracticeResult ? "ready" : practiceStarted ? "active" : "preparing";
+  const scoreSignalText = hasPracticeResult
+    ? `${resolvedCorrectCount}/${resolvedTotal} correct`
+    : practiceStarted
+      ? `${answeredCount}/${freshQuestions.length} answered`
+      : "Not started";
+  const nextRouteSignalText = hasPracticeResult
+    ? resolvedOutcome === "Command"
+      ? commandActionTitle
+      : "Open short revision"
+    : isReady
+      ? "Start practice"
+      : "Wait for reviewed set";
 
   const persistPracticeAnswer = (option: string) => {
     const nextAnswers = {
@@ -359,6 +372,12 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
           data-next-topic-route={nextDayHref}
           data-visible-mode="single-action-practice"
           data-student-surface="compact-one-action"
+          data-signal-model="mcq-four-signal-one-action"
+          data-essential-signal-count="4"
+          data-essential-signals="recall-cleared|fresh-set|score-outcome|next-route"
+          data-fresh-set-state={freshSetState}
+          data-next-action-route={hasPracticeResult ? nextActionHref : isReady ? "#practice" : ""}
+          data-next-action-label={nextRouteSignalText}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
         >
           <Link href={`/upsc/geography?day=${activeSession.day}`} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
@@ -402,6 +421,95 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
               >
                 Discussion cleared: {Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}% recall
               </p>
+
+              <section
+                data-testid="mcq-four-signal-grid"
+                data-signal-count="4"
+                data-fresh-set-state={freshSetState}
+                data-visible-talk-score={Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}
+                data-outcome={resolvedOutcome}
+                data-score-percent={resolvedScorePercent}
+                data-next-action-route={hasPracticeResult ? nextActionHref : isReady ? "#practice" : ""}
+                data-next-action-label={nextRouteSignalText}
+                className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              >
+                <div
+                  data-testid="mcq-signal-recall-cleared"
+                  data-signal="recall-cleared"
+                  data-visible-talk-score={Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}
+                  className="rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-3"
+                >
+                  <BrainCircuit className="h-5 w-5 text-[#1d9e75]" />
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    Recall cleared
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">
+                    {Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}%
+                  </p>
+                </div>
+
+                <div
+                  data-testid="mcq-signal-fresh-set"
+                  data-signal="fresh-set"
+                  data-fresh-set-state={freshSetState}
+                  data-ready={isReady || hasPracticeResult ? "true" : "false"}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                >
+                  <ClipboardCheck className="h-5 w-5 text-[#1d9e75]" />
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    Fresh set
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">
+                    {isReady || hasPracticeResult ? "Ready" : `${freshQuestions.length}/${plannedQuestionCount} reviewed`}
+                  </p>
+                </div>
+
+                <div
+                  data-testid="mcq-signal-score-outcome"
+                  data-signal="score-outcome"
+                  data-outcome={resolvedOutcome}
+                  data-score-percent={resolvedScorePercent}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                >
+                  <RotateCcw className="h-5 w-5 text-[#1d9e75]" />
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                    Score outcome
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{scoreSignalText}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{resolvedOutcome}</p>
+                </div>
+
+                {hasPracticeResult ? (
+                  <Link
+                    href={nextActionHref}
+                    data-testid="mcq-signal-next-route"
+                    data-signal="next-route"
+                    data-next-action-route={nextActionHref}
+                    data-next-action-label={nextRouteSignalText}
+                    className="rounded-lg border border-[#1d9e75] bg-[#e7f5ee] p-3 transition hover:border-[#1a3a2a] hover:bg-white"
+                  >
+                    <ArrowRight className="h-5 w-5 text-[#1d9e75]" />
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                      Next route
+                    </p>
+                    <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{nextRouteSignalText}</p>
+                  </Link>
+                ) : (
+                  <div
+                    data-testid="mcq-signal-next-route"
+                    data-signal="next-route"
+                    data-next-action-route={isReady ? "#practice" : ""}
+                    data-next-action-label={nextRouteSignalText}
+                    className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                  >
+                    <ArrowRight className="h-5 w-5 text-[#1d9e75]" />
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                      Next route
+                    </p>
+                    <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{nextRouteSignalText}</p>
+                  </div>
+                )}
+              </section>
             </div>
 
             {!practiceStarted || hasPracticeResult ? (

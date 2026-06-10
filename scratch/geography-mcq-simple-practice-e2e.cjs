@@ -112,6 +112,88 @@ async function assertStudentCopy(page, label, checks) {
   if (leaked.length > 0) throw new Error(`${label} leaked operator language: ${JSON.stringify(leaked)}`);
 }
 
+async function assertMcqFourSignalContract(page, expected, checks) {
+  const shell = page.getByTestId("geography-mcq-level-shell");
+  const grid = page.getByTestId("mcq-four-signal-grid");
+  await grid.waitFor({ timeout: 15000 });
+
+  const shellContract = await shell.evaluate((node) => ({
+    signalModel: node.getAttribute("data-signal-model"),
+    signalCount: node.getAttribute("data-essential-signal-count"),
+    signals: node.getAttribute("data-essential-signals"),
+    freshSetState: node.getAttribute("data-fresh-set-state"),
+    nextActionRoute: node.getAttribute("data-next-action-route"),
+    nextActionLabel: node.getAttribute("data-next-action-label"),
+  }));
+
+  const gridContract = await grid.evaluate((node) => ({
+    signalCount: node.getAttribute("data-signal-count"),
+    freshSetState: node.getAttribute("data-fresh-set-state"),
+    talkScore: node.getAttribute("data-visible-talk-score"),
+    outcome: node.getAttribute("data-outcome"),
+    scorePercent: node.getAttribute("data-score-percent"),
+    nextActionRoute: node.getAttribute("data-next-action-route"),
+    nextActionLabel: node.getAttribute("data-next-action-label"),
+    text: node.textContent || "",
+  }));
+
+  const signals = await grid.locator("[data-testid^='mcq-signal-']").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      id: node.getAttribute("data-testid"),
+      signal: node.getAttribute("data-signal"),
+      href: node.getAttribute("href"),
+      ready: node.getAttribute("data-ready"),
+      freshSetState: node.getAttribute("data-fresh-set-state"),
+      outcome: node.getAttribute("data-outcome"),
+      scorePercent: node.getAttribute("data-score-percent"),
+      nextRoute: node.getAttribute("data-next-action-route"),
+      nextLabel: node.getAttribute("data-next-action-label"),
+      text: node.textContent || "",
+    }))
+  );
+
+  checks.push({ label: expected.label, shellContract, gridContract, signals });
+
+  const signalIds = signals.map((signal) => signal.id);
+  const requiredSignals = [
+    "mcq-signal-recall-cleared",
+    "mcq-signal-fresh-set",
+    "mcq-signal-score-outcome",
+    "mcq-signal-next-route",
+  ];
+  const freshSetSignal = signals.find((signal) => signal.id === "mcq-signal-fresh-set");
+  const scoreSignal = signals.find((signal) => signal.id === "mcq-signal-score-outcome");
+  const nextRouteSignal = signals.find((signal) => signal.id === "mcq-signal-next-route");
+
+  if (
+    shellContract.signalModel !== "mcq-four-signal-one-action" ||
+    shellContract.signalCount !== "4" ||
+    shellContract.signals !== "recall-cleared|fresh-set|score-outcome|next-route" ||
+    gridContract.signalCount !== "4" ||
+    signals.length !== 4 ||
+    !requiredSignals.every((id) => signalIds.includes(id)) ||
+    !gridContract.text.includes("Recall cleared") ||
+    !gridContract.text.includes("Fresh set") ||
+    !gridContract.text.includes("Score outcome") ||
+    !gridContract.text.includes("Next route") ||
+    gridContract.freshSetState !== expected.freshSetState ||
+    shellContract.freshSetState !== expected.freshSetState ||
+    gridContract.nextActionRoute !== expected.nextRoute ||
+    shellContract.nextActionRoute !== expected.nextRoute ||
+    gridContract.nextActionLabel !== expected.nextLabel ||
+    shellContract.nextActionLabel !== expected.nextLabel ||
+    freshSetSignal?.freshSetState !== expected.freshSetState ||
+    (expected.freshReady && freshSetSignal?.ready !== "true") ||
+    (expected.outcome && scoreSignal?.outcome !== expected.outcome) ||
+    (expected.scorePercent && scoreSignal?.scorePercent !== expected.scorePercent) ||
+    nextRouteSignal?.nextRoute !== expected.nextRoute ||
+    nextRouteSignal?.nextLabel !== expected.nextLabel ||
+    (expected.nextRoute.startsWith("/") && nextRouteSignal?.href !== expected.nextRoute)
+  ) {
+    throw new Error(`MCQ four-signal contract failed: ${JSON.stringify({ expected, shellContract, gridContract, signals }, null, 2)}`);
+  }
+}
+
 async function seed(page) {
   const questions = [buildQuestion(1, "A"), buildQuestion(2, "B")];
   await page.addInitScript(
@@ -365,6 +447,18 @@ async function main() {
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=8`, { waitUntil: "networkidle", timeout: 45000 });
   await page.getByText("Practice is being prepared", { exact: true }).waitFor({ timeout: 15000 });
   await page.getByTestId("geography-mcq-advanced-tools").waitFor({ timeout: 15000 });
+  await assertMcqFourSignalContract(
+    page,
+    {
+      label: "geography-mcq-four-signal-preparing",
+      freshSetState: "preparing",
+      nextRoute: "",
+      nextLabel: "Wait for reviewed set",
+      outcome: "Pending",
+      scorePercent: "0",
+    },
+    checks
+  );
   await assertStudentCopy(page, "geography-mcq-preparing-copy", checks);
   await assertNoOverflow(page, "geography-mcq-preparing-desktop", checks);
 
@@ -386,6 +480,19 @@ async function main() {
   }));
   const levelBadgeText = await page.getByTestId("geography-mcq-level-badge").innerText();
   const levelCopyText = await page.getByTestId("geography-mcq-level-copy").innerText();
+  await assertMcqFourSignalContract(
+    page,
+    {
+      label: "geography-mcq-four-signal-ready",
+      freshSetState: "ready",
+      freshReady: true,
+      nextRoute: "#practice",
+      nextLabel: "Start practice",
+      outcome: "Pending",
+      scorePercent: "0",
+    },
+    checks
+  );
   checks.push({
     label: "geography-mcq-visible-funnel-ready",
     readyFlowStrip,
@@ -430,6 +537,19 @@ async function main() {
   if (revisitVisibleActionCount !== 1) {
     throw new Error(`Completed weak practice should expose one next action, got ${revisitVisibleActionCount}.`);
   }
+  await assertMcqFourSignalContract(
+    page,
+    {
+      label: "geography-mcq-four-signal-revisit",
+      freshSetState: "ready",
+      freshReady: true,
+      nextRoute: "/upsc/geography/revisit?day=8",
+      nextLabel: "Open short revision",
+      outcome: "Revisit",
+      scorePercent: "50",
+    },
+    checks
+  );
   if (!revisitRouteHref || !revisitRouteHref.includes("/upsc/geography/revisit?day=8")) {
     throw new Error(`Expected revisit route, got ${revisitRouteHref}`);
   }
@@ -496,9 +616,9 @@ async function main() {
   await assertNoOverflow(page, "geography-short-revision-return-mobile", checks);
 
   await page.goto(`${baseUrl}/upsc`, { waitUntil: "networkidle", timeout: 45000 });
-  await page.getByTestId("upsc-simple-dashboard").waitFor({ timeout: 15000 });
-  const postRecoveryStartHref = await page.getByTestId("upsc-start-today").getAttribute("href");
-  const postRecoveryGapText = (await page.getByTestId("upsc-signal-learning-gap").innerText()).trim();
+  await page.getByTestId("daily-learning-dashboard").waitFor({ timeout: 15000 });
+  const postRecoveryStartHref = await page.getByTestId("daily-today-task").getAttribute("href");
+  const postRecoveryGapText = (await page.getByTestId("daily-learning-gap").innerText()).trim();
   if (
     postRecoveryStartHref !== "/upsc/geography/talk?day=8" ||
     !postRecoveryGapText.includes("Explain corrected answer") ||
@@ -527,6 +647,19 @@ async function main() {
     open: element.open,
   }));
   const commandVisibleActionCount = await page.locator('[data-testid="mcq-student-next-action"], [data-testid="mcq-practice-outcome-route"]').count();
+  await assertMcqFourSignalContract(
+    page,
+    {
+      label: "geography-mcq-four-signal-command",
+      freshSetState: "ready",
+      freshReady: true,
+      nextRoute: "/upsc/geography/talk?day=9",
+      nextLabel: "Continue to next topic",
+      outcome: "Command",
+      scorePercent: "100",
+    },
+    checks
+  );
   checks.push({ label: "geography-mcq-command-single-action", commandVisibleActionCount, commandNextTopicProof, commandFlowStrip });
   if (commandVisibleActionCount !== 1) {
     throw new Error(`Completed command practice should expose one next action, got ${commandVisibleActionCount}.`);
