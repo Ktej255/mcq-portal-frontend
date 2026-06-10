@@ -45,7 +45,9 @@ function isPublicSecretLeak() {
     envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY").startsWith("sb_secret_") ||
       hasEnv("NEXT_PUBLIC_SUPABASE_SECRET_KEY") ||
       hasEnv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY") ||
-      hasEnv("NEXT_PUBLIC_GEMINI_API_KEY")
+      hasEnv("NEXT_PUBLIC_GEMINI_API_KEY") ||
+      hasEnv("NEXT_PUBLIC_NVIDIA_API_KEY") ||
+      hasEnv("NEXT_PUBLIC_NVIDIA_TEACHER_API_KEY")
   );
 }
 
@@ -118,7 +120,7 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       title: "No server secret is exposed as NEXT_PUBLIC",
       group: "local-config",
       status: publicSecretExposure ? "fail" : "pass",
-      proof: "The boundary checks for public Supabase service keys and public Gemini keys without printing values.",
+      proof: "The boundary checks for public Supabase service keys and public AI provider keys without printing values.",
       nextAction: "Delete any NEXT_PUBLIC_* server secret immediately before building.",
       publicSafe: !publicSecretExposure,
     }),
@@ -141,12 +143,12 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       publicSafe: true,
     }),
     check({
-      id: "server-gemini-key",
-      title: "Server-only Gemini key configured",
+      id: "server-ai-teacher-key",
+      title: "Server-only AI teacher key configured",
       group: "server-secret",
-      status: hasEnv("GEMINI_API_KEY") ? "pass" : "pending",
-      proof: "GEMINI_API_KEY is checked server-side only and never rendered to the client.",
-      nextAction: "Add GEMINI_API_KEY as a Vercel server-only secret before marketing live AI language.",
+      status: hasEnv("NVIDIA_TEACHER_API_KEY") || hasEnv("NVIDIA_API_KEY") || hasEnv("GEMINI_API_KEY") ? "pass" : "pending",
+      proof: "The AI teacher key is checked server-side only and never rendered to the client.",
+      nextAction: "Add NVIDIA_TEACHER_API_KEY as a Vercel server-only secret before marketing live AI language.",
       publicSafe: true,
     }),
     check({

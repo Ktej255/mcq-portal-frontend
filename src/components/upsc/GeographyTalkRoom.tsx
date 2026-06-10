@@ -145,7 +145,7 @@ type SpeechRecognitionLike = {
   stop: () => void;
 };
 
-type SpeechState = "idle" | "listening" | "unsupported" | "blocked" | "error";
+type SpeechState = "idle" | "listening" | "recording" | "unsupported" | "blocked" | "error";
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
@@ -216,10 +216,13 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const [speechRecognition, setSpeechRecognition] = useState<SpeechRecognitionLike | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const [speechMessage, setSpeechMessage] = useState("");
+  const [audioNoteUrl, setAudioNoteUrl] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
   const [submittedInCurrentVisit, setSubmittedInCurrentVisit] = useState(false);
   const teacherRequestId = useRef(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const answerDraftRef = useRef<HTMLTextAreaElement | null>(null);
 
   const activeSession = resolveSession(activeDay);
@@ -370,7 +373,13 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
               }
             : null
         );
-        setTeacherConnection(savedProgress.teacherMode === "gemini" ? "ready" : savedProgress.teacherMode === "local-fallback" ? "local" : "idle");
+        setTeacherConnection(
+          savedProgress.teacherMode === "nvidia-teacher" || savedProgress.teacherMode === "gemini"
+            ? "ready"
+            : savedProgress.teacherMode === "local-fallback"
+              ? "local"
+              : "idle"
+        );
       }
 
       setHydrated(true);
@@ -382,6 +391,29 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   useEffect(() => {
     return () => speechRecognition?.stop();
   }, [speechRecognition]);
+
+  useEffect(() => {
+    return () => {
+      if (audioNoteUrl) URL.revokeObjectURL(audioNoteUrl);
+    };
+  }, [audioNoteUrl]);
+
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder?.state !== "inactive") {
+        recorder?.stop();
+      }
+      recorder?.stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const clearAudioNote = () => {
+    setAudioNoteUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return "";
+    });
+  };
 
   const persistTalk = (
     nextAssessment: GeographyAssessment | null = assessment,
@@ -457,7 +489,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       .then((response) => {
         if (teacherRequestId.current !== requestId) return;
         setTeacherCoach(response.coach);
-        setTeacherConnection(response.mode === "gemini" ? "ready" : "local");
+        setTeacherConnection(response.mode === "local-fallback" ? "local" : "ready");
         saveDayProgress(activeSession.day, {
           teacherMode: response.mode,
           teacherPromptVersion: response.trace.promptVersion,
@@ -480,7 +512,76 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       });
   };
 
+  const stopAudioRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return false;
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+      setSpeechMessage("Stopping voice note...");
+      return true;
+    }
+    return false;
+  };
+
+  const startAudioFallbackRecording = async (reason: string) => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setSpeechState("unsupported");
+      setSpeechMessage(`${reason} Audio-note recording is unavailable in this browser. Type your answer here.`);
+      return;
+    }
+
+    try {
+      clearAudioNote();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setSpeechState("idle");
+
+        if (blob.size === 0) {
+          setSpeechMessage("Voice note stopped, but no audio was captured. Try again or type the answer.");
+          return;
+        }
+
+        const nextUrl = URL.createObjectURL(blob);
+        setAudioNoteUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextUrl;
+        });
+        setSpeechMessage("Voice note recorded. Play it back, then type the transcript for AI checking.");
+      };
+      recorder.onerror = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setSpeechState("error");
+        setSpeechMessage("Audio-note recording failed. Type your answer here, or retry after refreshing.");
+      };
+
+      recorder.start();
+      setSpeechRecognition(null);
+      setSpeechState("recording");
+      setSpeechMessage(`${reason} Recording audio note now. Stop when you finish.`);
+    } catch {
+      setSpeechState("blocked");
+      setSpeechMessage("Microphone recording is blocked. Allow microphone access for this site, then try again.");
+    }
+  };
+
   const toggleSpeechCapture = async () => {
+    if (speechState === "recording") {
+      stopAudioRecording();
+      return;
+    }
+
     if (speechState === "listening" && speechRecognition) {
       speechRecognition.stop();
       setSpeechRecognition(null);
@@ -490,10 +591,10 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     }
 
     setSpeechMessage("");
+    clearAudioNote();
     const Recognition = getSpeechRecognitionConstructor();
     if (!Recognition) {
-      setSpeechState("unsupported");
-      setSpeechMessage("Voice capture is unavailable in this browser. Type your answer here.");
+      await startAudioFallbackRecording("Speech-to-text is unavailable in this browser.");
       return;
     }
 
@@ -523,6 +624,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
         .trim();
       if (!transcript) return;
       setAnswerDraft((current) => `${current}${current.trim() ? " " : ""}${transcript}`.trim());
+      clearAudioNote();
       setSpeechMessage("Speech captured. You can continue speaking or stop recording.");
       setAssessment(null);
       setDiscussion(null);
@@ -540,6 +642,10 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     recognition.onerror = (event) => {
       stoppedByError = true;
       setSpeechRecognition(null);
+      if (event.error === "network") {
+        void startAudioFallbackRecording("Browser speech recognition could not reach its speech service.");
+        return;
+      }
       setSpeechState(event.error === "not-allowed" || event.error === "service-not-allowed" ? "blocked" : "error");
       setSpeechMessage(getSpeechErrorMessage(event.error));
     };
@@ -731,8 +837,8 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                 onClick={toggleSpeechCapture}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
               >
-                {speechState === "listening" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                {speechState === "listening" ? "Stop speaking" : "Speak answer"}
+                {speechState === "listening" || speechState === "recording" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {speechState === "listening" ? "Stop speaking" : speechState === "recording" ? "Stop recording" : "Speak answer"}
               </button>
               <button
                 type="button"
@@ -758,6 +864,14 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                 >
                   {speechMessage}
                 </span>
+              ) : null}
+              {audioNoteUrl ? (
+                <audio
+                  aria-label="Recorded answer voice note"
+                  className="h-10 w-full max-w-xs"
+                  controls
+                  src={audioNoteUrl}
+                />
               ) : null}
             </div>
             </div>

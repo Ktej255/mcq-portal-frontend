@@ -48,7 +48,7 @@ export function LaunchEnvironmentBoundaryPanel() {
           </h2>
           <p className="mt-1 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
             This mirrors the no-secret launch preflight inside the operator console. It checks names and presence only:
-            no Supabase, Gemini, or OAuth secret value is printed here. Local gates prepare the build; live SQL and
+            no Supabase, AI provider, or OAuth secret value is printed here. Local gates prepare the build; live SQL and
             OAuth receipts remain the final production launch evidence.
           </p>
         </div>

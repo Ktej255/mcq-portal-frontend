@@ -13,7 +13,7 @@ import {
 } from "@/lib/upsc/subjectLearning";
 import { subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 
-export type AdaptiveTeacherMode = "gemini" | "local-fallback";
+export type AdaptiveTeacherMode = "nvidia-teacher" | "gemini" | "local-fallback";
 
 export const ADAPTIVE_TEACHER_PROMPT_VERSION = "upsc-teacher-2026-06-03.2";
 export const ADAPTIVE_TEACHER_RUBRIC_VERSION = "upsc-recall-rubric-2026-06-03.1";
@@ -388,7 +388,7 @@ export function buildLocalAdaptiveTeacherResponse(
   };
 }
 
-export function parseGeminiCoach(value: unknown): AdaptiveTeacherCoach | null {
+export function parseAdaptiveTeacherCoach(value: unknown): AdaptiveTeacherCoach | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<AdaptiveTeacherCoach>;
   const diagnosis = candidate.doubtDiagnosis as Partial<AdaptiveTeacherDoubtDiagnosis> | undefined;
@@ -448,13 +448,13 @@ export function parseAdaptiveTeacherResponse(value: unknown): AdaptiveTeacherRes
   const candidate = value as Partial<AdaptiveTeacherResponse>;
   const trace = candidate.trace;
   const assessment = candidate.assessment;
-  const coach = parseGeminiCoach(candidate.coach);
+  const coach = parseAdaptiveTeacherCoach(candidate.coach);
   const fallbackReasons = ["provider-not-configured", "provider-unavailable", "invalid-provider-response"];
   const rubricLabels = ["Recall", "Mechanism", "Map proof", "UPSC trap", "Expression"];
   const rubricStatuses = ["Weak", "Forming", "Ready"];
 
   if (
-    !["gemini", "local-fallback"].includes(candidate.mode ?? "") ||
+    !["nvidia-teacher", "gemini", "local-fallback"].includes(candidate.mode ?? "") ||
     typeof candidate.providerConfigured !== "boolean" ||
     (candidate.fallbackReason !== undefined && !fallbackReasons.includes(candidate.fallbackReason)) ||
     !trace ||

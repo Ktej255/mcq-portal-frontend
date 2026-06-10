@@ -65,7 +65,7 @@ export type SubjectDayProgress = {
   talkNextRoute?: string;
   talkNextActionLabel?: string;
   talkPreliminaryScore?: number;
-  teacherMode?: "gemini" | "local-fallback";
+  teacherMode?: "nvidia-teacher" | "gemini" | "local-fallback";
   teacherPromptVersion?: string;
   teacherRubricVersion?: string;
   teacherRecallTarget?: number;

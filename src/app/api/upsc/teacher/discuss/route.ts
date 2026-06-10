@@ -18,14 +18,18 @@ import {
   ADAPTIVE_TEACHER_PROMPT_VERSION,
   ADAPTIVE_TEACHER_RUBRIC_VERSION,
   getAdaptiveTeacherLevelInstruction,
+  parseAdaptiveTeacherCoach,
   parseAdaptiveTeacherRequest,
-  parseGeminiCoach,
   resolveAdaptiveTeacherSubject,
 } from "@/lib/upsc/adaptiveTeacher";
 
 export const dynamic = "force-dynamic";
 
-const geminiModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+const nvidiaBaseUrl = process.env.NVIDIA_API_BASE_URL?.trim() || "https://integrate.api.nvidia.com/v1";
+const nvidiaTeacherModel = process.env.NVIDIA_TEACHER_MODEL?.trim() || "z-ai/glm-5.1";
+const nvidiaChatModel = process.env.NVIDIA_CHAT_MODEL?.trim() || "deepseek-ai/deepseek-v4-flash";
+const nvidiaTeacherMaxTokens = Number(process.env.NVIDIA_TEACHER_MAX_TOKENS ?? 2048);
+const nvidiaTeacherTemperature = Number(process.env.NVIDIA_TEACHER_TEMPERATURE ?? 0.6);
 
 const teacherCoachSchema = {
   type: "object",
@@ -100,6 +104,68 @@ function rateLimitHeaders(limit: number, remaining: number, retryAfterSeconds: n
 
 function hasJsonContentType(request: NextRequest) {
   return request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "application/json";
+}
+
+type NvidiaTeacherCandidate = {
+  apiKey: string;
+  model: string;
+  temperature: number;
+  stream: boolean;
+};
+
+function tryParseJsonObject(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parseProviderJsonObject(value: string): unknown | null {
+  const direct = tryParseJsonObject(value);
+  if (direct) return direct;
+
+  const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    const parsedFence = tryParseJsonObject(fenced[1].trim());
+    if (parsedFence) return parsedFence;
+  }
+
+  const firstBrace = value.indexOf("{");
+  const lastBrace = value.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return tryParseJsonObject(value.slice(firstBrace, lastBrace + 1));
+  }
+
+  return null;
+}
+
+function extractNvidiaMessageText(providerRawBody: string, stream: boolean) {
+  if (!stream) {
+    const providerBody = JSON.parse(providerRawBody) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+    };
+    return providerBody.choices?.[0]?.message?.content?.trim() ?? "";
+  }
+
+  return providerRawBody
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trim())
+    .filter((line) => line && line !== "[DONE]")
+    .map((line) => {
+      try {
+        const chunk = JSON.parse(line) as {
+          choices?: Array<{ delta?: { content?: string | null } }>;
+        };
+        return chunk.choices?.[0]?.delta?.content ?? "";
+      } catch {
+        return "";
+      }
+    })
+    .join("")
+    .trim();
 }
 
 async function readBoundedJsonBody(request: NextRequest) {
@@ -190,8 +256,21 @@ export async function POST(request: NextRequest) {
     return noStoreJson({ message: "Invalid teacher discussion request" }, { status: 400 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
+  const providerCandidates: NvidiaTeacherCandidate[] = [
+    {
+      apiKey: process.env.NVIDIA_TEACHER_API_KEY?.trim() || process.env.NVIDIA_API_KEY?.trim() || "",
+      model: nvidiaTeacherModel,
+      temperature: Number.isFinite(nvidiaTeacherTemperature) ? nvidiaTeacherTemperature : 0.6,
+      stream: true,
+    },
+    {
+      apiKey: process.env.NVIDIA_CHAT_API_KEY?.trim() || "",
+      model: nvidiaChatModel,
+      temperature: 0.5,
+      stream: false,
+    },
+  ].filter((candidate) => candidate.apiKey);
+  if (!providerCandidates.length) {
     return noStoreJson(buildLocalAdaptiveTeacherResponse(teacherRequest));
   }
 
@@ -220,72 +299,66 @@ export async function POST(request: NextRequest) {
   ]
     .filter(Boolean)
     .join("\n");
+  const systemPrompt = [
+    "You are the Primary AI Teacher and Discussion Room inside UPSC Command.",
+    "Diagnose the student's answer like a rigorous one-to-one UPSC mentor, not a generic chatbot.",
+    "Your job is to find the single learning gap, repair it briefly, and decide the next prompt.",
+    "Return only valid JSON. No markdown, no code fence, no preface, no extra keys.",
+    `JSON shape: ${JSON.stringify(teacherCoachSchema)}`,
+  ].join("\n");
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`,
-      {
+  for (const providerCandidate of providerCandidates) {
+    try {
+      const response = await fetch(`${nvidiaBaseUrl.replace(/\/+$/, "")}/chat/completions`, {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${providerCandidate.apiKey}`,
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseJsonSchema: teacherCoachSchema,
-          },
+          model: providerCandidate.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          temperature: providerCandidate.temperature,
+          top_p: 0.95,
+          max_tokens: Number.isFinite(nvidiaTeacherMaxTokens) ? nvidiaTeacherMaxTokens : 2048,
+          stream: providerCandidate.stream,
         }),
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(18_000),
+      });
+
+      if (!response.ok) {
+        continue;
       }
-    );
 
-    if (!response.ok) {
-      return noStoreJson(
-        buildLocalAdaptiveTeacherResponse(teacherRequest, {
-          providerConfigured: true,
-          fallbackReason: "provider-unavailable",
-        })
-      );
+      const providerRawBody = await response.text();
+      if (new TextEncoder().encode(providerRawBody).byteLength > ADAPTIVE_TEACHER_MAX_PROVIDER_RESPONSE_BYTES) {
+        continue;
+      }
+
+      const providerText = extractNvidiaMessageText(providerRawBody, providerCandidate.stream);
+      const coach = providerText ? parseAdaptiveTeacherCoach(parseProviderJsonObject(providerText)) : null;
+      if (!coach) {
+        continue;
+      }
+
+      const localResponse = buildLocalAdaptiveTeacherResponse(teacherRequest, { providerConfigured: true });
+      return noStoreJson({
+        ...localResponse,
+        mode: "nvidia-teacher",
+        coach,
+      });
+    } catch {
+      continue;
     }
-
-    const providerRawBody = await response.text();
-    if (new TextEncoder().encode(providerRawBody).byteLength > ADAPTIVE_TEACHER_MAX_PROVIDER_RESPONSE_BYTES) {
-      return noStoreJson(
-        buildLocalAdaptiveTeacherResponse(teacherRequest, {
-          providerConfigured: true,
-          fallbackReason: "invalid-provider-response",
-        })
-      );
-    }
-
-    const providerBody = JSON.parse(providerRawBody) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const providerText = providerBody.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-    const coach = providerText ? parseGeminiCoach(JSON.parse(providerText)) : null;
-    if (!coach) {
-      return noStoreJson(
-        buildLocalAdaptiveTeacherResponse(teacherRequest, {
-          providerConfigured: true,
-          fallbackReason: "invalid-provider-response",
-        })
-      );
-    }
-
-    const localResponse = buildLocalAdaptiveTeacherResponse(teacherRequest, { providerConfigured: true });
-    return noStoreJson({
-      ...localResponse,
-      mode: "gemini",
-      coach,
-    });
-  } catch {
-    return noStoreJson(
-      buildLocalAdaptiveTeacherResponse(teacherRequest, {
-        providerConfigured: true,
-        fallbackReason: "provider-unavailable",
-      })
-    );
   }
+
+  return noStoreJson(
+    buildLocalAdaptiveTeacherResponse(teacherRequest, {
+      providerConfigured: true,
+      fallbackReason: "provider-unavailable",
+    })
+  );
 }

@@ -77,7 +77,7 @@ export type GeographyDayProgress = {
   talkClassroomStage?: GeographyTalkClassroomStage;
   talkNextRoute?: string;
   talkNextActionLabel?: string;
-  teacherMode?: "gemini" | "local-fallback";
+  teacherMode?: "nvidia-teacher" | "gemini" | "local-fallback";
   teacherPromptVersion?: string;
   teacherRubricVersion?: string;
   teacherRecallTarget?: number;
