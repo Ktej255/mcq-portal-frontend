@@ -111,6 +111,7 @@ type NvidiaTeacherCandidate = {
   model: string;
   temperature: number;
   stream: boolean;
+  timeoutMs: number;
 };
 
 function tryParseJsonObject(value: string): unknown | null {
@@ -262,12 +263,14 @@ export async function POST(request: NextRequest) {
       model: nvidiaTeacherModel,
       temperature: Number.isFinite(nvidiaTeacherTemperature) ? nvidiaTeacherTemperature : 0.6,
       stream: true,
+      timeoutMs: 6_000,
     },
     {
       apiKey: process.env.NVIDIA_CHAT_API_KEY?.trim() || "",
       model: nvidiaChatModel,
       temperature: 0.5,
       stream: false,
+      timeoutMs: 4_000,
     },
   ].filter((candidate) => candidate.apiKey);
   if (!providerCandidates.length) {
@@ -326,7 +329,7 @@ export async function POST(request: NextRequest) {
           max_tokens: Number.isFinite(nvidiaTeacherMaxTokens) ? nvidiaTeacherMaxTokens : 2048,
           stream: providerCandidate.stream,
         }),
-        signal: AbortSignal.timeout(18_000),
+        signal: AbortSignal.timeout(providerCandidate.timeoutMs),
       });
 
       if (!response.ok) {
