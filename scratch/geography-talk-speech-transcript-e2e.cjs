@@ -69,7 +69,7 @@ async function run() {
             resultIndex: 0,
             results: [makeResult("Geographic thinking connects location and scale.", true)],
           });
-        }, 60);
+        }, 500);
         window.setTimeout(() => {
           this.onresult?.({
             resultIndex: 1,
@@ -78,7 +78,7 @@ async function run() {
               makeResult("It avoids isolated map facts.", true),
             ],
           });
-        }, 100);
+        }, 700);
       }
 
       stop() {
