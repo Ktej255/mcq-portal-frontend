@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth as useClerkAuth, useClerk, useUser as useClerkUser } from "@clerk/nextjs";
 import {
   auth,
   googleProvider,
@@ -12,8 +13,22 @@ import {
 import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { resolveToken } from "../auth/token-strategy";
-import { canUsePreviewAuth, clearLocalMockToken, isLocalTestingHost, readLocalMockToken } from "../auth/local-testing";
-import { activeAuthProvider, env, missingFirebaseEnvVars, missingSupabaseEnvVars } from "@/env";
+import {
+  canUsePreviewAuth,
+  clearLocalMockToken,
+  isLocalTestingHost,
+  readLocalMockIdentity,
+  readLocalMockToken,
+  saveLocalMockIdentity,
+} from "../auth/local-testing";
+import {
+  activeAuthProvider,
+  clerkConfigReady,
+  env,
+  missingClerkEnvVars,
+  missingFirebaseEnvVars,
+  missingSupabaseEnvVars,
+} from "@/env";
 import { supabase } from "@/lib/supabase/client";
 import {
   clearLocalUpscLearnerState,
@@ -111,7 +126,29 @@ function normalizeInternalRedirectPath(redirectPath = "/dashboard") {
   }
 }
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+function buildLocalMockUser(savedToken: string | null): AuthUser | null {
+  if (!savedToken) return null;
+
+  const savedIdentity = readLocalMockIdentity();
+  let email = savedIdentity?.email ?? "student@upsc.local";
+  let uid = savedIdentity?.uid ?? "dev-student-id";
+
+  if (!savedIdentity && savedToken.includes("_sim_")) {
+    const persona = savedToken.split("_sim_")[1];
+    email = `${persona.replace(/_/g, "")}@upsc.local`;
+    uid = `mock-uid-${persona}`;
+  }
+
+  return {
+    email,
+    uid,
+    displayName: email.split("@")[0],
+    photoURL: null,
+    getIdToken: async () => savedToken,
+  };
+}
+
+const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -142,6 +179,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (typeof window !== 'undefined') {
       (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = token;
       localStorage.setItem("MOCK_TOKEN", token);
+      saveLocalMockIdentity(email, uid);
     }
     setUser(mockUser);
     setLoading(false);
@@ -170,24 +208,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (authDebug) console.info("AUTH | Restoring MOCK_TOKEN session");
         (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = savedToken;
         
-        // Derive user identity from token if possible
-        let email = "student@upsc.local";
-        let uid = "dev-student-id";
-        
-        if (savedToken.includes("_sim_")) {
-          const persona = savedToken.split("_sim_")[1];
-          email = `${persona.replace(/_/g, '')}@upsc.local`;
-          uid = `mock-uid-${persona}`;
-        }
+        const mockUser = buildLocalMockUser(savedToken);
 
         window.setTimeout(() => {
-          setUser({
-            email: email,
-            uid: uid,
-            displayName: email.split("@")[0],
-            photoURL: null,
-            getIdToken: async () => savedToken,
-          });
+          setUser(mockUser);
           setLoading(false);
         }, 0);
         return;
@@ -204,6 +228,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       let cancelled = false;
       supabase.auth.getSession().then(({ data }) => {
         if (cancelled) return;
+        const mockUser = buildLocalMockUser(readLocalMockToken());
+        if (mockUser) {
+          setUser(mockUser);
+          setLoading(false);
+          return;
+        }
         reconcileLocalUpscLearnerIdentity(data.session?.user.id);
         setUser(data.session?.user ? mapSupabaseUser(data.session.user, data.session.access_token) : null);
         setLoading(false);
@@ -212,6 +242,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, session) => {
+        const mockUser = buildLocalMockUser(readLocalMockToken());
+        if (!session && mockUser) {
+          setUser(mockUser);
+          setLoading(false);
+          return;
+        }
         reconcileLocalUpscLearnerIdentity(session?.user.id);
         setUser(session?.user ? mapSupabaseUser(session.user, session.access_token) : null);
         setLoading(false);
@@ -416,6 +452,146 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+function clearExamStores() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("mcq-timer-storage");
+  localStorage.removeItem("mcq-exam-storage");
+}
+
+const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const { isLoaded, isSignedIn, getToken: getClerkToken } = useClerkAuth();
+  const { user: clerkUser } = useClerkUser();
+  const { signOut: clerkSignOut } = useClerk();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  const replaceRoute = useCallback((redirectPath = "/dashboard") => {
+    window.setTimeout(() => {
+      router.replace(normalizeInternalRedirectPath(redirectPath));
+    }, 0);
+  }, [router]);
+
+  const pushRoute = useCallback((redirectPath = "/dashboard") => {
+    window.setTimeout(() => {
+      router.push(normalizeInternalRedirectPath(redirectPath));
+    }, 0);
+  }, [router]);
+
+  const devLogin = useCallback((email: string, uid: string, redirectPath?: string) => {
+    if (!canUsePreviewAuth()) return;
+    const token = `MOCK_TOKEN_local_${uid}`;
+    const mockUser: AuthUser = {
+      email,
+      uid,
+      displayName: email.split("@")[0],
+      photoURL: null,
+      getIdToken: async () => token,
+    };
+    if (typeof window !== "undefined") {
+      (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = token;
+      localStorage.setItem("MOCK_TOKEN", token);
+      saveLocalMockIdentity(email, uid);
+    }
+    setUser(mockUser);
+    setLoading(false);
+    if (redirectPath) replaceRoute(redirectPath);
+  }, [replaceRoute]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const existingMockToken = readLocalMockToken();
+      if (existingMockToken) {
+        (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = existingMockToken;
+        setUser(buildLocalMockUser(existingMockToken));
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (!isLoaded) {
+      setLoading(true);
+      return;
+    }
+
+    if (!isSignedIn || !clerkUser) {
+      reconcileLocalUpscLearnerIdentity(null);
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    const primaryEmail =
+      clerkUser.primaryEmailAddress?.emailAddress ??
+      clerkUser.emailAddresses?.[0]?.emailAddress ??
+      null;
+    const mappedUser: AuthUser = {
+      email: primaryEmail,
+      uid: clerkUser.id,
+      displayName: clerkUser.fullName ?? clerkUser.username ?? primaryEmail?.split("@")[0] ?? null,
+      photoURL: clerkUser.imageUrl ?? null,
+      getIdToken: async () => (await getClerkToken()) ?? "",
+    };
+
+    reconcileLocalUpscLearnerIdentity(clerkUser.id);
+    setUser(mappedUser);
+    setLoading(false);
+
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/login")) {
+      const params = new URLSearchParams(window.location.search);
+      replaceRoute(params.get("redirect") || "/dashboard");
+    }
+  }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute]);
+
+  const signInWithGoogle = async (redirectPath = "/dashboard") => {
+    pushRoute(`/login?redirect=${encodeURIComponent(normalizeInternalRedirectPath(redirectPath))}`);
+  };
+
+  const sendEmailOtp = async (_email: string, redirectPath = "/dashboard") => {
+    pushRoute(`/login?redirect=${encodeURIComponent(normalizeInternalRedirectPath(redirectPath))}`);
+  };
+
+  const verifyEmailOtp = async () => {
+    throw new Error("Use the Clerk sign-in screen to verify your email session.");
+  };
+
+  const logout = async () => {
+    reconcileLocalUpscLearnerIdentity(null);
+    clearLocalUpscLearnerState();
+    clearLocalMockToken();
+    clearExamStores();
+    setUser(null);
+    setLoading(false);
+    await clerkSignOut({ redirectUrl: "/login" });
+  };
+
+  const getToken = async () => {
+    const mockToken = readLocalMockToken();
+    if (mockToken) return mockToken;
+    return (await getClerkToken()) ?? null;
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{ user, loading, signInWithGoogle, sendEmailOtp, verifyEmailOtp, logout, getToken, devLogin }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  if (activeAuthProvider === "clerk" && clerkConfigReady) {
+    return <ClerkAuthProvider>{children}</ClerkAuthProvider>;
+  }
+
+  if (activeAuthProvider === "clerk" && !clerkConfigReady && authDebug) {
+    console.error(`AUTH | Clerk auth is not initialized. Missing: ${missingClerkEnvVars.join(", ")}`);
+  }
+
+  return <LegacyAuthProvider>{children}</LegacyAuthProvider>;
 };
 
 export const useAuth = () => useContext(AuthContext);

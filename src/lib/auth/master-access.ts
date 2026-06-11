@@ -1,8 +1,14 @@
-const DEFAULT_MASTER_EMAILS = ["sarit.kumar.dev@gmail.com", "quicklearn601@gmail.com"];
+export const PRIMARY_MASTER_EMAIL = "ktej255@gmail.com";
+
+const DEFAULT_MASTER_EMAILS = [
+  PRIMARY_MASTER_EMAIL,
+  "sarit.kumar.dev@gmail.com",
+  "quicklearn601@gmail.com",
+];
 
 function configuredMasterEmails() {
   const raw = process.env.NEXT_PUBLIC_MASTER_EMAILS;
-  const emails = raw ? raw.split(",") : DEFAULT_MASTER_EMAILS;
+  const emails = raw ? [...DEFAULT_MASTER_EMAILS, ...raw.split(",")] : DEFAULT_MASTER_EMAILS;
   return emails.map((email) => email.trim().toLowerCase()).filter(Boolean);
 }
 

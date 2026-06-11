@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
+import { auth as clerkAuth } from "@clerk/nextjs/server";
 
+import { activeAuthProvider } from "@/env";
 import { supabase } from "@/lib/supabase/client";
 
 function readBearerToken(request: NextRequest) {
@@ -14,11 +16,21 @@ function isLocalRequest(request: NextRequest) {
 
 export async function hasLearnerApiAccess(request: NextRequest) {
   const token = readBearerToken(request);
-  if (!token) return false;
 
-  if (isLocalRequest(request) && token.startsWith("MOCK_TOKEN")) {
+  if (token && isLocalRequest(request) && token.startsWith("MOCK_TOKEN")) {
     return true;
   }
+
+  if (activeAuthProvider === "clerk") {
+    try {
+      const { userId } = await clerkAuth();
+      return Boolean(userId);
+    } catch {
+      return false;
+    }
+  }
+
+  if (!token) return false;
 
   if (!supabase) return false;
 

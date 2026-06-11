@@ -1,4 +1,5 @@
 import { readLocalMockToken } from "@/lib/auth/local-testing";
+import { activeAuthProvider } from "@/env";
 import { supabase } from "@/lib/supabase/client";
 import {
   parseAdaptiveTeacherResponse,
@@ -22,7 +23,7 @@ export async function readLearnerApiAccessToken() {
 
 export async function requestAdaptiveTeacherDiscussion(payload: AdaptiveTeacherRequest) {
   const token = await readLearnerApiAccessToken();
-  if (!token) throw new Error("Learner session required");
+  if (!token && activeAuthProvider !== "clerk") throw new Error("Learner session required");
 
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), ADAPTIVE_TEACHER_CLIENT_TIMEOUT_MS);
@@ -33,7 +34,7 @@ export async function requestAdaptiveTeacherDiscussion(payload: AdaptiveTeacherR
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(payload),
       signal: controller.signal,

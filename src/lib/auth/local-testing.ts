@@ -1,4 +1,6 @@
 const authFallbackKey = "sarit-auth-fallback-unlocked-v1";
+const mockUserEmailKey = "MOCK_USER_EMAIL";
+const mockUserUidKey = "MOCK_USER_UID";
 
 export function isLocalTestingHost(hostname?: string) {
   const resolvedHostname =
@@ -39,4 +41,19 @@ export function clearLocalMockToken() {
   if (typeof window === "undefined") return;
   delete (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN;
   window.localStorage.removeItem("MOCK_TOKEN");
+  window.localStorage.removeItem(mockUserEmailKey);
+  window.localStorage.removeItem(mockUserUidKey);
+}
+
+export function saveLocalMockIdentity(email: string, uid: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(mockUserEmailKey, email);
+  window.localStorage.setItem(mockUserUidKey, uid);
+}
+
+export function readLocalMockIdentity() {
+  if (typeof window === "undefined") return null;
+  const email = window.localStorage.getItem(mockUserEmailKey);
+  const uid = window.localStorage.getItem(mockUserUidKey);
+  return email && uid ? { email, uid } : null;
 }

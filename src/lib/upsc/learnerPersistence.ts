@@ -1,4 +1,5 @@
 import { readLocalMockToken } from "@/lib/auth/local-testing";
+import { activeAuthProvider } from "@/env";
 import { supabase } from "@/lib/supabase/client";
 
 type ProgressItem = {
@@ -26,6 +27,7 @@ function timestamp(value?: string) {
 }
 
 async function currentRemoteUserId() {
+  if (activeAuthProvider === "clerk") return null;
   if (!supabase || readLocalMockToken()) return null;
 
   try {

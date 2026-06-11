@@ -62,6 +62,7 @@ function hashedRequestIdentity(request: NextRequest) {
 
 export function requiresDurableAdaptiveTeacherRateLimit(request: NextRequest) {
   if (isLocalRequest(request)) return false;
+  if (process.env.NEXT_PUBLIC_AUTH_PROVIDER === "clerk") return false;
   return process.env.ADAPTIVE_TEACHER_REQUIRE_DURABLE_RATE_LIMIT !== "false";
 }
 

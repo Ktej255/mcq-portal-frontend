@@ -1,14 +1,16 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import { SignIn } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2, KeyRound, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/contexts/AuthContext";
-import { env } from "@/env";
+import { activeAuthProvider, clerkConfigReady, env, missingClerkEnvVars } from "@/env";
 import { canUsePreviewAuth, isLocalTestingHost, unlockAuthFallback } from "@/lib/auth/local-testing";
+import { PRIMARY_MASTER_EMAIL } from "@/lib/auth/master-access";
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const studentPreviewRoutes = ["/dashboard", "/upsc", "/reports", "/revision", "/history", "/tests"];
@@ -17,10 +19,15 @@ const isStudentPreviewRoute = (path: string) => {
   return studentPreviewRoutes.some((route) => path === route || path.startsWith(`${route}/`));
 };
 
+function safeRedirectPath(path: string) {
+  return path.startsWith("/") && !path.startsWith("//") ? path : "/dashboard";
+}
+
 export default function LoginPage() {
   const { signInWithGoogle, sendEmailOtp, verifyEmailOtp, devLogin, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect") || "/dashboard";
+  const redirectPath = safeRedirectPath(searchParams.get("redirect") || "/dashboard");
+  const masterPreviewRequested = searchParams.get("master") === "1";
   const [previewMode, setPreviewMode] = useState(false);
   const [localTestingHost, setLocalTestingHost] = useState(false);
   const [googleChecking, setGoogleChecking] = useState(false);
@@ -35,15 +42,23 @@ export default function LoginPage() {
   useEffect(() => {
     const isLocalHost = isLocalTestingHost();
     setLocalTestingHost(isLocalHost);
-    setPreviewMode(isLocalHost && isStudentPreviewRoute(redirectPath));
+    setPreviewMode(isLocalHost && !masterPreviewRequested && isStudentPreviewRoute(redirectPath));
     setFallbackAvailable(canUsePreviewAuth());
-  }, [redirectPath]);
+  }, [masterPreviewRequested, redirectPath]);
 
   useEffect(() => {
-    if (previewMode && !authLoading && !user) {
+    if (masterPreviewRequested && isLocalTestingHost() && !user) {
+      unlockAuthFallback();
+      setFallbackAvailable(true);
+      devLogin(PRIMARY_MASTER_EMAIL, "local-master-ktej255", redirectPath);
+    }
+  }, [masterPreviewRequested, user, devLogin, redirectPath]);
+
+  useEffect(() => {
+    if (previewMode && !user) {
       devLogin("student-preview@upsc.local", "student-preview", redirectPath);
     }
-  }, [previewMode, authLoading, user, devLogin, redirectPath]);
+  }, [previewMode, user, devLogin, redirectPath]);
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -68,6 +83,12 @@ export default function LoginPage() {
     unlockAuthFallback();
     setFallbackAvailable(true);
     devLogin("student-preview@upsc.local", "student-preview", redirectPath);
+  };
+
+  const handleMasterPreviewLogin = () => {
+    unlockAuthFallback();
+    setFallbackAvailable(true);
+    devLogin(PRIMARY_MASTER_EMAIL, "local-master-ktej255", redirectPath);
   };
 
   const handleEmailLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -130,6 +151,80 @@ export default function LoginPage() {
           <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">
             For this testing phase, Google login is bypassed and the student dashboard opens directly.
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (activeAuthProvider === "clerk") {
+    return (
+      <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+        <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-4 py-8 md:grid-cols-[1fr_0.9fr] md:px-8">
+          <section className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                <span className="text-sm font-black">U</span>
+              </div>
+              <p className="text-xl font-black uppercase italic tracking-tight">UPSC Command</p>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Clerk secure login</p>
+              <h1 className="max-w-2xl text-4xl font-black tracking-tight md:text-6xl">
+                Open your study workspace cleanly.
+              </h1>
+              <p className="max-w-xl text-base font-semibold leading-7 text-[#5d675f]">
+                Clerk now handles student identity, email login, Google login, and session recovery. The learning
+                dashboard stays focused on today&apos;s task, gaps, revision timing, and progress.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {["Stable session", "Email and Google login", "Cleaner recovery", "No Supabase auth dependency"].map(
+                (item) => (
+                  <div key={item} className="flex items-center gap-3 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-3">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#1d9e75]" />
+                    <span className="text-sm font-bold">{item}</span>
+                  </div>
+                )
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Login</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight">Continue to UPSC Command</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+              Use the Clerk sign-in box below. It can be configured for email code, magic link, Google, or both from
+              the Clerk dashboard.
+            </p>
+
+            <div className="mt-6">
+              {clerkConfigReady ? (
+                <div className="[&_.cl-card]:w-full [&_.cl-card]:shadow-none">
+                  <SignIn
+                    routing="hash"
+                    fallbackRedirectUrl={redirectPath}
+                    forceRedirectUrl={redirectPath}
+                    signUpFallbackRedirectUrl={redirectPath}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-4 text-[#6f4a12]">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-black">Clerk needs configuration</p>
+                      <p className="mt-1 text-sm font-semibold leading-6">
+                        Missing {missingClerkEnvVars.join(", ")}. Add the Clerk publishable key locally and in Vercel,
+                        then set NEXT_PUBLIC_AUTH_PROVIDER=clerk.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       </main>
     );
@@ -270,6 +365,17 @@ export default function LoginPage() {
                 className="h-12 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
               >
                 Continue as Student Preview
+              </Button>
+            ) : null}
+            {localTestingHost ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleMasterPreviewLogin}
+                data-testid="login-master-preview"
+                className="h-12 w-full rounded-md border-[#1d9e75]/40 bg-[#eefaf4] text-sm font-black text-[#1a3a2a] hover:bg-[#dff4ea]"
+              >
+                Continue as Master Preview
               </Button>
             ) : null}
           </div>
