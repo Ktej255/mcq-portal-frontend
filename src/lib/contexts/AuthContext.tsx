@@ -116,6 +116,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const replaceRoute = useCallback((redirectPath = "/dashboard") => {
+    window.setTimeout(() => {
+      router.replace(normalizeInternalRedirectPath(redirectPath));
+    }, 0);
+  }, [router]);
+
+  const pushRoute = useCallback((redirectPath = "/dashboard") => {
+    window.setTimeout(() => {
+      router.push(normalizeInternalRedirectPath(redirectPath));
+    }, 0);
+  }, [router]);
+
   const devLogin = useCallback((email: string, uid: string, redirectPath?: string) => {
     if (!canUsePreviewAuth()) return;
     if (authDebug) console.info("AUTH | DEV LOGIN TRIGGERED | Email:", email);
@@ -134,9 +146,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(mockUser);
     setLoading(false);
     if (redirectPath) {
-      router.replace(redirectPath);
+      replaceRoute(redirectPath);
     }
-  }, [router]);
+  }, [replaceRoute]);
 
   useEffect(() => {
     if (authDebug) console.info("AUTH | AuthProvider Mount | Auth Initialized:", !!auth);
@@ -205,7 +217,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
         if (session?.user && window.location.pathname.startsWith("/login")) {
           const params = new URLSearchParams(window.location.search);
-          router.replace(params.get("redirect") || "/dashboard");
+          replaceRoute(params.get("redirect") || "/dashboard");
         }
       });
 
@@ -250,7 +262,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       if (currentUser && window.location.pathname.startsWith("/login")) {
         const params = new URLSearchParams(window.location.search);
-        router.replace(params.get("redirect") || "/dashboard");
+        replaceRoute(params.get("redirect") || "/dashboard");
       }
     });
 
@@ -266,7 +278,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       window.clearTimeout(fallback);
       unsubscribe();
     };
-  }, [devLogin, router]);
+  }, [devLogin, replaceRoute]);
 
   const signInWithGoogle = async (redirectPath = "/dashboard") => {
     if (authDebug) console.info("AUTH | signInWithGoogle triggered");
@@ -349,7 +361,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     reconcileLocalUpscLearnerIdentity(data.user?.id);
     setUser(data.user ? mapSupabaseUser(data.user, data.session?.access_token) : null);
     setLoading(false);
-    router.replace(normalizeInternalRedirectPath(redirectPath));
+    replaceRoute(redirectPath);
   };
 
   const logout = async () => {
@@ -362,7 +374,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('mcq-exam-storage');
       setUser(null);
       setLoading(false);
-      router.push("/login");
+      pushRoute("/login");
       return;
     }
 
@@ -373,7 +385,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       clearLocalMockToken();
       localStorage.removeItem('mcq-timer-storage');
       localStorage.removeItem('mcq-exam-storage');
-      router.push("/login");
+      pushRoute("/login");
       return;
     }
 
@@ -387,7 +399,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Clear persisted stores
       localStorage.removeItem('mcq-timer-storage');
       localStorage.removeItem('mcq-exam-storage');
-      router.push("/login");
+      pushRoute("/login");
     } catch (error) {
       console.error("AUTH | logout ERROR", error);
     }

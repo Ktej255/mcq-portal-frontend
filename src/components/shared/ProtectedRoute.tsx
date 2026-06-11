@@ -21,13 +21,22 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
 
   useEffect(() => {
     if (!loading) {
+      let timeoutId: number | undefined;
       if (!user) {
         const search = window.location.search;
         const redirectTarget = `${pathname}${search}`;
-        router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+        timeoutId = window.setTimeout(() => {
+          router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+        }, 0);
       } else if (requiredRole && userRole !== requiredRole) {
-        router.push('/dashboard'); // Unauthorized
+        timeoutId = window.setTimeout(() => {
+          router.push('/dashboard'); // Unauthorized
+        }, 0);
       }
+
+      return () => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      };
     }
   }, [user, loading, router, pathname, requiredRole, userRole]);
 

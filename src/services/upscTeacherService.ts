@@ -7,7 +7,7 @@ import {
 
 export const ADAPTIVE_TEACHER_CLIENT_TIMEOUT_MS = 13_000;
 
-async function readAccessToken() {
+export async function readLearnerApiAccessToken() {
   const mockToken = readLocalMockToken();
   if (mockToken) return mockToken;
   if (!supabase) return null;
@@ -21,7 +21,7 @@ async function readAccessToken() {
 }
 
 export async function requestAdaptiveTeacherDiscussion(payload: AdaptiveTeacherRequest) {
-  const token = await readAccessToken();
+  const token = await readLearnerApiAccessToken();
   if (!token) throw new Error("Learner session required");
 
   const controller = new AbortController();

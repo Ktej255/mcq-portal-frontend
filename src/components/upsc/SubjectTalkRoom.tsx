@@ -55,6 +55,7 @@ import {
 } from "@/lib/upsc/useSubjectProgress";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
+import { requestUpscSpeechTranscription } from "@/services/upscSpeechService";
 import { cn } from "@/lib/utils";
 
 const confidenceOptions: SubjectConfidence[] = ["Shaky", "Working", "Command"];
@@ -240,6 +241,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const [speechMessage, setSpeechMessage] = useState("");
   const [speechInterimDraft, setSpeechInterimDraft] = useState("");
+  const [speechTranscribing, setSpeechTranscribing] = useState(false);
   const [audioNoteUrl, setAudioNoteUrl] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
@@ -850,7 +852,34 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
           if (current) URL.revokeObjectURL(current);
           return nextUrl;
         });
-        setSpeechMessage("Voice note recorded. Play it back, then type the transcript for AI checking.");
+        setSpeechMessage("Voice note recorded. Uploading for server transcription...");
+        setSpeechTranscribing(true);
+        void requestUpscSpeechTranscription(blob)
+          .then((result) => {
+            if (!result.transcript) {
+              setSpeechMessage("Voice note recorded. Play it back, then type the transcript for AI checking.");
+              return;
+            }
+            setAnswerDraft((current) => appendSpeechTranscript(current, result.transcript));
+            clearAudioNote();
+            setChallengeDraft("");
+            setDiscussionStep("explain");
+            setAssessment(null);
+            setMaicDiscussion(null);
+            setTeacherCoach(null);
+            setTeacherConnection("idle");
+            teacherRequestId.current += 1;
+            setSavedReflection(false);
+            setSubmittedInCurrentVisit(false);
+            setSpeechMessage("Voice note transcribed into the answer box. Review it, then send to the AI teacher.");
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : "Server transcription failed.";
+            setSpeechMessage(`Voice note recorded. ${message} Play it back, then type the transcript for AI checking.`);
+          })
+          .finally(() => {
+            setSpeechTranscribing(false);
+          });
       };
       recorder.onerror = () => {
         stream.getTracks().forEach((track) => track.stop());
@@ -1183,6 +1212,11 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                     controls
                     src={audioNoteUrl}
                   />
+                ) : null}
+                {speechTranscribing ? (
+                  <span className="inline-flex min-h-10 items-center rounded-md border border-[var(--subject-border)] bg-white px-3 text-xs font-black text-[var(--subject-dark)]">
+                    Transcribing voice note...
+                  </span>
                 ) : null}
               </div>
             </>
