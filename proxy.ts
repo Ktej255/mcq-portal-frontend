@@ -25,7 +25,7 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, request) => {
   }
 });
 
-export default function middleware(request: NextRequest, event: NextFetchEvent) {
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (process.env.NEXT_PUBLIC_AUTH_PROVIDER !== "clerk") {
     return NextResponse.next();
   }

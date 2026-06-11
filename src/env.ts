@@ -38,8 +38,17 @@ export const activeAuthProvider: AuthProviderName = isMockAuth
       ? 'supabase'
       : 'firebase';
 
+const hasValidClerkPublishableKey =
+  typeof env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === 'string' &&
+  /^pk_(test|live)_[A-Za-z0-9_-]{20,}$/.test(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
 export const missingClerkEnvVars = [
-  ['NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY],
+  [
+    hasValidClerkPublishableKey
+      ? 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'
+      : 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY(valid pk_test_/pk_live_ value)',
+    hasValidClerkPublishableKey ? env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY : undefined,
+  ],
 ]
   .filter(([, value]) => !value)
   .map(([key]) => key);
