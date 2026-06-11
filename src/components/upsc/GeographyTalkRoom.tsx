@@ -35,7 +35,7 @@ import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 import type { AdaptiveTeacherCoach, AdaptiveTeacherDoubtDiagnosis } from "@/lib/upsc/adaptiveTeacher";
 import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
-import { requestUpscSpeechTranscription } from "@/services/upscSpeechService";
+import { requestUpscSpeechTranscription, requestUpscSpeechTranscriptionStatus } from "@/services/upscSpeechService";
 import { cn } from "@/lib/utils";
 
 function resolveSession(day?: number): GeographySession {
@@ -257,6 +257,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const [speechMessage, setSpeechMessage] = useState("");
   const [speechInterimDraft, setSpeechInterimDraft] = useState("");
   const [speechTranscribing, setSpeechTranscribing] = useState(false);
+  const [serverTranscriptionAvailable, setServerTranscriptionAvailable] = useState<boolean | null>(null);
   const [audioNoteUrl, setAudioNoteUrl] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
@@ -434,6 +435,21 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   }, [speechRecognition]);
 
   useEffect(() => {
+    let cancelled = false;
+    void requestUpscSpeechTranscriptionStatus()
+      .then((status) => {
+        if (!cancelled) setServerTranscriptionAvailable(status.configured);
+      })
+      .catch(() => {
+        if (!cancelled) setServerTranscriptionAvailable(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (audioNoteUrl) URL.revokeObjectURL(audioNoteUrl);
     };
@@ -599,6 +615,13 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
           if (current) URL.revokeObjectURL(current);
           return nextUrl;
         });
+        if (serverTranscriptionAvailable === false) {
+          setSpeechMessage(
+            "Voice note recorded. Automatic transcription is not configured yet. Play it back, then type the key points for AI checking."
+          );
+          return;
+        }
+
         setSpeechMessage("Voice note recorded. Uploading for server transcription...");
         setSpeechTranscribing(true);
         void requestUpscSpeechTranscription(blob)
