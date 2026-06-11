@@ -249,6 +249,8 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const teacherRequestId = useRef(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const speechManualStopRef = useRef(false);
+  const speechCapturedTextRef = useRef(false);
 
   const activeSession = plan.sessions.find((session) => session.day === activeDay) ?? plan.sessions[0];
   const environmentPack = useMemo(
@@ -928,6 +930,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     }
 
     if (speechState === "listening" && speechRecognition) {
+      speechManualStopRef.current = true;
       speechRecognition.stop();
       setSpeechRecognition(null);
       setSpeechState("idle");
@@ -956,6 +959,8 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
 
     const recognition = new Recognition();
     let stoppedByError = false;
+    speechManualStopRef.current = false;
+    speechCapturedTextRef.current = false;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-IN";
@@ -974,6 +979,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       }
 
       if (finalTranscript) {
+        speechCapturedTextRef.current = true;
         setAnswerDraft((current) => appendSpeechTranscript(current, finalTranscript));
         clearAudioNote();
         setSpeechMessage("Speech captured as text. You can continue speaking or stop recording.");
@@ -992,6 +998,10 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       setSpeechRecognition(null);
       setSpeechInterimDraft("");
       if (!stoppedByError) {
+        if (!speechManualStopRef.current && !speechCapturedTextRef.current) {
+          void startAudioFallbackRecording("Live speech did not return text.");
+          return;
+        }
         setSpeechState("idle");
         setSpeechMessage((current) =>
           current && !current.startsWith("Listening") && !current.startsWith("Transcribing")
@@ -1004,8 +1014,12 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       stoppedByError = true;
       setSpeechRecognition(null);
       setSpeechInterimDraft("");
-      if (event.error === "network") {
-        void startAudioFallbackRecording("Browser speech recognition could not reach its speech service.");
+      if (event.error === "network" || event.error === "no-speech") {
+        void startAudioFallbackRecording(
+          event.error === "network"
+            ? "Browser speech recognition could not reach its speech service."
+            : "Live speech did not return text."
+        );
         return;
       }
       setSpeechState(event.error === "not-allowed" || event.error === "service-not-allowed" ? "blocked" : "error");
