@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { parseAdaptiveTeacherResponse } from "@/lib/upsc/adaptiveTeacher";
 import { cn } from "@/lib/utils";
+import { requestUpscSpeechTranscriptionStatus } from "@/services/upscSpeechService";
 
 type CheckStatus = "idle" | "running" | "pass" | "warn" | "fail";
 
@@ -70,6 +71,12 @@ const defaultChecks: CheckItem[] = [
   {
     id: "teacher",
     label: "AI teacher API",
+    status: "idle",
+    detail: "Not checked yet.",
+  },
+  {
+    id: "server-stt",
+    label: "Server speech fallback",
     status: "idle",
     detail: "Not checked yet.",
   },
@@ -196,7 +203,7 @@ export function GeographyProductionCheck() {
 
     if (!token) {
       nextChecks = nextChecks.map((check) =>
-        check.id === "teacher"
+        check.id === "teacher" || check.id === "server-stt"
           ? { ...check, status: "fail", detail: "Skipped because no authenticated learner token is available." }
           : check
       );
@@ -205,6 +212,27 @@ export function GeographyProductionCheck() {
       setIsRunning(false);
       return;
     }
+
+    try {
+      const transcriptionStatus = await requestUpscSpeechTranscriptionStatus();
+      nextChecks = nextChecks.map((check) =>
+        check.id === "server-stt"
+          ? {
+              ...check,
+              status: transcriptionStatus.configured ? "pass" : "warn",
+              detail: transcriptionStatus.message,
+            }
+          : check
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown request failure.";
+      nextChecks = nextChecks.map((check) =>
+        check.id === "server-stt"
+          ? { ...check, status: "fail", detail: `Server transcription status failed: ${message}` }
+          : check
+      );
+    }
+    setChecks(nextChecks);
 
     try {
       const response = await fetch("/api/upsc/teacher/discuss", {

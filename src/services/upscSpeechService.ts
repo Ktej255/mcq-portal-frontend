@@ -5,6 +5,40 @@ export type UpscSpeechTranscriptionResult = {
   mode: "server-stt";
 };
 
+export type UpscSpeechTranscriptionStatus = {
+  configured: boolean;
+  message: string;
+  maxAudioBytes?: number;
+  missing?: {
+    baseUrl?: boolean;
+    apiKey?: boolean;
+    model?: boolean;
+  };
+};
+
+export async function requestUpscSpeechTranscriptionStatus(): Promise<UpscSpeechTranscriptionStatus> {
+  const token = await readLearnerApiAccessToken();
+  if (!token) throw new Error("Learner session required");
+
+  const response = await fetch("/api/upsc/teacher/transcribe", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok || typeof body?.configured !== "boolean") {
+    throw new Error(typeof body?.message === "string" ? body.message : "Speech transcription status failed");
+  }
+
+  return {
+    configured: body.configured,
+    message: typeof body.message === "string" ? body.message : "",
+    maxAudioBytes: typeof body.maxAudioBytes === "number" ? body.maxAudioBytes : undefined,
+    missing: typeof body.missing === "object" && body.missing ? body.missing : undefined,
+  };
+}
+
 export async function requestUpscSpeechTranscription(audio: Blob): Promise<UpscSpeechTranscriptionResult> {
   const token = await readLearnerApiAccessToken();
   if (!token) throw new Error("Learner session required");

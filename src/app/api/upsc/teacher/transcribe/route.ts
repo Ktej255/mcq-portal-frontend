@@ -12,6 +12,22 @@ const sttApiKey =
 const sttModel = process.env.NVIDIA_STT_MODEL?.trim() || process.env.STT_MODEL?.trim() || "";
 const maxAudioBytes = Number(process.env.UPSC_STT_MAX_AUDIO_BYTES ?? 8_000_000);
 
+function getTranscriptionStatus() {
+  const configured = Boolean(sttBaseUrl && sttApiKey && sttModel);
+  return {
+    configured,
+    maxAudioBytes: Number.isFinite(maxAudioBytes) ? maxAudioBytes : 8_000_000,
+    missing: {
+      baseUrl: !sttBaseUrl,
+      apiKey: !sttApiKey,
+      model: !sttModel,
+    },
+    message: configured
+      ? "Server transcription is configured. Record a short answer to verify the provider response."
+      : "Server transcription is not configured. Browser speech-to-text, typed answers, and audio-note fallback remain available.",
+  };
+}
+
 function noStoreJson(body: object, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store");
@@ -48,12 +64,21 @@ function readTranscript(value: unknown) {
   );
 }
 
+export async function GET(request: NextRequest) {
+  if (!(await hasLearnerApiAccess(request))) {
+    return noStoreJson({ message: "Learner access required" }, { status: 403 });
+  }
+
+  return noStoreJson(getTranscriptionStatus());
+}
+
 export async function POST(request: NextRequest) {
   if (!(await hasLearnerApiAccess(request))) {
     return noStoreJson({ message: "Learner access required" }, { status: 403 });
   }
 
-  if (!sttBaseUrl || !sttApiKey || !sttModel) {
+  const status = getTranscriptionStatus();
+  if (!status.configured) {
     return noStoreJson(
       {
         message:
