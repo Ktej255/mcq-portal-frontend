@@ -76,7 +76,7 @@ const defaultChecks: CheckItem[] = [
   },
   {
     id: "server-stt",
-    label: "Server speech fallback",
+    label: "Speech fallback policy",
     status: "idle",
     detail: "Not checked yet.",
   },
@@ -219,8 +219,10 @@ export function GeographyProductionCheck() {
         check.id === "server-stt"
           ? {
               ...check,
-              status: transcriptionStatus.configured ? "pass" : "warn",
-              detail: transcriptionStatus.message,
+              status: "pass",
+              detail: transcriptionStatus.configured
+                ? transcriptionStatus.message
+                : `${transcriptionStatus.message} This is acceptable for the current production path: browser live speech first, audio note fallback second, Whisper/whisper.cpp backend later.`,
             }
           : check
       );
@@ -228,7 +230,11 @@ export function GeographyProductionCheck() {
       const message = error instanceof Error ? error.message : "Unknown request failure.";
       nextChecks = nextChecks.map((check) =>
         check.id === "server-stt"
-          ? { ...check, status: "fail", detail: `Server transcription status failed: ${message}` }
+          ? {
+              ...check,
+              status: "warn",
+              detail: `Could not read optional server transcription status: ${message}. Current path still uses browser speech plus audio note fallback.`,
+            }
           : check
       );
     }
@@ -379,8 +385,8 @@ export function GeographyProductionCheck() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Production check</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Geography live session proof</h1>
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                Run this after logging in on production. It checks the same session, layout, speech, and AI teacher
-                boundary that a real Geography student uses.
+                Run this after logging in on production. It checks the same session, layout, browser speech path,
+                audio-note fallback, and AI teacher boundary that a real Geography student uses.
               </p>
             </div>
             <div className="grid min-w-52 grid-cols-3 gap-2 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-center">

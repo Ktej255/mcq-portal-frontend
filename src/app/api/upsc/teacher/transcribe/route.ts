@@ -24,7 +24,7 @@ function getTranscriptionStatus() {
     },
     message: configured
       ? "Server transcription is configured. Record a short answer to verify the provider response."
-      : "Server transcription is not configured. Browser speech-to-text, typed answers, and audio-note fallback remain available.",
+      : "Server transcription backend is optional for this build. Browser live speech, typed answers, and audio-note fallback are the current production path; Whisper/whisper.cpp can be added later on a separate backend.",
   };
 }
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     return noStoreJson(
       {
         message:
-          "Server transcription is not configured. Add NVIDIA_STT_API_KEY and NVIDIA_STT_MODEL to enable automatic audio transcription.",
+          "Optional server transcription is not configured. Use browser live speech or the audio-note fallback now; add a Whisper/whisper.cpp or provider STT backend later to auto-transcribe recorded notes.",
         transcriptionAvailable: false,
       },
       { status: 503 }

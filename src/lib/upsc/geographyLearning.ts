@@ -269,26 +269,26 @@ export function getCompressedGeographyRecap(session: GeographySession) {
   }
   if (session.day === 18) {
     return [
-      `Start with ${geographyDay18PortalLesson.title}: trace nodes, routes, corridors, and terminals as one connectivity system.`,
-      "Compare railways, highways, waterways, air routes, and pipelines through cargo, distance, terrain, urgency, and network connection before adding port-hinterland logic.",
-      "Connect market access, specialization, settlement, industry, agriculture, regional growth, inequality, and ecological pressure through one corridor or port example.",
-      "End with the UPSC trap: a real corridor, port, cargo, or transport advantage can still be paired with the wrong hinterland, route, or location.",
+      `Start with ${geographyDay27PortalLesson.title}: recall the physical base through process, location, and consequence.`,
+      "Overlay India map layers and human-geography outcomes through relief, rivers, monsoon, resources, settlements, sectors, networks, industry, and regions.",
+      "Add environment and disaster bridges through habitat, climate exposure, hazard, vulnerability, and capacity.",
+      "End with the repair loop: tag chapter, map zone, concept type, and trap type before creating one correction and fresh retest.",
     ];
   }
   if (session.day === 19) {
     return [
-      `Start with ${geographyDay19PortalLesson.title}: compare classical input-market factors with newer skill, data, innovation, logistics, policy, and value-chain logic.`,
-      "Explain why older industrial regions often reflect coal, ore, railway, port, water, and colonial-market geography while newer clusters can follow skills, suppliers, finance, highways, airports, and agglomeration.",
-      "Compare one old industrial region with one newer cluster before naming the dominant factor, support factors, network, and changing context.",
-      "End with the UPSC trap: a real industry and a real location factor can still be paired with the wrong region, network, or period logic.",
+      `Start with ${geographyDay28PortalLesson.title}: classify the weak signal as knowledge, map recall, concept confusion, or statement-reading error.`,
+      "Name the smallest root cause, then write one narrow repair card with concept, map cue, example, trap, and correction.",
+      "Use a fresh retest against the same repaired idea and compare original confidence with retest confidence.",
+      "End with the UPSC trap: do not revise an entire chapter when one process, location, or question pattern remains weak.",
     ];
   }
   if (session.day === 20) {
     return [
-      `Start with ${geographyDay20PortalLesson.title}: identify one spatial development gap, the indicator that reveals it, and the geography or governance factor that creates it.`,
-      "Match the issue with a functional, administrative, resource-based, river-basin based, or problem-region planning unit before choosing a policy response.",
-      "Balance growth-pole and urbanization gains with housing, transport, waste, water, pollution, participation, and ecological pressure.",
-      "End with the UPSC trap: a useful policy can still be mismatched with the cause, indicator, planning unit, governance capacity, or sustainability risk.",
+      `Start with ${geographyDay30PortalLesson.title}: explain every major theme through cause and location before marking the subject complete.`,
+      "Check map confidence through recurring places, directions, neighboring regions, relief, rivers, climate, resources, biodiversity, and hazards.",
+      "Audit proof through Watch, Talk, MCQ, and Revisit closure, then lock the next revision dates.",
+      "End with the UPSC trap: feeling familiar with a topic is not the same as applying it under exam pressure.",
     ];
   }
   if (session.day === 21) {
@@ -339,39 +339,6 @@ export function getCompressedGeographyRecap(session: GeographySession) {
       "End with the UPSC trap: a long list of correct facts still produces a weak answer when flow, spatial evidence, examples, or conclusion discipline are missing.",
     ];
   }
-  if (session.day === 27) {
-    return [
-      `Start with ${geographyDay27PortalLesson.title}: recall the physical base through process, location, and consequence.`,
-      "Overlay India map layers and human-geography outcomes through relief, rivers, monsoon, resources, settlements, sectors, networks, industry, and regions.",
-      "Add environment and disaster bridges through habitat, climate exposure, hazard, vulnerability, and capacity.",
-      "End with the repair loop: tag chapter, map zone, concept type, and trap type before creating one correction and fresh retest.",
-    ];
-  }
-  if (session.day === 28) {
-    return [
-      `Start with ${geographyDay28PortalLesson.title}: classify the weak signal as knowledge, map recall, concept confusion, or statement-reading error.`,
-      "Name the smallest root cause, then write one narrow repair card with concept, map cue, example, trap, and correction.",
-      "Use a fresh retest against the same repaired idea and compare original confidence with retest confidence.",
-      "End with the UPSC trap: do not revise an entire chapter when one process, location, or question pattern remains weak.",
-    ];
-  }
-  if (session.day === 29) {
-    return [
-      `Start with ${geographyDay29PortalLesson.title}: treat the mock score as a signal, not the diagnosis.`,
-      "Classify each mistake as knowledge gap, map error, statement-reading error, overconfidence, or time pressure before selecting the repair.",
-      "Move repeated and high-value mistakes into the 24-hour queue with one correction and one retest cue.",
-      "End with the UPSC trap: familiarity is not confidence until the corrected idea survives a fresh retest.",
-    ];
-  }
-  if (session.day === 30) {
-    return [
-      `Start with ${geographyDay30PortalLesson.title}: explain every major theme through cause and location before marking the subject complete.`,
-      "Check map confidence through recurring places, directions, neighboring regions, relief, rivers, climate, resources, biodiversity, and hazards.",
-      "Audit proof through Watch, Talk, MCQ, and Revisit closure, then lock the next revision dates.",
-      "End with the UPSC trap: feeling familiar with a topic is not the same as applying it under exam pressure.",
-    ];
-  }
-
   const subtopics = getGeographySubtopics(session);
 
   return [
@@ -400,9 +367,9 @@ export function buildGeographyWatchScenes(session: GeographySession): GeographyW
   if (session.day === 15) return geographyDay15PortalLesson.scenes;
   if (session.day === 16) return geographyDay16PortalLesson.scenes;
   if (session.day === 17) return geographyDay17PortalLesson.scenes;
-  if (session.day === 18) return geographyDay18PortalLesson.scenes;
-  if (session.day === 19) return geographyDay19PortalLesson.scenes;
-  if (session.day === 20) return geographyDay20PortalLesson.scenes;
+  if (session.day === 18) return geographyDay27PortalLesson.scenes;
+  if (session.day === 19) return geographyDay28PortalLesson.scenes;
+  if (session.day === 20) return geographyDay30PortalLesson.scenes;
   if (session.day === 21) return geographyDay21PortalLesson.scenes;
   if (session.day === 22) return geographyDay22PortalLesson.scenes;
   if (session.day === 23) return geographyDay23PortalLesson.scenes;

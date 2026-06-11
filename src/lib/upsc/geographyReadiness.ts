@@ -208,7 +208,7 @@ export function buildGeographyReadinessSnapshot(
     label,
     detail:
       score >= 95 && commandCount === geographySessions.length
-        ? "All 30 Geography days have local command proof."
+        ? `All ${geographySessions.length} Geography days have local command proof.`
         : `${blockedCount} days still need a lesson, discussion, or short revision before practice is complete.`,
     stageCounts,
     blockedCount,

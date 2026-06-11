@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   BrainCircuit,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   FileText,
+  LockKeyhole,
   MapPinned,
   PlayCircle,
   Route,
@@ -60,6 +62,13 @@ import {
   labSlugForGeographySession,
 } from "@/lib/upsc/geographyLearning";
 import { geographyDay1MediaAttachment } from "@/lib/upsc/geographyDay1Media";
+import {
+  getGeographyContentModule,
+  getGeographyModuleSection,
+  getPrimaryGeographyContentModuleForDay,
+  type GeographyContentModule,
+  type GeographyContentModuleSection,
+} from "@/lib/upsc/geographyContentModules";
 import { hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
@@ -117,7 +126,27 @@ function getWatchLevelCopy({
   };
 }
 
-export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
+function moduleTalkHref(day: number, module: GeographyContentModule, section: GeographyContentModuleSection) {
+  return `/upsc/geography/talk?day=${day}&module=${module.id}&section=${section.id}`;
+}
+
+function moduleWatchHref(day: number, module: GeographyContentModule, section: GeographyContentModuleSection) {
+  return `/upsc/geography/watch?day=${day}&module=${module.id}&section=${section.id}`;
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+export function GeographyWatchRoom({
+  initialDay,
+  initialModuleId,
+  initialSectionId,
+}: {
+  initialDay?: number;
+  initialModuleId?: string;
+  initialSectionId?: string;
+}) {
   const router = useRouter();
   const { getDayProgress, isLoaded, saveDayProgress } = useGeographyProgress();
   const [activeDay] = useState(resolveSession(initialDay).day);
@@ -130,12 +159,46 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
 
   const activeSession = resolveSession(activeDay);
   const watchScenes = buildGeographyWatchScenes(activeSession);
+  const requestedModule = getGeographyContentModule(initialModuleId);
+  const dayModule = getPrimaryGeographyContentModuleForDay(activeSession.day);
+  const activeModule = requestedModule?.day === activeSession.day ? requestedModule : dayModule;
   const durationMinutes = watchScenes.reduce((total, scene) => total + scene.durationMinutes, 0);
   const recap = getCompressedGeographyRecap(activeSession);
   const subtopics = getGeographySubtopics(activeSession);
   const labSlug = labSlugForGeographySession(activeSession.lab);
   const dayOneMedia = activeSession.day === 1 ? geographyDay1MediaAttachment : null;
   const progress = getDayProgress(activeSession.day);
+  const activeModuleProgress = activeModule ? progress?.moduleProgress?.[activeModule.id] : undefined;
+  const activeModuleFirstSectionId = activeModule?.sections[0]?.id;
+  const activeModuleUnlockedSectionId =
+    activeModuleProgress?.nextUnlockedSectionId ?? activeModuleFirstSectionId;
+  const requestedModuleSectionIndex = activeModule
+    ? activeModule.sections.findIndex((section) => section.id === initialSectionId)
+    : -1;
+  const unlockedModuleSectionIndex = activeModule
+    ? Math.max(
+        0,
+        activeModule.sections.findIndex((section) => section.id === activeModuleUnlockedSectionId)
+      )
+    : -1;
+  const activeModuleSectionIndex = activeModule
+    ? Math.min(
+        requestedModuleSectionIndex >= 0 ? requestedModuleSectionIndex : unlockedModuleSectionIndex,
+        unlockedModuleSectionIndex
+      )
+    : -1;
+  const activeModuleSection =
+    activeModule && activeModuleSectionIndex >= 0
+      ? getGeographyModuleSection(activeModule, activeModule.sections[activeModuleSectionIndex]?.id)
+      : null;
+  const activeModuleReadSectionIds = activeModuleProgress?.readSectionIds ?? [];
+  const activeModulePassedSectionIds = activeModuleProgress?.passedSectionIds ?? [];
+  const activeModuleSectionRead = Boolean(
+    activeModuleSection && activeModuleReadSectionIds.includes(activeModuleSection.id)
+  );
+  const activeModuleComplete = Boolean(
+    activeModule && activeModulePassedSectionIds.length >= activeModule.sections.length
+  );
   const recallScore = progress?.talkScore;
   const savedRecall = progress?.reflection?.trim() || progress?.baselineKnowledge?.trim() || baselineKnowledge.trim();
   const hasSavedRecall = Boolean(savedRecall) || typeof recallScore === "number";
@@ -147,12 +210,25 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
     !talkCleared;
   const canOpenLesson = !talkCleared && (isBeginner || hasRepairDiagnosis);
   const completedCount = completedSceneIds.length;
-  const isComplete = completedCount >= watchScenes.length || Boolean(progress?.watched);
+  const isComplete = activeModuleComplete || completedCount >= watchScenes.length || Boolean(progress?.watched);
   const progressPercent = Math.round((Math.min(completedCount, watchScenes.length) / watchScenes.length) * 100);
+  const moduleProgressPercent = activeModule
+    ? Math.round(
+        (Math.min(
+          uniqueValues([...activeModuleReadSectionIds, ...activeModulePassedSectionIds]).length,
+          activeModule.sections.length
+        ) /
+          activeModule.sections.length) *
+          100
+      )
+    : progressPercent;
   const previousDay = activeSession.day > 1 ? resolveSession(activeSession.day - 1) : null;
   const nextDay = activeSession.day < geographySessions.length ? resolveSession(activeSession.day + 1) : null;
 
-  const talkHref = `/upsc/geography/talk?day=${activeSession.day}`;
+  const talkHref =
+    activeModule && activeModuleSection
+      ? moduleTalkHref(activeSession.day, activeModule, activeModuleSection)
+      : `/upsc/geography/talk?day=${activeSession.day}`;
   const currentAction = talkCleared
     ? {
         label: "Open MCQ practice",
@@ -250,6 +326,41 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
     persistWatch(allScenes, true);
   };
 
+  const saveModuleSectionAndDiscuss = () => {
+    if (!activeModule || !activeModuleSection) return;
+    const existingModuleProgress = progress?.moduleProgress?.[activeModule.id];
+    const nextReadSectionIds = uniqueValues([
+      ...(existingModuleProgress?.readSectionIds ?? []),
+      activeModuleSection.id,
+    ]);
+    const nextModuleProgress = {
+      ...(progress?.moduleProgress ?? {}),
+      [activeModule.id]: {
+        ...existingModuleProgress,
+        moduleId: activeModule.id,
+        activeSectionId: activeModuleSection.id,
+        readSectionIds: nextReadSectionIds,
+        passedSectionIds: existingModuleProgress?.passedSectionIds ?? [],
+        nextUnlockedSectionId: existingModuleProgress?.nextUnlockedSectionId ?? activeModule.sections[0]?.id,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    saveDayProgress(activeSession.day, {
+      moduleProgress: nextModuleProgress,
+      watchState: activeModuleComplete ? "Watched" : "In class",
+      watchMinutes: Math.max(
+        progress?.watchMinutes ?? 0,
+        activeModule.sections
+          .filter((section) => nextReadSectionIds.includes(section.id))
+          .reduce((sum, section) => sum + section.estimatedMinutes, 0)
+      ),
+      watchSceneIndex: activeModuleSectionIndex,
+      labMode: labSlug,
+    });
+    window.setTimeout(() => router.push(moduleTalkHref(activeSession.day, activeModule, activeModuleSection)), 0);
+  };
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f7f4ee] text-[#13251d]">
@@ -304,7 +415,7 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
                 </span>
               )}
               <span className="inline-flex h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-white">
-                Day {activeSession.day}/30
+                Day {activeSession.day}/{geographySessions.length}
               </span>
               <span className="inline-flex h-9 max-w-full items-center gap-1 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-3 text-[#746f66]">
                 {nextDay ? `Next opens after MCQ: Day ${nextDay.day}` : "Final day closeout"}
@@ -457,92 +568,234 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
                 Use the green button. The portal moves you to discussion, MCQ, and the next topic.
               </p>
               <div className="flex min-h-[36rem] flex-col justify-between rounded-lg border border-white/10 bg-white/5 p-5 md:min-h-[42rem]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#13251d]">
-                    <Video className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em]">
-                    {durationMinutes} min guided class
-                  </span>
-                </div>
-                <div>
-                    {activeSession.day === 1 && !dayOneMedia?.releaseAssetPairReady ? <GeographyDay1MapThinkingVisual /> : null}
-                    {activeSession.day === 2 ? <GeographyDay2UniverseVisual /> : null}
-                    {activeSession.day === 3 ? <GeographyDay3PlateVisual /> : null}
-                    {activeSession.day === 4 ? <GeographyDay4GeomorphicVisual /> : null}
-                    {activeSession.day === 5 ? <GeographyDay5ClimatologyVisual /> : null}
-                    {activeSession.day === 6 ? <GeographyDay6OceanVisual /> : null}
-                    {activeSession.day === 7 ? <GeographyDay7ConsolidationVisual /> : null}
-                    {activeSession.day === 8 ? <GeographyDay8IndiaReliefVisual /> : null}
-                    {activeSession.day === 9 ? <GeographyDay9DrainageVisual /> : null}
-                    {activeSession.day === 10 ? <GeographyDay10MonsoonVisual /> : null}
-                    {activeSession.day === 11 ? <GeographyDay11ClimateRegionsVisual /> : null}
-                    {activeSession.day === 12 ? <GeographyDay12SoilsVegetationVisual /> : null}
-                    {activeSession.day === 13 ? <GeographyDay13ResourcesAgricultureVisual /> : null}
-                    {activeSession.day === 14 ? <GeographyDay14IndiaMapDrillVisual /> : null}
-                    {activeSession.day === 15 ? <GeographyDay15PopulationVisual /> : null}
-                    {activeSession.day === 16 ? <GeographyDay16SettlementsVisual /> : null}
-                    {activeSession.day === 17 ? <GeographyDay17EconomicActivitiesVisual /> : null}
-                    {activeSession.day === 18 ? <GeographyDay18TransportTradeVisual /> : null}
-                    {activeSession.day === 19 ? <GeographyDay19IndustryLocationVisual /> : null}
-                    {activeSession.day === 20 ? <GeographyDay20RegionalDevelopmentVisual /> : null}
-                    {activeSession.day === 21 ? <GeographyDay21HumanGeographyConsolidationVisual /> : null}
-                    {activeSession.day === 22 ? <GeographyDay22AtlasMasteryVisual /> : null}
-                    {activeSession.day === 23 ? <GeographyDay23PyqPatternReadingVisual /> : null}
-                    {activeSession.day === 24 ? <GeographyDay24DisasterGeographyBridgeVisual /> : null}
-                    {activeSession.day === 25 ? <GeographyDay25EnvironmentGeographyBridgeVisual /> : null}
-                    {activeSession.day === 26 ? <GeographyDay26MainsGeographyApplicationVisual /> : null}
-                    {activeSession.day === 27 ? <GeographyDay27FullGeographyDrillVisual /> : null}
-                    {activeSession.day === 28 ? <GeographyDay28WeakAreaRepairVisual /> : null}
-                    {activeSession.day === 29 ? <GeographyDay29FinalMockReviewVisual /> : null}
-                    {activeSession.day === 30 ? <GeographyDay30GeographyCommandDayVisual /> : null}
-                  {dayOneMedia?.releaseAssetPairReady && dayOneMedia.mediaUrl ? (
-                    <div className="mb-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
-                      <video
-                        data-testid="watch-approved-day1-video"
-                        controls
-                        preload="metadata"
-                        src={dayOneMedia.mediaUrl}
-                        onEnded={completeAndDiscuss}
-                        className="aspect-video w-full bg-black object-contain"
-                      />
-                      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                        <p className="text-xs font-black text-white/80">{dayOneMedia.mediaLabel}</p>
-                        {dayOneMedia.transcriptUrl ? (
-                          <a
-                            href={dayOneMedia.transcriptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-black text-[#75ddbc] hover:text-white"
-                          >
-                            Transcript <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : null}
+                {activeModule && activeModuleSection ? (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-white text-[#13251d]">
+                          <BookOpen className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#75ddbc]">
+                            {activeModule.cluster} module reader
+                          </p>
+                          <p className="truncate text-sm font-black text-white">{activeModule.title}</p>
+                        </div>
                       </div>
+                      <span
+                        data-testid="geography-module-slide-progress"
+                        className="rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em]"
+                      >
+                        Slide {activeModuleSectionIndex + 1} of {activeModule.sections.length}
+                      </span>
                     </div>
-                  ) : null}
-                  <h3 className="text-2xl font-black tracking-tight">{activeSession.title}</h3>
-                  <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-white/72">{activeSession.watch}</p>
-                </div>
-                <button
-                  type="button"
-                  data-testid="watch-complete-and-discuss"
-                  data-action-location="player"
-                  data-next-action-href={talkHref}
-                  data-duration-minutes={durationMinutes}
-                  onClick={completeAndDiscuss}
-                  className="inline-flex h-11 w-fit items-center justify-center rounded-md bg-[#1d9e75] px-4 text-sm font-black text-white transition hover:bg-[#087a59]"
-                >
-                  {isBeginner ? "Finish lesson and discuss" : "Finish repair and discuss"} <ArrowRight className="ml-2 h-4 w-4" />
-                </button>
+
+                    <div
+                      data-testid="geography-module-slide"
+                      data-module-id={activeModule.id}
+                      data-section-id={activeModuleSection.id}
+                      data-section-read={activeModuleSectionRead ? "true" : "false"}
+                      className="my-5 grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch"
+                    >
+                      <article className="rounded-lg border border-white/15 bg-white p-5 text-[#13251d]">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                          {activeModuleSection.eyebrow}
+                        </p>
+                        <h3 className="mt-2 text-2xl font-black tracking-tight">
+                          {activeModuleSection.title}
+                        </h3>
+                        <p className="mt-3 text-sm font-semibold leading-6 text-[#4f5e55]">
+                          {activeModuleSection.body}
+                        </p>
+                        <div className="mt-4 grid gap-2">
+                          {activeModuleSection.bullets.map((bullet) => (
+                            <p key={bullet} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-bold leading-6 text-[#34453b]">
+                              {bullet}
+                            </p>
+                          ))}
+                        </div>
+                      </article>
+
+                      <aside className="flex min-h-72 flex-col justify-between rounded-lg border border-white/15 bg-white/10 p-4">
+                        {activeModuleSection.image?.url ? (
+                          <div className="overflow-hidden rounded-lg border border-white/15 bg-black/30">
+                            <img
+                              src={activeModuleSection.image.url}
+                              alt={activeModuleSection.image.alt}
+                              className="max-h-56 w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex min-h-48 items-center justify-center rounded-lg border border-white/15 bg-[#0f2a20] p-5 text-center">
+                            <p className="text-sm font-black leading-6 text-white/80">
+                              Visual slot: use sourced map, NASA/public-domain image, or portal-native diagram here.
+                            </p>
+                          </div>
+                        )}
+                        <div className="mt-4 rounded-md bg-white/10 p-3 text-xs font-bold leading-5 text-white/72">
+                          <p className="font-black uppercase tracking-[0.14em] text-[#75ddbc]">Image/source rule</p>
+                          <p className="mt-2">
+                            {activeModuleSection.image
+                              ? `${activeModuleSection.image.credit}. ${activeModuleSection.image.license}.`
+                              : activeModule.sourceLabel}
+                          </p>
+                          {activeModuleSection.image?.sourceUrl ? (
+                            <a
+                              href={activeModuleSection.image.sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 font-black text-[#75ddbc] hover:text-white"
+                            >
+                              Source <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </aside>
+                    </div>
+
+                    <div data-testid="geography-module-section-rail" className="grid gap-2 md:grid-cols-4">
+                      {activeModule.sections.map((section, index) => {
+                        const passed = activeModulePassedSectionIds.includes(section.id);
+                        const read = activeModuleReadSectionIds.includes(section.id);
+                        const unlocked = index <= unlockedModuleSectionIndex;
+                        const active = section.id === activeModuleSection.id;
+                        const content = (
+                          <>
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/80 text-[10px] font-black text-[#13251d]">
+                              {passed ? <CheckCircle2 className="h-3.5 w-3.5 text-[#1d9e75]" /> : unlocked ? index + 1 : <LockKeyhole className="h-3.5 w-3.5 text-[#8a8174]" />}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-black">{section.title}</span>
+                              <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.1em] opacity-70">
+                                {passed ? "Recall clear" : read ? "Discuss now" : unlocked ? "Unlocked" : "Locked"}
+                              </span>
+                            </span>
+                          </>
+                        );
+
+                        return unlocked ? (
+                          <Link
+                            key={section.id}
+                            href={moduleWatchHref(activeSession.day, activeModule, section)}
+                            data-testid={`geography-module-section-${section.id}`}
+                            data-section-state={active ? "active" : passed ? "passed" : read ? "read" : "unlocked"}
+                            className={cn(
+                              "flex min-h-14 min-w-0 items-center gap-2 rounded-md border px-3 transition",
+                              active
+                                ? "border-[#75ddbc] bg-[#1d9e75] text-white"
+                                : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                            )}
+                          >
+                            {content}
+                          </Link>
+                        ) : (
+                          <div
+                            key={section.id}
+                            data-testid={`geography-module-section-${section.id}`}
+                            data-section-state="locked"
+                            className="flex min-h-14 min-w-0 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-white/45"
+                          >
+                            {content}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      data-testid="watch-module-read-and-discuss"
+                      data-action-location="module-player"
+                      data-module-id={activeModule.id}
+                      data-section-id={activeModuleSection.id}
+                      data-next-action-href={moduleTalkHref(activeSession.day, activeModule, activeModuleSection)}
+                      onClick={saveModuleSectionAndDiscuss}
+                      className="mt-5 inline-flex h-11 w-fit items-center justify-center rounded-md bg-[#1d9e75] px-4 text-sm font-black text-white transition hover:bg-[#087a59]"
+                    >
+                      {activeModuleSectionRead ? "Discuss cumulative recall" : "Mark slide read and discuss"}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#13251d]">
+                        <Video className="h-5 w-5" />
+                      </div>
+                      <span className="rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-[0.16em]">
+                        {durationMinutes} min guided class
+                      </span>
+                    </div>
+                    <div>
+                        {activeSession.day === 1 && !dayOneMedia?.releaseAssetPairReady ? <GeographyDay1MapThinkingVisual /> : null}
+                        {activeSession.day === 2 ? <GeographyDay2UniverseVisual /> : null}
+                        {activeSession.day === 3 ? <GeographyDay3PlateVisual /> : null}
+                        {activeSession.day === 4 ? <GeographyDay4GeomorphicVisual /> : null}
+                        {activeSession.day === 5 ? <GeographyDay5ClimatologyVisual /> : null}
+                        {activeSession.day === 6 ? <GeographyDay6OceanVisual /> : null}
+                        {activeSession.day === 7 ? <GeographyDay7ConsolidationVisual /> : null}
+                        {activeSession.day === 8 ? <GeographyDay8IndiaReliefVisual /> : null}
+                        {activeSession.day === 9 ? <GeographyDay9DrainageVisual /> : null}
+                        {activeSession.day === 10 ? <GeographyDay10MonsoonVisual /> : null}
+                        {activeSession.day === 11 ? <GeographyDay11ClimateRegionsVisual /> : null}
+                        {activeSession.day === 12 ? <GeographyDay12SoilsVegetationVisual /> : null}
+                        {activeSession.day === 13 ? <GeographyDay13ResourcesAgricultureVisual /> : null}
+                        {activeSession.day === 14 ? <GeographyDay22AtlasMasteryVisual /> : null}
+                        {activeSession.day === 15 ? <GeographyDay15PopulationVisual /> : null}
+                        {activeSession.day === 16 ? <GeographyDay21HumanGeographyConsolidationVisual /> : null}
+                        {activeSession.day === 17 ? <GeographyDay24DisasterGeographyBridgeVisual /> : null}
+                        {activeSession.day === 18 ? <GeographyDay27FullGeographyDrillVisual /> : null}
+                        {activeSession.day === 19 ? <GeographyDay28WeakAreaRepairVisual /> : null}
+                        {activeSession.day === 20 ? <GeographyDay30GeographyCommandDayVisual /> : null}
+                      {dayOneMedia?.releaseAssetPairReady && dayOneMedia.mediaUrl ? (
+                        <div className="mb-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
+                          <video
+                            data-testid="watch-approved-day1-video"
+                            controls
+                            preload="metadata"
+                            src={dayOneMedia.mediaUrl}
+                            onEnded={completeAndDiscuss}
+                            className="aspect-video w-full bg-black object-contain"
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                            <p className="text-xs font-black text-white/80">{dayOneMedia.mediaLabel}</p>
+                            {dayOneMedia.transcriptUrl ? (
+                              <a
+                                href={dayOneMedia.transcriptUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-black text-[#75ddbc] hover:text-white"
+                              >
+                                Transcript <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                      <h3 className="text-2xl font-black tracking-tight">{activeSession.title}</h3>
+                      <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-white/72">{activeSession.watch}</p>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="watch-complete-and-discuss"
+                      data-action-location="player"
+                      data-next-action-href={talkHref}
+                      data-duration-minutes={durationMinutes}
+                      onClick={completeAndDiscuss}
+                      className="inline-flex h-11 w-fit items-center justify-center rounded-md bg-[#1d9e75] px-4 text-sm font-black text-white transition hover:bg-[#087a59]"
+                    >
+                      {isBeginner ? "Finish lesson and discuss" : "Finish repair and discuss"} <ArrowRight className="ml-2 h-4 w-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#eee6d7]">
-              <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${isComplete ? 100 : progressPercent}%` }} />
+              <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${isComplete ? 100 : moduleProgressPercent}%` }} />
             </div>
           </div>
 
+          {!activeModule && (
           <details data-testid="geography-watch-checkpoints" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
             <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
               Class checkpoints
@@ -584,6 +837,7 @@ export function GeographyWatchRoom({ initialDay }: { initialDay?: number }) {
             </div>
             </div>
           </details>
+          )}
         </section>
         )}
 

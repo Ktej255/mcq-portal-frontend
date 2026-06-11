@@ -21,6 +21,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import {
+  assessGeographyModuleRecall,
+  getCumulativeGeographyModuleSections,
+  getGeographyContentModule,
+  getGeographyModuleSection,
+  getPrimaryGeographyContentModuleForDay,
+  type GeographyContentModule,
+  type GeographyContentModuleSection,
+  type GeographyModuleRecallAssessment,
+} from "@/lib/upsc/geographyContentModules";
+import {
   assessGeographyExplanation,
   buildGeographyChallengeScaffold,
   buildGeographyMaicDiscussion,
@@ -81,6 +91,53 @@ function nextRouteFor(
   }
 
   return null;
+}
+
+function moduleWatchHref(day: number, module: GeographyContentModule, section: GeographyContentModuleSection) {
+  return `/upsc/geography/watch?day=${day}&module=${module.id}&section=${section.id}`;
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function moduleRouteFor(
+  session: GeographySession,
+  module: GeographyContentModule | null,
+  section: GeographyContentModuleSection | null,
+  moduleRecall: GeographyModuleRecallAssessment | null
+) {
+  if (!module || !section || !moduleRecall) return null;
+  const targetIndex = module.sections.findIndex((item) => item.id === section.id);
+  const nextSection = module.sections[targetIndex + 1];
+
+  if (moduleRecall.currentMasteryPercent < GEOGRAPHY_RECALL_TARGET) {
+    return {
+      href: moduleWatchHref(session.day, module, section),
+      label: "Reopen missing slide",
+      title: "Cumulative recall is incomplete",
+      detail: moduleRecall.repairPrompt,
+      tone: "border-[#8db7d8] bg-[#edf7ff] text-[#23406f]",
+    };
+  }
+
+  if (nextSection) {
+    return {
+      href: moduleWatchHref(session.day, module, nextSection),
+      label: "Open next slide",
+      title: "Next module slide unlocked",
+      detail: `Slide ${targetIndex + 2} opens now. Discussion will still include slides 1-${targetIndex + 2}.`,
+      tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
+    };
+  }
+
+  return {
+    href: `/upsc/geography/mcq-readiness?day=${session.day}`,
+    label: "Open MCQ",
+    title: "Module cleared",
+    detail: "All module sections are recalled cumulatively. Fresh MCQ practice is next.",
+    tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
+  };
 }
 
 function getTalkLevelCopy(learnerLevel: StudentLevel) {
@@ -241,7 +298,13 @@ function readSavedDoubtDiagnosis(progress?: GeographyDayProgress): AdaptiveTeach
   };
 }
 
-export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
+type GeographyTalkRoomProps = {
+  initialDay?: number;
+  initialModuleId?: string;
+  initialSectionId?: string;
+};
+
+export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionId }: GeographyTalkRoomProps) {
   const { getDayProgress, isLoaded, saveDayProgress } = useGeographyProgress();
   const [activeDay] = useState(resolveSession(initialDay).day);
   const [answerDraft, setAnswerDraft] = useState("");
@@ -260,6 +323,8 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const [serverTranscriptionAvailable, setServerTranscriptionAvailable] = useState<boolean | null>(null);
   const [audioNoteUrl, setAudioNoteUrl] = useState("");
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
+  const [moduleRecall, setModuleRecall] = useState<GeographyModuleRecallAssessment | null>(null);
+  const [activeLedgerTab, setActiveLedgerTab] = useState<"known" | "need">("known");
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
   const [submittedInCurrentVisit, setSubmittedInCurrentVisit] = useState(false);
   const teacherRequestId = useRef(0);
@@ -270,15 +335,38 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const speechCapturedTextRef = useRef(false);
 
   const activeSession = resolveSession(activeDay);
+  const requestedModule = getGeographyContentModule(initialModuleId);
+  const dayModule = getPrimaryGeographyContentModuleForDay(activeSession.day);
+  const activeModule = requestedModule?.day === activeSession.day ? requestedModule : dayModule;
+  const activeModuleSection = activeModule ? getGeographyModuleSection(activeModule, initialSectionId) : null;
+  const activeModuleSections =
+    activeModule && activeModuleSection
+      ? getCumulativeGeographyModuleSections(activeModule, activeModuleSection.id)
+      : [];
+  const activeModuleSectionIds = activeModuleSections.map((section) => section.id);
+  const activeExpectedRecallPoints = activeModuleSections.flatMap((section) =>
+    section.expectedRecallPoints.map((point) => `${point.label}: ${point.detail}`)
+  );
   const progress = getDayProgress(activeSession.day);
+  const activeModuleProgress = activeModule ? progress?.moduleProgress?.[activeModule.id] : undefined;
+  const activeModuleSectionRead = Boolean(
+    activeModuleSection && activeModuleProgress?.readSectionIds?.includes(activeModuleSection.id)
+  );
+  const activeModuleSectionPassed = Boolean(
+    activeModuleSection && activeModuleProgress?.passedSectionIds?.includes(activeModuleSection.id)
+  );
   const savedDoubtDiagnosis = readSavedDoubtDiagnosis(progress);
   const teacherDoubtDiagnosis = teacherCoach?.doubtDiagnosis ?? savedDoubtDiagnosis;
   const watchScenes = buildGeographyWatchScenes(activeSession);
   const watchProofCount = Math.min(progress?.watchSceneCompletedIds?.length ?? (progress?.watched ? watchScenes.length : 0), watchScenes.length);
   const isWatchComplete = Boolean(progress?.watched) && watchProofCount >= watchScenes.length;
+  const isTalkContentReady = isWatchComplete || activeModuleSectionRead || activeModuleSectionPassed;
   const recap = getCompressedGeographyRecap(activeSession);
   const watchHandoff = progress?.watchHandoffSummary?.trim() ?? "";
-  const route = assessment ? nextRouteFor(activeSession, assessment, isWatchComplete, learnerLevel) : null;
+  const route = assessment
+    ? moduleRouteFor(activeSession, activeModule, activeModuleSection, moduleRecall) ??
+      nextRouteFor(activeSession, assessment, isTalkContentReady, learnerLevel)
+    : null;
   const talkLevelCopy = getTalkLevelCopy(learnerLevel);
   const challengeScaffold = assessment ? buildGeographyChallengeScaffold(activeSession, assessment) : "";
   const teacherFollowUpPrompt =
@@ -289,7 +377,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     teacherCoach?.nextPrompt ??
     (assessment?.repairHints[0] || challengeScaffold || "Repair the weakest concept, then explain once more.");
   const visibleRecallScore =
-    assessment?.score ?? (typeof progress?.talkScore === "number" ? progress.talkScore : 0);
+    moduleRecall?.currentMasteryPercent ?? assessment?.score ?? (typeof progress?.talkScore === "number" ? progress.talkScore : 0);
   const recallMeterWidth = Math.max(0, Math.min(100, visibleRecallScore));
   const recallGap = Math.max(GEOGRAPHY_RECALL_TARGET - visibleRecallScore, 0);
   const teacherLoopSteps = [
@@ -309,18 +397,23 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
           href: `/upsc/geography/revisit?day=${activeSession.day}`,
           cta: "Open short revision",
         }
-      : learnerLevel === "beginner" && !isWatchComplete
+      : learnerLevel === "beginner" && !isTalkContentReady
         ? {
             eyebrow: "Lesson required",
-            title: "Finish the lesson first",
-            detail: "Your beginner path starts with one 10-15 minute topic. The discussion opens immediately after it.",
-            href: `/upsc/geography/watch?day=${activeSession.day}`,
-            cta: "Open lesson",
+            title: activeModule ? "Read this module slide first" : "Finish the lesson first",
+            detail: activeModule
+              ? "Read the current slide, save it, then discuss every unlocked slide cumulatively."
+              : "Your beginner path starts with one 10-15 minute topic. The discussion opens immediately after it.",
+            href:
+              activeModule && activeModuleSection
+                ? moduleWatchHref(activeSession.day, activeModule, activeModuleSection)
+                : `/upsc/geography/watch?day=${activeSession.day}`,
+            cta: activeModule ? "Open slide" : "Open lesson",
           }
         : learnerLevel !== "beginner" &&
             typeof progress?.talkScore === "number" &&
             progress.talkScore < GEOGRAPHY_RECALL_TARGET &&
-            !isWatchComplete &&
+            !isTalkContentReady &&
             !submittedInCurrentVisit
           ? {
               eyebrow: "Repair required",
@@ -373,11 +466,46 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     const timer = window.setTimeout(() => {
       const savedSession = resolveSession(activeDay);
       const savedProgress = getDayProgress(savedSession.day);
+      const savedModuleProgress = activeModule ? savedProgress?.moduleProgress?.[activeModule.id] : undefined;
       setLearnerLevel(readStudentProfile()?.level ?? "beginner");
       setAnswerDraft(savedProgress?.reflection?.trim() || "");
       setChallengeDraft(savedProgress?.talkChallengeResponse ?? "");
       setSaved(false);
       setChallengeOpen(savedProgress?.talkDiscussionStep === "challenge");
+      if (
+        activeModule &&
+        activeModuleSection &&
+        typeof savedModuleProgress?.currentMasteryPercent === "number"
+      ) {
+        const savedAttempt = savedModuleProgress.sectionRecallAttempts
+          ?.filter((attempt) => attempt.sectionId === activeModuleSection.id)
+          .at(-1);
+        const targetIndex = activeModule.sections.findIndex((section) => section.id === activeModuleSection.id);
+        setModuleRecall({
+          moduleId: activeModule.id,
+          sectionId: activeModuleSection.id,
+          cumulativeSectionIds: savedAttempt?.cumulativeSectionIds ?? activeModuleSectionIds,
+          knownConcepts: savedModuleProgress.knownConcepts ?? [],
+          missingConcepts: savedModuleProgress.missingConcepts ?? [],
+          initialKnownPercent: savedModuleProgress.initialKnownPercent ?? savedModuleProgress.currentMasteryPercent,
+          currentMasteryPercent: savedModuleProgress.currentMasteryPercent,
+          gapFilledPercent: savedModuleProgress.gapFilledPercent ?? 0,
+          remainingGapPercent: savedModuleProgress.remainingGapPercent ?? Math.max(0, 100 - savedModuleProgress.currentMasteryPercent),
+          nextUnlockedSectionId: savedModuleProgress.nextUnlockedSectionId,
+          allSectionsCleared:
+            (savedModuleProgress.passedSectionIds?.length ?? 0) >= activeModule.sections.length &&
+            targetIndex === activeModule.sections.length - 1,
+          summary:
+            savedModuleProgress.currentMasteryPercent >= GEOGRAPHY_RECALL_TARGET
+              ? "Saved cumulative module recall is clear."
+              : "Saved cumulative module recall still has gaps.",
+          repairPrompt:
+            savedModuleProgress.missingConcepts?.[0]?.repairPrompt ??
+            "Repeat the cumulative section recall before opening new content.",
+        });
+      } else {
+        setModuleRecall(null);
+      }
 
       if (typeof savedProgress?.talkScore === "number") {
         const restoredAssessment: GeographyAssessment = {
@@ -430,7 +558,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [activeDay, getDayProgress, hydrated, isLoaded]);
+  }, [activeDay, activeModule, activeModuleSection, activeModuleSectionIds, getDayProgress, hydrated, isLoaded]);
 
   useEffect(() => {
     return () => speechRecognition?.stop();
@@ -477,10 +605,60 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
   const persistTalk = (
     nextAssessment: GeographyAssessment | null = assessment,
     nextDiscussion: GeographyMaicDiscussion | null = discussion,
-    nextChallengeOpen = challengeOpen
+    nextChallengeOpen = challengeOpen,
+    nextModuleRecall: GeographyModuleRecallAssessment | null = moduleRecall
   ) => {
-    const nextRoute = nextAssessment ? nextRouteFor(activeSession, nextAssessment, isWatchComplete, learnerLevel) : null;
+    const nextRoute = nextAssessment
+      ? moduleRouteFor(activeSession, activeModule, activeModuleSection, nextModuleRecall) ??
+        nextRouteFor(activeSession, nextAssessment, isTalkContentReady, learnerLevel)
+      : null;
     const stage = nextAssessment ? getGeographyTalkUnlockStage(nextAssessment) : undefined;
+    const moduleAttempt =
+      nextModuleRecall && activeModule && activeModuleSection
+        ? {
+            moduleId: activeModule.id,
+            sectionId: activeModuleSection.id,
+            cumulativeSectionIds: nextModuleRecall.cumulativeSectionIds,
+            answer: [answerDraft, challengeDraft.trim() ? challengeDraft : ""]
+              .map((part) => part.trim())
+              .filter(Boolean)
+              .join("\n\nChallenge repair:\n"),
+            score: nextModuleRecall.currentMasteryPercent,
+            knownConcepts: nextModuleRecall.knownConcepts,
+            missingConcepts: nextModuleRecall.missingConcepts,
+            attemptedAt: new Date().toISOString(),
+          }
+        : null;
+    const existingModuleProgress =
+      nextModuleRecall && activeModule ? progress?.moduleProgress?.[activeModule.id] : undefined;
+    const nextPassedSectionIds =
+      nextModuleRecall && activeModuleSection && nextModuleRecall.currentMasteryPercent >= GEOGRAPHY_RECALL_TARGET
+        ? uniqueValues([...(existingModuleProgress?.passedSectionIds ?? []), activeModuleSection.id])
+        : existingModuleProgress?.passedSectionIds;
+    const nextModuleProgress =
+      nextModuleRecall && activeModule
+        ? {
+            ...(progress?.moduleProgress ?? {}),
+            [activeModule.id]: {
+              ...existingModuleProgress,
+              moduleId: activeModule.id,
+              activeSectionId: activeModuleSection?.id,
+              readSectionIds: existingModuleProgress?.readSectionIds ?? [],
+              passedSectionIds: nextPassedSectionIds ?? [],
+              nextUnlockedSectionId: nextModuleRecall.nextUnlockedSectionId,
+              knownConcepts: nextModuleRecall.knownConcepts,
+              missingConcepts: nextModuleRecall.missingConcepts,
+              initialKnownPercent: nextModuleRecall.initialKnownPercent,
+              currentMasteryPercent: nextModuleRecall.currentMasteryPercent,
+              gapFilledPercent: nextModuleRecall.gapFilledPercent,
+              remainingGapPercent: nextModuleRecall.remainingGapPercent,
+              sectionRecallAttempts: moduleAttempt
+                ? [...(existingModuleProgress?.sectionRecallAttempts ?? []), moduleAttempt]
+                : existingModuleProgress?.sectionRecallAttempts,
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        : undefined;
     saveDayProgress(activeSession.day, {
       learnerLevel: progressLearnerLevelLabel(learnerLevel),
       reflection: answerDraft,
@@ -514,6 +692,26 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       confidence: nextAssessment?.score && nextAssessment.score >= 85 ? "Command" : nextAssessment?.score && nextAssessment.score < 40 ? "Shaky" : "Working",
       mentorMode: "Cause-effect",
       activePromptLabel: "Explain",
+      ...(nextModuleRecall
+        ? {
+            moduleProgress: nextModuleProgress,
+            sectionRecallAttempts: moduleAttempt
+              ? [...(progress?.sectionRecallAttempts ?? []), moduleAttempt]
+              : progress?.sectionRecallAttempts,
+            knownConcepts: nextModuleRecall.knownConcepts,
+            missingConcepts: nextModuleRecall.missingConcepts,
+            initialKnownPercent: nextModuleRecall.initialKnownPercent,
+            currentMasteryPercent: nextModuleRecall.currentMasteryPercent,
+            gapFilledPercent: nextModuleRecall.gapFilledPercent,
+            nextUnlockedSectionId: nextModuleRecall.nextUnlockedSectionId,
+            watched: nextModuleRecall.allSectionsCleared ? true : progress?.watched,
+            watchState: nextModuleRecall.allSectionsCleared ? "Watched" : progress?.watchState,
+            watchHandoffReady: nextModuleRecall.allSectionsCleared ? true : progress?.watchHandoffReady,
+            watchHandoffSummary: nextModuleRecall.allSectionsCleared
+              ? `${activeModule?.title ?? activeSession.title} module cleared through cumulative recall.`
+              : progress?.watchHandoffSummary,
+          }
+        : {}),
     });
     setSaved(true);
   };
@@ -524,17 +722,44 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       .map((part) => part.trim())
       .filter(Boolean)
       .join("\n\nChallenge repair:\n");
-    const nextAssessment = assessGeographyExplanation(activeSession, combinedAnswer);
+    const baseAssessment = assessGeographyExplanation(activeSession, combinedAnswer);
+    const nextModuleRecall =
+      activeModule && activeModuleSection
+        ? assessGeographyModuleRecall(
+            activeModule,
+            activeModuleSection.id,
+            combinedAnswer,
+            progress?.moduleProgress?.[activeModule.id]?.initialKnownPercent
+          )
+        : null;
+    const nextAssessment: GeographyAssessment = nextModuleRecall
+      ? {
+          ...baseAssessment,
+          score: nextModuleRecall.currentMasteryPercent,
+          band:
+            nextModuleRecall.currentMasteryPercent >= 85
+              ? "Command"
+              : nextModuleRecall.currentMasteryPercent >= 40
+                ? "Practice"
+                : "Revisit",
+          matchedKeywords: nextModuleRecall.knownConcepts.map((concept) => concept.label).slice(0, 25),
+          missingKeywords: nextModuleRecall.missingConcepts.map((concept) => concept.label).slice(0, 5),
+          summary: nextModuleRecall.summary,
+          nextAction: nextModuleRecall.repairPrompt,
+          repairHints: nextModuleRecall.missingConcepts.map((concept) => concept.repairPrompt).slice(0, 5),
+        }
+      : baseAssessment;
     const nextDiscussion = buildGeographyMaicDiscussion(activeSession, combinedAnswer, nextAssessment);
     const nextChallengeOpen =
       !includeChallenge &&
-      isWatchComplete &&
+      isTalkContentReady &&
       getGeographyTalkUnlockStage(nextAssessment) === "retry";
     setAssessment(nextAssessment);
+    setModuleRecall(nextModuleRecall);
     setSubmittedInCurrentVisit(true);
     setDiscussion(nextDiscussion);
     setChallengeOpen(nextChallengeOpen);
-    persistTalk(nextAssessment, nextDiscussion, nextChallengeOpen);
+    persistTalk(nextAssessment, nextDiscussion, nextChallengeOpen, nextModuleRecall);
     setTeacherCoach(null);
     setTeacherConnection("checking");
     const requestId = teacherRequestId.current + 1;
@@ -544,6 +769,10 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
       answer: answerDraft,
       challengeAnswer: includeChallenge ? challengeDraft : undefined,
       learnerLevel,
+      moduleId: activeModule?.id,
+      sectionId: activeModuleSection?.id,
+      cumulativeSectionIds: activeModuleSectionIds.length ? activeModuleSectionIds : undefined,
+      expectedRecallPoints: activeExpectedRecallPoints.length ? activeExpectedRecallPoints : undefined,
     })
       .then((response) => {
         if (teacherRequestId.current !== requestId) return;
@@ -619,7 +848,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
         });
         if (serverTranscriptionAvailable === false) {
           setSpeechMessage(
-            "Voice note recorded. Automatic transcription is not configured yet. Play it back, then type the key points for AI checking."
+            "Voice note recorded. Current build uses browser live speech first; play this note back and type the key points for AI checking."
           );
           return;
         }
@@ -641,7 +870,7 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
           })
           .catch((error) => {
             const message = error instanceof Error ? error.message : "Server transcription failed.";
-            setSpeechMessage(`Voice note recorded. ${message} Play it back, then type the transcript for AI checking.`);
+            setSpeechMessage(`Voice note recorded. ${message} Play it back, then type the key points for AI checking.`);
           })
           .finally(() => {
             setSpeechTranscribing(false);
@@ -887,6 +1116,26 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                         {talkLevelCopy.question}
                       </h2>
                       <p className="mt-3 text-base font-black leading-7 text-[#13251d]">{activeSession.talk}</p>
+                      {activeModule && activeModuleSection ? (
+                        <div
+                          data-testid="geography-talk-module-cumulative-prompt"
+                          data-module-id={activeModule.id}
+                          data-section-id={activeModuleSection.id}
+                          data-cumulative-section-count={activeModuleSectionIds.length}
+                          className="mt-3 rounded-md border border-[#b9dacf] bg-white p-3"
+                        >
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                            Module recall rule
+                          </p>
+                          <p className="mt-1 text-sm font-bold leading-5 text-[#34453b]">
+                            Recall slides 1-{activeModuleSectionIds.length}:{" "}
+                            {activeModuleSections.map((section) => section.title).join(", ")}.
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">
+                            If an earlier slide is skipped, the next slide stays locked.
+                          </p>
+                        </div>
+                      ) : null}
                       <p data-testid="talk-level-teacher-hint" className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">
                         {talkLevelCopy.teacherHint}
                       </p>
@@ -1118,6 +1367,115 @@ export function GeographyTalkRoom({ initialDay }: { initialDay?: number }) {
                 <p className="mt-2 text-4xl font-black text-[#13251d]">{assessment.score}%</p>
                 <p className="mt-2 text-sm font-black text-[#085041]">{assessment.band}</p>
                 <p className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">{assessment.summary}</p>
+                {moduleRecall && activeModule ? (
+                  <div
+                    data-testid="geography-talk-known-gap-ledger"
+                    data-module-id={moduleRecall.moduleId}
+                    data-section-id={moduleRecall.sectionId}
+                    data-cumulative-section-count={moduleRecall.cumulativeSectionIds.length}
+                    data-known-count={moduleRecall.knownConcepts.length}
+                    data-missing-count={moduleRecall.missingConcepts.length}
+                    data-initial-known-percent={moduleRecall.initialKnownPercent}
+                    data-current-mastery-percent={moduleRecall.currentMasteryPercent}
+                    data-gap-filled-percent={moduleRecall.gapFilledPercent}
+                    className="mt-4 rounded-lg border border-[#b9dacf] bg-white/85 p-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#085041]">
+                          Cumulative module recall
+                        </p>
+                        <h4 className="mt-1 text-sm font-black text-[#13251d]">
+                          {activeModule.title}: {moduleRecall.cumulativeSectionIds.length} slide
+                          {moduleRecall.cumulativeSectionIds.length === 1 ? "" : "s"} checked together
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[
+                          ["Known first", `${moduleRecall.initialKnownPercent}%`],
+                          ["Now", `${moduleRecall.currentMasteryPercent}%`],
+                          ["Gap filled", `${moduleRecall.gapFilledPercent}%`],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-md bg-[#f7f4ee] px-2 py-1.5">
+                            <p className="text-xs font-black text-[#13251d]">{value}</p>
+                            <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#657066]">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {[
+                        ["known", "Known to student", moduleRecall.knownConcepts.length],
+                        ["need", "Need to cover", moduleRecall.missingConcepts.length],
+                      ].map(([id, label, count]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          data-testid={`geography-talk-ledger-tab-${id}`}
+                          onClick={() => setActiveLedgerTab(id as "known" | "need")}
+                          className={cn(
+                            "rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.12em] transition",
+                            activeLedgerTab === id
+                              ? "bg-[#1a3a2a] text-white"
+                              : "border border-[#cfe5dc] bg-white text-[#085041] hover:bg-[#e7f5ee]"
+                          )}
+                        >
+                          {label} ({count})
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {activeLedgerTab === "known" ? (
+                        moduleRecall.knownConcepts.length ? (
+                          moduleRecall.knownConcepts.map((concept) => (
+                            <div key={concept.id} className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3">
+                              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+                                {concept.label}
+                              </p>
+                              <p className="mt-1 text-sm font-bold leading-5 text-[#34453b]">{concept.detail}</p>
+                              <p className="mt-1 text-xs font-semibold leading-5 text-[#49675e]">{concept.evidence}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-sm font-bold text-[#657066]">
+                            Nothing is proven yet. Speak the cumulative slide set once.
+                          </p>
+                        )
+                      ) : moduleRecall.missingConcepts.length ? (
+                        moduleRecall.missingConcepts.map((concept) => {
+                          const sourceSection = activeModule.sections.find((section) => section.id === concept.sectionId);
+                          return (
+                            <div key={concept.id} className="rounded-md border border-[#ef9f27]/45 bg-[#fff8e8] p-3">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4a12]">
+                                    {concept.label}
+                                  </p>
+                                  <p className="mt-1 text-sm font-bold leading-5 text-[#5d3a05]">{concept.detail}</p>
+                                  <p className="mt-1 text-xs font-semibold leading-5 text-[#6f4a12]">
+                                    {concept.repairPrompt}
+                                  </p>
+                                </div>
+                                {sourceSection ? (
+                                  <Link
+                                    href={moduleWatchHref(activeSession.day, activeModule, sourceSection)}
+                                    className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white"
+                                  >
+                                    Open slide
+                                  </Link>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3 text-sm font-bold text-[#085041]">
+                          No missing concept in the cumulative set. Continue to the next unlocked step.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
                 {teacherDoubtDiagnosis ? (
                   <div data-testid="geography-talk-doubt-diagnosis" className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

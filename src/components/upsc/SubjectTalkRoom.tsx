@@ -872,7 +872,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         });
         if (serverTranscriptionAvailable === false) {
           setSpeechMessage(
-            "Voice note recorded. Automatic transcription is not configured yet. Play it back, then type the key points for AI checking."
+            "Voice note recorded. Current build uses browser live speech first; play this note back and type the key points for AI checking."
           );
           return;
         }
@@ -900,7 +900,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
           })
           .catch((error) => {
             const message = error instanceof Error ? error.message : "Server transcription failed.";
-            setSpeechMessage(`Voice note recorded. ${message} Play it back, then type the transcript for AI checking.`);
+            setSpeechMessage(`Voice note recorded. ${message} Play it back, then type the key points for AI checking.`);
           })
           .finally(() => {
             setSpeechTranscribing(false);

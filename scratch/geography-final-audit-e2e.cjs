@@ -48,16 +48,16 @@ function buildMcqQuestion(batchCode, index, correctOption) {
   return {
     test_id: 9600 + index,
     topic_id: 9600 + index,
-    text_en: `Final Geography audit question ${index}: choose the strongest map-linked resources and agriculture explanation.`,
+    text_en: `Final Geography audit question ${index}: choose the strongest map-linked transport and communications explanation.`,
     options_en: {
-      A: "Location, relief, rainfall, irrigation and market access together shape crop and resource patterns",
-      B: "Every mineral belt automatically creates the same crop pattern",
-      C: "Agriculture is unrelated to soils, climate and irrigation",
-      D: "Resource location has no connection with transport or industries",
+      A: "Ports, roads, railways, inland waterways, corridors and markets transform regions through connectivity",
+      B: "Every port, railway, road and inland waterway creates exactly the same regional outcome",
+      C: "Transport corridors are unrelated to location, relief, markets, ports or communication networks",
+      D: "Maritime trade has no connection with ports, hinterlands, roads or railway corridors",
     },
     correct_option: correctOption,
     explanation_en:
-      "The correct answer connects location, map proof, relief or climate mechanism, and the UPSC trap of single-factor explanation.",
+      "The correct answer connects location, map proof, corridor mechanism, market access, and the UPSC trap of single-factor explanation.",
     difficulty: "MEDIUM",
     source: "UPSC_MCQ_COMMAND",
     status: "DRAFT",
@@ -140,10 +140,10 @@ async function completeMainSuccessPath(page, checks) {
 
   await page.getByTestId("talk-answer-draft").fill(
     [
-      "Resources and agriculture in India Map Command require minerals, energy, irrigation, crops, and agro-climatic logic.",
-      "First, location advantages cause crops, minerals, and industries to cluster where relief, rainfall, soil, transport, and market access connect.",
-      "Because irrigation and energy affect regional specialization, map proof such as Deccan plateau mineral belts, western coast, eastern plains, and Ganga irrigation regions explains the pattern.",
-      "Finally, the UPSC trap is to assume every industry or crop belt is identical or that only one factor controls all locations; check the regional exception.",
+      "Transport and Communications in India Map Command require ports, maritime trade, road transport, railway transport, inland waterways, and communication corridors.",
+      "First, connectivity causes regions to transform differently because ports, corridors, roads, railways, waterways, markets, relief, and hinterlands do not have the same location advantage.",
+      "Because transport links affect market access and regional specialization, map proof such as western coast ports, eastern maritime trade, Ganga inland waterways, railway corridors, and road networks explains the pattern.",
+      "Finally, the UPSC trap is to assume every corridor, port, railway, road, or inland waterway creates an identical outcome; check the regional exception and communication network link.",
     ].join(" ")
   );
   await page.getByTestId("talk-assess-answer").click();
@@ -157,10 +157,10 @@ async function completeMainSuccessPath(page, checks) {
   if (await page.getByTestId("talk-teacher-follow-up").isVisible().catch(() => false)) {
     await page.getByTestId("talk-challenge-response").fill(
       [
-        "Resources and agriculture need the complete India Map Command chain: minerals, energy, irrigation, crops, agro-climatic logic, and location advantages.",
-        "A crop belt must be explained through rainfall, soil, irrigation, and markets; a mineral belt must be explained through geology, transport, energy, and industries.",
-        "For example, Deccan plateau mineral belts and Ganga irrigated crop regions are different map patterns because their causes and effects differ.",
-        "The UPSC trap is to overgeneralize one variable or say every region is identical without checking relief, infrastructure, and exceptions.",
+        "Transport and communications need the complete India Map Command chain: ports, maritime trade, roads, railways, inland waterways, corridors, markets, and regional location advantage.",
+        "A port must be explained through coast, hinterland, trade and road-rail linkage; a railway or road corridor must be explained through relief, markets, industry and communication access.",
+        "For example, western coast ports, eastern coast ports, Ganga waterways and railway corridors transform regions differently because their causes and effects differ.",
+        "The UPSC trap is to overgeneralize one transport variable or say every region is identical without checking relief, infrastructure, hinterland, market and communication exceptions.",
       ].join(" ")
     );
     await page.getByTestId("talk-reassess-challenge").click();

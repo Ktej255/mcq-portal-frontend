@@ -246,11 +246,23 @@ function questionBankPracticeLabel(attempts: DailyPlannerQuestionBankAttempt[] =
 }
 
 function hasStarted(progress?: DailyPlannerProgress, questionBankAttempts: DailyPlannerQuestionBankAttempt[] = []) {
+  const moduleProgress = progress as
+    | (DailyPlannerProgress & {
+        moduleProgress?: Record<string, { currentMasteryPercent?: number; gapFilledPercent?: number }>;
+      })
+    | undefined;
+  const moduleEvidence = Object.values(moduleProgress?.moduleProgress ?? {}).some(
+    (module) =>
+      typeof module.currentMasteryPercent === "number" ||
+      typeof module.gapFilledPercent === "number"
+  );
+
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
       progress?.baselineSavedAt ||
       typeof progress?.talkScore === "number" ||
+      moduleEvidence ||
       progress?.labCompleted ||
       progress?.mcqAttempted ||
       questionBankAttempts.length
@@ -695,11 +707,25 @@ function buildGrowth(input: PlannerInput): DailyPlannerDecision["growth"] {
 }
 
 function hasRecallBaseline(progress?: DailyPlannerProgress) {
+  const moduleProgress = progress as
+    | (DailyPlannerProgress & {
+        currentMasteryPercent?: number;
+        moduleProgress?: Record<string, { currentMasteryPercent?: number }>;
+      })
+    | undefined;
+  const moduleRecall = Boolean(
+    typeof moduleProgress?.currentMasteryPercent === "number" ||
+      Object.values(moduleProgress?.moduleProgress ?? {}).some(
+        (module) => typeof module.currentMasteryPercent === "number"
+      )
+  );
+
   return Boolean(
     progress?.baselineSavedAt ||
       progress?.baselineKnowledge?.trim() ||
       progress?.reflection?.trim() ||
-      typeof progress?.talkScore === "number"
+      typeof progress?.talkScore === "number" ||
+      moduleRecall
   );
 }
 

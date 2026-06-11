@@ -18,6 +18,10 @@ export type GeographyReportWindow = {
   recoveryItems: number;
   meTimeChecks: number;
   currentAffairsUnlocked: number;
+  initialKnownPercent: number | null;
+  currentMasteryPercent: number | null;
+  gapFilledPercent: number | null;
+  remainingGapPercent: number | null;
   verdict: string;
   nextAction: string;
 };
@@ -42,11 +46,19 @@ function dayProgress(progress: GeographyProgressInput, day: number) {
 }
 
 function hasStarted(progress?: GeographyDayProgress) {
+  const moduleEvidence = Object.values(progress?.moduleProgress ?? {}).some(
+    (module) =>
+      (module.readSectionIds?.length ?? 0) > 0 ||
+      (module.passedSectionIds?.length ?? 0) > 0 ||
+      (module.sectionRecallAttempts?.length ?? 0) > 0
+  );
+
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
       progress?.baselineSavedAt ||
       typeof progress?.talkScore === "number" ||
+      moduleEvidence ||
       progress?.labCompleted ||
       progress?.mcqAttempted ||
       progress?.meTimeCompletedAt
@@ -65,6 +77,29 @@ function needsRecovery(progress?: GeographyDayProgress) {
 function average(values: number[]) {
   if (!values.length) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function moduleGrowthValues(dayStates: Array<GeographyDayProgress | undefined>) {
+  const moduleStates = dayStates.flatMap((state) => Object.values(state?.moduleProgress ?? {}));
+  const initialKnown = moduleStates
+    .map((state) => state.initialKnownPercent)
+    .filter((value): value is number => typeof value === "number");
+  const currentMastery = moduleStates
+    .map((state) => state.currentMasteryPercent)
+    .filter((value): value is number => typeof value === "number");
+  const gapFilled = moduleStates
+    .map((state) => state.gapFilledPercent)
+    .filter((value): value is number => typeof value === "number");
+  const remainingGap = moduleStates
+    .map((state) => state.remainingGapPercent)
+    .filter((value): value is number => typeof value === "number");
+
+  return {
+    initialKnownPercent: average(initialKnown),
+    currentMasteryPercent: average(currentMastery),
+    gapFilledPercent: average(gapFilled),
+    remainingGapPercent: average(remainingGap),
+  };
 }
 
 function currentAffairsUnlockedCount(progress: GeographyProgressInput, daySet: Set<number>) {
@@ -86,6 +121,7 @@ function buildWindowReport(id: string, title: string, sessions: typeof geography
   const meTimeChecks = dayStates.filter((state) => state?.meTimeCompletedAt).length;
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
+  const moduleGrowth = moduleGrowthValues(dayStates);
   const currentAffairsUnlocked = currentAffairsUnlockedCount(progress, daySet);
   const range = sessions.length
     ? `Day ${sessions[0].day}-${sessions[sessions.length - 1].day}`
@@ -122,6 +158,7 @@ function buildWindowReport(id: string, title: string, sessions: typeof geography
     recoveryItems,
     meTimeChecks,
     currentAffairsUnlocked,
+    ...moduleGrowth,
     verdict,
     nextAction,
   };
@@ -132,7 +169,9 @@ function resolveGrowthScale(monthly: GeographyReportWindow, weekly: GeographyRep
   const latestWeek = [...weekly].reverse().find((week) => week.startedDays > 0);
   const growthPercent = monthly.totalDays ? Math.round((monthly.startedDays / monthly.totalDays) * 100) : 0;
   const strongestSignal =
-    monthly.averageRecall !== null && monthly.averageRecall >= 95
+    monthly.gapFilledPercent !== null && monthly.gapFilledPercent > 0
+      ? `Gap filled ${monthly.gapFilledPercent}%`
+      : monthly.averageRecall !== null && monthly.averageRecall >= 95
       ? "Recall command"
       : monthly.mcqSets > 0
         ? "Practice evidence"
@@ -142,7 +181,9 @@ function resolveGrowthScale(monthly: GeographyReportWindow, weekly: GeographyRep
             ? "Session readiness"
             : "Baseline pending";
   const weakestSignal =
-    monthly.recoveryItems > 0
+    monthly.remainingGapPercent !== null && monthly.remainingGapPercent > 0
+      ? `Remaining gap ${monthly.remainingGapPercent}%`
+      : monthly.recoveryItems > 0
       ? "Recovery queue"
       : monthly.recallAttempts === 0
         ? "Recall not measured"
@@ -173,6 +214,19 @@ export function buildGeographyReportSnapshot(progress: GeographyProgressInput): 
     growth,
     evidenceStreams: [
       {
+        label: "Known First",
+        value: monthly.initialKnownPercent === null ? "Not measured" : `${monthly.initialKnownPercent}%`,
+        detail: "First module recall baseline from student speech",
+      },
+      {
+        label: "Gap Filled",
+        value: monthly.gapFilledPercent === null ? "Not measured" : `${monthly.gapFilledPercent}%`,
+        detail:
+          monthly.remainingGapPercent === null
+            ? "Module section recall has not generated a gap ledger yet"
+            : `${monthly.remainingGapPercent}% gap still needs repair`,
+      },
+      {
         label: "Recall",
         value: monthly.averageRecall === null ? "Not measured" : `${monthly.averageRecall}/100`,
         detail: `${monthly.recallAttempts} Talk attempt${monthly.recallAttempts === 1 ? "" : "s"} recorded`,
@@ -191,11 +245,6 @@ export function buildGeographyReportSnapshot(progress: GeographyProgressInput): 
         label: "Me-time",
         value: `${monthly.meTimeChecks} saved`,
         detail: "Session readiness checks are included in the report",
-      },
-      {
-        label: "Current Affairs",
-        value: `${monthly.currentAffairsUnlocked} unlocked`,
-        detail: "Only hooks linked to covered topics are counted",
       },
     ],
   };

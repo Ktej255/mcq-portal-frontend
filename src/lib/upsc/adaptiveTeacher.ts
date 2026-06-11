@@ -46,6 +46,10 @@ export type AdaptiveTeacherRequest = {
   answer: string;
   challengeAnswer?: string;
   learnerLevel: StudentLevel;
+  moduleId?: string;
+  sectionId?: string;
+  cumulativeSectionIds?: string[];
+  expectedRecallPoints?: string[];
 };
 
 export type AdaptiveTeacherCoach = {
@@ -197,6 +201,22 @@ export function parseAdaptiveTeacherRequest(value: unknown): AdaptiveTeacherRequ
   const subject = resolveAdaptiveTeacherSubject(subjectSlug);
   const answer = typeof candidate.answer === "string" ? candidate.answer.trim() : "";
   const challengeAnswer = typeof candidate.challengeAnswer === "string" ? candidate.challengeAnswer.trim() : undefined;
+  const moduleId = typeof candidate.moduleId === "string" ? candidate.moduleId.trim().slice(0, 80) : undefined;
+  const sectionId = typeof candidate.sectionId === "string" ? candidate.sectionId.trim().slice(0, 80) : undefined;
+  const cumulativeSectionIds = Array.isArray(candidate.cumulativeSectionIds)
+    ? candidate.cumulativeSectionIds
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().slice(0, 80))
+        .filter(Boolean)
+        .slice(0, 20)
+    : undefined;
+  const expectedRecallPoints = Array.isArray(candidate.expectedRecallPoints)
+    ? candidate.expectedRecallPoints
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().slice(0, 180))
+        .filter(Boolean)
+        .slice(0, 30)
+    : undefined;
   if (
     !subject ||
     !Number.isInteger(candidate.day) ||
@@ -217,6 +237,10 @@ export function parseAdaptiveTeacherRequest(value: unknown): AdaptiveTeacherRequ
     answer,
     challengeAnswer,
     learnerLevel: candidate.learnerLevel as StudentLevel,
+    moduleId,
+    sectionId,
+    cumulativeSectionIds,
+    expectedRecallPoints,
   };
 }
 
@@ -360,13 +384,16 @@ export function buildLocalAdaptiveTeacherResponse(
           assessSubjectExplanation(session as SubjectSession, combinedAnswer)
         );
   const focusConcepts = assessment.missingKeywords.slice(0, 4);
+  const moduleFocusConcepts = request.expectedRecallPoints?.slice(0, 4) ?? [];
   const examplePrompt = subject.assessmentKind === "geography" ? "India map example" : "applied example";
   const levelInstruction = getAdaptiveTeacherLevelInstruction(request.learnerLevel);
   const doubtDiagnosis = buildDoubtDiagnosis(subject, assessment, levelInstruction);
   const nextPrompt =
     assessment.score >= subject.recallTarget
       ? "Apply the concept in fresh MCQs, then continue to the next topic."
-      : focusConcepts.length
+      : moduleFocusConcepts.length
+        ? `${levelInstruction.nextQuestionFrame} Recall the cumulative module points: ${moduleFocusConcepts.join("; ")}. Then add one cause-effect chain, one ${examplePrompt}, and one UPSC trap.`
+        : focusConcepts.length
         ? `${levelInstruction.nextQuestionFrame} Connect ${focusConcepts.join(", ")} through one cause-effect chain, one ${examplePrompt}, and one UPSC trap.`
         : `${levelInstruction.nextQuestionFrame} Explain the weakest concept once more through one cause-effect chain, one ${examplePrompt}, and one UPSC trap.`;
 

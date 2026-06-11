@@ -40,14 +40,19 @@ function parseGeographySessions() {
     });
   }
 
-  if (sessions.length !== 30) {
-    throw new Error(`Expected 30 Geography sessions, found ${sessions.length}`);
+  if (sessions.length < 20) {
+    throw new Error(`Expected at least 20 Geography sessions in the current production plan, found ${sessions.length}`);
+  }
+  const sortedSessions = sessions.sort((a, b) => a.day - b.day);
+  const nonContiguousSession = sortedSessions.find((session, index) => session.day !== index + 1);
+  if (nonContiguousSession) {
+    throw new Error(`Geography sessions must be contiguous from day 1. First mismatch: day ${nonContiguousSession.day}`);
   }
   const missingLabSlug = sessions.find((session) => !session.labSlug);
   if (missingLabSlug) {
     throw new Error(`Missing lab slug for ${missingLabSlug.day}: ${missingLabSlug.lab}`);
   }
-  return sessions.sort((a, b) => a.day - b.day);
+  return sortedSessions;
 }
 
 async function seedRouteState(page, room, day) {
@@ -196,8 +201,15 @@ function routeDefinitions(session) {
       critical: async (page, checks) => {
         await expectVisible(page, "watch-shell", page.getByTestId("geography-watch-simple-repair"));
         await expectVisible(page, "watch-player", page.getByTestId("watch-topic-player"));
-        await expectVisible(page, "watch-primary-action", page.getByTestId("watch-complete-and-discuss"));
-        await expectHiddenDetails(page, "watch-checkpoints-folded", "geography-watch-checkpoints", checks);
+        const isModuleReader = await page.getByTestId("geography-module-slide").first().isVisible().catch(() => false);
+        if (isModuleReader) {
+          await expectVisible(page, "watch-module-slide", page.getByTestId("geography-module-slide"));
+          await expectVisible(page, "watch-module-section-rail", page.getByTestId("geography-module-section-rail"));
+          await expectVisible(page, "watch-module-primary-action", page.getByTestId("watch-module-read-and-discuss"));
+        } else {
+          await expectVisible(page, "watch-primary-action", page.getByTestId("watch-complete-and-discuss"));
+          await expectHiddenDetails(page, "watch-checkpoints-folded", "geography-watch-checkpoints", checks);
+        }
         await expectHiddenDetails(page, "watch-details-folded", "geography-watch-details", checks);
       },
     },

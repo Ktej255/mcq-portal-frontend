@@ -133,7 +133,7 @@ export function GeographyVisualLab({ initialMode, initialDay }: { initialMode?: 
   const isDayTwentySevenFullGeographyDrill = activeSession.day === 27 && labSlug === "mcq-engine";
   const isDayTwentyEightWeakAreaRepair = activeSession.day === 28 && labSlug === "mcq-engine";
   const isDayTwentyNineFinalMockReview = activeSession.day === 29 && labSlug === "mcq-engine";
-  const isDayThirtyGeographyCommandDay = activeSession.day === 30 && labSlug === "india-map";
+  const isDayTwentyGeographyCommandDay = activeSession.day === 20 && labSlug === "india-map";
   const selectedRelationship = geographyDay1MapRelationshipDrills.find((drill) => drill.id === selectedRelationshipId);
   const nextActionLabel = isComplete ? "Return to MCQ practice" : "Save optional visual";
   const evidenceStatus = isComplete ? "mcq ready" : "proof pending";
@@ -206,7 +206,7 @@ export function GeographyVisualLab({ initialMode, initialDay }: { initialMode?: 
       {isDayTwentySevenFullGeographyDrill && <GeographyDay27FullGeographyDrillVisual />}
       {isDayTwentyEightWeakAreaRepair && <GeographyDay28WeakAreaRepairVisual />}
       {isDayTwentyNineFinalMockReview && <GeographyDay29FinalMockReviewVisual />}
-      {isDayThirtyGeographyCommandDay && <GeographyDay30GeographyCommandDayVisual />}
+      {isDayTwentyGeographyCommandDay && <GeographyDay30GeographyCommandDayVisual />}
     </>
   );
 

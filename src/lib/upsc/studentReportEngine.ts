@@ -11,6 +11,19 @@ import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjec
 export type StudentReportProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
   meTimeMood?: SubjectMeTimeMood;
+  initialKnownPercent?: number;
+  currentMasteryPercent?: number;
+  gapFilledPercent?: number;
+  remainingGapPercent?: number;
+  moduleProgress?: Record<
+    string,
+    {
+      initialKnownPercent?: number;
+      currentMasteryPercent?: number;
+      gapFilledPercent?: number;
+      remainingGapPercent?: number;
+    }
+  >;
 };
 
 export type StudentReportProgressMap = Record<string, StudentReportProgress | undefined>;
@@ -57,6 +70,10 @@ export type StudentSubjectReport = {
   latestMeTimeResetPlan: string | null;
   readinessSignal: string;
   currentAffairsUnlocked: number;
+  initialKnownPercent: number | null;
+  currentMasteryPercent: number | null;
+  gapFilledPercent: number | null;
+  remainingGapPercent: number | null;
   weeklyWindowsGenerated: number;
   monthlyVerdict: string;
   nextAction: string;
@@ -85,6 +102,10 @@ export type StudentReportWindow = {
   teacherDoubtCount: number;
   meTimeChecks: number;
   currentAffairsUnlocked: number;
+  initialKnownPercent: number | null;
+  currentMasteryPercent: number | null;
+  gapFilledPercent: number | null;
+  remainingGapPercent: number | null;
   verdict: string;
   nextAction: string;
 };
@@ -162,6 +183,28 @@ function average(values: number[]) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+function progressModuleGrowthValues(states: Array<StudentReportProgress | undefined>) {
+  type GrowthState = {
+    initialKnownPercent?: number;
+    currentMasteryPercent?: number;
+    gapFilledPercent?: number;
+    remainingGapPercent?: number;
+  };
+  const moduleStates = states.flatMap((state) => Object.values(state?.moduleProgress ?? {}));
+  const fallbackStates = states.filter((state): state is StudentReportProgress => Boolean(state));
+  const valueSet = (selector: (state: GrowthState) => number | undefined) => [
+    ...moduleStates.map(selector),
+    ...fallbackStates.map(selector),
+  ].filter((value): value is number => typeof value === "number");
+
+  return {
+    initialKnownPercent: average(valueSet((state) => state.initialKnownPercent)),
+    currentMasteryPercent: average(valueSet((state) => state.currentMasteryPercent)),
+    gapFilledPercent: average(valueSet((state) => state.gapFilledPercent)),
+    remainingGapPercent: average(valueSet((state) => state.remainingGapPercent)),
+  };
+}
+
 function attemptsForDay(attempts: StudentReportQuestionBankAttempt[] = [], day: number) {
   return attempts.filter((attempt) => attempt.linkedDay === day);
 }
@@ -191,11 +234,18 @@ function exactPyqSignal(attempts: StudentReportQuestionBankAttempt[] = []) {
 }
 
 function hasStarted(progress?: StudentReportProgress, questionBankAttempts: StudentReportQuestionBankAttempt[] = []) {
+  const moduleEvidence = Object.values(progress?.moduleProgress ?? {}).some(
+    (module) =>
+      typeof module.currentMasteryPercent === "number" ||
+      typeof module.gapFilledPercent === "number"
+  );
+
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
       progress?.baselineSavedAt ||
       typeof progress?.talkScore === "number" ||
+      moduleEvidence ||
       progress?.labCompleted ||
       progress?.mcqAttempted ||
       progress?.meTimeCompletedAt ||
@@ -361,6 +411,7 @@ function buildReportWindow(
   }, 0);
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
+  const moduleGrowth = progressModuleGrowthValues(dayRows.map((row) => row.progress));
   const completionRatio = dayRows.length ? startedDays / dayRows.length : 0;
   const verdict =
     startedDays === 0
@@ -412,6 +463,7 @@ function buildReportWindow(
     teacherDoubtCount,
     meTimeChecks,
     currentAffairsUnlocked,
+    ...moduleGrowth,
     verdict,
     nextAction,
   };
@@ -509,6 +561,7 @@ export function buildStudentSubjectReport(
   const meTimeSignal = latestMeTimeSignal(states);
   const averageRecall = average(recallScores);
   const averageMcq = average(mcqScores);
+  const moduleGrowth = progressModuleGrowthValues(states);
   const completionRatio = subject.sessions.length ? startedDays / subject.sessions.length : 0;
   const monthlyVerdict =
     startedDays === 0
@@ -559,6 +612,7 @@ export function buildStudentSubjectReport(
     ...teacherDoubtSignal,
     ...meTimeSignal,
     currentAffairsUnlocked: currentAffairsUnlocked(subject, progress, safeQuestionBankAttempts),
+    ...moduleGrowth,
     weeklyWindowsGenerated: weeklyWindowCount(subject),
     monthlyVerdict,
     nextAction,

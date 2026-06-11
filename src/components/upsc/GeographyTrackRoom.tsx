@@ -32,9 +32,8 @@ import { cn } from "@/lib/utils";
 const weekLabels = [
   "Physical base",
   "India map",
-  "Human geography",
-  "Atlas and PYQ",
-  "Command phase",
+  "World and human geography",
+  "Recall and command",
 ];
 
 const stageStatusTone = {
@@ -241,7 +240,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
       id: "trend",
       label: "Trend",
       value: simpleTrendLabel,
-      detail: `${readinessSnapshot.score}% Geography readiness, ${readinessSnapshot.commandCount}/30 command days.`,
+      detail: `${readinessSnapshot.score}% Geography readiness, ${readinessSnapshot.commandCount}/${geographySessions.length} command days.`,
       icon: BarChart3,
       testId: "geography-track-trend",
     },
@@ -335,7 +334,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
           >
             <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-4">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">30-day path</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">20-day path</p>
                 <h2 className="text-base font-black text-[#13251d]">Open only when you want to change day</h2>
               </div>
               <span className="rounded-md border border-[#cfc6b6] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] transition group-open:bg-[#1a3a2a] group-open:text-white">
@@ -488,7 +487,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
               ].map(([label, value]) => (
                 <div key={label} className="rounded-md border border-[#b9dacf] bg-white/70 p-3">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
-                  <p className="mt-2 text-2xl font-black leading-none text-[#13251d]">{value}/30</p>
+                  <p className="mt-2 text-2xl font-black leading-none text-[#13251d]">{value}/{geographySessions.length}</p>
                 </div>
               ))}
             </div>
@@ -541,7 +540,7 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">30-day heatmap</p>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">20-day heatmap</p>
                 <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Geography sprint state</h2>
               </div>
               <BarChart3 className="h-6 w-6 text-[#085041]" />

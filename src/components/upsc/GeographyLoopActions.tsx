@@ -13,6 +13,7 @@ import {
   RefreshCcw,
 } from "lucide-react";
 
+import { geographySessions } from "@/lib/upsc/plan";
 import { cn } from "@/lib/utils";
 
 export type GeographyLoopRoom = "watch" | "talk" | "lab" | "mcq" | "track" | "revisit";
@@ -28,7 +29,7 @@ type GeographyLoopActionsProps = {
   onSelectDay?: (day: number) => void;
 };
 
-const geographyDayCount = 30;
+const geographyDayCount = geographySessions.length;
 
 function buildLoopHref(room: GeographyLoopRoom | undefined, day: number, labSlug: string) {
   if (room === "watch") return `/upsc/geography/watch?day=${day}`;

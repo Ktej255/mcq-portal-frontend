@@ -15,6 +15,10 @@ import type {
   GeographyMaicTurn,
   GeographyTalkUnlockStage,
 } from "@/lib/upsc/geographyLearning";
+import type {
+  GeographyKnownConcept,
+  GeographyMissingConcept,
+} from "@/lib/upsc/geographyContentModules";
 
 export type GeographyConfidence = "Shaky" | "Working" | "Command";
 export type GeographyMentorMode = "Map logic" | "Cause-effect" | "UPSC trap";
@@ -39,8 +43,43 @@ export type GeographyMcqReadinessStatus =
 
 export type GeographyMeTimeMood = "calm" | "focused" | "tired" | "overloaded" | "low-confidence" | "exam-stress";
 
+export type GeographyModuleSectionRecallAttempt = {
+  moduleId: string;
+  sectionId: string;
+  cumulativeSectionIds: string[];
+  answer: string;
+  score: number;
+  knownConcepts: GeographyKnownConcept[];
+  missingConcepts: GeographyMissingConcept[];
+  attemptedAt: string;
+};
+
+export type GeographyModuleProgress = {
+  moduleId: string;
+  activeSectionId?: string;
+  readSectionIds?: string[];
+  passedSectionIds?: string[];
+  nextUnlockedSectionId?: string;
+  knownConcepts?: GeographyKnownConcept[];
+  missingConcepts?: GeographyMissingConcept[];
+  initialKnownPercent?: number;
+  currentMasteryPercent?: number;
+  gapFilledPercent?: number;
+  remainingGapPercent?: number;
+  sectionRecallAttempts?: GeographyModuleSectionRecallAttempt[];
+  updatedAt?: string;
+};
+
 export type GeographyDayProgress = {
   day: number;
+  moduleProgress?: Record<string, GeographyModuleProgress>;
+  sectionRecallAttempts?: GeographyModuleSectionRecallAttempt[];
+  knownConcepts?: GeographyKnownConcept[];
+  missingConcepts?: GeographyMissingConcept[];
+  initialKnownPercent?: number;
+  currentMasteryPercent?: number;
+  gapFilledPercent?: number;
+  nextUnlockedSectionId?: string;
   watched?: boolean;
   watchState?: GeographyWatchState;
   watchNote?: string;
@@ -177,11 +216,19 @@ function writeProgress(progress: GeographyProgressMap) {
 }
 
 function hasStartedTopic(progress?: GeographyDayProgress) {
+  const moduleEvidence = Object.values(progress?.moduleProgress ?? {}).some(
+    (module) =>
+      (module.readSectionIds?.length ?? 0) > 0 ||
+      (module.passedSectionIds?.length ?? 0) > 0 ||
+      (module.sectionRecallAttempts?.length ?? 0) > 0
+  );
+
   return Boolean(
     progress?.watched ||
       progress?.reflection?.trim() ||
       progress?.baselineSavedAt ||
       typeof progress?.talkScore === "number" ||
+      moduleEvidence ||
       progress?.labCompleted ||
       progress?.mcqAttempted
   );
@@ -203,6 +250,7 @@ export function useGeographyProgress() {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       const localProgress = readProgress();
+      if (cancelled) return;
       setProgress(localProgress);
       setIsLoaded(true);
 

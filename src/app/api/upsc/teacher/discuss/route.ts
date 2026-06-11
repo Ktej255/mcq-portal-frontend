@@ -294,7 +294,18 @@ export async function POST(request: NextRequest) {
     `Rubric version: ${ADAPTIVE_TEACHER_RUBRIC_VERSION}.`,
     `Level-specific diagnosis: ${levelInstruction.diagnosisFrame}`,
     `Level-specific repair: ${levelInstruction.repairFrame}`,
+    teacherRequest.moduleId ? `Content module: ${teacherRequest.moduleId}.` : "",
+    teacherRequest.sectionId ? `Current section: ${teacherRequest.sectionId}.` : "",
+    teacherRequest.cumulativeSectionIds?.length
+      ? `Cumulative sections to recall: ${teacherRequest.cumulativeSectionIds.join(", ")}.`
+      : "",
+    teacherRequest.expectedRecallPoints?.length
+      ? `Expected cumulative recall points: ${teacherRequest.expectedRecallPoints.join(" | ")}.`
+      : "",
     "Evaluate the explanation for concept recall, mechanism, applied proof, syllabus relevance, and UPSC statement trap.",
+    teacherRequest.expectedRecallPoints?.length
+      ? "When a content module is supplied, also check whether the learner recalled all previous unlocked sections, not only the newest section."
+      : "",
     "Do not invent facts. Keep the summary concise. Ask exactly one useful next question or provide one forward action.",
     "Return one doubtDiagnosis object: category, reason, repairAction, and masteryCheck. It must name the single biggest blocker.",
     `Learner explanation: ${teacherRequest.answer}`,
