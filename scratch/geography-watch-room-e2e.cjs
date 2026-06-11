@@ -5,6 +5,7 @@ const { chromium } = require("@playwright/test");
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:3001";
 const storageKey = "sarit-upsc-geography-progress-v1";
 const contentStorageKey = "sarit-upsc-content-command-v1";
+const profileKey = "sarit-upsc-student-profile-v1";
 const evidencePath = path.join(__dirname, "geography-watch-room-e2e-evidence.json");
 const screenshotPath = path.join(__dirname, "geography-watch-room-final.png");
 const allowedConsoleErrorFragments = ["AUTH | Firebase auth is not initialized"];
@@ -46,6 +47,27 @@ async function run() {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
+  await page.addInitScript(({ studentProfileKey }) => {
+    const token = "MOCK_TOKEN_geography_watch_room";
+    window.MOCK_TOKEN = token;
+    window.localStorage.setItem("MOCK_TOKEN", token);
+    window.localStorage.setItem(
+      studentProfileKey,
+      JSON.stringify({
+        level: "beginner",
+        preparationStage: "not-started",
+        studyWindow: "120",
+        learningStyle: "mixed",
+        weakSignal: "retention",
+        studyTime: "morning",
+        attemptHistory: "no-attempt",
+        learningPattern: "deep-work",
+        mindState: "calm",
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, { studentProfileKey: profileKey });
+
   await page.goto(`${baseUrl}/upsc/geography/talk?day=9`, { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ({ progressKey, contentKey }) => {
@@ -55,18 +77,19 @@ async function run() {
     { progressKey: storageKey, contentKey: contentStorageKey }
   );
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByTestId("talk-route-gate").getByText("Watch room required", { exact: false }).waitFor({ timeout: 15000 });
-  const watchHref = await page.getByTestId("talk-primary-route").getAttribute("href");
+  await page.getByTestId("talk-flow-gate").getByText("Finish the lesson first", { exact: false }).waitFor({ timeout: 15000 });
+  const watchHref = await page.getByTestId("talk-flow-gate-action").getAttribute("href");
   if (watchHref !== "/upsc/geography/watch?day=9") {
     throw new Error(`Expected Talk gate to route back to Watch, got ${watchHref}`);
   }
   await assertNoOverflow(page, "talk-watch-gate", checks);
 
   await page.goto(`${baseUrl}/upsc/geography/watch?day=9`, { waitUntil: "domcontentloaded" });
-  await page.getByTestId("watch-demo-player").waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-content-asset-gate").getByText("Demo fallback active", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-demo-player").getByText("Demo fallback active", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByTestId("watch-route-gate").getByText("Complete class scenes first", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-watch-simple-repair").waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-current-action").getByText("Finish lesson and discuss", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-topic-player").waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-watch-checkpoints").waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-complete-and-discuss").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "watch-initial", checks);
 
   await page.evaluate((key) => {
@@ -85,25 +108,13 @@ async function run() {
     );
   }, contentStorageKey);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByTestId("watch-content-asset-gate").getByText("Institutional content ready", { exact: false }).waitFor({
-    timeout: 15000,
-  });
-  await page.getByTestId("watch-demo-player").getByText("Institutional content ready", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-topic-player").waitFor({ timeout: 15000 });
+  await page.getByTestId("watch-current-action").getByText("Finish lesson and discuss", { exact: false }).waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "watch-content-ready", checks);
 
-  for (let index = 0; index < 5; index += 1) {
-    await page.getByTestId("watch-scene-complete").click();
-    await page.waitForFunction(
-      ({ key, expected }) => {
-        const day = JSON.parse(window.localStorage.getItem(key) || "{}")["9"];
-        return (day?.watchSceneCompletedIds?.length ?? 0) >= expected;
-      },
-      { key: storageKey, expected: index + 1 },
-      { timeout: 15000 }
-    );
-  }
+  await page.getByTestId("watch-complete-and-discuss").click();
+  await page.waitForURL("**/upsc/geography/talk?day=9", { timeout: 15000 });
 
-  await page.getByTestId("watch-route-gate").getByText("AI teacher unlocked", { exact: false }).waitFor({ timeout: 15000 });
   const stored = await readProgress(page, 9);
   if (!stored?.watched || stored?.watchState !== "Watched" || stored?.watchSceneCompletedIds?.length !== 5) {
     throw new Error(`Watch room did not save complete proof: ${JSON.stringify(stored)}`);
@@ -114,11 +125,9 @@ async function run() {
     watchState: stored.watchState,
     watchSceneCompletedIds: stored.watchSceneCompletedIds,
   });
-  await assertNoOverflow(page, "watch-complete", checks);
-
-  await page.getByTestId("watch-primary-route").click();
-  await page.waitForURL("**/upsc/geography/talk?day=9", { timeout: 15000 });
-  await page.getByTestId("talk-route-gate").getByText("Awaiting MAIC oral check", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-talk-simple-panel").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-discussion-surface").waitFor({ timeout: 15000 });
+  await page.getByTestId("talk-assess-answer").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "talk-after-watch-proof", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
 

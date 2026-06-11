@@ -56,7 +56,7 @@ async function run() {
     { key: profileKey }
   );
 
-  await page.goto(`${baseUrl}/upsc/geography/lab?mode=india-map&day=10`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/upsc/geography/lab?mode=monsoon&day=10`, { waitUntil: "domcontentloaded" });
   await page.evaluate((key) => {
     window.localStorage.setItem(
       key,
@@ -66,12 +66,12 @@ async function run() {
           watched: true,
           watchState: "Watched",
           watchSceneCompletedIds: ["10-briefing", "10-mechanism", "10-map", "10-trap", "10-recap"],
-          talkScore: 88,
+          talkScore: 96,
           talkBand: "Command",
           talkUnlockStage: "mcq",
           talkVerdict: "MCQ route conditionally unlocked.",
           confidence: "Command",
-          reflection: "India map logic is ready for applied atlas proof.",
+          reflection: "Monsoon mechanism is ready for applied visual proof.",
         },
       })
     );
@@ -84,12 +84,12 @@ async function run() {
     throw new Error("Manual lab proof stages should remain folded on first load.");
   }
   await page.getByTestId("geography-lab-proof-input").fill(
-    "Protected area proof: map the physical region first, then connect habitat, conservation category, example and one statement trap."
+    "Monsoon proof: map the pressure shift first, then connect wind reversal, relief rainfall, one Indian example and one statement trap."
   );
   await page.getByTestId("geography-lab-save-proof").click();
 
   const stored = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}")["10"], progressKey);
-  if (!stored?.labCompleted || stored?.labMode !== "india-map" || stored?.labProofCompletedIds?.length !== 5) {
+  if (!stored?.labCompleted || stored?.labMode !== "monsoon" || stored?.labProofCompletedIds?.length !== 5) {
     throw new Error(`Lab proof did not complete correctly: ${JSON.stringify(stored)}`);
   }
   checks.push({
@@ -103,8 +103,9 @@ async function run() {
   await assertNoOverflow(page, "geography-lab-proof", checks);
 
   await page.goto(`${baseUrl}/upsc/geography/mcq-readiness?day=10`, { waitUntil: "domcontentloaded" });
-  await page.getByText("Fresh MCQs pending", { exact: false }).waitFor({ timeout: 15000 });
-  await page.getByText("MCQ", { exact: true }).waitFor({ timeout: 15000 });
+  await page.getByTestId("geography-mcq-level-shell").waitFor({ timeout: 15000 });
+  await page.getByText("Practice is being prepared", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByTestId("mcq-talk-clearance-proof").waitFor({ timeout: 15000 });
   await page.getByTestId("geography-mcq-advanced-tools").waitFor({ timeout: 15000 });
   await assertNoOverflow(page, "geography-mcq-lab-proof-gate", checks);
   await page.screenshot({ path: screenshotPath, fullPage: true });
