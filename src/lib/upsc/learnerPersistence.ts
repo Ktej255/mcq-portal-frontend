@@ -113,6 +113,16 @@ export function mergeProgressMaps<T extends ProgressItem>(
 }
 
 export async function loadRemoteStudentProfile<T extends object>() {
+  if (activeAuthProvider === "clerk") {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem("sarit-upsc-student-profile-v1");
+    try {
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  }
+
   const userId = await currentRemoteUserId();
   if (!userId || !supabase) return null;
 
@@ -131,6 +141,13 @@ export async function loadRemoteStudentProfile<T extends object>() {
 }
 
 export async function saveRemoteStudentProfile<T extends object>(profile: T) {
+  if (activeAuthProvider === "clerk") {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sarit-upsc-profile-updated", { detail: profile }));
+    }
+    return true;
+  }
+
   const userId = await currentRemoteUserId();
   const remoteClient = supabase;
   if (!userId || !remoteClient) return false;
@@ -156,6 +173,16 @@ export async function saveRemoteStudentProfile<T extends object>(profile: T) {
 }
 
 export async function loadRemoteSubjectProgress<T extends ProgressItem>(subjectSlug: string) {
+  if (activeAuthProvider === "clerk") {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(`sarit-upsc-${subjectSlug}-progress-v1`);
+    try {
+      return raw ? (JSON.parse(raw) as ProgressMap<T>) : null;
+    } catch {
+      return null;
+    }
+  }
+
   const userId = await currentRemoteUserId();
   if (!userId || !supabase) return null;
 
@@ -178,6 +205,17 @@ export async function saveRemoteSubjectProgress<T extends ProgressItem>(
   subjectSlug: string,
   progress: ProgressMap<T>
 ) {
+  if (activeAuthProvider === "clerk") {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("sarit-upsc-progress-updated", {
+          detail: { subjectSlug, progress },
+        })
+      );
+    }
+    return true;
+  }
+
   const userId = await currentRemoteUserId();
   const remoteClient = supabase;
   if (!userId || !remoteClient) return false;

@@ -523,6 +523,17 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
+    // Hydrate local state from Clerk unsafeMetadata
+    const metadata = clerkUser.unsafeMetadata || {};
+    if (metadata.profile && typeof window !== "undefined") {
+      window.localStorage.setItem("sarit-upsc-student-profile-v1", JSON.stringify(metadata.profile));
+    }
+    if (metadata.progress && typeof metadata.progress === "object" && typeof window !== "undefined") {
+      Object.entries(metadata.progress).forEach(([slug, val]) => {
+        window.localStorage.setItem(`sarit-upsc-${slug}-progress-v1`, JSON.stringify(val));
+      });
+    }
+
     const primaryEmail =
       clerkUser.primaryEmailAddress?.emailAddress ??
       clerkUser.emailAddresses?.[0]?.emailAddress ??
@@ -544,6 +555,53 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
       replaceRoute(params.get("redirect") || "/dashboard");
     }
   }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute]);
+
+  // Sync profile & progress back to Clerk unsafeMetadata when updated locally
+  useEffect(() => {
+    if (!isSignedIn || !clerkUser) return;
+
+    const handleProfileUpdate = async (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const profile = customEvent.detail;
+      try {
+        await clerkUser.update({
+          unsafeMetadata: {
+            ...clerkUser.unsafeMetadata,
+            profile,
+          },
+        });
+      } catch (err) {
+        console.error("Clerk | Failed to save student profile metadata:", err);
+      }
+    };
+
+    const handleProgressUpdate = async (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { subjectSlug, progress } = customEvent.detail;
+      try {
+        const currentProgress = (clerkUser.unsafeMetadata?.progress as Record<string, any>) || {};
+        await clerkUser.update({
+          unsafeMetadata: {
+            ...clerkUser.unsafeMetadata,
+            progress: {
+              ...currentProgress,
+              [subjectSlug]: progress,
+            },
+          },
+        });
+      } catch (err) {
+        console.error("Clerk | Failed to save subject progress metadata:", err);
+      }
+    };
+
+    window.addEventListener("sarit-upsc-profile-updated", handleProfileUpdate);
+    window.addEventListener("sarit-upsc-progress-updated", handleProgressUpdate);
+
+    return () => {
+      window.removeEventListener("sarit-upsc-profile-updated", handleProfileUpdate);
+      window.removeEventListener("sarit-upsc-progress-updated", handleProgressUpdate);
+    };
+  }, [isSignedIn, clerkUser]);
 
   const signInWithGoogle = async (redirectPath = "/dashboard") => {
     pushRoute(`/login?redirect=${encodeURIComponent(normalizeInternalRedirectPath(redirectPath))}`);
