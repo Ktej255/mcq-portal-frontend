@@ -4,6 +4,7 @@ import {
   readLocalPyqImportRecords,
   type PyqImportRecord,
 } from "@/lib/upsc/pyqImportLedger";
+import type { StrategyPracticeHandoff } from "@/lib/upsc/prelims2027Strategy";
 import type { StudentLevel, StudentProfile } from "@/lib/upsc/studentProfile";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
@@ -14,6 +15,7 @@ export type QuestionSource =
   | "REFERENCE_ADVANCED"
   | "PYQ_PATTERN"
   | "CURRENT_AFFAIRS_BRIDGE"
+  | "UPSC_2027_STRATEGY"
   | "EXACT_PYQ_IMPORT";
 export type QuestionOption = "A" | "B" | "C" | "D";
 
@@ -52,6 +54,11 @@ export type PracticeQuestion = {
   questionNumber?: string;
   answerDemand?: string;
   isExactPyqImport?: boolean;
+  isStrategyPracticeHandoff?: boolean;
+  strategyBlueprintId?: string;
+  strategyFormat?: string;
+  strategyGap?: string;
+  strategyExpectedOutput?: string;
 };
 
 export type QuestionBankAttempt = {
@@ -152,6 +159,7 @@ export const questionSources: QuestionSource[] = [
   "REFERENCE_ADVANCED",
   "PYQ_PATTERN",
   "CURRENT_AFFAIRS_BRIDGE",
+  "UPSC_2027_STRATEGY",
   "EXACT_PYQ_IMPORT",
 ];
 export const questionOptions: QuestionOption[] = ["A", "B", "C", "D"];
@@ -790,6 +798,102 @@ export function buildQuestionBankQuestionsFromPyqImports(records: PyqImportRecor
     .filter((question): question is PracticeQuestion => Boolean(question));
 }
 
+function strategyQuestionStem(handoff: StrategyPracticeHandoff, index: number) {
+  const pattern = index % 5;
+
+  if (pattern === 0) {
+    return `2027 strategy drill (${handoff.format}): Which preparation action best converts "${handoff.title}" into UPSC-ready practice?`;
+  }
+  if (pattern === 1) {
+    return `A student is weak in this gap: ${handoff.matchedGap} What should be done before attempting the set?`;
+  }
+  if (pattern === 2) {
+    return `For "${handoff.title}", which option best preserves the expected UPSC answer demand?`;
+  }
+  if (pattern === 3) {
+    return `Which statement is the safest trap-control rule while solving the ${handoff.format} set from the 2027 strategy queue?`;
+  }
+
+  return `The teacher has generated ${handoff.plannedQuestions} questions for "${handoff.title}". Which review rule keeps the practice evidence-led?`;
+}
+
+function strategyQuestionOptions(handoff: StrategyPracticeHandoff, index: number): PracticeQuestion["options"] {
+  const pattern = index % 5;
+
+  if (pattern === 0) {
+    return {
+      A: `${handoff.instruction} Then attach source proof and one close UPSC distractor.`,
+      B: "Make a short recall list and skip the exact UPSC format.",
+      C: "Use only current headlines without static or source linkage.",
+      D: "Delay practice until the entire yearly syllabus is complete.",
+    };
+  }
+  if (pattern === 1) {
+    return {
+      A: "Read the gap, identify the syllabus node, then solve the generated set with explanation review.",
+      B: "Attempt random questions from another subject to build speed first.",
+      C: "Memorize only the labels and ignore why the miss happened.",
+      D: "Treat the gap as solved once the topic title is seen once.",
+    };
+  }
+  if (pattern === 2) {
+    return {
+      A: handoff.expectedOutput,
+      B: "A generic easy quiz with no trap, format, or gap tag.",
+      C: "A mains essay outline without options or elimination logic.",
+      D: "A news-only summary without source or concept explanation.",
+    };
+  }
+  if (pattern === 3) {
+    return {
+      A: "Check every statement or pair against the gap, source tag, and exact format before selecting.",
+      B: "Prefer the longest option without reading all statements.",
+      C: "Eliminate any option containing an unfamiliar institution or term.",
+      D: "Assume repeated words in the stem automatically prove correctness.",
+    };
+  }
+
+  return {
+    A: "Review the incorrect options, map them back to the audit gap, and keep the generated handoff visible.",
+    B: "Only count how many questions were attempted, not why mistakes happened.",
+    C: "Move to a new subject immediately after the first correct answer.",
+    D: "Remove the strategy tag so the question behaves like an ordinary drill.",
+  };
+}
+
+export function buildQuestionBankQuestionsFromStrategyHandoffs(
+  handoffs: StrategyPracticeHandoff[]
+): PracticeQuestion[] {
+  return handoffs.flatMap((handoff) => {
+    const subject = questionBankSubjects.find((item) => item.slug === handoff.subjectSlug);
+    if (!subject) return [];
+
+    const session = subject.sessions.find((item) => item.day === handoff.day) ?? subject.sessions[0];
+    const generatedCount = Math.max(5, Math.min(15, handoff.plannedQuestions));
+
+    return Array.from({ length: generatedCount }, (_, index): PracticeQuestion => ({
+      id: `strategy-${handoff.blueprintId}-${index + 1}`,
+      subjectSlug: handoff.subjectSlug,
+      subjectTitle: subject.title,
+      linkedDay: session?.day ?? handoff.day,
+      topic: handoff.title,
+      difficulty: handoff.difficulty,
+      stem: strategyQuestionStem(handoff, index),
+      options: strategyQuestionOptions(handoff, index),
+      correctOption: "A",
+      explanation: `This row is generated from the 2027 strategy handoff "${handoff.title}". It repairs: ${handoff.matchedGap} The expected output is: ${handoff.expectedOutput}`,
+      trap: `Do not solve it as a generic ${subject.title} question. The audit gap, ${handoff.format} format, and source-proof expectation must all stay attached.`,
+      source: "UPSC_2027_STRATEGY",
+      answerDemand: handoff.format,
+      isStrategyPracticeHandoff: true,
+      strategyBlueprintId: handoff.blueprintId,
+      strategyFormat: handoff.format,
+      strategyGap: handoff.matchedGap,
+      strategyExpectedOutput: handoff.expectedOutput,
+    }));
+  });
+}
+
 export function readLocalQuestionBankProgress(subjectSlug: string): QuestionBankProgressInput {
   if (typeof window === "undefined") return {};
 
@@ -1272,6 +1376,15 @@ function exactImportFirst(questions: PracticeQuestion[]) {
   });
 }
 
+function strategyPracticeFirst(questions: PracticeQuestion[]) {
+  return [...questions].sort((left, right) => {
+    if (left.isStrategyPracticeHandoff !== right.isStrategyPracticeHandoff) {
+      return left.isStrategyPracticeHandoff ? -1 : 1;
+    }
+    return left.id.localeCompare(right.id);
+  });
+}
+
 export function selectQuestionBankSet({
   subjectSlug = "geography",
   progress,
@@ -1299,10 +1412,11 @@ export function selectQuestionBankSet({
     (question) => question.subjectSlug === subject.slug && question.difficulty === selectedDifficulty
   );
   const exactImports = questionPool.filter((question) => question.isExactPyqImport);
-  const nonExactPool = questionPool.filter((question) => !question.isExactPyqImport);
-  const targeted = nonExactPool.filter((question) => targetDaySet.has(question.linkedDay));
-  const fallback = nonExactPool.filter((question) => !targetDaySet.has(question.linkedDay));
-  const prioritized = [...exactImportFirst(exactImports), ...targeted, ...fallback];
+  const strategyPractice = questionPool.filter((question) => question.isStrategyPracticeHandoff);
+  const nonExternalPool = questionPool.filter((question) => !question.isExactPyqImport && !question.isStrategyPracticeHandoff);
+  const targeted = nonExternalPool.filter((question) => targetDaySet.has(question.linkedDay));
+  const fallback = nonExternalPool.filter((question) => !targetDaySet.has(question.linkedDay));
+  const prioritized = [...exactImportFirst(exactImports), ...strategyPracticeFirst(strategyPractice), ...targeted, ...fallback];
   const questions = [
     ...prioritized.filter((question) => !solvedQuestionIds.has(question.id)),
     ...prioritized.filter((question) => solvedQuestionIds.has(question.id)),
@@ -1343,14 +1457,17 @@ export function selectCustomQuestionBankSet({
       (question) => question.subjectSlug === subject.slug && question.difficulty === difficulty
     );
     const exactImports = pool.filter((question) => question.isExactPyqImport);
-    const nonExactPool = pool.filter((question) => !question.isExactPyqImport);
-    const targeted = nonExactPool.filter((question) => targetDaySet.has(question.linkedDay));
-    const fallback = nonExactPool.filter((question) => !targetDaySet.has(question.linkedDay));
+    const strategyPractice = pool.filter((question) => question.isStrategyPracticeHandoff);
+    const nonExternalPool = pool.filter((question) => !question.isExactPyqImport && !question.isStrategyPracticeHandoff);
+    const targeted = nonExternalPool.filter((question) => targetDaySet.has(question.linkedDay));
+    const fallback = nonExternalPool.filter((question) => !targetDaySet.has(question.linkedDay));
     const prioritized = [
       ...exactImportFirst(exactImports.filter((question) => !solvedQuestionIds.has(question.id))),
+      ...strategyPracticeFirst(strategyPractice.filter((question) => !solvedQuestionIds.has(question.id))),
       ...targeted.filter((question) => !solvedQuestionIds.has(question.id)),
       ...fallback.filter((question) => !solvedQuestionIds.has(question.id)),
       ...exactImportFirst(exactImports.filter((question) => solvedQuestionIds.has(question.id))),
+      ...strategyPracticeFirst(strategyPractice.filter((question) => solvedQuestionIds.has(question.id))),
       ...targeted.filter((question) => solvedQuestionIds.has(question.id)),
       ...fallback.filter((question) => solvedQuestionIds.has(question.id)),
     ];

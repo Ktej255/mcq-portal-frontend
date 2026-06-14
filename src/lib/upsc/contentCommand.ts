@@ -89,7 +89,7 @@ const geographyClassPacks: Record<number, ContentState> = {
     studentHandoff:
       "Explain one chain from seismic evidence to moving plates, then compare one boundary type with its landform, hazard map cue, and a trap about S-waves, core state, or volcano distribution.",
     contentNote:
-      "Day 3 compact bridge preserves Earth-interior evidence and plate-boundary logic inside the 30-day Geography schedule. The portal-native learner visual is wired for Watch and optional Earth Layers review.",
+      "Day 3 compact bridge preserves Earth-interior evidence and plate-boundary logic inside the 20-day Geography schedule. The portal-native learner visual is wired for Watch and optional Earth Layers review.",
     updatedAt: "2026-06-01T00:00:00.000Z",
   },
   4: {
@@ -679,7 +679,7 @@ const geographyClassPacks: Record<number, ContentState> = {
       "UPSC trap: feeling familiar with topics is not the same as being able to explain and apply them under exam pressure.",
     ],
     transcriptSummary:
-      "Close the 30-day Geography sprint with full recall, final map checks, example bank, confidence audit, revision scheduling, and criteria for command-ready versus retest-needed.",
+      "Close the 20-day Geography sprint with full recall, final map checks, example bank, confidence audit, revision scheduling, and criteria for command-ready versus retest-needed.",
     studentHandoff:
       "Explain Geography command status through strongest area, weakest area, map confidence, retest need, revision date, and one final UPSC trap.",
     contentNote:

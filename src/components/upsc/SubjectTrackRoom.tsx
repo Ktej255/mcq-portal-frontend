@@ -428,7 +428,7 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             className="group mt-5 rounded-lg border border-[var(--subject-border)] bg-white/60 p-3"
           >
             <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md px-2 py-1 text-sm font-black text-[var(--subject-heading)] marker:text-[var(--subject-accent)]">
-              <span>View 30-day path</span>
+              <span>View {plan.sessions.length}-day path</span>
               <span className="text-xs font-bold text-[#746f66]">
                 Optional map. Today&apos;s action is already selected above.
               </span>

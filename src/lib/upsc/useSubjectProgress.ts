@@ -123,6 +123,10 @@ export type SubjectDayProgress = {
   meTimeCompletedAt?: string;
   meTimeMood?: SubjectMeTimeMood;
   meTimeResetPlan?: string;
+  retroCompleted?: boolean;
+  retroNote?: string;
+  retroAiCorrection?: string;
+  retroCompletedAt?: string;
   savedCount?: number;
   updatedAt?: string;
 };

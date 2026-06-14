@@ -14,6 +14,11 @@ import {
   Save,
   Target,
   UserRound,
+  Play,
+  Pause,
+  Volume2,
+  LockKeyhole,
+  Check,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +32,7 @@ import {
   buildQuestionBankQuestionsFromPyqImports,
   readLocalQuestionBankAttempts,
 } from "@/lib/upsc/questionBankEngine";
+import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
 import {
   buildGeographyDailyPath,
   getCurrentGeographyTopic,
@@ -182,6 +188,52 @@ export const DailyWorkspace = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [draft, setDraft] = useState<StudentProfile>(defaultStudentProfile);
+  const [localWelcomeVideoCompleted, setLocalWelcomeVideoCompleted] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("sarit-upsc-welcome-video-completed-v1") === "true";
+    }
+    return false;
+  });
+
+  const isWelcomeVideoCompleted = profile ? Boolean(profile.welcomeVideoCompleted) : localWelcomeVideoCompleted;
+
+  const handleCompleteWelcomeVideo = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sarit-upsc-welcome-video-completed-v1", "true");
+    }
+    setLocalWelcomeVideoCompleted(true);
+    if (profile) {
+      saveProfile({
+        ...profile,
+        welcomeVideoCompleted: true,
+      });
+    }
+  };
+
+  const updateInductionStep = (step: "syllabus" | "booklist" | "quiz", isDone: boolean) => {
+    if (!profile) return;
+    const patch: Partial<StudentProfile> = {};
+    if (step === "syllabus") patch.inductionSyllabusCompleted = isDone;
+    if (step === "booklist") patch.inductionBooklistCompleted = isDone;
+    if (step === "quiz") patch.inductionQuizCompleted = isDone;
+    
+    saveProfile({
+      ...profile,
+      ...patch,
+    });
+  };
+
+  const completeInduction = (skipped: boolean = false) => {
+    if (!profile) return;
+    saveProfile({
+      ...profile,
+      inductionSyllabusCompleted: skipped ? true : profile.inductionSyllabusCompleted,
+      inductionBooklistCompleted: skipped ? true : profile.inductionBooklistCompleted,
+      inductionQuizCompleted: skipped ? true : profile.inductionQuizCompleted,
+      inductionCompleted: true,
+    });
+  };
+
   const [dailyMissionState, setDailyMissionState] = useState<DailyMissionState>({ subjectSlug: "geography", day: 0 });
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
   const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] = useState<
@@ -380,7 +432,11 @@ export const DailyWorkspace = () => {
   };
 
   const saveProfile = (nextDraft: StudentProfile = draft) => {
-    const nextProfile = { ...nextDraft, updatedAt: new Date().toISOString() };
+    const nextProfile = {
+      ...nextDraft,
+      welcomeVideoCompleted: nextDraft.welcomeVideoCompleted || localWelcomeVideoCompleted || (profile ? profile.welcomeVideoCompleted : false),
+      updatedAt: new Date().toISOString()
+    };
     const normalizedProfile = saveStudentProfile(nextProfile);
     setProfile(normalizedProfile);
     setDraft(normalizedProfile);
@@ -393,6 +449,12 @@ export const DailyWorkspace = () => {
           Opening UPSC workspace...
         </div>
       </main>
+    );
+  }
+
+  if (!isWelcomeVideoCompleted) {
+    return (
+      <WelcomeVideoOverlay onComplete={handleCompleteWelcomeVideo} />
     );
   }
 
@@ -437,6 +499,15 @@ export const DailyWorkspace = () => {
                 {profile.level}
               </Badge>
             </div>
+            {!profile.inductionCompleted ? (
+              <div className="mb-4">
+                <InductionChecklist
+                  profile={profile}
+                  onUpdateStep={updateInductionStep}
+                  onComplete={completeInduction}
+                />
+              </div>
+            ) : null}
 
             <div data-testid="upsc-four-signal-grid" className="space-y-3">
               <article
@@ -647,16 +718,27 @@ export const DailyWorkspace = () => {
                       </div>
                     </div>
                   </div>
-                  <Link
-                    href={activeMissionHref}
-                    data-testid="upsc-start-today"
-                    data-student-level={profile.level}
-                    data-next-action-room={activeMissionReadiness.statusLabel}
-                    data-session-readiness={meTimeDone ? "ready" : "check-pending"}
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] md:w-auto"
-                  >
-                    {activeMissionReadiness.actionLabel} <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
+                  {!profile.inductionCompleted ? (
+                    <button
+                      type="button"
+                      disabled
+                      data-testid="upsc-start-today-locked"
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#dcd5c7] px-4 text-sm font-black text-[#756f64] cursor-not-allowed md:w-auto gap-2"
+                    >
+                      Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <Link
+                      href={activeMissionHref}
+                      data-testid="upsc-start-today"
+                      data-student-level={profile.level}
+                      data-next-action-room={activeMissionReadiness.statusLabel}
+                      data-session-readiness={meTimeDone ? "ready" : "check-pending"}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d] md:w-auto"
+                    >
+                      {activeMissionReadiness.actionLabel} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  )}
                 </div>
               </article>
 
@@ -680,6 +762,40 @@ export const DailyWorkspace = () => {
                     <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{card.detail}</p>
                   </Link>
                 ))}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {profile.inductionCompleted ? (
+                  <>
+                    <Link
+                      href={`/upsc/${activeMissionSubject.slug}/retro`}
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-black text-[#13251d] transition hover:bg-[#f7f4ee] hover:border-[#1d9e75]/60"
+                    >
+                      Sunday AI Retro
+                    </Link>
+                    <Link
+                      href="/upsc/answer-upload"
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-black text-[#13251d] transition hover:bg-[#f7f4ee] hover:border-[#1d9e75]/60"
+                    >
+                      Mains Answer Uploader
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      disabled
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-4 py-2 text-xs font-black text-[#657066] cursor-not-allowed gap-1.5 opacity-60"
+                    >
+                      Sunday AI Retro <LockKeyhole className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      disabled
+                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-4 py-2 text-xs font-black text-[#657066] cursor-not-allowed gap-1.5 opacity-60"
+                    >
+                      Mains Answer Uploader <LockKeyhole className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -1148,3 +1264,4 @@ function SelectBlock({
     </div>
   );
 }
+

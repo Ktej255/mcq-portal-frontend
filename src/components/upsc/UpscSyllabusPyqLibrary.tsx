@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  Archive,
   BookMarked,
   CheckCircle2,
   ClipboardList,
   Database,
   FileSearch,
+  FolderSearch,
+  RefreshCw,
   Route,
   ShieldCheck,
 } from "lucide-react";
@@ -30,6 +33,7 @@ import {
   readLocalPyqImportRecords,
   type PyqImportRecord,
 } from "@/lib/upsc/pyqImportLedger";
+import type { SourceArchiveIntakeResponse } from "@/lib/upsc/sourceArchiveIntake";
 
 function statusLabel(status: ImportStatus) {
   if (status === "source-indexed") return "Source indexed";
@@ -63,11 +67,52 @@ function exactStageTone(status: string) {
   return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
 }
 
+function archiveDecisionTone(decision: string) {
+  if (decision === "Build from scratch") return "border-[#d95f43] bg-[#fff0ec] text-[#9d3824]";
+  if (decision === "Depth upgrade") return "border-[#805ad5] bg-[#f2ecff] text-[#5b3aa5]";
+  if (decision === "Patch and tag") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
+  if (decision === "Maintain") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
+  return "border-[#1f5d8f] bg-[#eef5ff] text-[#1f5d8f]";
+}
+
+function formatArchiveBytes(bytes: number) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** index;
+  return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`;
+}
+
+function formatArchiveDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export function UpscSyllabusPyqLibrary() {
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+  const [archiveIntake, setArchiveIntake] = useState<SourceArchiveIntakeResponse | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     setPyqRecords(readLocalPyqImportRecords());
+  }, []);
+
+  const loadArchiveIntake = async () => {
+    setArchiveStatus("loading");
+    try {
+      const response = await fetch("/api/upsc/source-archive", { cache: "no-store" });
+      const payload = (await response.json()) as SourceArchiveIntakeResponse;
+      setArchiveIntake(payload);
+      setArchiveStatus(response.ok && payload.rootExists ? "ready" : "error");
+    } catch {
+      setArchiveIntake(null);
+      setArchiveStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    void loadArchiveIntake();
   }, []);
 
   const [firstSubject] = subjectSourcePacks;
@@ -117,6 +162,23 @@ export function UpscSyllabusPyqLibrary() {
     subjectSourcePacks.reduce((sum, subject) => sum + subject.dailyLoop.targetRecallPercent, 0) /
       subjectSourcePacks.length
   );
+  const archiveMetrics = useMemo(() => {
+    const pdfCount = archiveIntake?.extensions.find((item) => item.extension === ".pdf")?.count ?? 0;
+    const docxCount = archiveIntake?.extensions.find((item) => item.extension === ".docx")?.count ?? 0;
+    const imageCount =
+      (archiveIntake?.extensions.find((item) => item.extension === ".png")?.count ?? 0) +
+      (archiveIntake?.extensions.find((item) => item.extension === ".jpg")?.count ?? 0) +
+      (archiveIntake?.extensions.find((item) => item.extension === ".jpeg")?.count ?? 0);
+    const strongestTrack = archiveIntake?.tracks.slice().sort((left, right) => right.hitCount - left.hitCount)[0];
+
+    return {
+      pdfCount,
+      docxCount,
+      imageCount,
+      strongestTrack,
+      totalSize: formatArchiveBytes(archiveIntake?.totalBytes ?? 0),
+    };
+  }, [archiveIntake]);
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -146,6 +208,210 @@ export function UpscSyllabusPyqLibrary() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section
+          id="upsc-morning-batch-archive-intake"
+          data-testid="upsc-morning-batch-archive-intake"
+          data-scan-status={archiveStatus}
+          data-total-files={archiveIntake?.totalFiles ?? 0}
+          data-pdf-count={archiveMetrics.pdfCount}
+          data-docx-count={archiveMetrics.docxCount}
+          data-image-count={archiveMetrics.imageCount}
+          data-directory-count={archiveIntake?.totalDirectories ?? 0}
+          data-total-bytes={archiveIntake?.totalBytes ?? 0}
+          data-track-count={archiveIntake?.tracks.length ?? 0}
+          data-strongest-track-id={archiveMetrics.strongestTrack?.id ?? ""}
+          data-proof-rule="local-archive-to-proof-queue-and-2027-course-correction"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-5 grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Morning Batch archive intake
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Local source files can now feed the 2026 proof queue and 2027 rebuild plan.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                This internal scanner reads the configured course archive, summarizes file evidence, and groups
+                candidate material against the same decision tracks used in the 2027 course correction packet.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void loadArchiveIntake()}
+                className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Rescan archive
+              </button>
+              <Link href="/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue" className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-[#1d9e75] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#126245]">
+                Open proof queue <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          {archiveStatus === "loading" ? (
+            <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold text-[#5d675f]">
+              Scanning the configured source archive...
+            </div>
+          ) : archiveIntake?.rootExists ? (
+            <div className="grid gap-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                {[
+                  ["Files", archiveIntake.totalFiles],
+                  ["PDFs", archiveMetrics.pdfCount],
+                  ["DOCX", archiveMetrics.docxCount],
+                  ["Images", archiveMetrics.imageCount],
+                  ["Folders", archiveIntake.totalDirectories],
+                  ["Size", archiveMetrics.totalSize],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <div className="grid gap-4">
+                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Archive root</p>
+                        <p className="mt-1 break-words text-sm font-bold leading-6 text-[#31443a]">{archiveIntake.rootPath}</p>
+                      </div>
+                      <Archive className="h-5 w-5 shrink-0 text-[#1a3a2a]" />
+                    </div>
+                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#5d675f]">
+                      {archiveIntake.message}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Top folders</p>
+                      <FolderSearch className="h-5 w-5 text-[#1a3a2a]" />
+                    </div>
+                    <div className="grid gap-2">
+                      {archiveIntake.topFolders.slice(0, 8).map((folder) => (
+                        <div
+                          key={folder.name}
+                          data-testid="upsc-source-archive-folder"
+                          data-folder-name={folder.name}
+                          data-file-count={folder.fileCount}
+                          className="flex items-center justify-between gap-3 rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-bold text-[#31443a]"
+                        >
+                          <span className="min-w-0 break-words">{folder.name}</span>
+                          <span className="shrink-0 text-[#1d9e75]">{folder.fileCount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">File types</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {archiveIntake.extensions.slice(0, 10).map((extension) => (
+                        <span
+                          key={extension.extension}
+                          data-testid="upsc-source-archive-extension"
+                          data-extension={extension.extension}
+                          data-count={extension.count}
+                          className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#31443a]"
+                        >
+                          {extension.extension}: {extension.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {archiveIntake.tracks.map((track) => (
+                    <article
+                      key={track.id}
+                      data-testid="upsc-source-archive-track"
+                      data-track-id={track.id}
+                      data-hit-count={track.hitCount}
+                      data-decision={track.decision}
+                      data-sample-count={track.sampleFiles.length}
+                      className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${archiveDecisionTone(track.decision)}`}>
+                            {track.decision}
+                          </span>
+                          <h3 className="mt-3 text-lg font-black tracking-tight text-[#13251d]">{track.label}</h3>
+                        </div>
+                        <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#746f66]">
+                          {track.hitCount} candidate files
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{track.nextAction}</p>
+                      <div className="mt-3 grid gap-2">
+                        {track.sampleFiles.length ? (
+                          track.sampleFiles.slice(0, 3).map((file) => (
+                            <div
+                              key={`${track.id}-${file.relativePath}`}
+                              data-testid="upsc-source-archive-sample-file"
+                              data-track-id={track.id}
+                              data-extension={file.extension}
+                              data-size-bytes={file.sizeBytes}
+                              data-relative-path={file.relativePath}
+                              className="rounded-md border border-[#dcd5c7] bg-white p-3"
+                            >
+                              <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
+                              <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
+                              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                                {file.extension} / {formatArchiveBytes(file.sizeBytes)} / {formatArchiveDate(file.lastModified)}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-semibold text-[#746f66]">
+                            No filename/path match yet. Add source tags or move files into a clearer subject folder.
+                          </p>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Recent archive additions</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {archiveIntake.recentFiles.slice(0, 6).map((file) => (
+                    <div
+                      key={`recent-${file.relativePath}`}
+                      data-testid="upsc-source-archive-recent-file"
+                      data-extension={file.extension}
+                      data-size-bytes={file.sizeBytes}
+                      data-relative-path={file.relativePath}
+                      className="rounded-md border border-[#dcd5c7] bg-white p-3"
+                    >
+                      <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
+                      <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
+                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                        {file.extension} / {formatArchiveBytes(file.sizeBytes)} / {formatArchiveDate(file.lastModified)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-[#ef9f27] bg-[#fff4df] p-5">
+              <p className="text-sm font-black text-[#6f4a12]">Source archive not connected.</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#6f4a12]">
+                {archiveIntake?.message ?? "Configure UPSC_SOURCE_ARCHIVE_ROOT with the Morning Batch folder and rescan."}
+              </p>
+            </div>
+          )}
         </section>
 
         <section

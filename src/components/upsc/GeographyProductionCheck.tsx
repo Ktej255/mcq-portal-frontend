@@ -320,7 +320,7 @@ export function GeographyProductionCheck() {
         detail: "Listening now. Say one short sentence such as: geography map proof is ready.",
       });
     };
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const startIndex =
         typeof event.resultIndex === "number"
           ? Math.max(0, Math.min(event.resultIndex, event.results.length))
@@ -339,7 +339,7 @@ export function GeographyProductionCheck() {
         });
       }
     };
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorLike) => {
       setSpeechState("failed");
       updateCheck("speech", {
         status: event.error === "network" ? "warn" : "fail",

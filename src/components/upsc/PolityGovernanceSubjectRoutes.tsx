@@ -2,6 +2,7 @@
 
 import { SubjectLabRoom } from "@/components/upsc/SubjectLabRoom";
 import { SubjectMcqReadinessRoom } from "@/components/upsc/SubjectMcqReadinessRoom";
+import { SubjectRetroRoom } from "@/components/upsc/SubjectRetroRoom";
 import { SubjectRevisitRoom } from "@/components/upsc/SubjectRevisitRoom";
 import { SubjectTalkRoom } from "@/components/upsc/SubjectTalkRoom";
 import { SubjectTrackRoom } from "@/components/upsc/SubjectTrackRoom";
@@ -30,4 +31,8 @@ export function PolityGovernanceRevisitRoute({ initialDay }: { initialDay?: numb
 
 export function PolityGovernanceMcqReadinessRoute({ initialDay }: { initialDay?: number }) {
   return <SubjectMcqReadinessRoom plan={polityGovernancePlan} initialDay={initialDay} />;
+}
+
+export function PolityGovernanceRetroRoute({ initialDay }: { initialDay?: number }) {
+  return <SubjectRetroRoom plan={polityGovernancePlan} initialDay={initialDay} />;
 }

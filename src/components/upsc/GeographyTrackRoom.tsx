@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { GeographyRoomCompass } from "@/components/upsc/GeographyRoomCompass";
 import { getGeographyLoopState, hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { getCurrentGeographyTopic, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
 import { labSlugForGeographySession } from "@/lib/upsc/geographyLearning";
@@ -259,6 +260,14 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1b2f27]">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        <GeographyRoomCompass
+          day={focusedDayNumber}
+          room="Track"
+          title={focusedLoopState?.session.title ?? nextFocusSession.title}
+          detail={`${focusedLoopState?.state.label ?? "Start recall"}: ${focusedLoopState?.state.detail ?? "Open the first Talk room and continue from there."}`}
+          primaryHref={focusedCloseoutHref}
+          primaryLabel={focusedCloseoutLabel}
+        />
         <section
           data-testid="geography-track-simple-dashboard"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
@@ -275,9 +284,6 @@ export function GeographyTrackRoom({ initialDay }: { initialDay?: number }) {
               data-next-action-label={focusedCloseoutLabel}
               className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5"
             >
-              <Link href={`/upsc/geography?day=${nextFocusSession.day}`} className="mb-4 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
-                <ArrowLeft className="h-4 w-4" /> Geography
-              </Link>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1d9e75]">
                 Today&apos;s task
               </p>

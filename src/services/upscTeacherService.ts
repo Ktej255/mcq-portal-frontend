@@ -1,6 +1,5 @@
-import { readLocalMockToken } from "@/lib/auth/local-testing";
+import { resolveToken } from "@/lib/auth/token-strategy";
 import { activeAuthProvider } from "@/env";
-import { supabase } from "@/lib/supabase/client";
 import {
   parseAdaptiveTeacherResponse,
   type AdaptiveTeacherRequest,
@@ -9,16 +8,7 @@ import {
 export const ADAPTIVE_TEACHER_CLIENT_TIMEOUT_MS = 13_000;
 
 export async function readLearnerApiAccessToken() {
-  const mockToken = readLocalMockToken();
-  if (mockToken) return mockToken;
-  if (!supabase) return null;
-
-  try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
-  }
+  return await resolveToken();
 }
 
 export async function requestAdaptiveTeacherDiscussion(payload: AdaptiveTeacherRequest) {

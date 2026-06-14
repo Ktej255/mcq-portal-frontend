@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   allPracticeQuestionBank,
   buildQuestionBankQuestionsFromPyqImports,
+  buildQuestionBankQuestionsFromStrategyHandoffs,
   buildRecommendedQuestionBankMix,
   emptyQuestionBankMix,
   getQuestionBankSubject,
@@ -38,6 +39,7 @@ import {
   type PracticeQuestion,
   type QuestionOption,
 } from "@/lib/upsc/questionBankEngine";
+import { strategyPracticeHandoffStorageKey, type StrategyPracticeHandoff } from "@/lib/upsc/prelims2027Strategy";
 import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
@@ -54,9 +56,23 @@ function scoreText(value: number | null, suffix: string) {
   return value === null ? "Not measured" : `${value}${suffix}`;
 }
 
+function readLocalStrategyPracticeHandoffs(): StrategyPracticeHandoff[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(strategyPracticeHandoffStorageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function UpscQuestionBankBuilder() {
   const searchParams = useSearchParams();
   const requestedSubject = searchParams.get("subject") ?? "geography";
+  const requestedStrategyBlueprint = searchParams.get("strategyBlueprint");
   const [subjectSlug, setSubjectSlug] = useState(() => getQuestionBankSubject(requestedSubject).slug);
   const [progress, setProgress] = useState<QuestionBankProgressInput>({});
   const [profile, setProfile] = useState<StudentProfile | null>(null);
@@ -67,6 +83,7 @@ export function UpscQuestionBankBuilder() {
   const [customMix, setCustomMix] = useState<QuestionBankCustomMix>(emptyQuestionBankMix);
   const [displayQuestionIds, setDisplayQuestionIds] = useState<string[]>([]);
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+  const [strategyHandoffs, setStrategyHandoffs] = useState<StrategyPracticeHandoff[]>([]);
 
   useEffect(() => {
     const nextSubjectSlug = getQuestionBankSubject(requestedSubject).slug;
@@ -83,20 +100,45 @@ export function UpscQuestionBankBuilder() {
       setProgress(readLocalQuestionBankProgress(subjectSlug));
       setAttempts(readLocalQuestionBankAttempts(subjectSlug));
       setPyqRecords(readLocalPyqImportRecords());
+      setStrategyHandoffs(readLocalStrategyPracticeHandoffs());
     }, 0);
     return () => window.clearTimeout(timer);
   }, [subjectSlug]);
 
   const selectedSubject = useMemo(() => getQuestionBankSubject(subjectSlug), [subjectSlug]);
   const exactPyqQuestions = useMemo(() => buildQuestionBankQuestionsFromPyqImports(pyqRecords), [pyqRecords]);
+  const strategyPracticeQuestions = useMemo(
+    () => buildQuestionBankQuestionsFromStrategyHandoffs(strategyHandoffs),
+    [strategyHandoffs]
+  );
   const combinedQuestionBank = useMemo(
-    () => [...exactPyqQuestions, ...allPracticeQuestionBank],
-    [exactPyqQuestions]
+    () => [...exactPyqQuestions, ...strategyPracticeQuestions, ...allPracticeQuestionBank],
+    [exactPyqQuestions, strategyPracticeQuestions]
+  );
+  const activeStrategyHandoff = useMemo(
+    () => strategyHandoffs.find((handoff) => handoff.blueprintId === requestedStrategyBlueprint) ?? null,
+    [requestedStrategyBlueprint, strategyHandoffs]
   );
   const selectedExactPyqQuestions = useMemo(
     () => exactPyqQuestions.filter((question) => question.subjectSlug === selectedSubject.slug),
     [exactPyqQuestions, selectedSubject.slug]
   );
+  const selectedStrategyPracticeQuestions = useMemo(
+    () =>
+      strategyPracticeQuestions.filter(
+        (question) =>
+          question.subjectSlug === selectedSubject.slug &&
+          (!requestedStrategyBlueprint || question.strategyBlueprintId === requestedStrategyBlueprint)
+    ),
+    [requestedStrategyBlueprint, selectedSubject.slug, strategyPracticeQuestions]
+  );
+  const allSelectedSubjectStrategyQuestions = useMemo(
+    () => strategyPracticeQuestions.filter((question) => question.subjectSlug === selectedSubject.slug),
+    [selectedSubject.slug, strategyPracticeQuestions]
+  );
+  const strategyBridgeQuestions = requestedStrategyBlueprint
+    ? selectedStrategyPracticeQuestions
+    : allSelectedSubjectStrategyQuestions;
   const recommended = useMemo(
     () =>
       selectQuestionBankSet({
@@ -108,15 +150,27 @@ export function UpscQuestionBankBuilder() {
       }),
     [attempts, combinedQuestionBank, profile, progress, selectedSubject.slug]
   );
-  const activeDifficulty = difficulty ?? recommended.recommendation.recommendedDifficulty;
-  const activeCount = count ?? recommended.recommendation.recommendedCount;
+  const activeDifficulty = difficulty ?? activeStrategyHandoff?.difficulty ?? recommended.recommendation.recommendedDifficulty;
+  const activeCount =
+    count ??
+    (activeStrategyHandoff && selectedStrategyPracticeQuestions.length
+      ? Math.min(15, selectedStrategyPracticeQuestions.length)
+      : recommended.recommendation.recommendedCount);
+  const strategyPracticeMode = Boolean(activeStrategyHandoff && selectedStrategyPracticeQuestions.length);
   const recommendedMix = useMemo(
     () => buildRecommendedQuestionBankMix(recommended.recommendation),
     [recommended.recommendation]
   );
+  const strategyPracticeMix = useMemo(
+    () => ({
+      ...emptyQuestionBankMix,
+      [activeDifficulty]: activeCount,
+    }),
+    [activeCount, activeDifficulty]
+  );
   const effectiveCustomMix = useMemo(
-    () => (customMode ? customMix : recommendedMix),
-    [customMix, customMode, recommendedMix]
+    () => (strategyPracticeMode ? strategyPracticeMix : customMode ? customMix : recommendedMix),
+    [customMix, customMode, recommendedMix, strategyPracticeMix, strategyPracticeMode]
   );
   const selection = useMemo(
     () => {
@@ -151,8 +205,26 @@ export function UpscQuestionBankBuilder() {
   const targetDayKey = recommendation.targetDays.join(",");
 
   useEffect(() => {
+    if (requestedStrategyBlueprint && selectedStrategyPracticeQuestions.length) {
+      setDisplayQuestionIds(selectedStrategyPracticeQuestions.slice(0, activeCount).map((question) => question.id));
+      return;
+    }
+
     setDisplayQuestionIds(selection.questions.map((question) => question.id));
-  }, [activeCount, activeDifficulty, customMode, effectiveCustomMix.EASY, effectiveCustomMix.HARD, effectiveCustomMix.MEDIUM, effectiveCustomMix.PYQ_STYLE, selectedSubject.slug, targetDayKey]);
+  }, [
+    activeCount,
+    activeDifficulty,
+    customMode,
+    effectiveCustomMix.EASY,
+    effectiveCustomMix.HARD,
+    effectiveCustomMix.MEDIUM,
+    effectiveCustomMix.PYQ_STYLE,
+    requestedStrategyBlueprint,
+    selectedStrategyPracticeQuestions,
+    selectedSubject.slug,
+    selection.questions,
+    targetDayKey,
+  ]);
 
   const displayedQuestions = useMemo(() => {
     if (!displayQuestionIds.length) return selection.questions;
@@ -179,8 +251,10 @@ export function UpscQuestionBankBuilder() {
   const customMixLabel = questionDifficulties.map((item) => `${item}:${effectiveCustomMix[item]}`).join("|");
   const displayedMixLabel = questionDifficulties.map((item) => `${item}:${displayedDifficultyCounts[item]}`).join("|");
   const displayedExactPyqCount = displayedQuestions.filter((question) => question.isExactPyqImport).length;
-  const totalVisibleQuestions = questionBankCoverageSummary.totalQuestions + exactPyqQuestions.length;
-  const activeSubjectVisibleQuestions = (selectedCoverage?.totalQuestions ?? 0) + selectedExactPyqQuestions.length;
+  const displayedStrategyQuestionCount = displayedQuestions.filter((question) => question.isStrategyPracticeHandoff).length;
+  const totalVisibleQuestions = questionBankCoverageSummary.totalQuestions + exactPyqQuestions.length + strategyPracticeQuestions.length;
+  const activeSubjectVisibleQuestions =
+    (selectedCoverage?.totalQuestions ?? 0) + selectedExactPyqQuestions.length + allSelectedSubjectStrategyQuestions.length;
 
   const attemptByQuestionId = useMemo(
     () => new Map(attempts.map((attempt) => [attempt.questionId, attempt])),
@@ -282,6 +356,9 @@ export function UpscQuestionBankBuilder() {
           data-visible-question-rows={totalVisibleQuestions}
           data-imported-exact-question-rows={exactPyqQuestions.length}
           data-active-subject-imported-exact-rows={selectedExactPyqQuestions.length}
+          data-strategy-question-rows={strategyPracticeQuestions.length}
+          data-active-subject-strategy-rows={allSelectedSubjectStrategyQuestions.length}
+          data-requested-strategy-blueprint={requestedStrategyBlueprint ?? ""}
           data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
           data-expected-difficulty-slots={questionBankCoverageSummary.expectedDifficultySlots}
           data-full-coverage-subjects={questionBankCoverageSummary.fullCoverageSubjects}
@@ -301,7 +378,7 @@ export function UpscQuestionBankBuilder() {
                 consistency.
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {[
                 ["Recommended", recommendation.recommendedDifficulty.replace("_", " ")],
                 ["Set size", recommendation.recommendedCount],
@@ -312,10 +389,13 @@ export function UpscQuestionBankBuilder() {
                 ["Solved", recommendation.solvedCount],
                 ["Accuracy", solvedAccuracy],
                 ["Coverage", selectedCoverage?.fullCoverage ? "Full path" : "Partial"],
+                ["2027 Strategy", allSelectedSubjectStrategyQuestions.length],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
-                  <p className="mt-1 text-xl font-black capitalize">{value}</p>
+                <div key={label} className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                  <p className="break-words text-[10px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">
+                    {label}
+                  </p>
+                  <p className="mt-1 break-words text-xl font-black capitalize leading-tight">{value}</p>
                 </div>
               ))}
             </div>
@@ -329,6 +409,7 @@ export function UpscQuestionBankBuilder() {
           data-total-question-rows={questionBankCoverageSummary.totalQuestions}
           data-visible-question-rows={totalVisibleQuestions}
           data-imported-exact-question-rows={exactPyqQuestions.length}
+          data-strategy-question-rows={strategyPracticeQuestions.length}
           data-curated-question-rows={questionBankCoverageSummary.curatedQuestions}
           data-generated-question-rows={questionBankCoverageSummary.generatedQuestions}
           data-covered-difficulty-slots={questionBankCoverageSummary.coveredDifficultySlots}
@@ -339,12 +420,13 @@ export function UpscQuestionBankBuilder() {
           data-active-subject-questions={selectedCoverage?.totalQuestions}
           data-active-subject-visible-questions={activeSubjectVisibleQuestions}
           data-active-subject-imported-exact-rows={selectedExactPyqQuestions.length}
+          data-active-subject-strategy-rows={allSelectedSubjectStrategyQuestions.length}
           data-active-subject-slots={selectedCoverage?.coveredDifficultySlots}
           data-active-subject-expected-slots={selectedCoverage?.expectedDifficultySlots}
           data-active-subject-full-coverage={selectedCoverage?.fullCoverage ? "true" : "false"}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
         >
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               ["Full subjects", `${questionBankCoverageSummary.fullCoverageSubjects}/${questionBankCoverageSummary.subjectCount}`],
               ["Day slots", `${questionBankCoverageSummary.coveredDifficultySlots}/${questionBankCoverageSummary.expectedDifficultySlots}`],
@@ -352,9 +434,11 @@ export function UpscQuestionBankBuilder() {
               ["Exact imports", exactPyqQuestions.length],
               ["Active subject", selectedCoverage ? `${activeSubjectVisibleQuestions} rows` : "Pending"],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
-                <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+              <div key={label} className="min-w-0 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                <p className="break-words text-[10px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">
+                  {label}
+                </p>
+                <p className="mt-1 break-words text-lg font-black leading-tight text-[#13251d]">{value}</p>
               </div>
             ))}
           </div>
@@ -426,6 +510,83 @@ export function UpscQuestionBankBuilder() {
         </section>
 
         <section
+          data-testid="upsc-question-bank-strategy-bridge"
+          data-proof-rule="generated-2027-strategy-handoffs-become-student-practice"
+          data-total-strategy-handoffs={strategyHandoffs.length}
+          data-total-strategy-questions={strategyPracticeQuestions.length}
+          data-active-subject={selectedSubject.slug}
+          data-active-subject-strategy-questions={allSelectedSubjectStrategyQuestions.length}
+          data-requested-strategy-blueprint={requestedStrategyBlueprint ?? ""}
+          data-displayed-strategy-questions={displayedStrategyQuestionCount}
+          className="rounded-lg border border-[#c7d8ef] bg-[#eef5ff] p-5 shadow-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1f5d8f]">
+                2027 Strategy Practice
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                Generated strategy handoffs can now enter the student practice lane.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#41566d]">
+                MCQ Command handoffs become solvable rows with options, correct answer, explanation, trap and audit-gap
+                metadata. Opening a blueprint link selects those rows first.
+              </p>
+            </div>
+            <Badge className="rounded-md bg-[#1f5d8f] px-2 py-1 text-white">
+              {allSelectedSubjectStrategyQuestions.length} active
+            </Badge>
+          </div>
+
+          {activeStrategyHandoff ? (
+            <div className="mt-4 rounded-md border border-[#c7d8ef] bg-white/80 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1f5d8f]">
+                    Active blueprint
+                  </p>
+                  <h3 className="mt-1 text-base font-black tracking-tight text-[#13251d]">
+                    {activeStrategyHandoff.title}
+                  </h3>
+                </div>
+                <Badge variant="outline" className="rounded-md border-[#1f5d8f] text-[#1f5d8f]">
+                  {activeStrategyHandoff.format}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#41566d]">{activeStrategyHandoff.matchedGap}</p>
+            </div>
+          ) : null}
+
+          {strategyBridgeQuestions.length > 0 ? (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {strategyBridgeQuestions.slice(0, 4).map((question) => (
+                <article
+                  key={question.id}
+                  data-testid="upsc-question-bank-strategy-row"
+                  data-question-id={question.id}
+                  data-blueprint-id={question.strategyBlueprintId ?? ""}
+                  data-question-difficulty={question.difficulty}
+                  className="rounded-md border border-[#c7d8ef] bg-white/80 p-4"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1f5d8f]">
+                    {question.strategyFormat} / Day {question.linkedDay} / {question.difficulty.replace("_", " ")}
+                  </p>
+                  <h3 className="mt-2 text-sm font-black leading-6 text-[#13251d]">{question.stem}</h3>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#41566d]">
+                    Gap: {question.strategyGap}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-md border border-dashed border-[#c7d8ef] bg-white/70 p-4 text-sm font-bold leading-6 text-[#41566d]">
+              No 2027 strategy rows are available for {selectedSubject.title} yet. Generate a practice set from the
+              2027 Strategy Command, then return to this page.
+            </div>
+          )}
+        </section>
+
+        <section
           data-testid="upsc-question-bank-subjects"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
         >
@@ -477,15 +638,17 @@ export function UpscQuestionBankBuilder() {
           data-recovery-penalty={recommendation.adaptiveSignals.recoveryPenalty}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
-          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
+            <div className="min-w-0">
               <div className="mb-3 flex items-center gap-3">
                 <BrainCircuit className="h-5 w-5 text-[#085041]" />
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
                   AI selection rule
                 </p>
               </div>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">{recommendation.reason}</h2>
+              <h2 className="text-2xl font-black leading-tight tracking-tight text-[#13251d]">
+                {recommendation.reason}
+              </h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
                 Target days: {recommendation.targetDays.length ? recommendation.targetDays.join(", ") : "fresh baseline"}.
               </p>
@@ -496,7 +659,7 @@ export function UpscQuestionBankBuilder() {
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
                   Evidence-derived MCQ level
                 </p>
-                <p className="mt-1 text-sm font-black capitalize text-[#13251d]">
+                <p className="mt-1 break-words text-sm font-black capitalize text-[#13251d]">
                   {recommendation.adaptiveLevel} / {recommendation.adaptiveReadinessScore}
                 </p>
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#49675e]">
@@ -504,12 +667,14 @@ export function UpscQuestionBankBuilder() {
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {recommendationMetrics.map(({ label, value, Icon }) => (
-                <div key={label} className="rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
+                <div key={label} className="min-w-0 rounded-lg border border-[#b9d9cd] bg-white/70 p-4">
                   <Icon className="mb-3 h-4 w-4 text-[#085041]" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
-                  <p className="mt-1 text-lg font-black capitalize">{value}</p>
+                  <p className="break-words text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">
+                    {label}
+                  </p>
+                  <p className="mt-1 break-words text-lg font-black capitalize leading-tight">{value}</p>
                 </div>
               ))}
             </div>
@@ -757,6 +922,7 @@ export function UpscQuestionBankBuilder() {
           data-custom-mode={customMode ? "true" : "false"}
           data-question-mix={displayedMixLabel}
           data-displayed-exact-pyq-count={displayedExactPyqCount}
+          data-displayed-strategy-question-count={displayedStrategyQuestionCount}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -789,6 +955,8 @@ export function UpscQuestionBankBuilder() {
                   data-linked-day={question.linkedDay}
                   data-question-source={question.source}
                   data-exact-pyq-import={question.isExactPyqImport ? "true" : "false"}
+                  data-strategy-practice-handoff={question.isStrategyPracticeHandoff ? "true" : "false"}
+                  data-strategy-blueprint-id={question.strategyBlueprintId ?? ""}
                   data-source-year={question.sourceYear ?? ""}
                   data-question-number={question.questionNumber ?? ""}
                   data-solved-state={attempt ? (attempt.isCorrect ? "correct" : "incorrect") : "unsolved"}
@@ -811,6 +979,11 @@ export function UpscQuestionBankBuilder() {
                           {attempt.isCorrect ? "Solved correct" : "Repair saved"}
                         </Badge>
                       ) : null}
+                      {question.isStrategyPracticeHandoff ? (
+                        <Badge className="rounded-md bg-[#1f5d8f] px-2 py-1 text-white">
+                          2027 strategy
+                        </Badge>
+                      ) : null}
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
                       {question.source.replaceAll("_", " ")}
@@ -821,6 +994,11 @@ export function UpscQuestionBankBuilder() {
                     <div className="mt-3 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-xs font-bold leading-5 text-[#085041]">
                       Exact PYQ demand drill: official text and source are imported, but official answer options/key are
                       not claimed here.
+                    </div>
+                  ) : null}
+                  {question.isStrategyPracticeHandoff ? (
+                    <div className="mt-3 rounded-md border border-[#c7d8ef] bg-[#eef5ff] p-3 text-xs font-bold leading-5 text-[#1f5d8f]">
+                      2027 strategy drill: {question.strategyGap}
                     </div>
                   ) : null}
                   <div className="mt-4 grid gap-2 md:grid-cols-2">

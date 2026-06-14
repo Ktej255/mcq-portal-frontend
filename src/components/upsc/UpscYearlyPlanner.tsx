@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   FileText,
+  Gauge,
   Layers3,
   LibraryBig,
   Route,
@@ -25,6 +26,11 @@ import {
   yearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
 import { getOptionalSourcePack, syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
+import {
+  prelims2027Priorities,
+  strategyReallocationPlan,
+  strategySprintCalendar,
+} from "@/lib/upsc/prelims2027Strategy";
 
 function statusTone(status: string) {
   if (status === "ready") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
@@ -34,6 +40,29 @@ function statusTone(status: string) {
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
+}
+
+const priorityRank: Record<(typeof prelims2027Priorities)[number]["priority"], number> = {
+  Critical: 1,
+  High: 2,
+  Medium: 3,
+  Low: 4,
+  Minimal: 5,
+};
+
+const strategyOverlayRows = prelims2027Priorities
+  .map((priority) => ({
+    ...priority,
+    reallocation: strategyReallocationPlan.find((item) => item.priorityId === priority.id),
+  }))
+  .sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority]);
+
+function priorityTone(priority: (typeof prelims2027Priorities)[number]["priority"]) {
+  if (priority === "Critical") return "border-[#d95f43] bg-[#fff0ec] text-[#9d3824]";
+  if (priority === "High") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
+  if (priority === "Medium") return "border-[#1f5d8f] bg-[#eef5ff] text-[#1f5d8f]";
+  if (priority === "Low") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
+  return "border-[#dcd5c7] bg-[#f7f4ee] text-[#5d675f]";
 }
 
 export function UpscYearlyPlanner() {
@@ -130,6 +159,133 @@ export function UpscYearlyPlanner() {
                 <ArrowRight className="hidden h-5 w-5 text-[#1a3a2a] md:block" />
               </Link>
             ))}
+          </div>
+        </section>
+
+        <section
+          id="upsc-2027-strategy-overlay"
+          data-testid="upsc-2027-strategy-overlay"
+          data-priority-count={strategyOverlayRows.length}
+          data-sprint-count={strategySprintCalendar.length}
+          className="rounded-lg border border-[#b9d9cd] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+        >
+          <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                2027 correction overlay
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                The yearly planner now shows what changes after the 2026 Prelims audit.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                This layer keeps the existing subject calendar visible, but marks the course corrections: build IR and
+                new-domain S&T first, patch legal-current and map intelligence, keep Economy in maintenance, and cap
+                Medieval expansion.
+              </p>
+              <p className="mt-3 max-w-3xl rounded-md border border-[#d9c8a4] bg-[#fff4df] p-3 text-sm font-black leading-6 text-[#6f4a12]">
+                Proof locked: every 2027 planner change needs retained source/page evidence before it becomes a public
+                claim or student-facing proof example.
+              </p>
+            </div>
+            <Link
+              href="/upsc/prelims-2027-strategy#prelims-2027-reallocation-board"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
+            >
+              Open strategy command <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              ["Critical rebuilds", strategyOverlayRows.filter((row) => row.priority === "Critical").length],
+              ["High-priority patch", strategyOverlayRows.filter((row) => row.priority === "High").length],
+              ["12-week sprints", strategySprintCalendar.length],
+              ["Release gate", "Proof locked"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-3">
+              {strategyOverlayRows.map((row) => (
+                <article
+                  key={row.id}
+                  data-testid="upsc-2027-strategy-priority-row"
+                  data-priority-id={row.id}
+                  data-priority={row.priority}
+                  data-decision={row.reallocation?.decision ?? "Plan"}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#746f66]">
+                        {row.window}
+                      </p>
+                      <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">{row.subject}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${priorityTone(row.priority)}`}>
+                        {row.priority}
+                      </span>
+                      <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#31443a]">
+                        {row.reallocation?.decision ?? "Plan"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{row.action}</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#31443a]">
+                      <span className="font-black text-[#13251d]">Planner shift:</span>{" "}
+                      {row.reallocation?.allocation ?? row.evidence}
+                    </p>
+                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#31443a]">
+                      <span className="font-black text-[#13251d]">MCQ target:</span>{" "}
+                      {row.reallocation?.mcqTarget ?? row.action}
+                    </p>
+                  </div>
+                  <p className="mt-3 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]">
+                    Release gate: {row.reallocation?.releaseGate ?? "Keep proof locked until exact source evidence exists."}
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">12-week execution</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">Sprint order</h3>
+                </div>
+                <Gauge className="h-5 w-5 text-[#1a3a2a]" />
+              </div>
+              <div className="grid gap-3">
+                {strategySprintCalendar.map((sprint) => (
+                  <Link
+                    key={sprint.id}
+                    href={sprint.route}
+                    data-testid="upsc-2027-strategy-sprint-row"
+                    data-sprint-id={sprint.id}
+                    className="rounded-lg border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {sprint.window} / {sprint.phase}
+                      </p>
+                      <ArrowRight className="h-4 w-4 text-[#1a3a2a]" />
+                    </div>
+                    <h4 className="mt-1 text-sm font-black tracking-tight text-[#13251d]">{sprint.title}</h4>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{sprint.focus}</p>
+                    <p className="mt-2 rounded-md bg-[#fff4df] p-2 text-[11px] font-bold leading-5 text-[#6f4a12]">
+                      {sprint.releaseSignal}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

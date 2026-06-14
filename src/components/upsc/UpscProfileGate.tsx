@@ -5,20 +5,32 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, UserRoundCheck } from "lucide-react";
 
 import { upscLearnerStateClearedEvent } from "@/lib/upsc/learnerPersistence";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { activateUpscMasterPass, upscMasterPassActivatedEvent } from "@/lib/upsc/masterPass";
 import {
   readStudentProfile,
   readSyncedStudentProfile,
 } from "@/lib/upsc/studentProfile";
 
 export function UpscProfileGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
   const [state, setState] = useState<"checking" | "ready" | "missing">("checking");
   const profileCheckId = useRef(0);
 
   useEffect(() => {
+    if (loading) return;
+
     let cancelled = false;
     const refreshProfileGate = async () => {
       const checkId = profileCheckId.current + 1;
       profileCheckId.current = checkId;
+
+      if (isMasterEmail(user?.email) || isLocalMockMasterSession()) {
+        activateUpscMasterPass(user?.email, { notify: false });
+        setState("ready");
+        return;
+      }
 
       if (readStudentProfile()) {
         setState("ready");
@@ -37,13 +49,15 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
     const recheckProfileGate = () => void refreshProfileGate();
     window.addEventListener("online", recheckProfileGate);
     window.addEventListener(upscLearnerStateClearedEvent, recheckProfileGate);
+    window.addEventListener(upscMasterPassActivatedEvent, recheckProfileGate);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
       window.removeEventListener("online", recheckProfileGate);
       window.removeEventListener(upscLearnerStateClearedEvent, recheckProfileGate);
+      window.removeEventListener(upscMasterPassActivatedEvent, recheckProfileGate);
     };
-  }, []);
+  }, [loading, user?.email]);
 
   if (state === "checking") {
     return (

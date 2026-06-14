@@ -17,7 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { readLocalMockToken } from "@/lib/auth/local-testing";
+import { resolveToken } from "@/lib/auth/token-strategy";
 import { supabase } from "@/lib/supabase/client";
 import {
   appendLocalPyqImportRecords,
@@ -84,22 +84,10 @@ function parseCsv(input: string): PyqImportCsvRow[] {
 
 async function buildInternalApiHeaders() {
   const headers: Record<string, string> = {};
-  const mockToken = readLocalMockToken();
-  if (mockToken) {
-    headers.Authorization = `Bearer ${mockToken}`;
-    return headers;
+  const token = await resolveToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
-
-  if (!supabase) return headers;
-
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) headers.Authorization = `Bearer ${token}`;
-  } catch {
-    return headers;
-  }
-
   return headers;
 }
 

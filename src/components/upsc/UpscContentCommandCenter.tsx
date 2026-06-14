@@ -30,6 +30,12 @@ import {
   writeContentStates,
   type ContentState,
 } from "@/lib/upsc/contentCommand";
+import {
+  prelims2027Priorities,
+  strategyExecutionTasks,
+  strategyReallocationPlan,
+  type StrategyExecutionTask,
+} from "@/lib/upsc/prelims2027Strategy";
 import { geographySessions } from "@/lib/upsc/plan";
 import { getSubjectBatchCode, subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { cn } from "@/lib/utils";
@@ -66,9 +72,43 @@ const contentSubjects: ContentSubject[] = [
 
 const statuses: ContentState["videoStatus"][] = ["Planned", "Drafted", "Ready"];
 const sourceTypes: ContentState["sourceType"][] = ["Local", "Recorded", "Live", "External"];
+const strategyStorageKey = "sarit-upsc-prelims-2027-strategy-v1";
+const sourceBuildTaskPhases = new Set<StrategyExecutionTask["phase"]>(["Source", "Capsule"]);
+const prioritySubjectSlug: Record<string, string> = {
+  "ir-multilateral": "internal-security-society",
+  "science-new-domains": "science-tech",
+  "polity-legal-ethics": "polity-governance",
+  "environment-current": "environment",
+  "geography-international": "geography",
+  "ancient-tn-board": "history",
+  "economy-maintenance": "economy",
+  "medieval-reduction": "history",
+};
 
 function buildBatchCode(subject: ContentSubject, session: SubjectSession) {
   return getSubjectBatchCode(subject.slug, session.day);
+}
+
+function readCompletedStrategyTasks() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(strategyStorageKey);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.completedTasks)
+      ? parsed.completedTasks.filter((taskId: unknown): taskId is string => typeof taskId === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function strategyPhaseTone(phase: StrategyExecutionTask["phase"]) {
+  if (phase === "Source") return "border-[#d9c18f] bg-[#fff4df] text-[#6f4a12]";
+  if (phase === "Capsule") return "border-[#c8ded6] bg-[#eef8f2] text-[#085041]";
+  return "border-[#dcd5c7] bg-white text-[#4f5e55]";
 }
 
 export function UpscContentCommandCenter({
@@ -84,6 +124,7 @@ export function UpscContentCommandCenter({
   const [activeSubjectSlug, setActiveSubjectSlug] = useState(initialSubjectSlug ?? "geography");
   const [activeDay, setActiveDay] = useState(initialDay ?? 1);
   const [saved, setSaved] = useState(false);
+  const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -92,6 +133,20 @@ export function UpscContentCommandCenter({
     }, 0);
 
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const syncCompletedTasks = () => setCompletedStrategyTasks(readCompletedStrategyTasks());
+    const timer = window.setTimeout(syncCompletedTasks, 0);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === strategyStorageKey) syncCompletedTasks();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const activeSubject = contentSubjects.find((subject) => subject.slug === activeSubjectSlug) ?? contentSubjects[0];
@@ -130,6 +185,38 @@ export function UpscContentCommandCenter({
       }),
     [contentStates]
   );
+  const sourceBuildRows = useMemo(
+    () =>
+      prelims2027Priorities
+        .map((priority) => {
+          const tasks = strategyExecutionTasks.filter(
+            (task) => task.priorityId === priority.id && sourceBuildTaskPhases.has(task.phase)
+          );
+          const decision = strategyReallocationPlan.find((item) => item.priorityId === priority.id);
+          const subjectSlug = prioritySubjectSlug[priority.id] ?? "geography";
+          const completedCount = tasks.filter((task) => completedStrategyTasks.includes(task.id)).length;
+
+          return {
+            priority,
+            subjectSlug,
+            tasks,
+            decision,
+            completedCount,
+          };
+        })
+        .filter((row) => row.tasks.length > 0),
+    [completedStrategyTasks]
+  );
+  const sourceBuildTotals = useMemo(() => {
+    const taskCount = sourceBuildRows.reduce((sum, row) => sum + row.tasks.length, 0);
+    const completedCount = sourceBuildRows.reduce((sum, row) => sum + row.completedCount, 0);
+    const activeRows = sourceBuildRows.filter((row) => row.subjectSlug === activeSubject.slug);
+    const activeTaskCount = activeRows.reduce((sum, row) => sum + row.tasks.length, 0);
+    const activeCompletedCount = activeRows.reduce((sum, row) => sum + row.completedCount, 0);
+    const criticalCount = sourceBuildRows.filter((row) => row.priority.priority === "Critical").length;
+
+    return { taskCount, completedCount, activeTaskCount, activeCompletedCount, criticalCount };
+  }, [activeSubject.slug, sourceBuildRows]);
 
   const totals = useMemo(() => {
     const totalClasses = contentSubjects.reduce((sum, subject) => sum + subject.sessions.length, 0);
@@ -317,6 +404,170 @@ export function UpscContentCommandCenter({
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#657066]">{detail}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section
+          id="upsc-2027-content-source-build-overlay"
+          data-testid="upsc-2027-content-source-build-overlay"
+          data-source-build-count={sourceBuildRows.length}
+          data-task-count={sourceBuildTotals.taskCount}
+          data-completed-task-count={sourceBuildTotals.completedCount}
+          data-active-subject={activeSubject.slug}
+          data-active-task-count={sourceBuildTotals.activeTaskCount}
+          data-active-completed-task-count={sourceBuildTotals.activeCompletedCount}
+          data-critical-count={sourceBuildTotals.criticalCount}
+          data-proof-rule="source-capsule-build-before-mcq-release"
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-[#085041]" />
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#085041]">
+                  2027 source and capsule rebuild
+                </p>
+              </div>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d] md:text-3xl">
+                Turn the 2026 audit gaps into teacher build orders.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#49675e]">
+                These are the source packs and concept capsules that must exist before the portal expands MCQ volume.
+                The active subject is {activeSubject.title}, so its source tasks are highlighted in this queue.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["Build rows", sourceBuildRows.length],
+                  ["Source/capsule tasks", sourceBuildTotals.taskCount],
+                  [`${activeSubject.title} tasks`, sourceBuildTotals.activeTaskCount],
+                  ["Critical rebuilds", sourceBuildTotals.criticalCount],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#93cdb6] bg-white/80 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href="/upsc/prelims-2027-strategy#prelims-2027-reallocation-board"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
+                >
+                  Open reallocation board <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link
+                  href="/upsc/source-library#upsc-morning-batch-archive-intake"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1a3a2a] bg-white px-4 text-sm font-black text-[#1a3a2a]"
+                >
+                  Open source archive
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid min-w-0 gap-3">
+              {sourceBuildRows.map((row) => {
+                const isActiveSubject = row.subjectSlug === activeSubject.slug;
+
+                return (
+                  <article
+                    key={row.priority.id}
+                    data-testid="upsc-2027-content-source-build-row"
+                    data-priority-id={row.priority.id}
+                    data-subject-slug={row.subjectSlug}
+                    data-active-subject={isActiveSubject ? "true" : "false"}
+                    data-task-count={row.tasks.length}
+                    data-completed-count={row.completedCount}
+                    className={cn(
+                      "rounded-lg border p-4 shadow-sm",
+                      isActiveSubject ? "border-[#1d9e75] bg-white" : "border-[#c8ded6] bg-[#fffdf8]"
+                    )}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                          {row.priority.subject}
+                        </p>
+                        <h3 className="mt-1 break-words text-lg font-black tracking-tight text-[#13251d]">
+                          {row.priority.action}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+                          {row.priority.priority}
+                        </Badge>
+                        <Badge className="rounded-md bg-[#fff4df] px-2 py-1 text-[#6f4a12]">
+                          {row.completedCount}/{row.tasks.length} done
+                        </Badge>
+                        {isActiveSubject ? (
+                          <Badge className="rounded-md bg-[#1d9e75] px-2 py-1 text-white">Active subject</Badge>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{row.priority.evidence}</p>
+
+                    {row.decision ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                            Source shift
+                          </p>
+                          <p className="mt-2 text-xs font-semibold leading-5 text-[#4f5e55]">
+                            {row.decision.sourceShift}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-[#b9d9cd] bg-[#eef8f2] p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                            Release gate
+                          </p>
+                          <p className="mt-2 text-xs font-semibold leading-5 text-[#49675e]">
+                            {row.decision.releaseGate}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid gap-2">
+                      {row.tasks.map((task) => {
+                        const isDone = completedStrategyTasks.includes(task.id);
+
+                        return (
+                          <div
+                            key={task.id}
+                            data-testid="upsc-2027-content-source-build-task"
+                            data-task-id={task.id}
+                            data-phase={task.phase}
+                            data-done={isDone ? "true" : "false"}
+                            className={cn(
+                              "rounded-md border p-3",
+                              isDone ? "border-[#93cdb6] bg-[#eef8f2]" : "border-[#dcd5c7] bg-white"
+                            )}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <Badge className={cn("rounded-md border px-2 py-1", strategyPhaseTone(task.phase))}>
+                                {task.phase}
+                              </Badge>
+                              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5d675f]">
+                                {isDone ? "Done" : "Pending"}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm font-black tracking-tight text-[#13251d]">{task.title}</p>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{task.output}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Link
+                      href={row.priority.targetRoute}
+                      className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white"
+                    >
+                      Open build surface
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </section>
 

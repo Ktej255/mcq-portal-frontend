@@ -1,0 +1,215 @@
+import { buildPrelims2026ShowcaseEvidence } from "@/lib/upsc/prelims2026ShowcaseEvidence";
+import {
+  prelims2026ShowcaseRequirementTracker,
+  prelims2026ShowcaseWebsiteCopyBlocks,
+  prelims2026ShowcaseWebsiteIntegrationMap,
+} from "@/lib/upsc/prelims2026ShowcasePublicContract";
+import {
+  formatRebuildRules,
+  prelims2027Priorities,
+  strategyExecutionTasks,
+  strategyPracticeBlueprints,
+} from "@/lib/upsc/prelims2027Strategy";
+
+export const prelims2026BuildReadinessVersion = "upsc-prelims-2026-build-readiness-v1";
+
+export const prelims2026BuildReadinessRequirements = [
+  {
+    id: "standalone-page",
+    label: "Standalone public showcase page",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase",
+    portalOwner: "/upsc/prelims-2026-showcase",
+    apiEvidence: "/api/upsc/prelims-2026/showcase-manifest",
+    verifier: "scratch/verify-upsc-showcase-public-handoff.cjs",
+    proof: "The page can run independently now and later be pasted into the main website.",
+  },
+  {
+    id: "main-site-safe-copy",
+    label: "Public-safe website language",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#website-copy-kit",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-website-publish-packet",
+    apiEvidence: "/api/upsc/prelims-2026/showcase-manifest",
+    verifier: "scratch/verify-upsc-showcase-copy-kit.cjs",
+    proof: "Copy blocks separate public claims from internal planning and proof-locked question evidence.",
+  },
+  {
+    id: "final-pdf-corrected-audit",
+    label: "Corrected 2026 audit interpretation",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#strategy-2027",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2027-publish-gate",
+    apiEvidence: "/api/upsc/prelims-2026/showcase-manifest",
+    verifier: "scratch/verify-upsc-showcase-dual-ledger.cjs",
+    proof: "The public number is 44 direct, 30 partial, 23 misses, 3 dropped and 76% effective coverage.",
+  },
+  {
+    id: "complete-mcq-ledger",
+    label: "Complete UPSC MCQ ledger",
+    status: "Proof locked",
+    publicAnchor: "/upsc-prelims-2026-showcase#question-ledger",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue",
+    apiEvidence: "/api/upsc/prelims-2026/question-ledger",
+    verifier: "scratch/verify-upsc-question-ledger-api.cjs",
+    proof: "All 100 MCQs carry stems, statements, options, answers, match scope and next proof actions.",
+  },
+  {
+    id: "matched-portion-highlights",
+    label: "Matched portion highlighting",
+    status: "Proof locked",
+    publicAnchor: "/upsc-prelims-2026-showcase#question-ledger",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-public-claim-release-board",
+    apiEvidence: "/api/upsc/prelims-2026/question-ledger",
+    verifier: "scratch/verify-upsc-showcase-question-ledger.cjs",
+    proof: "Question stems and statement rows highlight candidate matched signals while page-level proof remains locked.",
+  },
+  {
+    id: "source-archive-summary",
+    label: "Year-long source archive summary",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#source-archive-summary",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-source-archive-summary-api-readiness",
+    apiEvidence: "/api/upsc/prelims-2026/source-archive-summary",
+    verifier: "scratch/verify-upsc-source-archive-summary-api.cjs",
+    proof: "The public API exposes counts and rebuild tracks only, while raw paths and filenames stay internal.",
+  },
+  {
+    id: "what-built-vs-appeared",
+    label: "What was built vs what appeared",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#coverage-map",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2027-evidence-ledger",
+    apiEvidence: "/api/upsc/prelims-2026/showcase-manifest",
+    verifier: "scratch/verify-upsc-showcase-requirement-tracker.cjs",
+    proof: "Subject cards and the requirement tracker connect built content, appeared questions and gaps.",
+  },
+  {
+    id: "surprise-trend-introspection",
+    label: "Surprise elements and trend change",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#surprise-action-matrix",
+    portalOwner: "/upsc/prelims-2027-strategy#gap-radar",
+    apiEvidence: "/api/upsc/prelims-2027/course-action",
+    verifier: "scratch/verify-upsc-surprise-action-matrix.cjs",
+    proof: "The page identifies each surprise element and turns it into a public-safe 2027 software decision.",
+  },
+  {
+    id: "untapped-domain-actions",
+    label: "Untapped domains and next actions",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#surprise-action-matrix",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2027-reallocation-board",
+    apiEvidence: "/api/upsc/prelims-2027/course-action",
+    verifier: "scratch/verify-prelims-2027-reallocation-board.cjs",
+    proof: "IR, new-domain S&T, legal-current caselets, map intelligence and source-depth proof become linked matrix rows and reallocation-board decisions.",
+  },
+  {
+    id: "software-execution-path",
+    label: "Software execution path",
+    status: "Portal owned",
+    publicAnchor: "/upsc-prelims-2026-showcase#software-path",
+    portalOwner: "/upsc/prelims-review-command",
+    apiEvidence: "/api/upsc/prelims-2027/course-action",
+    verifier: "scratch/verify-upsc-prelims-review-command.cjs",
+    proof: "The Review Command ties the public showcase, source readiness, proof queue, reallocation board and Strategy Command into one software handoff.",
+  },
+  {
+    id: "public-proof-feed",
+    label: "Public proof feed boundary",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#main-website-proof-feed-preview",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-public-proof-feed",
+    apiEvidence: "/api/upsc/prelims-2026/public-proof-feed",
+    verifier: "scratch/verify-upsc-showcase-proof-feed-preview.cjs",
+    proof: "The public feed can stay empty until approved proof packets unlock claim cards.",
+  },
+  {
+    id: "main-website-api-contract",
+    label: "Main website API contract",
+    status: "Complete",
+    publicAnchor: "/upsc-prelims-2026-showcase#main-website-manifest-contract",
+    portalOwner: "/upsc/prelims-2027-strategy#prelims-2026-main-website-manifest-contract",
+    apiEvidence: "/api/upsc/prelims-2026/build-readiness",
+    verifier: "scratch/verify-upsc-build-readiness-api.cjs",
+    proof: "The main site can read the release-decision, handoff bundle, manifest, match-accountability, question ledger, proof feed, course-action, source-summary and build-readiness endpoints.",
+  },
+] as const;
+
+export function buildPrelims2026BuildReadiness() {
+  const questionEvidence = buildPrelims2026ShowcaseEvidence();
+  const statementCoverageRows = questionEvidence.reduce((total, question) => total + question.statementCoverage.length, 0);
+  const completeQuestionCards = questionEvidence.filter(
+    (question) => question.stemFull.trim() && question.options.length > 0 && question.answer.trim()
+  ).length;
+  const requirements = prelims2026BuildReadinessRequirements;
+
+  return {
+    version: prelims2026BuildReadinessVersion,
+    generatedAt: new Date().toISOString(),
+    status: "ready-for-main-site-integration-with-proof-locks",
+    publicRoute: "/upsc-prelims-2026-showcase",
+    reviewCommandRoute: "/upsc/prelims-review-command",
+    strategyRoute: "/upsc/prelims-2027-strategy",
+    proofPolicy:
+      "The build is ready for website integration, but exact question-wise claims remain proof-locked until source, page and teacher validation are retained.",
+    summary: {
+      requirementCount: requirements.length,
+      completeCount: requirements.filter((requirement) => requirement.status === "Complete").length,
+      proofLockedCount: requirements.filter((requirement) => requirement.status === "Proof locked").length,
+      portalOwnedCount: requirements.filter((requirement) => requirement.status === "Portal owned").length,
+      websiteCopyBlockCount: prelims2026ShowcaseWebsiteCopyBlocks.length,
+      integrationRowCount: prelims2026ShowcaseWebsiteIntegrationMap.length,
+      originalTrackerCount: prelims2026ShowcaseRequirementTracker.length,
+      questionCount: questionEvidence.length,
+      completeQuestionCards,
+      optionSetCount: questionEvidence.filter((question) => question.options.length > 0).length,
+      statementCoverageRows,
+      priorityCount: prelims2027Priorities.length,
+      strategyTaskCount: strategyExecutionTasks.length,
+      practiceBlueprintCount: strategyPracticeBlueprints.length,
+      formatRuleCount: formatRebuildRules.length,
+      apiEndpointCount: 10,
+      verifierCount: new Set(requirements.map((requirement) => requirement.verifier)).size,
+    },
+    gates: [
+      {
+        id: "public-audit-number",
+        label: "Public audit number",
+        status: "Pass",
+        rule: "Use corrected 76% effective coverage, not the automated source-lead ledger, as the public summary.",
+      },
+      {
+        id: "question-claim-proof-lock",
+        label: "Question claim proof lock",
+        status: "Pass",
+        rule: "Show full MCQ evidence as candidate proof until exact page/source and teacher validation are retained.",
+      },
+      {
+        id: "raw-archive-boundary",
+        label: "Raw archive boundary",
+        status: "Pass",
+        rule: "Public source archive endpoint exposes counts and track decisions only; raw filenames and paths stay internal.",
+      },
+      {
+        id: "portal-execution-owner",
+        label: "Portal execution owner",
+        status: "Pass",
+        rule: "The Review Command is the top-level operator handoff, while the 2027 Strategy Command owns task execution, proof release, sprint calendar and delivery tracking.",
+      },
+    ],
+    requirements,
+    api: {
+      releaseDecision: "/api/upsc/prelims-2026/release-decision",
+      mainSiteHandoff: "/api/upsc/prelims-2026/main-site-handoff",
+      reviewCommand: "/api/upsc/prelims-2026/review-command",
+      manifest: "/api/upsc/prelims-2026/showcase-manifest",
+      matchAccountability: "/api/upsc/prelims-2026/match-accountability",
+      questionLedger: "/api/upsc/prelims-2026/question-ledger",
+      proofFeed: "/api/upsc/prelims-2026/public-proof-feed",
+      courseAction: "/api/upsc/prelims-2027/course-action",
+      sourceArchiveSummary: "/api/upsc/prelims-2026/source-archive-summary",
+      buildReadiness: "/api/upsc/prelims-2026/build-readiness",
+    },
+  };
+}

@@ -80,6 +80,9 @@ export type GeographyDayProgress = {
   currentMasteryPercent?: number;
   gapFilledPercent?: number;
   nextUnlockedSectionId?: string;
+  dayStartRecallSourceDay?: number;
+  dayStartRecallClearedAt?: string;
+  dayStartRecallScore?: number;
   watched?: boolean;
   watchState?: GeographyWatchState;
   watchNote?: string;

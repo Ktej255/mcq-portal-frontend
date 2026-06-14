@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, LockKeyhole, Newspaper, RefreshCcw, Route } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileSearch,
+  LockKeyhole,
+  Newspaper,
+  RefreshCcw,
+  Route,
+  ShieldCheck,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,8 +26,48 @@ import {
   readLocalQuestionBankAttempts,
   type QuestionBankAttempt,
 } from "@/lib/upsc/questionBankEngine";
+import {
+  prelims2027Priorities,
+  strategyExecutionTasks,
+  strategyGapTypes,
+  strategyReallocationPlan,
+  type StrategyExecutionTask,
+} from "@/lib/upsc/prelims2027Strategy";
 import { useSubjectProgress, type SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
+
+const strategyStorageKey = "sarit-upsc-prelims-2027-strategy-v1";
+const currentBridgeGapTitle = "Current bridge gap";
+const currentBridgeTaskPhases = new Set<StrategyExecutionTask["phase"]>([
+  "Source",
+  "Capsule",
+  "Proof",
+  "Release",
+  "Planner",
+]);
+
+function readCompletedStrategyTasks() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(strategyStorageKey);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.completedTasks)
+      ? parsed.completedTasks.filter((taskId: unknown): taskId is string => typeof taskId === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function taskPhaseTone(phase: StrategyExecutionTask["phase"]) {
+  if (phase === "Proof") return "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]";
+  if (phase === "Source") return "border-[#d9c18f] bg-[#fff4df] text-[#6f4a12]";
+  if (phase === "Capsule") return "border-[#c8ded6] bg-[#eef8f2] text-[#085041]";
+  return "border-[#dcd5c7] bg-[#fffdf8] text-[#4f5e55]";
+}
 
 function questionBankSignals(attempts: QuestionBankAttempt[], linkedDay: number) {
   const dayAttempts = attempts.filter((attempt) => attempt.linkedDay === linkedDay);
@@ -67,10 +116,25 @@ export function UpscCurrentAffairsBridge() {
   const requestedSubject = searchParams.get("subject") ?? "geography";
   const [subjectSlug, setSubjectSlug] = useState(() => getCurrentAffairsSubject(requestedSubject).slug);
   const [questionBankAttempts, setQuestionBankAttempts] = useState<QuestionBankAttempt[]>([]);
+  const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
 
   useEffect(() => {
     setSubjectSlug(getCurrentAffairsSubject(requestedSubject).slug);
   }, [requestedSubject]);
+
+  useEffect(() => {
+    const syncCompletedTasks = () => setCompletedStrategyTasks(readCompletedStrategyTasks());
+    const timer = window.setTimeout(syncCompletedTasks, 0);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === strategyStorageKey) syncCompletedTasks();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -106,6 +170,37 @@ export function UpscCurrentAffairsBridge() {
   const nextLockedSession = nextLocked
     ? selectedSubject.sessions.find((session) => session.day === nextLocked.linkedDay)
     : null;
+  const currentBridgeGap = strategyGapTypes.find((gap) => gap.title === currentBridgeGapTitle);
+  const currentBridgeRows = useMemo(
+    () =>
+      prelims2027Priorities
+        .filter((priority) => priority.gapTypes.includes(currentBridgeGapTitle))
+        .map((priority) => {
+          const decision = strategyReallocationPlan.find((item) => item.priorityId === priority.id);
+          const tasks = strategyExecutionTasks.filter(
+            (task) => task.priorityId === priority.id && currentBridgeTaskPhases.has(task.phase)
+          );
+          const completedCount = tasks.filter((task) => completedStrategyTasks.includes(task.id)).length;
+          const proofTaskCount = tasks.filter((task) => task.phase === "Source" || task.phase === "Proof").length;
+
+          return {
+            priority,
+            decision,
+            tasks,
+            completedCount,
+            proofTaskCount,
+          };
+        }),
+    [completedStrategyTasks]
+  );
+  const currentBridgeTotals = useMemo(() => {
+    const taskCount = currentBridgeRows.reduce((sum, row) => sum + row.tasks.length, 0);
+    const proofTaskCount = currentBridgeRows.reduce((sum, row) => sum + row.proofTaskCount, 0);
+    const completedTaskCount = currentBridgeRows.reduce((sum, row) => sum + row.completedCount, 0);
+    const criticalCount = currentBridgeRows.filter((row) => row.priority.priority === "Critical").length;
+
+    return { taskCount, proofTaskCount, completedTaskCount, criticalCount };
+  }, [currentBridgeRows]);
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -168,6 +263,146 @@ export function UpscCurrentAffairsBridge() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section
+          id="upsc-2027-current-bridge-overlay"
+          data-testid="upsc-2027-current-bridge-overlay"
+          data-bridge-count={currentBridgeRows.length}
+          data-task-count={currentBridgeTotals.taskCount}
+          data-proof-task-count={currentBridgeTotals.proofTaskCount}
+          data-completed-bridge-tasks={currentBridgeTotals.completedTaskCount}
+          data-critical-count={currentBridgeTotals.criticalCount}
+          data-proof-rule="syllabus-tagged-source-backed-proof-locked"
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-start">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                  2027 current bridge correction
+                </p>
+              </div>
+              <h2 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">
+                Convert current affairs into syllabus-tagged proof, not a date-wise news dump.
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">
+                The 2026 audit says current affairs must be attached to static syllabus nodes, official source anchors,
+                map/report context and predicted UPSC statement frames before it becomes student-facing practice.
+              </p>
+              {currentBridgeGap ? (
+                <div className="mt-4 rounded-lg border border-[#93cdb6] bg-white/75 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                    Software action
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 text-[#34453b]">{currentBridgeGap.softwareAction}</p>
+                </div>
+              ) : null}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["Bridge gaps", currentBridgeRows.length],
+                  ["Source/proof tasks", currentBridgeTotals.proofTaskCount],
+                  ["Tasks done", currentBridgeTotals.completedTaskCount],
+                  ["Critical rebuilds", currentBridgeTotals.criticalCount],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#93cdb6] bg-white/80 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-2xl font-black">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <Link
+                href="/upsc/prelims-2027-strategy#prelims-2027-build-queue"
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
+              >
+                Open build queue <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="grid gap-3">
+              {currentBridgeRows.map((row) => (
+                <article
+                  key={row.priority.id}
+                  data-testid="upsc-2027-current-bridge-row"
+                  data-priority-id={row.priority.id}
+                  data-priority={row.priority.priority}
+                  data-task-count={row.tasks.length}
+                  data-completed-count={row.completedCount}
+                  data-release-gate={row.decision?.releaseGate ?? "proof-required"}
+                  className="rounded-lg border border-[#c8ded6] bg-[#fffdf8] p-4 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {row.priority.subject}
+                      </p>
+                      <h3 className="mt-1 text-lg font-black tracking-tight">{row.priority.action}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+                        {row.priority.priority}
+                      </Badge>
+                      <Badge className="rounded-md bg-[#fff4df] px-2 py-1 text-[#6f4a12]">
+                        {row.completedCount}/{row.tasks.length} done
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{row.priority.evidence}</p>
+                  {row.decision ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <SignalBlock icon={FileSearch} label="Source shift" text={row.decision.sourceShift} />
+                      <SignalBlock icon={ShieldCheck} label="Release gate" text={row.decision.releaseGate} />
+                    </div>
+                  ) : null}
+                  <div className="mt-4 grid gap-2">
+                    {row.tasks.map((task) => {
+                      const isDone = completedStrategyTasks.includes(task.id);
+
+                      return (
+                        <div
+                          key={task.id}
+                          data-testid="upsc-2027-current-bridge-task"
+                          data-task-id={task.id}
+                          data-phase={task.phase}
+                          data-done={isDone ? "true" : "false"}
+                          className={cn(
+                            "rounded-md border p-3",
+                            isDone ? "border-[#93cdb6] bg-[#eef8f2]" : "border-[#dcd5c7] bg-white"
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Badge className={cn("rounded-md border px-2 py-1", taskPhaseTone(task.phase))}>
+                              {task.phase}
+                            </Badge>
+                            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5d675f]">
+                              {isDone ? "Done" : "Pending"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-black tracking-tight">{task.title}</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{task.output}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      href={row.priority.targetRoute}
+                      className="inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white"
+                    >
+                      Open owner surface
+                    </Link>
+                    <Link
+                      href="/upsc/prelims-2027-strategy#prelims-2027-course-correction-packet"
+                      className="inline-flex min-h-10 items-center rounded-md border border-[#1a3a2a] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1a3a2a]"
+                    >
+                      Course correction
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 

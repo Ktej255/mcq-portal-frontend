@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   BrainCircuit,
   ClipboardCheck,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { GeographyRoomCompass } from "@/components/upsc/GeographyRoomCompass";
 import { GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT } from "@/lib/upsc/geographyLaunchReadiness";
 import { hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { GEOGRAPHY_RECALL_TARGET, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
@@ -364,6 +364,14 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <GeographyRoomCompass
+          day={activeSession.day}
+          room="MCQ"
+          title={activeSession.title}
+          detail={nextActionDetail}
+          primaryHref={hasPracticeResult ? nextActionHref : isReady ? "#practice" : `/upsc/geography?day=${activeSession.day}`}
+          primaryLabel={hasPracticeResult ? nextRouteSignalText : isReady ? "Start practice" : "Return to Today"}
+        />
         <section
           data-testid="geography-mcq-level-shell"
           data-learner-level={learnerLevel}
@@ -380,10 +388,6 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
           data-next-action-label={nextRouteSignalText}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
         >
-          <Link href={`/upsc/geography?day=${activeSession.day}`} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
-            <ArrowLeft className="h-4 w-4" /> Day funnel
-          </Link>
-
           <div className={cn("grid gap-4 lg:items-start", practiceStarted && !hasPracticeResult ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_300px]")}>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -558,7 +562,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
         </section>
 
         {practiceStarted && currentPracticeQuestion && !hasPracticeResult && (
-          <section data-testid="mcq-local-practice-runner" data-student-surface="question-first" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5">
+          <section id="practice" data-testid="mcq-local-practice-runner" data-student-surface="question-first" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Fresh question</p>

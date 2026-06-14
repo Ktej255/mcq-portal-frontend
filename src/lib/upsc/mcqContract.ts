@@ -40,7 +40,7 @@ export const geographyMcqContractColumns: McqContractColumn[] = [
     key: "day",
     label: "Day",
     required: true,
-    detail: "Maps the MCQ to the 30-day Geography class plan.",
+    detail: "Maps the MCQ to the 20-day Geography class plan.",
   },
   {
     key: "chapter",

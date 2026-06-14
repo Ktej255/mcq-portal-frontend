@@ -3,6 +3,7 @@
 import { SubjectCommandRoom } from "@/components/upsc/SubjectCommandRoom";
 import { SubjectLabRoom } from "@/components/upsc/SubjectLabRoom";
 import { SubjectMcqReadinessRoom } from "@/components/upsc/SubjectMcqReadinessRoom";
+import { SubjectRetroRoom } from "@/components/upsc/SubjectRetroRoom";
 import { SubjectRevisitRoom } from "@/components/upsc/SubjectRevisitRoom";
 import { SubjectTalkRoom } from "@/components/upsc/SubjectTalkRoom";
 import { SubjectTrackRoom } from "@/components/upsc/SubjectTrackRoom";
@@ -35,4 +36,8 @@ export function EnvironmentRevisitRoute({ initialDay }: { initialDay?: number })
 
 export function EnvironmentMcqReadinessRoute({ initialDay }: { initialDay?: number }) {
   return <SubjectMcqReadinessRoom plan={environmentPlan} initialDay={initialDay} />;
+}
+
+export function EnvironmentRetroRoute({ initialDay }: { initialDay?: number }) {
+  return <SubjectRetroRoom plan={environmentPlan} initialDay={initialDay} />;
 }

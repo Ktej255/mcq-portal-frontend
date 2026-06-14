@@ -11,7 +11,14 @@ import {
   type AutoSessionHandoffRecord,
   type DailyPlannerProgress,
 } from "@/lib/upsc/dailyPlannerEngine";
-import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
+import { readLocalQuestionBankAttempts, type QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
+import {
+  prelims2027Priorities,
+  strategyExecutionTasks,
+  strategyPracticeBlueprints,
+  strategyPracticeHandoffStorageKey,
+  type StrategyPracticeHandoff,
+} from "@/lib/upsc/prelims2027Strategy";
 import {
   buildUpscStudentReportSnapshot,
   readLocalStudentReportProgress,
@@ -32,6 +39,17 @@ type DailyReportState = {
 };
 
 const dailyStorageKey = "sarit-upsc-daily-command-v1";
+const strategyStorageKey = "sarit-upsc-prelims-2027-strategy-v1";
+const prioritySubjectSlug: Record<string, string> = {
+  "ir-multilateral": "internal-security-society",
+  "science-new-domains": "science-tech",
+  "polity-legal-ethics": "polity-governance",
+  "environment-current": "environment",
+  "geography-international": "geography",
+  "ancient-tn-board": "history",
+  "economy-maintenance": "economy",
+  "medieval-reduction": "history",
+};
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -46,6 +64,19 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+function readCompletedStrategyTasks() {
+  return (
+    readJson<{ completedTasks?: unknown[] }>(strategyStorageKey, {}).completedTasks?.filter(
+      (taskId): taskId is string => typeof taskId === "string"
+    ) ?? []
+  );
+}
+
+function readStrategyPracticeHandoffs() {
+  const handoffs = readJson<unknown>(strategyPracticeHandoffStorageKey, []);
+  return Array.isArray(handoffs) ? (handoffs as StrategyPracticeHandoff[]) : [];
+}
+
 export default function ReportsPage() {
   const overview = useGeographyStudentOverview();
   const { progress } = useGeographyProgress();
@@ -54,6 +85,9 @@ export default function ReportsPage() {
     useState<StudentReportQuestionBankAttemptMap>({});
   const [dailyState, setDailyState] = useState<DailyReportState>({ subjectSlug: "geography", day: 1 });
   const [autoSessionHandoff, setAutoSessionHandoff] = useState<AutoSessionHandoffRecord | null>(null);
+  const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
+  const [strategyPracticeHandoffs, setStrategyPracticeHandoffs] = useState<StrategyPracticeHandoff[]>([]);
+  const [strategyQuestionAttempts, setStrategyQuestionAttempts] = useState<QuestionBankAttempt[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -69,6 +103,13 @@ export default function ReportsPage() {
       );
       setDailyState(readJson<DailyReportState>(dailyStorageKey, { subjectSlug: "geography", day: 1 }));
       setAutoSessionHandoff(readLocalAutoSessionHandoff());
+      setCompletedStrategyTasks(readCompletedStrategyTasks());
+      setStrategyPracticeHandoffs(readStrategyPracticeHandoffs());
+      setStrategyQuestionAttempts(
+        studentReportSubjects
+          .flatMap((subject) => readLocalQuestionBankAttempts(subject.slug))
+          .filter((attempt) => attempt.source === "UPSC_2027_STRATEGY")
+      );
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -136,6 +177,52 @@ export default function ReportsPage() {
   const handoffMatchesActiveDay =
     autoSessionHandoff?.selectedSubjectSlug === activeReportSubject.slug &&
     autoSessionHandoff.selectedDay === activeReportDay;
+  const strategyAuditReadiness = useMemo(() => {
+    const generatedBlueprintIds = new Set(strategyPracticeHandoffs.map((handoff) => handoff.blueprintId));
+    const attemptedBlueprintIds = new Set(
+      strategyQuestionAttempts
+        .map(
+          (attempt) =>
+            strategyPracticeBlueprints.find((blueprint) =>
+              attempt.questionId.startsWith(`strategy-${blueprint.id}-`)
+            )?.id
+        )
+        .filter((blueprintId): blueprintId is string => Boolean(blueprintId))
+    );
+    const correctAttempts = strategyQuestionAttempts.filter((attempt) => attempt.isCorrect).length;
+    const completedTaskCount = strategyExecutionTasks.filter((task) => completedStrategyTasks.includes(task.id)).length;
+    const priorityRows = prelims2027Priorities.map((priority) => {
+      const tasks = strategyExecutionTasks.filter((task) => task.priorityId === priority.id);
+      const blueprints = strategyPracticeBlueprints.filter((blueprint) => blueprint.priorityId === priority.id);
+      const completed = tasks.filter((task) => completedStrategyTasks.includes(task.id)).length;
+      const generated = blueprints.filter((blueprint) => generatedBlueprintIds.has(blueprint.id)).length;
+      const attempted = blueprints.filter((blueprint) => attemptedBlueprintIds.has(blueprint.id)).length;
+      const subjectSlug = prioritySubjectSlug[priority.id] ?? "geography";
+
+      return {
+        priority,
+        subjectSlug,
+        tasks,
+        blueprints,
+        completed,
+        generated,
+        attempted,
+        status: attempted ? "Solved evidence" : generated ? "Practice generated" : completed ? "Build moving" : "Pending",
+      };
+    });
+
+    return {
+      generatedBlueprintIds,
+      attemptedBlueprintIds,
+      strategyAttempts: strategyQuestionAttempts,
+      correctAttempts,
+      completedTaskCount,
+      accuracyPercent: strategyQuestionAttempts.length
+        ? Math.round((correctAttempts / strategyQuestionAttempts.length) * 100)
+        : null,
+      priorityRows,
+    };
+  }, [completedStrategyTasks, strategyPracticeHandoffs, strategyQuestionAttempts]);
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -270,6 +357,106 @@ export default function ReportsPage() {
                 <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{card.detail}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section
+          data-testid="upsc-2027-audit-readiness-report"
+          data-proof-rule="strategy-build-generated-practice-solved-attempt-readiness"
+          data-priority-count={strategyAuditReadiness.priorityRows.length}
+          data-build-task-count={strategyExecutionTasks.length}
+          data-completed-task-count={strategyAuditReadiness.completedTaskCount}
+          data-blueprint-count={strategyPracticeBlueprints.length}
+          data-generated-blueprints={strategyAuditReadiness.generatedBlueprintIds.size}
+          data-attempted-blueprints={strategyAuditReadiness.attemptedBlueprintIds.size}
+          data-strategy-attempts={strategyAuditReadiness.strategyAttempts.length}
+          data-strategy-correct={strategyAuditReadiness.correctAttempts}
+          data-strategy-accuracy={strategyAuditReadiness.accuracyPercent ?? "no-attempts"}
+          className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+            <div>
+              <div className="mb-3 flex items-center gap-3">
+                <Target className="h-5 w-5 text-[#085041]" />
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                  2027 audit readiness
+                </p>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">
+                Strategy changes count only when build, practice, and solved evidence line up.
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                This report reads the same 2027 strategy queue used by Content, MCQ, Current Affairs, Revision, and
+                Question Bank. It separates planned work from generated practice and solved student attempts.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["Build tasks done", `${strategyAuditReadiness.completedTaskCount}/${strategyExecutionTasks.length}`],
+                  ["Practice generated", `${strategyAuditReadiness.generatedBlueprintIds.size}/${strategyPracticeBlueprints.length}`],
+                  ["Blueprints solved", strategyAuditReadiness.attemptedBlueprintIds.size],
+                  [
+                    "Strategy accuracy",
+                    strategyAuditReadiness.accuracyPercent === null ? "No attempts" : `${strategyAuditReadiness.accuracyPercent}%`,
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#93cdb6] bg-white/80 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <Link
+                href="/upsc/question-bank"
+                data-testid="upsc-2027-audit-readiness-action"
+                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              >
+                Open strategy practice <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {strategyAuditReadiness.priorityRows.map((row) => (
+                <Link
+                  key={row.priority.id}
+                  href={`/upsc/question-bank?subject=${row.subjectSlug}`}
+                  data-testid="upsc-2027-audit-readiness-row"
+                  data-priority-id={row.priority.id}
+                  data-subject-slug={row.subjectSlug}
+                  data-task-count={row.tasks.length}
+                  data-completed-count={row.completed}
+                  data-blueprint-count={row.blueprints.length}
+                  data-generated-count={row.generated}
+                  data-attempted-count={row.attempted}
+                  data-status={row.status}
+                  className="rounded-lg border border-[#c8ded6] bg-[#fffdf8] p-4 shadow-sm transition hover:border-[#1d9e75]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {row.priority.subject}
+                      </p>
+                      <h3 className="mt-1 text-base font-black tracking-tight text-[#13251d]">{row.status}</h3>
+                    </div>
+                    <span className="rounded-md bg-[#fff4df] px-2 py-1 text-xs font-black text-[#6f4a12]">
+                      {row.priority.priority}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{row.priority.action}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    {[
+                      ["Build", `${row.completed}/${row.tasks.length}`],
+                      ["Practice", `${row.generated}/${row.blueprints.length}`],
+                      ["Solved", row.attempted],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-2">
+                        <p className="text-sm font-black text-[#13251d]">{value}</p>
+                        <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#6f756d]">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -598,7 +785,7 @@ export default function ReportsPage() {
             </div>
             <FileText className="h-6 w-6 text-[#1a3a2a]" />
           </div>
-          <div className="grid gap-3 md:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             {report.evidenceStreams.map((stream) => (
               <div key={stream.label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{stream.label}</p>
@@ -726,6 +913,10 @@ function AllSubjectReportWindowCard({
       data-ai-gap-count={report.teacherDoubtCount}
       data-me-time-checks={report.meTimeChecks}
       data-current-affairs-unlocked={report.currentAffairsUnlocked}
+      data-initial-known-percent={report.initialKnownPercent ?? "not-measured"}
+      data-current-mastery-percent={report.currentMasteryPercent ?? "not-measured"}
+      data-gap-filled-percent={report.gapFilledPercent ?? "not-measured"}
+      data-remaining-gap-percent={report.remainingGapPercent ?? "not-measured"}
       data-verdict={report.verdict}
       className={`rounded-lg border p-4 shadow-sm ${
         variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#f7f4ee]"
@@ -744,6 +935,8 @@ function AllSubjectReportWindowCard({
         {[
           ["Started", `${report.startedDays}/${report.totalDays}`],
           ["Recall", report.averageRecall === null ? "Not measured" : `${report.averageRecall}/100`],
+          ["Known first", report.initialKnownPercent === null ? "Not measured" : `${report.initialKnownPercent}%`],
+          ["Gap filled", report.gapFilledPercent === null ? "Not measured" : `${report.gapFilledPercent}%`],
           ["MCQ", report.averageMcq === null ? "No score" : `${report.averageMcq}%`],
           ["QB", report.questionBankAttempts],
           [
@@ -789,6 +982,10 @@ function ReportWindowCard({
       data-recovery-items={report.recoveryItems}
       data-me-time-checks={report.meTimeChecks}
       data-current-affairs-unlocked={report.currentAffairsUnlocked}
+      data-initial-known-percent={report.initialKnownPercent ?? "not-measured"}
+      data-current-mastery-percent={report.currentMasteryPercent ?? "not-measured"}
+      data-gap-filled-percent={report.gapFilledPercent ?? "not-measured"}
+      data-remaining-gap-percent={report.remainingGapPercent ?? "not-measured"}
       data-verdict={report.verdict}
       className={`rounded-lg border p-5 shadow-sm ${
         variant === "monthly" ? "border-[#b9d9cd] bg-[#e7f5ee]" : "border-[#dcd5c7] bg-[#fffdf8]"
@@ -805,6 +1002,8 @@ function ReportWindowCard({
         {[
           ["Started", `${report.startedDays}/${report.totalDays}`],
           ["Recall", report.averageRecall === null ? "Not measured" : `${report.averageRecall}/100`],
+          ["Known first", report.initialKnownPercent === null ? "Not measured" : `${report.initialKnownPercent}%`],
+          ["Gap filled", report.gapFilledPercent === null ? "Not measured" : `${report.gapFilledPercent}%`],
           ["MCQ", report.averageMcq === null ? "No score" : `${report.averageMcq}%`],
           ["Recovery", report.recoveryItems],
           ["Me-time", report.meTimeChecks],
@@ -816,10 +1015,78 @@ function ReportWindowCard({
           </div>
         ))}
       </div>
+      <GeographyGapGrowthBar report={report} />
       <div className="mt-4 rounded-md border border-[#dcd5c7] bg-white/70 p-3">
         <p className="text-sm font-black text-[#13251d]">{report.verdict}</p>
         <p className="mt-1 text-sm font-semibold leading-6 text-[#657066]">{report.nextAction}</p>
       </div>
     </article>
+  );
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function GeographyGapGrowthBar({ report }: { report: GeographyReportWindow }) {
+  const measured =
+    report.initialKnownPercent !== null ||
+    report.currentMasteryPercent !== null ||
+    report.gapFilledPercent !== null ||
+    report.remainingGapPercent !== null;
+  const initialKnown = clampPercent(report.initialKnownPercent ?? 0);
+  const currentMastery = clampPercent(report.currentMasteryPercent ?? report.initialKnownPercent ?? 0);
+  const gapFilled = clampPercent(Math.max(0, currentMastery - initialKnown));
+  const remainingGap = clampPercent(report.remainingGapPercent ?? Math.max(0, 100 - currentMastery));
+
+  return (
+    <div
+      data-testid="geography-gap-growth-bar"
+      data-report-id={report.id}
+      data-initial-known-percent={measured ? initialKnown : "not-measured"}
+      data-gap-filled-absolute-percent={measured ? gapFilled : "not-measured"}
+      data-remaining-gap-percent={measured ? remainingGap : "not-measured"}
+      className="mt-4 rounded-md border border-[#dcd5c7] bg-white/75 p-3"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+          Known vs gap filled
+        </p>
+        <p className="text-xs font-bold text-[#657066]">
+          {measured ? `${initialKnown}% initial, ${gapFilled}% filled, ${remainingGap}% remaining` : "Module recall baseline pending"}
+        </p>
+      </div>
+      <div
+        aria-label="Geography growth stacked bar showing initially known, gap filled, and remaining gap"
+        className="mt-3 flex h-3 overflow-hidden rounded-full bg-[#f7f4ee]"
+      >
+        {measured ? (
+          <>
+            <div
+              data-testid="gap-bar-initial-known"
+              className="h-full bg-[#1a3a2a]"
+              style={{ width: `${initialKnown}%` }}
+            />
+            <div
+              data-testid="gap-bar-filled"
+              className="h-full bg-[#1d9e75]"
+              style={{ width: `${gapFilled}%` }}
+            />
+            <div
+              data-testid="gap-bar-remaining"
+              className="h-full bg-[#ef9f27]"
+              style={{ width: `${remainingGap}%` }}
+            />
+          </>
+        ) : (
+          <div className="h-full w-full bg-[#e7e2d9]" />
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 text-[11px] font-black uppercase tracking-[0.1em] text-[#506257] sm:grid-cols-3">
+        <span>Initial known</span>
+        <span>Gap filled</span>
+        <span>Remaining gap</span>
+      </div>
+    </div>
   );
 }

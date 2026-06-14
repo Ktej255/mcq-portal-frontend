@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity,
   BadgeIndianRupee,
@@ -12,12 +12,15 @@ import {
   FileSearch,
   FileInput,
   FolderTree,
+  GitBranch,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   LibraryBig,
   LogOut,
   Newspaper,
   RefreshCcw,
+  Route,
   Settings,
   ShieldAlert,
   Target,
@@ -38,6 +41,9 @@ const adminNavItems = [
   { name: 'Yearly Planner', href: '/upsc/yearly-planner', icon: FolderTree },
   { name: 'Pricing', href: '/upsc/pricing', icon: BadgeIndianRupee },
   { name: 'Syllabus/PYQ', href: '/upsc/source-library', icon: LibraryBig },
+  { name: 'Review Command', href: '/upsc/prelims-review-command', icon: GitBranch },
+  { name: '2027 Strategy', href: '/upsc/prelims-2027-strategy', icon: Route },
+  { name: '2026 Showcase', href: '/upsc/prelims-2026-showcase', icon: BarChart3 },
   { name: 'PYQ Import', href: '/admin/pyq-import', icon: FileInput },
   { name: 'Current Affairs', href: '/upsc/current-affairs', icon: Newspaper },
   { name: 'Feature Inventory', href: '/admin/feature-inventory', icon: ListChecks },
@@ -50,6 +56,8 @@ const adminNavItems = [
 
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { isLocalMockMasterSession, isMasterEmail } from '@/lib/auth/master-access';
+import { activateUpscMasterPass } from '@/lib/upsc/masterPass';
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -59,8 +67,16 @@ interface SidebarProps {
 
 export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
-  const navItems = isAdmin ? adminNavItems : studentNavItems;
+  const hasMasterAccess = isAdmin || isMasterEmail(user?.email) || isLocalMockMasterSession();
+  const navItems = hasMasterAccess ? adminNavItems : studentNavItems;
+
+  const openMasterPass = () => {
+    activateUpscMasterPass(user?.email, { notify: true });
+    router.push('/admin/feature-inventory');
+    onClose?.();
+  };
 
   return (
     <>
@@ -93,7 +109,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
             <p className="mb-4 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-[#7b7469]">Study</p>
             <nav className="space-y-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`) || (!isAdmin && item.href === "/dashboard" && pathname.startsWith("/upsc"));
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`) || (!hasMasterAccess && item.href === "/dashboard" && pathname.startsWith("/upsc"));
                 return (
                   <Link 
                     key={item.name} 
@@ -116,6 +132,30 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
         </div>
         
         <div className="mt-auto p-6 space-y-6">
+          {hasMasterAccess ? (
+            <div className="rounded-lg border border-[#1d9e75]/30 bg-[#e7f5ee] p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                  <KeyRound className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-[#13251d]">Master Pass</p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-[#476258]">
+                    Unlock the operator view and seed the UPSC profile for flow checks.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="master-one-pass"
+                onClick={openMasterPass}
+                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#10291d]"
+              >
+                One Pass
+              </button>
+            </div>
+          ) : null}
+
           <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white">
@@ -131,7 +171,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black truncate">{user?.displayName || 'Student'}</p>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{isAdmin ? 'Admin' : 'Student'}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{hasMasterAccess ? 'Master' : 'Student'}</p>
               </div>
             </div>
             

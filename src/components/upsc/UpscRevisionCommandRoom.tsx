@@ -19,6 +19,14 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { geographySessions } from "@/lib/upsc/plan";
+import {
+  formatRebuildRules,
+  prelims2027Priorities,
+  strategyExecutionTasks,
+  strategyPracticeBlueprints,
+  strategySprintCalendar,
+  type StrategyExecutionTask,
+} from "@/lib/upsc/prelims2027Strategy";
 import { readLocalQuestionBankAttempts, type QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import { subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
@@ -87,8 +95,33 @@ const revisionSubjects: RevisionSubject[] = [
   })),
 ];
 
+const strategyStorageKey = "sarit-upsc-prelims-2027-strategy-v1";
+const revisionTaskPhases = new Set<StrategyExecutionTask["phase"]>(["Release", "Planner"]);
+
 function storageKey(subjectSlug: string) {
   return `sarit-upsc-${subjectSlug}-progress-v1`;
+}
+
+function readCompletedStrategyTasks() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(strategyStorageKey);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.completedTasks)
+      ? parsed.completedTasks.filter((taskId: unknown): taskId is string => typeof taskId === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function revisionTaskTone(phase: StrategyExecutionTask["phase"]) {
+  if (phase === "Release") return "border-[#c8ded6] bg-[#eef8f2] text-[#085041]";
+  if (phase === "Planner") return "border-[#d9c18f] bg-[#fff4df] text-[#6f4a12]";
+  return "border-[#dcd5c7] bg-white text-[#4f5e55]";
 }
 
 function readProgress(subjectSlug: string) {
@@ -349,6 +382,7 @@ export function UpscRevisionCommandRoom({
 }) {
   const [summaries, setSummaries] = useState<SubjectSummary[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -357,6 +391,20 @@ export function UpscRevisionCommandRoom({
     }, 0);
 
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const syncCompletedTasks = () => setCompletedStrategyTasks(readCompletedStrategyTasks());
+    const timer = window.setTimeout(syncCompletedTasks, 0);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === strategyStorageKey) syncCompletedTasks();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const totals = useMemo(() => {
@@ -457,6 +505,31 @@ export function UpscRevisionCommandRoom({
         .slice(0, 12),
     [summaries]
   );
+  const revisionStrategyRows = useMemo(() => {
+    const taskRows = strategyExecutionTasks.filter((task) => revisionTaskPhases.has(task.phase));
+    const priorityRows = prelims2027Priorities
+      .map((priority) => {
+        const tasks = taskRows.filter((task) => task.priorityId === priority.id);
+        const blueprints = strategyPracticeBlueprints.filter((blueprint) => blueprint.priorityId === priority.id);
+        const completedCount = tasks.filter((task) => completedStrategyTasks.includes(task.id)).length;
+
+        return { priority, tasks, blueprints, completedCount };
+      })
+      .filter((row) => row.tasks.length > 0 || row.blueprints.length > 0);
+    const completedTaskCount = taskRows.filter((task) => completedStrategyTasks.includes(task.id)).length;
+    const revisionSprintIds = ["sprint-4-format-rebuild", "sprint-5-student-pilot", "sprint-6-maintenance-publication"];
+    const revisionSprints = strategySprintCalendar.filter((sprint) => revisionSprintIds.includes(sprint.id));
+
+    return {
+      taskRows,
+      priorityRows,
+      completedTaskCount,
+      revisionSprints,
+      maintenanceBlueprints: strategyPracticeBlueprints.filter((blueprint) =>
+        blueprint.priorityId === "medieval-reduction" || blueprint.priorityId === "economy-maintenance"
+      ),
+    };
+  }, [completedStrategyTasks]);
 
   const targetSummary = summaries.find((summary) => summary.slug === initialSubjectSlug);
   const targetSession =
@@ -558,6 +631,173 @@ export function UpscRevisionCommandRoom({
                 <p className="mt-3 text-4xl font-black tracking-tight text-[#13251d]">{item.value}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section
+          id="upsc-2027-revision-strategy-overlay"
+          data-testid="upsc-2027-revision-strategy-overlay"
+          data-format-rule-count={formatRebuildRules.length}
+          data-priority-row-count={revisionStrategyRows.priorityRows.length}
+          data-revision-task-count={revisionStrategyRows.taskRows.length}
+          data-completed-revision-task-count={revisionStrategyRows.completedTaskCount}
+          data-blueprint-count={strategyPracticeBlueprints.length}
+          data-maintenance-blueprint-count={revisionStrategyRows.maintenanceBlueprints.length}
+          data-sprint-count={revisionStrategyRows.revisionSprints.length}
+          data-proof-rule="format-rebuild-maintenance-revision-only"
+          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+        >
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <RefreshCcw className="h-5 w-5 text-[#085041]" />
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#085041]">
+                  2027 revision and repair plan
+                </p>
+              </div>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d] md:text-3xl">
+                Rebuild practice around UPSC formats, then keep low-return areas in revision-only mode.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#49675e]">
+                The 2026 paper rewarded format discipline: multi-statement, how-many-correct, match-pair,
+                NOT/exception, assertion-reason, and scenario caselets. Revision Command now shows which practice
+                loops, release tasks, and maintenance drills must exist before the student queue can be trusted.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["Format rules", formatRebuildRules.length],
+                  ["Practice blueprints", strategyPracticeBlueprints.length],
+                  ["Release/planner tasks", revisionStrategyRows.taskRows.length],
+                  ["Maintenance drills", revisionStrategyRows.maintenanceBlueprints.length],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#93cdb6] bg-white/80 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href="/upsc/prelims-2027-strategy#practice-blueprints"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
+                >
+                  Open practice blueprints <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link
+                  href="/upsc/mcq-command"
+                  className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1a3a2a] bg-white px-4 text-sm font-black text-[#1a3a2a]"
+                >
+                  Open MCQ command
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid min-w-0 gap-4">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {formatRebuildRules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    data-testid="upsc-2027-revision-format-rule"
+                    data-format-id={rule.id}
+                    data-target-percent={rule.targetPercent}
+                    className="rounded-lg border border-[#c8ded6] bg-[#fffdf8] p-4"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      {rule.targetPercent}% target
+                    </p>
+                    <h3 className="mt-1 text-base font-black tracking-tight text-[#13251d]">{rule.format}</h3>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{rule.reason}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-3">
+                {revisionStrategyRows.priorityRows.map((row) => (
+                  <article
+                    key={row.priority.id}
+                    data-testid="upsc-2027-revision-priority-row"
+                    data-priority-id={row.priority.id}
+                    data-blueprint-count={row.blueprints.length}
+                    data-task-count={row.tasks.length}
+                    data-completed-count={row.completedCount}
+                    className="rounded-lg border border-[#c8ded6] bg-[#fffdf8] p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                          {row.priority.subject}
+                        </p>
+                        <h3 className="mt-1 break-words text-lg font-black tracking-tight text-[#13251d]">
+                          {row.priority.action}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+                          {row.priority.priority}
+                        </Badge>
+                        <Badge className="rounded-md bg-[#fff4df] px-2 py-1 text-[#6f4a12]">
+                          {row.completedCount}/{row.tasks.length} tasks
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 md:grid-cols-2">
+                      {row.blueprints.map((blueprint) => (
+                        <Link
+                          key={blueprint.id}
+                          href={blueprint.route}
+                          data-testid="upsc-2027-revision-blueprint-link"
+                          data-blueprint-id={blueprint.id}
+                          className="rounded-md border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
+                        >
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                            {blueprint.difficulty} / {blueprint.minutes} min
+                          </p>
+                          <p className="mt-1 text-sm font-black tracking-tight text-[#13251d]">{blueprint.title}</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">
+                            {blueprint.expectedOutput}
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+
+                    {row.tasks.length ? (
+                      <div className="mt-4 grid gap-2">
+                        {row.tasks.map((task) => {
+                          const isDone = completedStrategyTasks.includes(task.id);
+
+                          return (
+                            <Link
+                              key={task.id}
+                              href={task.route}
+                              data-testid="upsc-2027-revision-task-link"
+                              data-task-id={task.id}
+                              data-phase={task.phase}
+                              data-done={isDone ? "true" : "false"}
+                              className={cn(
+                                "rounded-md border p-3 transition hover:border-[#1d9e75]",
+                                isDone ? "border-[#93cdb6] bg-[#eef8f2]" : "border-[#dcd5c7] bg-white"
+                              )}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <Badge className={cn("rounded-md border px-2 py-1", revisionTaskTone(task.phase))}>
+                                  {task.phase}
+                                </Badge>
+                                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#5d675f]">
+                                  {isDone ? "Done" : "Pending"}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm font-black tracking-tight text-[#13251d]">{task.title}</p>
+                              <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{task.output}</p>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

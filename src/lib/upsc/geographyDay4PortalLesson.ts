@@ -49,7 +49,7 @@ export const geographyDay4PortalLesson = {
   promise:
     "Explain how exposed rock becomes weathered material, transported sediment, depositional landforms, and slope-failure risk.",
   sourceSummary:
-    "Adapted from the portal's weathering-erosion-mass-wasting animation blueprint and the compact 30-day Geography foundation.",
+    "Adapted from the portal's weathering-erosion-mass-wasting animation blueprint and the compact 20-day Geography foundation.",
   scenes: [
     {
       id: "4-briefing",

@@ -17,15 +17,18 @@ export async function resolveToken(forceRefresh = false): Promise<string | null>
     return mockToken;
   }
 
-  // 2. Supabase Authentication
-  if (activeAuthProvider === 'supabase' && supabase) {
+  // 2. Clerk Authentication
+  if (activeAuthProvider === 'clerk') {
     try {
-      const sessionResult = forceRefresh
-        ? await supabase.auth.refreshSession()
-        : await supabase.auth.getSession();
-      return sessionResult.data.session?.access_token ?? null;
+      if (typeof window !== 'undefined') {
+        const clerkObj = (window as any).Clerk;
+        if (clerkObj && clerkObj.session) {
+          const token = await clerkObj.session.getToken();
+          return token ?? null;
+        }
+      }
     } catch (err) {
-      console.error("FORENSIC | TOKEN_STRATEGY | Supabase token retrieval failed:", err);
+      console.error("FORENSIC | TOKEN_STRATEGY | Clerk token retrieval failed:", err);
     }
   }
 

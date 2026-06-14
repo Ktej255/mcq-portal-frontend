@@ -21,6 +21,12 @@ export type StudentProfile = {
   learningPattern: LearningPattern;
   mindState: MindState;
   updatedAt: string;
+  welcomeVideoCompleted?: boolean;
+  inductionSyllabusCompleted?: boolean;
+  inductionBooklistCompleted?: boolean;
+  inductionQuizCompleted?: boolean;
+  inductionCompleted?: boolean;
+  retroReflections?: string;
 };
 
 export type StudentPlanSummary = {
@@ -49,6 +55,12 @@ export const defaultStudentProfile: StudentProfile = {
   learningPattern: "deep-work",
   mindState: "calm",
   updatedAt: "",
+  welcomeVideoCompleted: false,
+  inductionSyllabusCompleted: false,
+  inductionBooklistCompleted: false,
+  inductionQuizCompleted: false,
+  inductionCompleted: false,
+  retroReflections: undefined,
 };
 
 function isStudentLevel(level: StudentProfile["level"] | undefined): level is StudentLevel {

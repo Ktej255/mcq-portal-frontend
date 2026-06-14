@@ -61,6 +61,7 @@ function stateTone(state: SubjectWatchState) {
 export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const router = useRouter();
   const { getDayProgress, isLoaded, saveDayProgress } = useSubjectProgress(plan.slug, plan.sessions);
+  const durationMinutes = FOCUSED_TOPIC_DURATION_MINUTES;
   const [activeDay, setActiveDay] = useState(initialDay ?? 1);
   const [watchState, setWatchState] = useState<SubjectWatchState>("Queued");
   const [watchMinutes, setWatchMinutes] = useState(0);
@@ -74,6 +75,68 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [savedNote, setSavedNote] = useState(false);
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
   const [handoffStatus, setHandoffStatus] = useState<"Idle" | "Armed" | "Opening">("Idle");
+  const [cameraStatus, setCameraStatus] = useState<"idle" | "granted" | "denied">("idle");
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [showInterventionDrawer, setShowInterventionDrawer] = useState(false);
+  const [simulatedDistraction, setSimulatedDistraction] = useState(false);
+  const [showFallbackCheckpoint, setShowFallbackCheckpoint] = useState(false);
+  const [fallbackQuizAnswered, setFallbackQuizAnswered] = useState(false);
+  const [selectedFallbackOption, setSelectedFallbackOption] = useState<string | null>(null);
+  const [fallbackTimerCount, setFallbackTimerCount] = useState(0);
+  const [userDoubt, setUserDoubt] = useState("");
+  const [aiDoubtResponse, setAiDoubtResponse] = useState("");
+
+  const requestCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setCameraStatus("granted");
+      setCameraStream(stream);
+      return stream;
+    } catch (err) {
+      setCameraStatus("denied");
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isDemoPlaying) {
+      interval = setInterval(() => {
+        setFallbackTimerCount((prev) => {
+          const nextCount = prev + 1;
+          
+          if (cameraStatus === "granted" && nextCount === 8 && !simulatedDistraction) {
+            setIsDemoPlaying(false);
+            setSimulatedDistraction(true);
+            setShowInterventionDrawer(true);
+            return nextCount;
+          }
+          
+          if (cameraStatus === "denied" && nextCount === 10 && !fallbackQuizAnswered) {
+            setIsDemoPlaying(false);
+            setShowFallbackCheckpoint(true);
+            return nextCount;
+          }
+          
+          return nextCount;
+        });
+
+        setWatchMinutes((prev) => {
+          if (prev >= durationMinutes) return durationMinutes;
+          return Math.min(prev + 0.5, durationMinutes);
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isDemoPlaying, cameraStatus, simulatedDistraction, fallbackQuizAnswered, durationMinutes]);
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
   const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
   const handoffTimersRef = useRef<number[]>([]);
@@ -91,7 +154,6 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     (hasTalkAssessment && (recallScore ?? 0) >= SUBJECT_RECALL_TARGET) || activeDayProgress?.talkUnlockStage === "mcq";
   const hasRepairDiagnosis = !isBeginner && hasTalkAssessment && !isPracticeReady;
   const canUseWatchContent = !needsBeginnerBaseline && (isBeginner || hasRepairDiagnosis || hasSavedRecall || watchState === "Watched");
-  const durationMinutes = FOCUSED_TOPIC_DURATION_MINUTES;
   const weekSessions = useMemo(
     () => plan.sessions.filter((session) => session.week === activeSession.week),
     [activeSession.week, plan.sessions]
@@ -448,10 +510,17 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     });
   };
 
-  const playDemoLesson = () => {
+  const playDemoLesson = async () => {
     clearAutoHandoff();
+    await requestCamera();
     setIsDemoPlaying(true);
     setHandoffStatus("Armed");
+    setFallbackTimerCount(0);
+    setFallbackQuizAnswered(false);
+    setSelectedFallbackOption(null);
+    setShowFallbackCheckpoint(false);
+    setSimulatedDistraction(false);
+    setShowInterventionDrawer(false);
     const nextMinutes = Math.max(watchMinutes, Math.min(demoMinutes, durationMinutes));
     setWatchMinutes(nextMinutes);
     setWatchState("In class");
@@ -461,30 +530,6 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       watchMinutes: nextMinutes,
       watched: false,
     });
-
-    const completeTimer = window.setTimeout(() => {
-      setWatchState("Watched");
-      setWatchMinutes(durationMinutes);
-      setSavedNote(true);
-      setHandoffStatus("Opening");
-      saveDayProgress(activeSession.day, {
-        watched: true,
-        watchState: "Watched",
-        watchMinutes: durationMinutes,
-        watchSceneIndex: watchScenes.length - 1,
-        watchSceneCompletedIds: watchScenes.map((scene) => scene.id),
-        watchNote,
-        baselineKnowledge,
-        baselineSavedAt: new Date().toISOString(),
-      });
-
-      const routeTimer = window.setTimeout(() => {
-        router.push(`${basePath}/talk?day=${activeSession.day}`);
-      }, 850);
-      handoffTimersRef.current.push(routeTimer);
-    }, 2200);
-
-    handoffTimersRef.current.push(completeTimer);
   };
 
   const markWatched = () => {
@@ -826,24 +871,82 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                 data-visible-mode="single-action-player"
                 className="flex min-h-[34rem] flex-col justify-between rounded-lg border border-white/10 bg-white/5 p-5 md:min-h-[38rem] lg:min-h-[42rem]"
               >
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
-                    Teacher-led session
-                  </p>
-                  <h2 className="mt-3 text-3xl font-black tracking-tight">{activeSession.title}</h2>
-                  <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/75">{activeSession.watch}</p>
-                  <div
-                    data-testid="subject-watch-player-flow"
-                    className="mt-5 grid gap-2 text-xs font-black uppercase tracking-[0.1em] text-white/90 sm:grid-cols-2 lg:grid-cols-4"
-                  >
-                    {["Topic", "10-15 min lesson", "AI discussion", `${SUBJECT_RECALL_TARGET}% recall`].map((step, index) => (
-                      <div key={step} className="flex min-h-12 items-center gap-2 rounded-md border border-white/10 bg-white/10 px-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[var(--subject-dark)]">
-                          {index + 1}
+                <div className="grid gap-6 md:grid-cols-[1fr_240px] items-stretch">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[var(--subject-light)]">
+                      Teacher-led session
+                    </p>
+                    <h2 className="mt-3 text-3xl font-black tracking-tight">{activeSession.title}</h2>
+                    <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/75">{activeSession.watch}</p>
+                    <div
+                      data-testid="subject-watch-player-flow"
+                      className="mt-5 grid gap-2 text-xs font-black uppercase tracking-[0.1em] text-white/90 sm:grid-cols-2"
+                    >
+                      {["Topic", "10-15 min lesson", "AI discussion", `${SUBJECT_RECALL_TARGET}% recall`].map((step, index) => (
+                        <div key={step} className="flex min-h-12 items-center gap-2 rounded-md border border-white/10 bg-white/10 px-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[var(--subject-dark)]">
+                            {index + 1}
+                          </span>
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Webcam Focus Monitor Panel */}
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 flex flex-col justify-between min-h-[200px]">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-[var(--subject-light)]">Focus Monitor</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs font-semibold">Webcam Status:</span>
+                        <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                          cameraStatus === "granted" ? "bg-[#e7f5ee] text-[#085041]" : cameraStatus === "denied" ? "bg-red-500/20 text-red-300" : "bg-white/10 text-white/60"
+                        }`}>
+                          {cameraStatus}
                         </span>
-                        <span>{step}</span>
                       </div>
-                    ))}
+                    </div>
+
+                    {cameraStatus === "granted" && cameraStream ? (
+                      <div className="relative mt-3 aspect-video overflow-hidden rounded-md border border-white/10 bg-black">
+                        <video
+                          ref={(videoEl) => {
+                            if (videoEl && cameraStream && videoEl.srcObject !== cameraStream) {
+                              videoEl.srcObject = cameraStream;
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="h-full w-full object-cover scale-x-[-1]"
+                        />
+                        <div className="absolute top-2 left-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                          <span>LIVE</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex flex-col items-center justify-center rounded-md border border-dashed border-white/20 bg-black/20 p-4 text-center aspect-video">
+                        <Video className="h-6 w-6 opacity-40 mb-1" />
+                        <span className="text-[10px] text-white/50 leading-relaxed">
+                          {cameraStatus === "denied" ? "Camera blocked. Periodical fallbacks active." : "Play demo to start focus check."}
+                        </span>
+                      </div>
+                    )}
+
+                    {cameraStatus === "granted" && isDemoPlaying && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDemoPlaying(false);
+                          setSimulatedDistraction(true);
+                          setShowInterventionDrawer(true);
+                        }}
+                        className="mt-3 w-full rounded bg-white/10 hover:bg-white/20 py-1.5 text-xs font-bold text-white transition text-center"
+                      >
+                        Simulate Look Away
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1601,6 +1704,141 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
         </section>
           </div>
         </details>
+        )}
+        {/* AI Intervention Sliding Drawer */}
+        {showInterventionDrawer && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
+            <div className="h-full w-full max-w-md bg-[#f7f4ee] p-6 shadow-2xl text-[#13251d] flex flex-col justify-between border-l border-[#dcd5c7] animate-in slide-in-from-right duration-300">
+              <div>
+                <div className="flex items-center justify-between border-b border-[#dcd5c7] pb-3">
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">AI Intervention</span>
+                  <span className="rounded bg-[#ef9f27]/20 px-2 py-0.5 text-[9px] font-black uppercase text-[#6f4a12]">Distracted</span>
+                </div>
+
+                <div className="mt-6 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                    <BrainCircuit className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight">I noticed you were away</h3>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">
+                      Do you have a question about this segment, or should we resume?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  <label className="block text-xs font-black uppercase tracking-wider text-[#1d9e75]">Ask a doubt (Optional)</label>
+                  <textarea
+                    value={userDoubt}
+                    onChange={(e) => setUserDoubt(e.target.value)}
+                    placeholder="Type your doubt about this topic segment here..."
+                    className="min-h-24 w-full resize-none rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-semibold leading-5 text-[#13251d] focus:border-[#1d9e75] outline-none"
+                  />
+                  
+                  {userDoubt.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiDoubtResponse(
+                          `Based on your study of "${activeSession.title}", that is an excellent doubt. The core mechanism involves ${activeSession.watch.toLowerCase()} which is crucial to remember for Prelims structure.`
+                        );
+                      }}
+                      className="rounded bg-[#1a3a2a] px-3 py-1.5 text-xs font-black text-white hover:bg-[#10291d]"
+                    >
+                      Ask AI Teacher
+                    </button>
+                  )}
+
+                  {aiDoubtResponse && (
+                    <div className="mt-3 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-xs text-[#085041] font-semibold">
+                      <p className="font-black uppercase tracking-wider text-[10px]">AI Teacher Response:</p>
+                      <p className="mt-1">{aiDoubtResponse}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-[#dcd5c7] pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInterventionDrawer(false);
+                    setSimulatedDistraction(false);
+                    setIsDemoPlaying(true);
+                    setUserDoubt("");
+                    setAiDoubtResponse("");
+                  }}
+                  className="flex-1 rounded-md bg-[#1a3a2a] py-3 text-sm font-black text-white hover:bg-[#10291d] transition text-center"
+                >
+                  Resume Lesson
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Micro-Checkpoint Fallback Modal */}
+        {showFallbackCheckpoint && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 shadow-2xl text-[#13251d] animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-black tracking-tight">Micro-Checkpoint Review</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">
+                Webcam is disabled. Please verify you are active by answering this quick conceptual check.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                <p className="text-xs font-black leading-5 text-[#13251d]">
+                  Which of the following is correct regarding this subject&apos;s core mechanism?
+                </p>
+                
+                <div className="space-y-2">
+                  {[
+                    ["A", "It operates as a primary dynamic system."],
+                    ["B", "It has static parameters only."],
+                  ].map(([val, label]) => (
+                    <label key={val} className="flex items-center gap-2 rounded border border-[#dcd5c7] bg-white p-2.5 cursor-pointer text-xs font-semibold text-[#657066] hover:bg-[#f7f4ee]">
+                      <input
+                        type="radio"
+                        name="fallback-opt"
+                        value={val}
+                        checked={selectedFallbackOption === val}
+                        onChange={(e) => setSelectedFallbackOption(e.target.value)}
+                        className="text-[#1d9e75] focus:ring-[#1d9e75]"
+                      />
+                      <span>{val}. {label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {selectedFallbackOption && (
+                  <div className={`rounded p-3 text-xs font-semibold ${selectedFallbackOption === "A" ? "bg-[#e7f5ee] border border-[#b9d9cd] text-[#085041]" : "bg-red-500/10 border border-red-500/20 text-red-800"}`}>
+                    {selectedFallbackOption === "A" 
+                      ? "Correct! You can resume watching now." 
+                      : "Incorrect. Try selecting option A."}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  disabled={selectedFallbackOption !== "A"}
+                  onClick={() => {
+                    setShowFallbackCheckpoint(false);
+                    setFallbackQuizAnswered(true);
+                    setIsDemoPlaying(true);
+                  }}
+                  className="rounded-md bg-[#1a3a2a] px-4 py-2 text-xs font-black text-white hover:bg-[#10291d] transition disabled:opacity-45 disabled:cursor-not-allowed"
+                >
+                  Continue Watching
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

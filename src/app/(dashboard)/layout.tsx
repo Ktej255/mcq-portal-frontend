@@ -1,10 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
+
+const adminShellRoutes = new Set([
+  "/upsc/content-command",
+  "/upsc/current-affairs",
+  "/upsc/mcq-command",
+  "/upsc/prelims-2026-audit",
+  "/upsc/prelims-2026-audit-v2",
+  "/upsc/prelims-2026-showcase",
+  "/upsc/prelims-review-command",
+  "/upsc/prelims-2027-strategy",
+  "/upsc/pricing",
+  "/upsc/readiness-audit",
+  "/upsc/revision-command",
+  "/upsc/source-library",
+  "/upsc/yearly-planner",
+]);
 
 export default function DashboardLayout({
   children,
@@ -12,7 +29,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isLoaded } = useApiConfig();
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isAdminShell = adminShellRoutes.has(pathname);
 
   if (!isLoaded) return (
     <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
@@ -28,6 +47,7 @@ export default function DashboardLayout({
       <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden">
         {/* Sidebar for Desktop & Mobile */}
         <DashboardSidebar 
+          isAdmin={isAdminShell}
           isOpen={isSidebarOpen} 
           onClose={() => setIsSidebarOpen(false)} 
         />

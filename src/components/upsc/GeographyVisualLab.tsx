@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   Eye,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { GeographyRoomCompass } from "@/components/upsc/GeographyRoomCompass";
 import { GeographyDay3PlateVisual } from "@/components/upsc/GeographyDay3PlateVisual";
 import { GeographyDay4GeomorphicVisual } from "@/components/upsc/GeographyDay4GeomorphicVisual";
 import { GeographyDay5ClimatologyVisual } from "@/components/upsc/GeographyDay5ClimatologyVisual";
@@ -301,7 +301,15 @@ export function GeographyVisualLab({ initialMode, initialDay }: { initialMode?: 
   if (!talkCleared) {
     return (
       <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-        <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
+        <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-8 md:px-8">
+          <GeographyRoomCompass
+            day={activeSession.day}
+            title={activeSession.title}
+            room="Lab"
+            detail="Visual Lab is optional support. It opens only after Talk proves the topic is ready for practice."
+            primaryHref={`/upsc/geography/talk?day=${activeSession.day}`}
+            primaryLabel="Open discussion"
+          />
           <section className="rounded-lg border border-[#ef9f27]/55 bg-[#fff4df] p-6 shadow-sm">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#9a6a16] text-white">
@@ -327,16 +335,20 @@ export function GeographyVisualLab({ initialMode, initialDay }: { initialMode?: 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <GeographyRoomCompass
+          day={activeSession.day}
+          title={activeSession.title}
+          room="Lab"
+          detail="Optional visual proof. Save one map/mechanism note only if it helps, otherwise continue to MCQ."
+          primaryHref={mcqHref}
+          primaryLabel={isComplete ? "Open MCQ" : "Skip to MCQ"}
+        />
         <section
           data-testid="geography-lab-simple-surface"
           data-visible-mode="one-optional-note-one-action"
           data-student-surface="optional-lab-first"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-6"
         >
-          <Link href={`/upsc/geography?day=${activeSession.day}`} className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
-            <ArrowLeft className="h-4 w-4" /> Day funnel
-          </Link>
-
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
             <div>
               <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { BrainDumpModal } from "@/components/upsc/BrainDumpModal";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,6 +21,9 @@ import {
   RefreshCcw,
   Save,
   Target,
+  LockKeyhole,
+  Sparkles,
+  UploadCloud,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +36,10 @@ import {
 import { getUpscMcqBatchStatus, isUpscMcqCommandCleared } from "@/lib/upsc/mcqCommandStatus";
 import { geographyLabs, geographySessions } from "@/lib/upsc/plan";
 import {
+  buildPrelims2027OperationalQueue,
+  buildPrelims2027OperationalTotals,
+} from "@/lib/upsc/prelims2027Operations";
+import {
   allPracticeQuestionBank,
   buildQuestionBankQuestionsFromPyqImports,
   buildRecommendedQuestionBankMix,
@@ -39,7 +47,14 @@ import {
   selectQuestionBankSet,
 } from "@/lib/upsc/questionBankEngine";
 import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
-import { readStudentProfile } from "@/lib/upsc/studentProfile";
+import {
+  readStudentProfile,
+  defaultStudentProfile,
+  saveStudentProfile,
+  readSyncedStudentProfile,
+  type StudentProfile,
+} from "@/lib/upsc/studentProfile";
+import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
@@ -246,7 +261,15 @@ function labelForDailyDoubt(href: string) {
 
 export function UpscDailyMissionControl() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [localWelcomeVideoCompleted, setLocalWelcomeVideoCompleted] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("sarit-upsc-welcome-video-completed-v1") === "true";
+    }
+    return false;
+  });
   const [dailyState, setDailyState] = useState<DailyState>({ subjectSlug: "geography", day: 1, note: "" });
+  const [brainDumpOpen, setBrainDumpOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [meTimeSaved, setMeTimeSaved] = useState(false);
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
@@ -255,13 +278,73 @@ export function UpscDailyMissionControl() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const savedProfile = readStudentProfile();
+      if (savedProfile) {
+        setProfile(savedProfile);
+      }
       setDailyState(getInitialDailyState());
       setPyqRecords(readLocalPyqImportRecords());
       setIsLoaded(true);
+
+      void readSyncedStudentProfile().then((syncedProfile) => {
+        if (!syncedProfile) return;
+        setProfile(syncedProfile);
+      });
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  const isWelcomeVideoCompleted = profile ? Boolean(profile.welcomeVideoCompleted) : localWelcomeVideoCompleted;
+
+  const handleCompleteWelcomeVideo = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sarit-upsc-welcome-video-completed-v1", "true");
+    }
+    setLocalWelcomeVideoCompleted(true);
+    if (profile) {
+      saveProfile({
+        ...profile,
+        welcomeVideoCompleted: true,
+      });
+    }
+  };
+
+  const updateInductionStep = (step: "syllabus" | "booklist" | "quiz", isDone: boolean) => {
+    if (!profile) return;
+    const patch: Partial<StudentProfile> = {};
+    if (step === "syllabus") patch.inductionSyllabusCompleted = isDone;
+    if (step === "booklist") patch.inductionBooklistCompleted = isDone;
+    if (step === "quiz") patch.inductionQuizCompleted = isDone;
+    
+    saveProfile({
+      ...profile,
+      ...patch,
+    });
+  };
+
+  const completeInduction = (skipped: boolean = false) => {
+    if (!profile) return;
+    saveProfile({
+      ...profile,
+      inductionSyllabusCompleted: skipped ? true : profile.inductionSyllabusCompleted,
+      inductionBooklistCompleted: skipped ? true : profile.inductionBooklistCompleted,
+      inductionQuizCompleted: skipped ? true : profile.inductionQuizCompleted,
+      inductionCompleted: true,
+    });
+  };
+
+  const saveProfile = (nextProfile: StudentProfile) => {
+    const nextProfileWithTime = {
+      ...nextProfile,
+      welcomeVideoCompleted: nextProfile.welcomeVideoCompleted || localWelcomeVideoCompleted || (profile ? profile.welcomeVideoCompleted : false),
+      updatedAt: new Date().toISOString()
+    };
+    const normalizedProfile = saveStudentProfile(nextProfileWithTime);
+    setProfile(normalizedProfile);
+    setSaved(true);
+    setEvidenceRefresh((current) => current + 1);
+  };
 
   const activeSubject = dailySubjects.find((subject) => subject.slug === dailyState.subjectSlug) ?? dailySubjects[0];
   const activeSession =
@@ -314,7 +397,18 @@ export function UpscDailyMissionControl() {
     );
   }, [isLoaded, dailyState, evidenceRefresh]);
   const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(8) : []), [isLoaded, dailyState, saved, evidenceRefresh]);
-  const studentProfile = useMemo(() => (isLoaded ? readStudentProfile() : null), [isLoaded, dailyState, saved, evidenceRefresh]);
+  const strategyOpsQueue = useMemo(
+    () => (isLoaded ? buildPrelims2027OperationalQueue(3) : []),
+    [isLoaded, saved, evidenceRefresh]
+  );
+  const strategyOpsTotals = useMemo(
+    () =>
+      isLoaded
+        ? buildPrelims2027OperationalTotals()
+        : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 },
+    [isLoaded, saved, evidenceRefresh]
+  );
+  const studentProfile = profile;
   const activeProgressMap = useMemo<Record<string, DailyPlannerProgress | undefined>>(() => {
     if (!isLoaded) return {};
     return activeSubject.sessions.reduce<Record<string, DailyPlannerProgress | undefined>>((map, session) => {
@@ -523,9 +617,24 @@ export function UpscDailyMissionControl() {
     );
   }
 
+  if (!isWelcomeVideoCompleted) {
+    return (
+      <WelcomeVideoOverlay onComplete={handleCompleteWelcomeVideo} />
+    );
+  }
+
   return (
     <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f4ee] text-[#1b2f27]">
       <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        {profile && !profile.inductionCompleted ? (
+          <div className="mb-2">
+            <InductionChecklist
+              profile={profile}
+              onUpdateStep={updateInductionStep}
+              onComplete={completeInduction}
+            />
+          </div>
+        ) : null}
         <section
           data-testid="daily-command-student-focus"
           data-visible-mode="single-action-planner-proof"
@@ -593,16 +702,27 @@ export function UpscDailyMissionControl() {
                 </p>
               </details>
             </div>
-            <Link
-              href={dailyPlanner.sessionReadiness.href}
-              data-testid="daily-command-primary-action"
-              data-next-action-href={dailyPlanner.sessionReadiness.href}
-              data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
-              data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
-            >
-              {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-            </Link>
+            {profile && !profile.inductionCompleted ? (
+              <button
+                type="button"
+                disabled
+                data-testid="daily-command-locked"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-5 text-sm font-black text-[#756f64] cursor-not-allowed lg:w-auto"
+              >
+                Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+              </button>
+            ) : (
+              <Link
+                href={dailyPlanner.sessionReadiness.href}
+                data-testid="daily-command-primary-action"
+                data-next-action-href={dailyPlanner.sessionReadiness.href}
+                data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
+                data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
+              >
+                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
         </section>
 
@@ -628,13 +748,24 @@ export function UpscDailyMissionControl() {
                 {activeSubject.title} Day {activeSession.day}
               </h2>
             </div>
-            <Link
-              href={dailyPlanner.sessionReadiness.href}
-              data-testid="daily-funnel-primary-action"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
-            >
-              {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            {profile && !profile.inductionCompleted ? (
+              <button
+                type="button"
+                disabled
+                data-testid="daily-funnel-locked"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
+              >
+                Locked (Complete Induction) <LockKeyhole className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <Link
+                href={dailyPlanner.sessionReadiness.href}
+                data-testid="daily-funnel-primary-action"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+              >
+                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
           </div>
           <div className="grid gap-2 md:grid-cols-4">
             {learningFunnelSteps.map((step, index) => (
@@ -690,28 +821,52 @@ export function UpscDailyMissionControl() {
             </Badge>
           </div>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {dailyOperatingContractRows.map((row, index) => (
-              <Link
-                key={row.id}
-                href={row.href}
-                data-testid="daily-operating-contract-row"
-                data-contract-id={row.id}
-                data-status={row.status}
-                data-href={row.href}
-                className={cn("min-h-28 rounded-md border p-3 transition hover:-translate-y-0.5", operatingContractTone(row.status))}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">
-                      {index + 1}. {row.label}
-                    </p>
-                    <h3 className="mt-2 text-sm font-black uppercase tracking-[0.12em]">{row.status}</h3>
+            {dailyOperatingContractRows.map((row, index) => {
+              const isGated = profile && !profile.inductionCompleted;
+              const CardContent = (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">
+                        {index + 1}. {row.label}
+                      </p>
+                      <h3 className="mt-2 text-sm font-black uppercase tracking-[0.12em]">{row.status}</h3>
+                    </div>
+                    {isGated ? (
+                      <LockKeyhole className="h-4 w-4 shrink-0 text-[#756f64]" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4 shrink-0" />
+                    )}
                   </div>
-                  <ArrowRight className="h-4 w-4 shrink-0" />
+                  <p className="mt-2 text-xs font-bold leading-5 opacity-85">
+                    {isGated ? "Locked (Complete Induction)" : row.proof}
+                  </p>
+                </>
+              );
+
+              return isGated ? (
+                <div
+                  key={row.id}
+                  data-testid="daily-operating-contract-row-locked"
+                  data-contract-id={row.id}
+                  className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-[#756f64] cursor-not-allowed opacity-80"
+                >
+                  {CardContent}
                 </div>
-                <p className="mt-2 text-xs font-bold leading-5 opacity-85">{row.proof}</p>
-              </Link>
-            ))}
+              ) : (
+                <Link
+                  key={row.id}
+                  href={row.href}
+                  data-testid="daily-operating-contract-row"
+                  data-contract-id={row.id}
+                  data-status={row.status}
+                  data-href={row.href}
+                  className={cn("min-h-28 rounded-md border p-3 transition hover:-translate-y-0.5", operatingContractTone(row.status))}
+                >
+                  {CardContent}
+                </Link>
+              );
+            })}
           </div>
         </section>
 
@@ -739,12 +894,22 @@ export function UpscDailyMissionControl() {
                 Only rows marked exact verified and mapped can enter today&apos;s practice. If the count is zero, the
                 student still receives PYQ-style pattern practice without any false exact-PYQ claim.
               </p>
-              <Link
-                href={`/upsc/question-bank?subject=${activeSubject.slug}`}
-                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
-              >
-                Open PYQ practice lane <ArrowRight className="h-4 w-4" />
-              </Link>
+              {profile && !profile.inductionCompleted ? (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
+                >
+                  Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                </button>
+              ) : (
+                <Link
+                  href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+                >
+                  Open PYQ practice lane <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
@@ -761,7 +926,7 @@ export function UpscDailyMissionControl() {
             </div>
           </div>
         </section>
-
+ 
         <section
           data-testid="daily-today-origin-proof"
           data-source-day={dailyPlanner.todayOriginProof.sourceDay}
@@ -784,12 +949,22 @@ export function UpscDailyMissionControl() {
               <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
                 {dailyPlanner.todayOriginProof.evidenceSummary}
               </p>
-              <Link
-                href={dailyPlanner.todayOriginProof.href}
-                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
-              >
-                {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
-              </Link>
+              {profile && !profile.inductionCompleted ? (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64] cursor-not-allowed"
+                >
+                  Locked <LockKeyhole className="h-4 w-4" />
+                </button>
+              ) : (
+                <Link
+                  href={dailyPlanner.todayOriginProof.href}
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
+                >
+                  {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {dailyPlanner.todayOriginProof.evidence.map((item) => (
@@ -875,46 +1050,84 @@ export function UpscDailyMissionControl() {
             <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.learningGap.detail}</p>
           </article>
 
-          <Link
-            data-testid="daily-revision-signal"
-            href={dailyPlanner.revision.href}
-            className={cn(
-              "rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5",
-              dailyPlanner.revision.urgent
-                ? "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
-                : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]"
-            )}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
-                <RefreshCcw className="h-5 w-5" />
+          {profile && !profile.inductionCompleted ? (
+            <div
+              data-testid="daily-revision-signal-locked"
+              className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
+                  <LockKeyhole className="h-5 w-5" />
+                </div>
+                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  Locked
+                </span>
               </div>
-              <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                {dailyPlanner.revision.dueLabel}
-              </span>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
-            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.revision.title}</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.revision.detail}</p>
-          </Link>
+          ) : (
+            <Link
+              data-testid="daily-revision-signal"
+              href={dailyPlanner.revision.href}
+              className={cn(
+                "rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5",
+                dailyPlanner.revision.urgent
+                  ? "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
+                  : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]"
+              )}
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
+                  <RefreshCcw className="h-5 w-5" />
+                </div>
+                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  {dailyPlanner.revision.dueLabel}
+                </span>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.revision.title}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.revision.detail}</p>
+            </Link>
+          )}
 
-          <Link
-            data-testid="daily-today-task"
-            href={dailyPlanner.todayTask.href}
-            className="rounded-lg border border-[#1a3a2a] bg-[#1a3a2a] p-5 text-white shadow-sm transition hover:-translate-y-0.5"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/15">
-                <Target className="h-5 w-5" />
+          {profile && !profile.inductionCompleted ? (
+            <div
+              data-testid="daily-today-task-locked"
+              className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
+                  <LockKeyhole className="h-5 w-5" />
+                </div>
+                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  Locked
+                </span>
               </div>
-              <span className="rounded-md bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                {dailyPlanner.todayTask.actionLabel}
-              </span>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Today&apos;s task</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">Today&apos;s task</p>
-            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.todayTask.title}</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-white/80">{dailyPlanner.todayTask.detail}</p>
-          </Link>
+          ) : (
+            <Link
+              data-testid="daily-today-task"
+              href={dailyPlanner.todayTask.href}
+              className="rounded-lg border border-[#1a3a2a] bg-[#1a3a2a] p-5 text-white shadow-sm transition hover:-translate-y-0.5"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/15">
+                  <Target className="h-5 w-5" />
+                </div>
+                <span className="rounded-md bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  {dailyPlanner.todayTask.actionLabel}
+                </span>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">Today&apos;s task</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.todayTask.title}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-white/80">{dailyPlanner.todayTask.detail}</p>
+            </Link>
+          )}
 
           <article
             data-testid="daily-growth-signal"
@@ -962,12 +1175,22 @@ export function UpscDailyMissionControl() {
               <p className="mt-2 text-sm font-semibold leading-6 opacity-85">
                 {dailyPlanner.sessionReadiness.detail}
               </p>
-              <Link
-                href={dailyPlanner.sessionReadiness.href}
-                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-              >
-                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-              </Link>
+              {profile && !profile.inductionCompleted ? (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-4 text-sm font-black text-[#756f64] cursor-not-allowed"
+                >
+                  Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                </button>
+              ) : (
+                <Link
+                  href={dailyPlanner.sessionReadiness.href}
+                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                >
+                  {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               {dailyPlanner.sessionReadiness.checklist.map((item) => (
@@ -990,30 +1213,55 @@ export function UpscDailyMissionControl() {
           </div>
         </section>
 
-        <Link
-          data-testid="daily-tomorrow-adjustment"
-          data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
-          href={dailyPlanner.tomorrowAdjustment.href}
-          className="grid gap-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 text-[#085041] shadow-sm transition hover:-translate-y-0.5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-5"
-        >
-          <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
-            <CalendarDays className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-              Tomorrow auto-adjusts from today&apos;s evidence
+        {profile && !profile.inductionCompleted ? (
+          <div
+            data-testid="daily-tomorrow-adjustment-locked"
+            className="grid gap-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 text-[#756f64] shadow-sm cursor-not-allowed md:grid-cols-[auto_1fr_auto] md:items-center md:p-5 opacity-85"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#756f64]">
+              <LockKeyhole className="h-5 w-5" />
             </span>
-            <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#13251d]">
-              {dailyPlanner.tomorrowAdjustment.title}
+            <span className="min-w-0">
+              <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#756f64]/80">
+                Tomorrow auto-adjusts from today&apos;s evidence (Locked)
+              </span>
+              <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#756f64]">
+                Tomorrow Auto-Adjustment Locked
+              </span>
+              <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#756f64]/80">
+                Complete onboarding induction to unlock planning tracks.
+              </span>
             </span>
-            <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#49675e]">
-              {dailyPlanner.tomorrowAdjustment.detail}
+            <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64]">
+              Locked <LockKeyhole className="h-4 w-4" />
             </span>
-          </span>
-          <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
-            {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
-          </span>
-        </Link>
+          </div>
+        ) : (
+          <Link
+            data-testid="daily-tomorrow-adjustment"
+            data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
+            href={dailyPlanner.tomorrowAdjustment.href}
+            className="grid gap-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 text-[#085041] shadow-sm transition hover:-translate-y-0.5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-5"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
+              <CalendarDays className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                Tomorrow auto-adjusts from today&apos;s evidence
+              </span>
+              <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#13251d]">
+                {dailyPlanner.tomorrowAdjustment.title}
+              </span>
+              <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#49675e]">
+                {dailyPlanner.tomorrowAdjustment.detail}
+              </span>
+            </span>
+            <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
+              {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
+            </span>
+          </Link>
+        )}
 
         <section
           data-testid="daily-next-session-proof"
@@ -1235,6 +1483,57 @@ export function UpscDailyMissionControl() {
         </section>
 
         <section
+          data-testid="daily-prelims-2027-ops-queue"
+          data-source-orders={strategyOpsTotals.sourceOrders}
+          data-unresolved-orders={strategyOpsTotals.unresolved}
+          data-drafted-orders={strategyOpsTotals.drafted}
+          data-action-count={strategyOpsQueue.length}
+          className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+        >
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#d95f43]">2027 strategy work</p>
+              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Source gaps and proof gates</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                ["Orders", strategyOpsTotals.sourceOrders],
+                ["Open", strategyOpsTotals.unresolved],
+                ["Drafted", strategyOpsTotals.drafted],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-20 rounded-md border border-[#dcd5c7] bg-[#fdfaf3] px-3 py-2">
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#9d3824]">{label}</p>
+                  <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {strategyOpsQueue.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                data-testid="daily-prelims-2027-ops-row"
+                data-action-key={item.key}
+                data-status-label={item.statusLabel}
+                className={cn("min-h-36 rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                    {item.badge}
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+                <p className="text-base font-black leading-5">{item.title}</p>
+                <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] opacity-75">{item.statusLabel}</p>
+                <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section
           data-testid="global-next-action-queue"
           className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
         >
@@ -1407,6 +1706,20 @@ export function UpscDailyMissionControl() {
                     active: true,
                   },
                   {
+                    label: "Retro",
+                    detail: activeProgress?.retroCompleted ? "Retrospective completed" : "Review Saturday test",
+                    href: `${basePath}/retro?day=${activeSession.day}`,
+                    icon: Sparkles,
+                    active: profile ? Boolean(profile.inductionCompleted) : true,
+                  },
+                  {
+                    label: "Mains",
+                    detail: "Frictionless Answer Uploader",
+                    href: "/upsc/answer-upload",
+                    icon: UploadCloud,
+                    active: profile ? Boolean(profile.inductionCompleted) : true,
+                  },
+                  {
                     label: "Track",
                     detail: "Subject progress",
                     href: `${basePath}/track`,
@@ -1489,24 +1802,85 @@ export function UpscDailyMissionControl() {
             </div>
             <Gauge className="h-6 w-6 text-[#085041]" />
           </div>
-          <div className="grid gap-2 sm:grid-cols-4">
+          <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
             {[
-              ["Prelims Showcase", "/upsc/prelims-2026-showcase"],
-              ["Content Command", "/upsc/content-command"],
-              ["MCQ Command", "/upsc/mcq-command"],
-              ["Revision Command", "/upsc/revision-command"],
-            ].map(([label, href]) => (
-              <Link
-                key={label}
-                href={href}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#e7f5ee]"
-              >
-                {label} <ArrowRight className="h-4 w-4" />
-              </Link>
-            ))}
+              { label: "Prelims Showcase", href: "/upsc/prelims-2026-showcase", gated: false },
+              { label: "2027 Strategy", href: "/upsc/prelims-2027-strategy", gated: false },
+              { label: "Content Command", href: "/upsc/content-command", gated: false },
+              { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
+              { label: "Revision Command", href: "/upsc/revision-command", gated: false },
+              { label: "Sunday AI Retro", href: `/upsc/${activeSubject.slug}/retro`, gated: true },
+              { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+            ].map((item) => {
+              const isLocked = item.gated && profile && !profile.inductionCompleted;
+              if (isLocked) {
+                return (
+                  <button
+                    key={item.label}
+                    disabled
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#756f64] opacity-65 cursor-not-allowed"
+                  >
+                    {item.label} <LockKeyhole className="h-4 w-4" />
+                  </button>
+                );
+              }
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#e7f5ee]"
+                >
+                  {item.label} <ArrowRight className="h-4 w-4" />
+                </Link>
+              );
+            })}
           </div>
         </section>
       </div>
+
+      {/* ── Phase 5: Brain Dump FAB ── */}
+      <button
+        id="brain-dump-fab"
+        type="button"
+        onClick={() => setBrainDumpOpen(true)}
+        title="Brain Dump — safe space to vent"
+        aria-label="Open Brain Dump"
+        style={{
+          position: "fixed",
+          bottom: "1.5rem",
+          right: "1.5rem",
+          zIndex: 9000,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.75rem 1.1rem",
+          background: "#13251d",
+          color: "#fff",
+          border: "none",
+          borderRadius: "2rem",
+          boxShadow: "0 4px 16px rgba(10,20,14,0.22)",
+          cursor: "pointer",
+          fontSize: "0.8rem",
+          fontWeight: 900,
+          letterSpacing: "0.04em",
+          transition: "transform 0.15s, box-shadow 0.15s",
+        }}
+        onMouseOver={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(10,20,14,0.3)";
+        }}
+        onMouseOut={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "";
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(10,20,14,0.22)";
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.49V22l-3-2-3 2v-2.51C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/>
+        </svg>
+        Brain Dump
+      </button>
+
+      <BrainDumpModal isOpen={brainDumpOpen} onClose={() => setBrainDumpOpen(false)} />
     </div>
   );
 }

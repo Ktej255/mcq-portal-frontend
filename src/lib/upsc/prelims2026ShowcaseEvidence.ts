@@ -166,11 +166,28 @@ function statusCopy(status: AuditStatus) {
 }
 
 function formatLabelFor(question: AuditQuestion) {
+  if (/match|paired|pairs/i.test(question.stem + question.instruction)) return "Pair matching";
   if (question.statements.length >= 3) return "Multi-statement elimination";
   if (question.statements.length === 2) return "Two-statement judgement";
-  if (/match|paired|pairs/i.test(question.stem + question.instruction)) return "Pair matching";
   if (/identify/i.test(question.stem + question.instruction)) return "Identification frame";
   return "Single-concept application";
+}
+
+function isPairMatchingQuestion(question: AuditQuestion) {
+  return /match|paired|pairs|correctly matched/i.test(`${question.stem} ${question.instruction}`);
+}
+
+function portionLabelFor(question: AuditQuestion, statement: string, index: number) {
+  if (!question.statements.length) return "Core question frame";
+
+  if (/match list/i.test(question.stem)) {
+    const listRow = statement.match(/^([A-D])\./i);
+    return listRow ? `List row ${listRow[1].toUpperCase()}` : `List row ${index + 1}`;
+  }
+
+  if (isPairMatchingQuestion(question)) return `Pair row ${index + 1}`;
+
+  return `Statement ${index + 1}`;
 }
 
 function trapStyleFor(question: AuditQuestion) {
@@ -264,7 +281,7 @@ function buildStatementCoverage(
           : "Manual proof needed";
 
     return {
-      label: question.statements.length > 0 ? `Statement ${index + 1}` : "Core question frame",
+      label: portionLabelFor(question, statement, index),
       text: sanitizeText(statement),
       coverage,
       coverageLabel: label,
@@ -295,12 +312,7 @@ function matchScopeFor(coverage: ShowcaseQuestionEvidence["statementCoverage"]) 
 }
 
 function nextActionFor(status: AuditStatus, question: AuditQuestion) {
-  const format =
-    question.statements.length >= 3
-      ? "multi-statement elimination"
-      : question.statements.length === 2
-        ? "two-statement judgement"
-        : "single-concept application";
+  const format = formatLabelFor(question).toLowerCase();
 
   if (status === "direct") {
     return `Verify page proof, then convert into ${format} practice variants.`;

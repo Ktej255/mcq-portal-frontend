@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  BarChart3,
   BookOpenCheck,
   BrainCircuit,
   CheckCircle2,
@@ -46,6 +47,20 @@ const subjectWindows = [
   ["August", "Economy", "Prepare subject room"],
   ["September", "Science and Tech", "Prepare subject room"],
   ["Next", "Polity + Governance", "Mega chapter"],
+];
+
+const proofActions = [
+  "Complete MCQs with matched covered portions",
+  "Direct, partial, miss, and dropped-question separation",
+  "Surprise pattern and untouched-domain view",
+  "2027 course-correction path for content, tests, and revision",
+];
+
+const softwarePath = [
+  ["Source archive", "Map class files, PDFs, and notes against every Prelims question."],
+  ["Evidence ledger", "Separate exact text leads from conceptual coverage before publishing a claim."],
+  ["Proof feed", "Send only verified question-wise evidence to the public showcase."],
+  ["2027 planner", "Turn misses and weak matches into content, MCQ, and revision work orders."],
 ];
 
 type ProductStat = {
@@ -181,6 +196,42 @@ export function UpscProductEntry() {
               )}
             </div>
 
+            <div
+              data-testid="upsc-public-showcase-entry"
+              className="rounded-lg border border-[#bfd7cf] bg-[#fffdf8] p-4 shadow-sm"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1d9e75]">2026 audit proof</p>
+                    <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">Public prelims showcase</h2>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+                      A standalone page for students to inspect what was covered, what appeared in the paper, what
+                      changed in the pattern, and where the 2027 course needs sharper preparation.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/upsc-prelims-2026-showcase"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-[#1d9e75]/40 bg-[#e7f5ee] px-4 text-sm font-black text-[#085041] transition hover:bg-[#d8f0e6]"
+                >
+                  View audit page
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {proofActions.map((action) => (
+                  <div key={action} className="flex items-start gap-2 text-sm font-bold leading-6 text-[#33443b]">
+                    <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                    <span>{action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
               {productStats.map(({ label, detail, icon: Icon }) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
@@ -242,6 +293,20 @@ export function UpscProductEntry() {
             Students enter through one account route, complete the daily Geography loop, and use MCQs as one action
             inside the wider learning system.
           </p>
+          <div className="mt-5 border-t border-[#e5ded0] pt-4">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8c5d14]">2027 software path</p>
+            <div className="mt-3 grid gap-3">
+              {softwarePath.map(([label, detail]) => (
+                <div key={label} className="flex gap-3">
+                  <Route className="mt-1 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                  <div>
+                    <p className="text-sm font-black text-[#13251d]">{label}</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">{detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-5">

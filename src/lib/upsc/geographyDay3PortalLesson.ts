@@ -49,7 +49,7 @@ export const geographyDay3PortalLesson = {
   promise:
     "Move from seismic evidence to layers, mantle behavior, plate boundaries, and the map pattern of landforms and hazards.",
   sourceSummary:
-    "Adapted from the portal's Earth-interior-to-plate-movement animation blueprint and the compact 30-day Geography bridge.",
+    "Adapted from the portal's Earth-interior-to-plate-movement animation blueprint and the compact 20-day Geography bridge.",
   scenes: [
     {
       id: "3-briefing",

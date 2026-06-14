@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Gauge,
+  KeyRound,
   Lightbulb,
   LockKeyhole,
   Mic,
@@ -44,6 +45,8 @@ import {
 } from "@/lib/upsc/subjectLearning";
 import { getSubjectLabProofCompletion, getSubjectWatchCompletion } from "@/lib/upsc/subjectProgressGates";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import {
   type SubjectConfidence,
   type SubjectDayProgress,
@@ -222,6 +225,7 @@ function readSavedDoubtDiagnosis(progress?: SubjectDayProgress): AdaptiveTeacher
 
 export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { getDayProgress, isLoaded, saveDayProgress } = useSubjectProgress(plan.slug, plan.sessions);
   const [activeDay, setActiveDay] = useState(initialDay ?? 1);
   const [mentorMode, setMentorMode] = useState<SubjectMentorMode>("Cause-effect");
@@ -281,6 +285,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     () => (plan.slug === "history" ? getHistoryLearningPack(activeSession) : null),
     [activeSession, plan.slug]
   );
+  const hasMasterAccess = isMasterEmail(user?.email) || isLocalMockMasterSession();
   const learningPack =
     environmentPack ??
     economyPack ??
@@ -686,8 +691,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     });
   };
 
-  const assessCurrentAnswer = (includeChallenge = false) => {
-    const assessmentText = [answerDraft, includeChallenge ? challengeDraft : ""]
+  const assessCurrentAnswer = (includeChallenge = false, overrideAnswer?: string) => {
+    const answerForAssessment = overrideAnswer ?? answerDraft;
+    const assessmentText = [answerForAssessment, includeChallenge ? challengeDraft : ""]
       .map((part) => part.trim())
       .filter(Boolean)
       .join("\n\nPeer challenge response:\n");
@@ -773,6 +779,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     setSubmittedInCurrentVisit(true);
     persistCurrentState({
       confidence: nextConfidence,
+      reflection: answerForAssessment,
       challengeResponse: challengeDraft,
       revisitQueued: nextRevisionQueued,
       assessment: nextAssessment,
@@ -794,7 +801,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     void requestAdaptiveTeacherDiscussion({
       subjectSlug: plan.slug,
       day: activeSession.day,
-      answer: answerDraft,
+      answer: answerForAssessment,
       challengeAnswer: includeChallenge ? challengeDraft : undefined,
       learnerLevel,
     })
@@ -822,6 +829,28 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         setTeacherCoach(null);
         setTeacherConnection("unavailable");
       });
+  };
+
+  const runMasterOnePassCheck = () => {
+    const packProof = learningPack
+      ? `Rubric proof: ${learningPack.lens}. Chain: ${learningPack.causeChain.slice(0, 4).join(" -> ")}. Trap: ${learningPack.trapBank[0]}.`
+      : `Subtopic proof: ${subtopics.slice(0, 4).join(", ")}.`;
+    const onePassAnswer = [
+      `Master pass flow check for ${plan.title}: ${activeSession.title}.`,
+      `Core command: define the issue, explain the cause-effect mechanism, give one applied example, add an exception, and name the UPSC trap.`,
+      packProof,
+      `This answer is only to verify that talk assessment, teacher repair, route gate, and next-room controls are working.`,
+    ].join(" ");
+
+    setAnswerDraft(onePassAnswer);
+    setChallengeDraft("");
+    setDiscussionStep("explain");
+    setSpeechRecognition(null);
+    setSpeechState("idle");
+    setSpeechInterimDraft("");
+    setSpeechMessage("Master pass filled and checked this answer.");
+    clearAudioNote();
+    assessCurrentAnswer(false, onePassAnswer);
   };
 
   const stopAudioRecording = () => {
@@ -970,7 +999,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       setSpeechInterimDraft("");
       setSpeechMessage("Listening now. Speak your full answer in one flow.");
     };
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const { finalTranscript, interimTranscript } = collectSpeechTranscripts(event);
       setSpeechInterimDraft(interimTranscript);
 
@@ -1010,7 +1039,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         );
       }
     };
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
       stoppedByError = true;
       setSpeechRecognition(null);
       setSpeechInterimDraft("");
@@ -1130,7 +1159,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
             <h1 className="text-3xl font-black tracking-tight text-[var(--subject-heading)] md:text-5xl">
               {activeSession.title}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#5d675f]/5 rounded px-1 -mx-1" title="Hover to reveal full details">
               {learnerLevel === "beginner"
                 ? `Explain the lesson in your own words. The AI teacher keeps the discussion focused until recall reaches ${SUBJECT_RECALL_TARGET}%.`
                 : learnerLevel === "advanced"
@@ -1144,7 +1173,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
                 {learnerModeCopy.label}
               </p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{learnerModeCopy.detail}</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#5d675f]/5 rounded px-1 -mx-1" title="Hover to reveal mode details">{learnerModeCopy.detail}</p>
             </div>
             <div
               data-testid="subject-talk-simple-loop"
@@ -1169,12 +1198,12 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[var(--subject-accent)] text-white">
                 <BrainCircuit className="h-5 w-5" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">{teacherPromptLabel}</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--subject-heading)]">
                   {teacherPromptTitle}
                 </h2>
-                <p className="mt-3 text-lg font-black leading-8 text-[var(--subject-heading)]">{teacherPromptQuestion}</p>
+                <p className="mt-3 text-lg font-black leading-8 text-[var(--subject-heading)] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-black/5 rounded px-1 -mx-1" title="Hover to reveal full prompt">{teacherPromptQuestion}</p>
               </div>
             </div>
           </div>
@@ -1183,8 +1212,14 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
             <>
               <textarea
                 data-testid="talk-answer-draft"
-                value={answerDraft}
+                value={
+                  speechState === "listening" && speechInterimDraft
+                    ? `${answerDraft}${answerDraft ? "\n" : ""}${speechInterimDraft}`
+                    : answerDraft
+                }
+                readOnly={speechState === "listening"}
                 onChange={(event) => {
+                  if (speechState === "listening") return;
                   setAnswerDraft(event.target.value);
                   setChallengeDraft("");
                   setDiscussionStep("explain");
@@ -1197,7 +1232,12 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   setSubmittedInCurrentVisit(false);
                 }}
                 placeholder="Write the explanation in your own words: concept, mechanism, example, and one UPSC trap."
-                className="mt-5 min-h-40 w-full resize-y rounded-lg border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[var(--subject-accent)] focus:ring-2 focus:ring-[var(--subject-accent)]/20"
+                className={cn(
+                  "mt-5 min-h-40 w-full resize-y rounded-lg border p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:ring-2",
+                  speechState === "listening"
+                    ? "cursor-default border-[#1d9e75] bg-[#f4fbf7] focus:border-[#1d9e75] focus:ring-[#1d9e75]/20"
+                    : "border-[var(--subject-border)] bg-[var(--subject-bg)] focus:border-[var(--subject-accent)] focus:ring-[var(--subject-accent)]/20",
+                )}
               />
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1210,6 +1250,17 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   {speechState === "listening" || speechState === "recording" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   {speechState === "listening" ? "Stop speaking" : speechState === "recording" ? "Stop recording" : "Speak answer"}
                 </button>
+                {hasMasterAccess ? (
+                  <button
+                    type="button"
+                    data-testid="talk-master-one-pass"
+                    onClick={runMasterOnePassCheck}
+                    disabled={teacherConnection === "checking"}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#1d9e75]/40 bg-[#e7f5ee] px-4 text-sm font-black text-[#085041] transition hover:bg-[#d7efe4] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                  >
+                    <KeyRound className="h-4 w-4" /> One-pass check
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   data-testid="talk-assess-answer"
@@ -1233,13 +1284,14 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                     {speechMessage}
                   </span>
                 ) : null}
-                {speechInterimDraft ? (
+                {speechState === "listening" && speechInterimDraft ? (
                   <span
                     aria-live="polite"
                     data-testid="talk-speech-interim"
-                    className="w-full max-w-full rounded-md border border-[var(--subject-border)] bg-white px-3 py-2 text-xs font-bold leading-5 text-[var(--subject-dark)]"
+                    className="flex min-h-8 items-center gap-2 text-xs font-bold text-[#1d9e75]"
                   >
-                    Transcribing: {speechInterimDraft}
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#1d9e75]" />
+                    Listening — words appearing in the box above
                   </span>
                 ) : null}
                 {audioNoteUrl ? (
@@ -1434,7 +1486,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">Next</p>
                     <h2 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">{routeGateTitle}</h2>
-                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{routeGateStudentLine}</p>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#49675e]/5 rounded px-1 -mx-1" title="Hover to reveal route details">{routeGateStudentLine}</p>
                   </div>
                 </div>
                 <details className="mt-3 rounded-md bg-white/60 p-2">

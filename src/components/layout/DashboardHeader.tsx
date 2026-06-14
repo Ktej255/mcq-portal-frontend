@@ -52,6 +52,9 @@ function resolvePageTitle(pathname: string) {
     ['/upsc/mcq-command', 'Practice'],
     ['/upsc/revision-command', 'Revise'],
     ['/upsc/readiness-audit', 'Readiness'],
+    ['/upsc/prelims-review-command', 'Prelims Review'],
+    ['/upsc/prelims-2026-showcase', '2026 Showcase'],
+    ['/upsc/prelims-2027-strategy', '2027 Strategy'],
   ] as const;
 
   const matchedUpscRoute = upscRoutes.find(([route]) => pathname.startsWith(route));

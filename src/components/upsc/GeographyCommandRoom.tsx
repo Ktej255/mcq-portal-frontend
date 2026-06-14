@@ -25,11 +25,24 @@ import { Badge } from "@/components/ui/badge";
 import { getGeographyLoopState, hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { GEOGRAPHY_RECALL_TARGET, getCurrentGeographyTopic, getGuidedStudySteps } from "@/lib/upsc/guidedStudy";
 import {
+  geographyCompletionAuditItems,
+  getGeographyCompletionAuditSummary,
+} from "@/lib/upsc/geographyCompletionAudit";
+import {
   getGeographyGsCompatibility,
   getGeographySubtopics,
   labSlugForGeographySession,
 } from "@/lib/upsc/geographyLearning";
-import { getPrimaryGeographyContentModuleForDay } from "@/lib/upsc/geographyContentModules";
+import {
+  geographyModuleReadinessSummaries,
+  getGeographyModuleReadiness,
+  getPrimaryGeographyContentModuleForDay,
+} from "@/lib/upsc/geographyContentModules";
+import {
+  getGeographyTopicCoverageSummary,
+  getGeographyTopicGroupsForDay,
+  geographyTopicGroups,
+} from "@/lib/upsc/geographyTopicCoverage";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { getSubjectSourcePack } from "@/lib/upsc/syllabusPyqRegistry";
@@ -131,7 +144,26 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const activeProgress = getDayProgress(activeSession.day);
   const labSlug = activeProgress?.labMode ?? labSlugForGeographySession(activeSession.lab);
   const profileLevel = learnerLevel.toLowerCase() as StudentLevel;
-  const nextAction = getGeographyLoopState(activeSession, activeProgress, { isLoaded, labSlug, learnerLevel: profileLevel });
+  const previousRecallSession = activeSession.day > 1 ? resolveSession(activeSession.day - 1) : null;
+  const dayStartRecallCleared = Boolean(
+    !previousRecallSession ||
+      (activeProgress?.dayStartRecallSourceDay === previousRecallSession.day &&
+        activeProgress.dayStartRecallClearedAt)
+  );
+  const shouldStartWithPreviousRecall = isLoaded && Boolean(previousRecallSession) && !dayStartRecallCleared;
+  const regularNextAction = getGeographyLoopState(activeSession, activeProgress, { isLoaded, labSlug, learnerLevel: profileLevel });
+  const nextAction =
+    previousRecallSession && shouldStartWithPreviousRecall
+      ? {
+          label: "Previous day recall due" as const,
+          detail: `Day ${activeSession.day} starts by recalling Day ${previousRecallSession.day}: ${previousRecallSession.title}. New content opens after this recall clears.`,
+          shortDetail: `Recall Day ${previousRecallSession.day} first`,
+          href: `/upsc/geography/talk?day=${previousRecallSession.day}&startDay=${activeSession.day}`,
+          cta: `Recall Day ${previousRecallSession.day} first`,
+          room: "talk" as const,
+          tone: "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]",
+        }
+      : regularNextAction;
   const funnelSteps = buildFunnelSteps(activeSession, activeProgress, nextAction.room, profileLevel);
   const completedStepCount = funnelSteps.filter((step) => step.status === "done").length;
   const monthPercent = Math.round((activeSession.day / geographySessions.length) * 100);
@@ -141,6 +173,15 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const syllabusChips = getGeographySubtopics(activeSession).slice(0, 4);
   const sourcePack = getSubjectSourcePack("geography");
   const contentModule = getPrimaryGeographyContentModuleForDay(activeSession.day);
+  const activeModuleReadiness = contentModule ? getGeographyModuleReadiness(contentModule) : null;
+  const moduleReadinessQueue = [...geographyModuleReadinessSummaries].sort((a, b) => a.day - b.day);
+  const productionReadyModuleCount = moduleReadinessQueue.filter((module) => module.status === "complete").length;
+  const moduleQueueMissingActionCount = moduleReadinessQueue.reduce((sum, module) => sum + module.missingActions.length, 0);
+  const topicCoverageSummary = getGeographyTopicCoverageSummary();
+  const completionAuditSummary = getGeographyCompletionAuditSummary();
+  const activeTopicGroups = getGeographyTopicGroupsForDay(activeSession.day);
+  const activeCompressedGroups = activeTopicGroups.filter((group) => group.coverageMode === "compressed-day");
+  const activeModuleGapCount = activeTopicGroups.filter((group) => group.moduleReadiness === "module-needed").length;
   const leadTrendInsight = sourcePack?.trendInsights[0];
   const revisionDay = Math.min(activeSession.day + 2, geographySessions.length);
   const revisionSession = resolveSession(revisionDay);
@@ -200,6 +241,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
           data-active-subject="geography"
           data-active-day={activeSession.day}
           data-current-readiness={nextAction.label}
+          data-day-start-recall-source-day={previousRecallSession?.day ?? ""}
+          data-day-start-recall-state={!isLoaded ? "loading" : dayStartRecallCleared ? "clear" : "due"}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -208,6 +251,15 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                 <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Geography</Badge>
                 <span className="text-sm font-black text-[#1d9e75]">Day {activeSession.day} of {geographySessions.length}</span>
                 <span className="text-sm font-semibold text-[#746f66]">{activeSession.duration}</span>
+                <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-xs font-black text-[#085041]">
+                  {activeTopicGroups.length || 0} PDF topic groups
+                </span>
+                <Link
+                  href="/upsc/geography/continue"
+                  className="inline-flex min-h-8 items-center rounded-md border border-[#cfe5dc] bg-white px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:border-[#1d9e75]"
+                >
+                  Continue Geography
+                </Link>
               </div>
               <h1 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">{activeSession.title}</h1>
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
@@ -233,6 +285,87 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                         {chip}
                       </span>
                     ))}
+                  </div>
+                  <div
+                    data-testid="geography-command-topic-coverage-audit"
+                    data-total-pdf-topic-groups={topicCoverageSummary.total}
+                    data-mapped-topic-percent={topicCoverageSummary.mappedPercent}
+                    data-module-ready-percent={topicCoverageSummary.moduleReadyPercent}
+                    data-active-topic-count={activeTopicGroups.length}
+                    data-active-compressed-topic-count={activeCompressedGroups.length}
+                    data-active-module-gap-count={activeModuleGapCount}
+                    className="mt-4 rounded-lg border border-[#dcd5c7] bg-white p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
+                          PDF topic coverage audit
+                        </p>
+                        <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">
+                          {topicCoverageSummary.total}/82 groups mapped into the 20-day plan
+                        </h3>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#66736b]">
+                          {topicCoverageSummary.compressed} groups are compressed inside broader days. {topicCoverageSummary.moduleNeeded} groups still need final slide-style web modules.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                        <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[#085041]">
+                          {topicCoverageSummary.direct} direct
+                        </span>
+                        <span className="rounded-md bg-[#fff4df] px-2.5 py-1 text-[#6f4a12]">
+                          {topicCoverageSummary.compressed} compressed
+                        </span>
+                        <span className="rounded-md bg-[#f7f4ee] px-2.5 py-1 text-[#5d675f]">
+                          {topicCoverageSummary.pilotModules} pilot / {topicCoverageSummary.draftModules} draft
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-2 md:grid-cols-2">
+                      {activeTopicGroups.length ? (
+                        activeTopicGroups.map((group) => (
+                          <div
+                            key={group.id}
+                            data-testid={`geography-topic-group-${group.id}`}
+                            data-topic-day={group.plannedDay}
+                            data-coverage-mode={group.coverageMode}
+                            data-module-readiness={group.moduleReadiness}
+                            className="rounded-md border border-[#eee7dc] bg-[#f7f4ee] p-3"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-white px-2 py-1 text-[10px] font-black text-[#1a3a2a]">
+                                Topic {group.id}
+                              </span>
+                              <span className={cn(
+                                "rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                group.coverageMode === "direct-day"
+                                  ? "bg-[#e7f5ee] text-[#085041]"
+                                  : "bg-[#fff4df] text-[#6f4a12]"
+                              )}>
+                                {group.coverageMode === "direct-day" ? "Direct" : "Compressed"}
+                              </span>
+                              <span className="rounded bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#5d675f]">
+                                {group.moduleReadiness === "pilot-module"
+                                  ? "Pilot module"
+                                  : group.moduleReadiness === "draft-module"
+                                    ? "Draft module"
+                                    : "Module needed"}
+                              </span>
+                            </div>
+                            <h4 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{group.title}</h4>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{group.auditNote}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-md border border-[#eee7dc] bg-[#f7f4ee] p-3 md:col-span-2">
+                          <p className="text-sm font-black text-[#13251d]">
+                            Day {activeSession.day} is a foundation or integration day.
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">
+                            It supports the PDF topic groups but does not introduce a new numbered PDF group.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {sourcePack ? (
                     <div
@@ -293,11 +426,14 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                       </div>
                     </div>
                   ) : null}
-                  {contentModule ? (
+                  {contentModule && activeModuleReadiness ? (
                     <div
                       data-testid="geography-command-content-module"
                       data-module-id={contentModule.id}
                       data-module-section-count={contentModule.sections.length}
+                      data-module-readiness-status={activeModuleReadiness.status}
+                      data-module-readiness-score={activeModuleReadiness.score}
+                      data-module-readiness-missing-count={activeModuleReadiness.missing}
                       className="mt-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -311,6 +447,17 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                           <p className="mt-1 text-xs font-bold leading-5 text-[#49675e]">
                             {contentModule.sections.length} slide-style sections with cumulative AI discussion after every section.
                           </p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                            <span className="rounded-md bg-white px-2.5 py-1 text-[#085041]">
+                              {activeModuleReadiness.score}% ready
+                            </span>
+                            <span className="rounded-md bg-white px-2.5 py-1 text-[#085041]">
+                              {activeModuleReadiness.complete}/5 checks complete
+                            </span>
+                            <span className="rounded-md bg-[#fff4df] px-2.5 py-1 text-[#6f4a12]">
+                              {activeModuleReadiness.missing} missing
+                            </span>
+                          </div>
                         </div>
                         <Link
                           href={`/upsc/geography/watch?day=${activeSession.day}&module=${contentModule.id}&section=${contentModule.sections[0]?.id ?? ""}`}
@@ -318,6 +465,38 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                         >
                           Open module <ArrowRight className="ml-2 h-3.5 w-3.5" />
                         </Link>
+                      </div>
+                      <div
+                        data-testid="geography-active-module-readiness"
+                        data-readiness-score={activeModuleReadiness.score}
+                        data-readiness-complete-count={activeModuleReadiness.complete}
+                        data-readiness-partial-count={activeModuleReadiness.partial}
+                        data-readiness-missing-count={activeModuleReadiness.missing}
+                        className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5"
+                      >
+                        {activeModuleReadiness.checklist.map((item) => (
+                          <div
+                            key={item.id}
+                            data-testid={`geography-active-module-readiness-${item.id}`}
+                            data-readiness-status={item.status}
+                            className="rounded-md border border-[#cfe5dc] bg-white p-3"
+                          >
+                            <span
+                              className={cn(
+                                "rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                item.status === "complete"
+                                  ? "bg-[#e7f5ee] text-[#085041]"
+                                  : item.status === "partial"
+                                    ? "bg-[#fff4df] text-[#6f4a12]"
+                                    : "bg-[#fff1ed] text-[#7d3827]"
+                              )}
+                            >
+                              {item.status}
+                            </span>
+                            <h4 className="mt-2 text-xs font-black leading-5 text-[#13251d]">{item.label}</h4>
+                            <p className="mt-1 text-[11px] font-bold leading-5 text-[#66736b]">{item.detail}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ) : null}
@@ -549,6 +728,201 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               </div>
             </section>
 
+            <section
+              data-testid="geography-completion-audit"
+              data-audit-score={completionAuditSummary.score}
+              data-audit-complete-count={completionAuditSummary.complete}
+              data-audit-partial-count={completionAuditSummary.partial}
+              data-audit-missing-count={completionAuditSummary.missing}
+              data-topic-groups={completionAuditSummary.topicGroups}
+              data-module-covered-topic-count={completionAuditSummary.moduleCoveredTopicCount}
+              data-module-gap-count={completionAuditSummary.moduleGapCount}
+              data-module-covered-day-count={completionAuditSummary.moduleCoveredDayCount}
+              data-module-day-gap-count={completionAuditSummary.moduleDayGapCount}
+              data-approved-module-count={completionAuditSummary.approvedModuleCount}
+              data-draft-module-count={completionAuditSummary.draftModuleCount}
+              data-sample-module-count={completionAuditSummary.sampleModuleCount}
+              data-module-section-count={completionAuditSummary.moduleSectionCount}
+              data-modules-with-image-metadata-count={completionAuditSummary.modulesWithImageMetadataCount}
+              data-sections-with-image-metadata-count={completionAuditSummary.sectionsWithImageMetadataCount}
+              data-modules-with-pyq-sections-count={completionAuditSummary.modulesWithPyqSectionsCount}
+              data-modules-with-mcq-sections-count={completionAuditSummary.modulesWithMcqSectionsCount}
+              data-modules-with-complete-recall-points-count={completionAuditSummary.modulesWithCompleteRecallPointsCount}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Completion audit</p>
+                  <h2 className="text-lg font-black tracking-tight">What is complete, partial, and still missing</h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-[#657066]">
+                    {completionAuditSummary.score}% implementation confidence. {completionAuditSummary.moduleGapCount} topic groups and {completionAuditSummary.moduleDayGapCount} student days are missing draft modules; remaining work is content approval, media, transcription, and evidence quality.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                  <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[#085041]">
+                    {completionAuditSummary.complete} complete
+                  </span>
+                  <span className="rounded-md bg-[#fff4df] px-2.5 py-1 text-[#6f4a12]">
+                    {completionAuditSummary.partial} partial
+                  </span>
+                  <span className="rounded-md bg-[#fff1ed] px-2.5 py-1 text-[#7d3827]">
+                    {completionAuditSummary.missing} missing
+                  </span>
+                  <span className="rounded-md bg-[#f7f4ee] px-2.5 py-1 text-[#5d675f]">
+                    {completionAuditSummary.approvedModuleCount}/{completionAuditSummary.moduleCount} approved
+                  </span>
+                  <span className="rounded-md bg-[#f7f4ee] px-2.5 py-1 text-[#5d675f]">
+                    {completionAuditSummary.modulesWithImageMetadataCount}/{completionAuditSummary.moduleCount} media
+                  </span>
+                  <span className="rounded-md bg-[#f7f4ee] px-2.5 py-1 text-[#5d675f]">
+                    {completionAuditSummary.modulesWithPyqSectionsCount}/{completionAuditSummary.moduleCount} PYQ
+                  </span>
+                  <span className="rounded-md bg-[#f7f4ee] px-2.5 py-1 text-[#5d675f]">
+                    {completionAuditSummary.modulesWithMcqSectionsCount}/{completionAuditSummary.moduleCount} MCQ
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {geographyCompletionAuditItems.map((item) => (
+                  <div
+                    key={item.id}
+                    data-testid={`geography-completion-audit-${item.id}`}
+                    data-audit-status={item.status}
+                    className="rounded-md border border-[#eee7dc] bg-[#f7f4ee] p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                          item.status === "complete"
+                            ? "bg-[#e7f5ee] text-[#085041]"
+                            : item.status === "partial"
+                              ? "bg-[#fff4df] text-[#6f4a12]"
+                              : "bg-[#fff1ed] text-[#7d3827]"
+                        )}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{item.gap}</p>
+                    <p className="mt-2 text-xs font-black leading-5 text-[#085041]">{item.nextAction}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section
+              data-testid="geography-content-production-queue"
+              data-module-count={moduleReadinessQueue.length}
+              data-production-ready-module-count={productionReadyModuleCount}
+              data-missing-action-count={moduleQueueMissingActionCount}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    Content production queue
+                  </p>
+                  <h2 className="text-lg font-black tracking-tight">All 20 modules, one approval view</h2>
+                  <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-[#657066]">
+                    This is the teacher/operator view for the remaining Geography work. It removes the need to open each day just to find missing approval, media, PYQ, MCQ, or recall-point tasks.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                  <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[#085041]">
+                    {productionReadyModuleCount}/{moduleReadinessQueue.length} production-ready
+                  </span>
+                  <span className="rounded-md bg-[#fff4df] px-2.5 py-1 text-[#6f4a12]">
+                    {moduleQueueMissingActionCount} remaining actions
+                  </span>
+                </div>
+              </div>
+
+              <div className="max-h-[34rem] overflow-y-auto pr-1">
+                <div className="grid gap-2 lg:grid-cols-2">
+                  {moduleReadinessQueue.map((module) => {
+                    const missingChecks = module.checklist.filter((item) => item.status !== "complete");
+                    return (
+                      <div
+                        key={module.moduleId}
+                        data-testid={`geography-content-production-module-${module.day}`}
+                        data-module-id={module.moduleId}
+                        data-module-day={module.day}
+                        data-module-readiness-status={module.status}
+                        data-module-readiness-score={module.score}
+                        data-module-missing-action-count={module.missingActions.length}
+                        className={cn(
+                          "rounded-md border p-3",
+                          module.status === "complete"
+                            ? "border-[#cfe5dc] bg-[#e7f5ee]"
+                            : "border-[#eee7dc] bg-[#f7f4ee]"
+                        )}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#1a3a2a]">
+                                Day {module.day}
+                              </span>
+                              <span
+                                className={cn(
+                                  "rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                  module.status === "complete"
+                                    ? "bg-white text-[#085041]"
+                                    : "bg-[#fff4df] text-[#6f4a12]"
+                                )}
+                              >
+                                {module.score}% ready
+                              </span>
+                              <span className="rounded bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#5d675f]">
+                                {module.complete}/5 checks
+                              </span>
+                            </div>
+                            <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{module.title}</h3>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">
+                              {missingChecks.length
+                                ? `${missingChecks.length} checks need attention before approval.`
+                                : "All checks are complete; this module can move into final approval records."}
+                            </p>
+                          </div>
+                          <Link
+                            href={`/upsc/geography/watch?day=${module.day}&module=${module.moduleId}`}
+                            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-md border border-[#cfe5dc] bg-white px-3 text-xs font-black text-[#085041] transition hover:border-[#1d9e75]"
+                          >
+                            Review
+                          </Link>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {missingChecks.length ? (
+                            missingChecks.map((item) => (
+                              <span
+                                key={item.id}
+                                data-testid={`geography-content-production-module-${module.day}-${item.id}`}
+                                data-readiness-status={item.status}
+                                className={cn(
+                                  "rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                  item.status === "partial"
+                                    ? "bg-[#fff4df] text-[#6f4a12]"
+                                    : "bg-[#fff1ed] text-[#7d3827]"
+                                )}
+                              >
+                                {item.label}: {item.status}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="rounded bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">
+                              No missing checks
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+
             <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-3">
@@ -628,6 +1002,65 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                         >
                           {status}
                         </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+
+            <section
+              data-testid="geography-topic-finder"
+              data-topic-count={geographyTopicGroups.length}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Topic finder</p>
+                  <h2 className="text-lg font-black tracking-tight">Jump from the 82 PDF groups to the right day</h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-[#657066]">
+                    Use this when a student asks where a specific Geography topic lives. The main route still remains the single current action above.
+                  </p>
+                </div>
+                <span className="rounded-md bg-[#e7f5ee] px-3 py-2 text-xs font-black text-[#085041]">
+                  {geographyTopicGroups.length} mapped groups
+                </span>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto pr-1">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {geographyTopicGroups.map((group) => {
+                    const isActiveTopicDay = group.plannedDay === activeSession.day;
+                    const canOpen = canSelectDay(group.plannedDay);
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        data-testid={`geography-topic-finder-${group.id}`}
+                        data-topic-day={group.plannedDay}
+                        data-topic-part={group.part}
+                        data-topic-module-readiness={group.moduleReadiness}
+                        disabled={!canOpen}
+                        onClick={() => canOpen && selectDay(group.plannedDay)}
+                        className={cn(
+                          "min-h-24 rounded-md border p-3 text-left transition",
+                          isActiveTopicDay
+                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                            : canOpen
+                              ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+                              : "cursor-not-allowed border-[#e7e2d9] bg-[#f7f4ee] text-[#9a9489] opacity-65"
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={cn("rounded px-2 py-1 text-[10px] font-black", isActiveTopicDay ? "bg-white/15" : "bg-white")}>
+                            Topic {group.id}
+                          </span>
+                          <span className={cn("rounded px-2 py-1 text-[10px] font-black", isActiveTopicDay ? "bg-white/15" : "bg-[#e7f5ee] text-[#085041]")}>
+                            Day {group.plannedDay}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm font-black leading-5">{group.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 opacity-75">{group.part}</p>
                       </button>
                     );
                   })}

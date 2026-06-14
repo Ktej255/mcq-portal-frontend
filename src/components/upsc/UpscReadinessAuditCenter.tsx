@@ -26,6 +26,10 @@ import {
   isUpscMcqRevisitOutcome,
 } from "@/lib/upsc/mcqCommandStatus";
 import { geographySessions } from "@/lib/upsc/plan";
+import {
+  buildPrelims2027OperationalQueue,
+  buildPrelims2027OperationalTotals,
+} from "@/lib/upsc/prelims2027Operations";
 import { getSubjectBatchCode, subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
@@ -97,11 +101,71 @@ const globalModules = [
   { title: "Syllabus and PYQ Library", href: "/upsc/source-library", status: "Ready" },
   { title: "Covered-Topic Current Affairs", href: "/upsc/current-affairs", status: "Ready" },
   { title: "Student Weekly and Monthly Reports", href: "/reports", status: "Ready" },
+  { title: "Prelims 2027 Strategy Command", href: "/upsc/prelims-2027-strategy", status: "Ready" },
   { title: "Content Command Center", href: "/upsc/content-command", status: "Ready" },
   { title: "MCQ Command Center", href: "/upsc/mcq-command", status: "Ready" },
   { title: "Custom MCQ Question Bank", href: "/upsc/question-bank", status: "Ready" },
   { title: "Revision Command Center", href: "/upsc/revision-command", status: "Ready" },
   { title: "Readiness Audit Center", href: "/upsc/readiness-audit", status: "Ready" },
+];
+
+const prelimsLaunchMatrix = [
+  {
+    id: "public-showcase",
+    owner: "Public proof page",
+    route: "/upsc-prelims-2026-showcase",
+    status: "Public safe",
+    proof: "Corrected 2026 audit, full MCQ ledger, highlighted matches, and main-site copy kept separate from operator notes.",
+  },
+  {
+    id: "proof-feed",
+    owner: "Claim release desk",
+    route: "/upsc/prelims-2027-strategy#prelims-2026-public-proof-feed",
+    status: "Proof locked",
+    proof: "Only accepted claims move through the proof feed before public copy can reuse the match evidence.",
+  },
+  {
+    id: "strategy-command",
+    owner: "2027 strategy room",
+    route: "/upsc/prelims-2027-strategy",
+    status: "Build queue",
+    proof: "Direct, partial, missed, dropped, surprise, format, and untapped-domain analysis becomes 2027 work.",
+  },
+  {
+    id: "content-build",
+    owner: "Content Command",
+    route: "/upsc/content-command",
+    status: "Teacher build orders",
+    proof: "Source gaps convert into capsule rebuild tasks, source shifts, and release gates for teachers.",
+  },
+  {
+    id: "current-bridge",
+    owner: "Current Affairs",
+    route: "/upsc/current-affairs",
+    status: "Syllabus tagged",
+    proof: "Current bridges are tagged to syllabus, source, capsule, proof, release, and planner actions.",
+  },
+  {
+    id: "practice-delivery",
+    owner: "Question Bank",
+    route: "/upsc/question-bank",
+    status: "Student evidence",
+    proof: "Strategy blueprints become solvable drills so accuracy and attempt evidence are measurable.",
+  },
+  {
+    id: "revision-repair",
+    owner: "Revision Command",
+    route: "/upsc/revision-command",
+    status: "Format rebuild",
+    proof: "How-many-correct, match-pair, exception, assertion, and caselet formats become revision rules.",
+  },
+  {
+    id: "reports-feedback",
+    owner: "Reports",
+    route: "/reports",
+    status: "Measured",
+    proof: "Reports show strategy task completion, generated blueprints, solved attempts, and accuracy movement.",
+  },
 ];
 
 const loopRooms = ["Command", "Watch", "Talk", "Visual Lab", "MCQ Readiness", "Track", "Revisit"];
@@ -250,6 +314,22 @@ export function UpscReadinessAuditCenter() {
     };
   }, [subjectAudits]);
   const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(10) : []), [isLoaded, refreshTick, subjectAudits]);
+  const strategyOpsQueue = useMemo(
+    () => (isLoaded ? buildPrelims2027OperationalQueue(4) : []),
+    [isLoaded, refreshTick]
+  );
+  const strategyOpsTotals = useMemo(
+    () =>
+      isLoaded
+        ? buildPrelims2027OperationalTotals()
+        : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 },
+    [isLoaded, refreshTick]
+  );
+  const publicSafeRows = prelimsLaunchMatrix.filter((row) => row.status === "Public safe").length;
+  const proofLockedRows = prelimsLaunchMatrix.filter((row) => row.status === "Proof locked").length;
+  const measuredRows = prelimsLaunchMatrix.filter(
+    (row) => row.status === "Student evidence" || row.status === "Measured"
+  ).length;
 
   const launchScore = Math.round(
     totals.structurePercent * 0.45 + totals.contentPercent * 0.2 + totals.mcqPercent * 0.2 + totals.reflectionPercent * 0.15
@@ -315,6 +395,73 @@ export function UpscReadinessAuditCenter() {
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</p>
                 <p className="mt-3 text-3xl font-black tracking-tight text-[#13251d]">{item.value}</p>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          id="upsc-2026-2027-launch-readiness-matrix"
+          data-testid="upsc-2026-2027-launch-readiness-matrix"
+          data-row-count={prelimsLaunchMatrix.length}
+          data-public-safe-count={publicSafeRows}
+          data-proof-locked-count={proofLockedRows}
+          data-measured-count={measuredRows}
+          data-proof-rule="public-page-proof-feed-strategy-student-evidence-chain"
+          className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+        >
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">2026 proof to 2027 action</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">2026 to 2027 launch chain</h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">
+                This is the operator proof that the public showcase, proof feed, strategy command, content/current/revision
+                rooms, question bank and reports are connected before main-site copy is used.
+              </p>
+            </div>
+            <Link
+              href="/upsc/prelims-2027-strategy"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-bold text-white transition hover:bg-[#10291d]"
+            >
+              Open strategy <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: "Public safe", value: publicSafeRows, note: "Main-site proof page ready" },
+              { label: "Proof locked", value: proofLockedRows, note: "Claim feed governs reuse" },
+              { label: "Student evidence", value: measuredRows, note: "Practice and reports measured" },
+              { label: "Software owners", value: prelimsLaunchMatrix.length, note: "Every handoff has a room" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{item.label}</p>
+                <p className="mt-2 text-2xl font-black text-[#13251d]">{item.value}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">{item.note}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {prelimsLaunchMatrix.map((row) => (
+              <Link
+                key={row.id}
+                href={row.route}
+                data-testid="upsc-2026-2027-launch-readiness-row"
+                data-launch-id={row.id}
+                data-status={row.status}
+                className="group flex min-h-44 min-w-0 flex-col justify-between rounded-md border border-[#dcd5c7] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#1d9e75]"
+              >
+                <span className="min-w-0">
+                  <span className="mb-3 inline-flex rounded-md bg-[#e7f5ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
+                    {row.status}
+                  </span>
+                  <span className="block break-words text-sm font-black leading-5 text-[#13251d]">{row.owner}</span>
+                  <span className="mt-2 block break-words text-xs font-semibold leading-5 text-[#657066]">{row.proof}</span>
+                </span>
+                <span className="mt-4 inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+                  Open room <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                </span>
+              </Link>
             ))}
           </div>
         </section>
@@ -432,6 +579,64 @@ export function UpscReadinessAuditCenter() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div
+              data-testid="readiness-prelims-2027-ops-queue"
+              data-source-orders={strategyOpsTotals.sourceOrders}
+              data-unresolved-orders={strategyOpsTotals.unresolved}
+              data-drafted-orders={strategyOpsTotals.drafted}
+              data-action-count={strategyOpsQueue.length}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#fff0ec] text-[#9d3824]">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-[#13251d]">2027 source-gap work</p>
+                  <p className="text-xs font-semibold text-[#746f66]">Pulled from Strategy Command local work orders</p>
+                </div>
+              </div>
+
+              <div className="mb-4 grid grid-cols-4 gap-2">
+                {[
+                  ["Orders", strategyOpsTotals.sourceOrders],
+                  ["Open", strategyOpsTotals.unresolved],
+                  ["Drafted", strategyOpsTotals.drafted],
+                  ["Done", strategyOpsTotals.resolved],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#9d3824]">{label}</p>
+                    <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-3">
+                {strategyOpsQueue.map((item) => (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    data-testid="readiness-prelims-2027-ops-row"
+                    data-action-key={item.key}
+                    data-status-label={item.statusLabel}
+                    className={cn("rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                        {item.badge}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </div>
+                    <p className="text-sm font-black leading-5">{item.title}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] opacity-75">
+                      {item.statusLabel}
+                    </p>
+                    <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+                  </Link>
+                ))}
+              </div>
             </div>
 
             <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">

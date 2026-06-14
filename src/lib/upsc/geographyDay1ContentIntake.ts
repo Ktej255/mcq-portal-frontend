@@ -89,5 +89,5 @@ export const geographyDay1Recommendation = {
   proposedDay3:
     "Interior of Earth and plate movement: seismic evidence, layers, mantle behavior, boundary types, and hazard patterns.",
   decision:
-    "Day 1 is staged as a source-backed portal-native foundation lesson with a five-choice India map-relationship drill. Day 2 is promoted locally as the source-backed Universe-to-Earth visual lesson. Day 3 is tightened into the Earth-interior-to-plate-movement bridge so the 30-day schedule remains intact. Final recorded media, transcript approval, detailed visual production, and fresh MCQ intake remain open.",
+    "Day 1 is staged as a source-backed portal-native foundation lesson with a five-choice India map-relationship drill. Day 2 is promoted locally as the source-backed Universe-to-Earth visual lesson. Day 3 is tightened into the Earth-interior-to-plate-movement bridge so the 20-day student schedule remains intact. Final recorded media, transcript approval, detailed visual production, and fresh MCQ intake remain open.",
 };

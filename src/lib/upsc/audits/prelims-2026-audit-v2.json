@@ -234,7 +234,12 @@
         "Medium"
       ],
       "stem": "Which of the following pairs of ancient and modern names of rivers is/are correctly matched?",
-      "statements": [],
+      "statements": [
+        "Vitasta - Chenab",
+        "Asikni - Jhelum",
+        "Parushni - Ravi",
+        "Yavyavati - Beas"
+      ],
       "instruction": "Which of the following pairs of ancient and modern names of rivers is/are correctly matched?",
       "options": [
         {
@@ -357,7 +362,11 @@
         "Difficult"
       ],
       "stem": "Which of the following pairs of the king and his dynasty in early historical Tamilakam is/are not correctly matched?",
-      "statements": [],
+      "statements": [
+        "Senguttuvan - Chera",
+        "Udiyanjeral - Chola",
+        "Nedunjeliyan - Pandya"
+      ],
       "instruction": "Which of the following pairs of the king and his dynasty in early historical Tamilakam is/are not correctly matched?",
       "options": [
         {
@@ -3084,8 +3093,13 @@
         "Medium"
       ],
       "stem": "Match List I with List II and select the answer using the code given below the Lists:",
-      "statements": [],
-      "instruction": "",
+      "statements": [
+        "A. Silver Notice",
+        "B. Blue Notice",
+        "C. Black Notice",
+        "D. Green Notice"
+      ],
+      "instruction": "List II: 1. Unidentified bodies; 2. Criminal investigation information; 3. Public safety warning; 4. Criminal assets.",
       "options": [
         {
           "letter": "A",
@@ -7047,8 +7061,13 @@
         "Difficult"
       ],
       "stem": "Match List I with List II and select the answer using the code given below the Lists:",
-      "statements": [],
-      "instruction": "",
+      "statements": [
+        "A. Mangdechhu",
+        "B. Stor Palace",
+        "C. Dickoya District Hospital",
+        "D. ISLES"
+      ],
+      "instruction": "List II: 1. Maldives security institute; 2. Afghanistan cultural restoration; 3. India-Bhutan hydropower; 4. Sri Lanka plantation community.",
       "options": [
         {
           "letter": "A",
@@ -7320,8 +7339,13 @@
         "Difficult"
       ],
       "stem": "Match List I with List II and select the answer using the code given below the Lists:",
-      "statements": [],
-      "instruction": "",
+      "statements": [
+        "A. UNMIL",
+        "B. MINURCAT",
+        "C. MINUSTAH",
+        "D. UNMISET"
+      ],
+      "instruction": "List II: 1. Chad/CAR, 2007-2010; 2. East Timor, 2002-2005; 3. Liberia, 2003-2018; 4. Haiti, 2004-2017.",
       "options": [
         {
           "letter": "A",
@@ -7372,8 +7396,13 @@
         "Difficult"
       ],
       "stem": "Match List I with List II and select the answer using the code given below the Lists:",
-      "statements": [],
-      "instruction": "",
+      "statements": [
+        "A. Cultural Industries Observatory",
+        "B. Energy Centre",
+        "C. Weather and Climate",
+        "D. Technology Transfer"
+      ],
+      "instruction": "List II: 1. NOIDA, India; 2. Bengaluru, India; 3. Colombo, Sri Lanka; 4. Thimphu, Bhutan.",
       "options": [
         {
           "letter": "A",

@@ -8,10 +8,15 @@ import { UpscProfileGate } from "@/components/upsc/UpscProfileGate";
 const operatorRoutes = new Set([
   "/upsc/prelims-2026-audit",
   "/upsc/prelims-2026-audit-v2",
+  "/upsc/prelims-2026-showcase",
+  "/upsc/prelims-review-command",
+  "/upsc/prelims-2027-strategy",
   "/upsc/readiness-audit",
+  "/upsc/current-affairs",
   "/upsc/mcq-command",
   "/upsc/content-command",
   "/upsc/revision-command",
+  "/upsc/yearly-planner",
   "/upsc/geography/testing",
 ]);
 

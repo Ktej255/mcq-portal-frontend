@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   BrainCircuit,
   CheckCircle2,
   Gauge,
+  KeyRound,
   Lightbulb,
   Lock,
   MapPinned,
@@ -18,7 +18,7 @@ import {
   Save,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { GeographyRoomCompass } from "@/components/upsc/GeographyRoomCompass";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import {
   assessGeographyModuleRecall,
@@ -43,6 +43,8 @@ import {
 import { GEOGRAPHY_RECALL_TARGET } from "@/lib/upsc/guidedStudy";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import type { AdaptiveTeacherCoach, AdaptiveTeacherDoubtDiagnosis } from "@/lib/upsc/adaptiveTeacher";
 import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
 import { requestUpscSpeechTranscription, requestUpscSpeechTranscriptionStatus } from "@/services/upscSpeechService";
@@ -302,9 +304,11 @@ type GeographyTalkRoomProps = {
   initialDay?: number;
   initialModuleId?: string;
   initialSectionId?: string;
+  dayStartReturnDay?: number;
 };
 
-export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionId }: GeographyTalkRoomProps) {
+export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionId, dayStartReturnDay }: GeographyTalkRoomProps) {
+  const { user } = useAuth();
   const { getDayProgress, isLoaded, saveDayProgress } = useGeographyProgress();
   const [activeDay] = useState(resolveSession(initialDay).day);
   const [answerDraft, setAnswerDraft] = useState("");
@@ -335,6 +339,8 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
   const speechCapturedTextRef = useRef(false);
 
   const activeSession = resolveSession(activeDay);
+  const dayStartReturnSession =
+    dayStartReturnDay && dayStartReturnDay > activeSession.day ? resolveSession(dayStartReturnDay) : null;
   const requestedModule = getGeographyContentModule(initialModuleId);
   const dayModule = getPrimaryGeographyContentModuleForDay(activeSession.day);
   const activeModule = requestedModule?.day === activeSession.day ? requestedModule : dayModule;
@@ -347,6 +353,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
   const activeExpectedRecallPoints = activeModuleSections.flatMap((section) =>
     section.expectedRecallPoints.map((point) => `${point.label}: ${point.detail}`)
   );
+  const hasMasterAccess = isMasterEmail(user?.email) || isLocalMockMasterSession();
   const progress = getDayProgress(activeSession.day);
   const activeModuleProgress = activeModule ? progress?.moduleProgress?.[activeModule.id] : undefined;
   const activeModuleSectionRead = Boolean(
@@ -363,8 +370,19 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
   const isTalkContentReady = isWatchComplete || activeModuleSectionRead || activeModuleSectionPassed;
   const recap = getCompressedGeographyRecap(activeSession);
   const watchHandoff = progress?.watchHandoffSummary?.trim() ?? "";
+  const dayStartRecallRoute =
+    dayStartReturnSession && assessment?.score && assessment.score >= GEOGRAPHY_RECALL_TARGET
+      ? {
+          href: `/upsc/geography?day=${dayStartReturnSession.day}`,
+          label: `Open Day ${dayStartReturnSession.day}`,
+          title: `Day ${dayStartReturnSession.day} can start`,
+          detail: `Previous-day recall is clear. Continue with ${dayStartReturnSession.title}.`,
+          tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
+        }
+      : null;
   const route = assessment
-    ? moduleRouteFor(activeSession, activeModule, activeModuleSection, moduleRecall) ??
+    ? dayStartRecallRoute ??
+      moduleRouteFor(activeSession, activeModule, activeModuleSection, moduleRecall) ??
       nextRouteFor(activeSession, assessment, isTalkContentReady, learnerLevel)
     : null;
   const talkLevelCopy = getTalkLevelCopy(learnerLevel);
@@ -606,10 +624,23 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
     nextAssessment: GeographyAssessment | null = assessment,
     nextDiscussion: GeographyMaicDiscussion | null = discussion,
     nextChallengeOpen = challengeOpen,
-    nextModuleRecall: GeographyModuleRecallAssessment | null = moduleRecall
+    nextModuleRecall: GeographyModuleRecallAssessment | null = moduleRecall,
+    nextReflection = answerDraft
   ) => {
+    const now = new Date().toISOString();
+    const dayStartRecallCleared = Boolean(
+      dayStartReturnSession && nextAssessment && nextAssessment.score >= GEOGRAPHY_RECALL_TARGET
+    );
     const nextRoute = nextAssessment
-      ? moduleRouteFor(activeSession, activeModule, activeModuleSection, nextModuleRecall) ??
+      ? dayStartRecallCleared && dayStartReturnSession
+        ? {
+            href: `/upsc/geography?day=${dayStartReturnSession.day}`,
+            label: `Open Day ${dayStartReturnSession.day}`,
+            title: `Day ${dayStartReturnSession.day} can start`,
+            detail: `Previous-day recall is clear. Continue with ${dayStartReturnSession.title}.`,
+            tone: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]",
+          }
+        : moduleRouteFor(activeSession, activeModule, activeModuleSection, nextModuleRecall) ??
         nextRouteFor(activeSession, nextAssessment, isTalkContentReady, learnerLevel)
       : null;
     const stage = nextAssessment ? getGeographyTalkUnlockStage(nextAssessment) : undefined;
@@ -619,14 +650,14 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
             moduleId: activeModule.id,
             sectionId: activeModuleSection.id,
             cumulativeSectionIds: nextModuleRecall.cumulativeSectionIds,
-            answer: [answerDraft, challengeDraft.trim() ? challengeDraft : ""]
+            answer: [nextReflection, challengeDraft.trim() ? challengeDraft : ""]
               .map((part) => part.trim())
               .filter(Boolean)
               .join("\n\nChallenge repair:\n"),
             score: nextModuleRecall.currentMasteryPercent,
             knownConcepts: nextModuleRecall.knownConcepts,
             missingConcepts: nextModuleRecall.missingConcepts,
-            attemptedAt: new Date().toISOString(),
+            attemptedAt: now,
           }
         : null;
     const existingModuleProgress =
@@ -655,13 +686,13 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
               sectionRecallAttempts: moduleAttempt
                 ? [...(existingModuleProgress?.sectionRecallAttempts ?? []), moduleAttempt]
                 : existingModuleProgress?.sectionRecallAttempts,
-              updatedAt: new Date().toISOString(),
+              updatedAt: now,
             },
           }
         : undefined;
     saveDayProgress(activeSession.day, {
       learnerLevel: progressLearnerLevelLabel(learnerLevel),
-      reflection: answerDraft,
+      reflection: nextReflection,
       talkChallengeResponse: challengeDraft,
       talkScore: nextAssessment?.score,
       talkBand: nextAssessment?.band,
@@ -713,12 +744,20 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
           }
         : {}),
     });
+    if (dayStartRecallCleared && dayStartReturnSession && nextAssessment) {
+      saveDayProgress(dayStartReturnSession.day, {
+        dayStartRecallSourceDay: activeSession.day,
+        dayStartRecallClearedAt: now,
+        dayStartRecallScore: nextAssessment.score,
+      });
+    }
     setSaved(true);
   };
 
-  const assess = (includeChallenge: boolean) => {
+  const assess = (includeChallenge: boolean, overrideAnswer?: string) => {
     if (teacherConnection === "checking") return;
-    const combinedAnswer = [answerDraft, includeChallenge ? challengeDraft : ""]
+    const answerForAssessment = overrideAnswer ?? answerDraft;
+    const combinedAnswer = [answerForAssessment, includeChallenge ? challengeDraft : ""]
       .map((part) => part.trim())
       .filter(Boolean)
       .join("\n\nChallenge repair:\n");
@@ -759,14 +798,14 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
     setSubmittedInCurrentVisit(true);
     setDiscussion(nextDiscussion);
     setChallengeOpen(nextChallengeOpen);
-    persistTalk(nextAssessment, nextDiscussion, nextChallengeOpen, nextModuleRecall);
+    persistTalk(nextAssessment, nextDiscussion, nextChallengeOpen, nextModuleRecall, answerForAssessment);
     setTeacherCoach(null);
     setTeacherConnection("checking");
     const requestId = teacherRequestId.current + 1;
     teacherRequestId.current = requestId;
     void requestAdaptiveTeacherDiscussion({
       day: activeSession.day,
-      answer: answerDraft,
+      answer: answerForAssessment,
       challengeAnswer: includeChallenge ? challengeDraft : undefined,
       learnerLevel,
       moduleId: activeModule?.id,
@@ -798,6 +837,28 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
         setTeacherCoach(null);
         setTeacherConnection("unavailable");
       });
+  };
+
+  const runMasterOnePassCheck = () => {
+    const recallProof = activeExpectedRecallPoints
+      .slice(0, 6)
+      .join("; ");
+    const onePassAnswer = [
+      `Master pass flow check for ${activeModule?.title ?? activeSession.title}.`,
+      `Core command: explain the concept, mechanism, map or example, exception, and UPSC trap in one answer.`,
+      recallProof ? `Covered recall points: ${recallProof}.` : `Covered focus: ${activeSession.title}.`,
+      `Applied proof: connect location, process, cause-effect chain, and one statement trap so the teacher can unlock the next room.`,
+    ].join(" ");
+
+    setAnswerDraft(onePassAnswer);
+    setChallengeDraft("");
+    setChallengeOpen(false);
+    setSpeechRecognition(null);
+    setSpeechState("idle");
+    setSpeechInterimDraft("");
+    setSpeechMessage("Master pass filled and checked this answer.");
+    clearAudioNote();
+    assess(false, onePassAnswer);
   };
 
   const stopAudioRecording = () => {
@@ -940,7 +1001,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
       setSpeechInterimDraft("");
       setSpeechMessage("Listening now. Speak your full answer in one flow.");
     };
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const { finalTranscript, interimTranscript } = collectSpeechTranscripts(event);
       setSpeechInterimDraft(interimTranscript);
 
@@ -974,7 +1035,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
         );
       }
     };
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
       stoppedByError = true;
       setSpeechRecognition(null);
       setSpeechInterimDraft("");
@@ -1057,16 +1118,14 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 md:px-8 md:py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={`/upsc/geography?day=${activeSession.day}`} className="inline-flex min-h-10 items-center gap-2 text-sm font-black text-[#085041]">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Talk</Badge>
-            <span className="text-sm font-black text-[#1d9e75]">Day {activeSession.day}</span>
-            <span className="text-sm font-semibold text-[#746f66]">Discussion checkpoint</span>
-          </div>
-        </div>
+        <GeographyRoomCompass
+          day={activeSession.day}
+          room="Talk"
+          title={activeSession.title}
+          detail={talkLevelCopy.panelDetail}
+          primaryHref={primaryActionHref}
+          primaryLabel={primaryActionLabel}
+        />
 
         <section className="space-y-5">
           <div
@@ -1097,7 +1156,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
               >
                 {talkLevelCopy.modeLabel}
               </p>
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#5d675f]/5 rounded px-1 -mx-1" title="Hover to reveal full details">
                 {talkLevelCopy.panelDetail}
               </p>
             </div>
@@ -1115,7 +1174,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                       <h2 className="mt-2 text-xl font-black tracking-tight">
                         {talkLevelCopy.question}
                       </h2>
-                      <p className="mt-3 text-base font-black leading-7 text-[#13251d]">{activeSession.talk}</p>
+                      <p className="mt-3 text-base font-black leading-7 text-[#13251d] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#13251d]/5 rounded px-1 -mx-1" title="Hover to reveal full prompt">{activeSession.talk}</p>
                       {activeModule && activeModuleSection ? (
                         <div
                           data-testid="geography-talk-module-cumulative-prompt"
@@ -1127,19 +1186,19 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
                             Module recall rule
                           </p>
-                          <p className="mt-1 text-sm font-bold leading-5 text-[#34453b]">
+                          <p className="mt-1 text-sm font-bold leading-5 text-[#34453b] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#34453b]/5 rounded px-1 -mx-1" title="Hover to reveal all slides">
                             Recall slides 1-{activeModuleSectionIds.length}:{" "}
                             {activeModuleSections.map((section) => section.title).join(", ")}.
                           </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#657066] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#657066]/5 rounded px-1 -mx-1">
                             If an earlier slide is skipped, the next slide stays locked.
                           </p>
                         </div>
                       ) : null}
-                      <p data-testid="talk-level-teacher-hint" className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">
+                      <p data-testid="talk-level-teacher-hint" className="mt-3 text-sm font-semibold leading-6 text-[#49675e] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#49675e]/5 rounded px-1 -mx-1" title="Hover to reveal hint">
                         {talkLevelCopy.teacherHint}
                       </p>
-                      <p data-testid="talk-level-repair-frame" className="mt-2 text-xs font-bold leading-5 text-[#657066]">
+                      <p data-testid="talk-level-repair-frame" className="mt-2 text-xs font-bold leading-5 text-[#657066] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#657066]/5 rounded px-1 -mx-1">
                         {talkLevelCopy.repairFrame}
                       </p>
                     </div>
@@ -1176,8 +1235,14 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
             <textarea
               ref={answerDraftRef}
               data-testid="talk-answer-draft"
-              value={answerDraft}
+              value={
+                speechState === "listening" && speechInterimDraft
+                  ? `${answerDraft}${answerDraft ? "\n" : ""}${speechInterimDraft}`
+                  : answerDraft
+              }
+              readOnly={speechState === "listening"}
               onChange={(event) => {
+                if (speechState === "listening") return;
                 teacherRequestId.current += 1;
                 setAnswerDraft(event.target.value);
                 setAssessment(null);
@@ -1188,7 +1253,12 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                 setSaved(false);
               }}
               placeholder={talkLevelCopy.inputPlaceholder}
-              className="min-h-72 w-full flex-1 resize-y rounded-lg border border-[#dcd5c7] bg-white p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+              className={cn(
+                "min-h-72 w-full flex-1 resize-y rounded-lg border p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:ring-2",
+                speechState === "listening"
+                  ? "cursor-default border-[#1d9e75] bg-[#f4fbf7] focus:border-[#1d9e75] focus:ring-[#1d9e75]/20"
+                  : "border-[#dcd5c7] bg-white focus:border-[#1d9e75] focus:ring-[#1d9e75]/20",
+              )}
             />
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1201,6 +1271,17 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                 {speechState === "listening" || speechState === "recording" ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 {speechState === "listening" ? "Stop speaking" : speechState === "recording" ? "Stop recording" : "Speak answer"}
               </button>
+              {hasMasterAccess ? (
+                <button
+                  type="button"
+                  data-testid="talk-master-one-pass"
+                  onClick={runMasterOnePassCheck}
+                  disabled={teacherConnection === "checking"}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#1d9e75]/40 bg-[#e7f5ee] px-4 text-sm font-black text-[#085041] transition hover:bg-[#d7efe4] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <KeyRound className="h-4 w-4" /> One-pass check
+                </button>
+              ) : null}
               <button
                 type="button"
                 data-testid="talk-assess-answer"
@@ -1226,13 +1307,14 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                   {speechMessage}
                 </span>
               ) : null}
-              {speechInterimDraft ? (
+              {speechState === "listening" && speechInterimDraft ? (
                 <span
                   aria-live="polite"
                   data-testid="talk-speech-interim"
-                  className="w-full max-w-full rounded-md border border-[#cfc6b6] bg-white px-3 py-2 text-xs font-bold leading-5 text-[#2d4f40]"
+                  className="flex min-h-8 items-center gap-2 text-xs font-bold text-[#1d9e75]"
                 >
-                  Transcribing: {speechInterimDraft}
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#1d9e75]" />
+                  Listening — words appearing in the box above
                 </span>
               ) : null}
               {audioNoteUrl ? (
@@ -1271,7 +1353,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                 <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
                   Teacher question
                 </p>
-                <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{talkLevelCopy.question}</p>
+                <p className="mt-2 text-sm font-black leading-6 text-[#13251d] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#13251d]/5 rounded px-1 -mx-1" title="Hover to reveal question">{talkLevelCopy.question}</p>
               </div>
 
               <div
@@ -1305,8 +1387,8 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                 <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">
                   Repair focus
                 </p>
-                <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{teacherGapCategory}</p>
-                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#66736b]">{teacherRepairAction}</p>
+                <p className="mt-2 text-sm font-black leading-6 text-[#13251d] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#13251d]/5 rounded px-1 -mx-1">{teacherGapCategory}</p>
+                <p className="mt-1 line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#66736b]/5 rounded px-1 -mx-1">{teacherRepairAction}</p>
               </div>
 
               {route ? (
@@ -1323,7 +1405,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                     Next route
                   </p>
                   <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{route.label}</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{route.title}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#66736b]/5 rounded px-1 -mx-1">{route.title}</p>
                 </Link>
               ) : (
                 <div
@@ -1361,7 +1443,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
               </div>
             </details>
 
-            {assessment && !challengeOpen && (
+            {assessment && (
               <div data-testid="talk-score-card" className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Recall score</p>
                 <p className="mt-2 text-4xl font-black text-[#13251d]">{assessment.score}%</p>

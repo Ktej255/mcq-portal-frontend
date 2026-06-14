@@ -505,7 +505,7 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
 
         <details data-testid="subject-planner-details" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] shadow-sm">
           <summary className="cursor-pointer px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
-            Open full 30-day planner and readiness details
+            Open full {plan.sessions.length}-day planner and readiness details
           </summary>
           <div className="space-y-6 border-t border-[var(--subject-border)] p-5">
         <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">

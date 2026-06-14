@@ -143,9 +143,9 @@ export const featureInventoryGroups: InventoryGroup[] = [
     summary: "The first subject funnel. Local behavior is connected; real launch content remains the main gap.",
     items: [
       {
-        feature: "30-day schedule",
+        feature: "20-day schedule",
         status: "verified",
-        behavior: "Geography is mapped from Day 1 to Day 30. The command-room map keeps future unfinished days locked, clamps typed untouched-future URLs back to the current topic, and keeps completed or evidence-bearing days available for backward review. Static lesson/media contracts pass 30/30 and Week 1-4 browser content-pack checks cover the full staged Geography month.",
+        behavior: "Geography is mapped from Day 1 to Day 20. The command-room map keeps future unfinished days locked, clamps typed untouched-future URLs back to the current topic, and keeps completed or evidence-bearing days available for backward review. Static lesson/media contracts are now student-facing 20-day aware while legacy 30-day class assets remain available internally during migration.",
         evidence: "plan.ts, geography-command-simple-entry-e2e.cjs, verify-geography-day*-lesson-static.mjs, and geography-week1-4-content-pack-e2e.cjs",
       },
       {
@@ -175,7 +175,7 @@ export const featureInventoryGroups: InventoryGroup[] = [
       {
         feature: "Revisit and Track",
         status: "verified",
-        behavior: "Track opens with one current task, three compact read-only signals, and one next-topic action. Detailed diagnostics, the evidence ledger, and the 30-day maps stay folded; untouched future cards are locked while saved historical days remain reviewable. Revisit appears only for a real weak point, requires one correction note, keeps the optional five-step checklist folded, and exposes one return-to-discussion action.",
+        behavior: "Track opens with one current task, three compact read-only signals, and one next-topic action. Detailed diagnostics, the evidence ledger, and the 20-day maps stay folded; untouched future cards are locked while saved historical days remain reviewable. Revisit appears only for a real weak point, requires one correction note, keeps the optional five-step checklist folded, and exposes one return-to-discussion action.",
         evidence: "geography-track-diagnostics-e2e.cjs, geography-track-evidence-ledger-e2e.cjs, geography-revisit-simple-e2e.cjs, and verify-mcq-revisit-simple.cjs",
       },
       {
@@ -646,7 +646,7 @@ export const launchVisionRequirements: LaunchVisionRequirement[] = [
     requirement: "At least one subject, Geography, should be student-ready before moving to the next subject.",
     status: "content-gap",
     currentState:
-      "Geography has the full local loop and 30-day route map. The launch readiness snapshot now blocks controlled sharing until the Day 1 practice bank has 25 reviewed READY questions, and the public-launch boundary remains locked until the Day 1 release-pack receipt board, clean first-wave receipts, and live continuity receipts exist. Real Day 1 media, transcript approval, detailed animation depth, and founder-approved fresh MCQs remain the main content gap.",
+      "Geography has the full local loop and 20-day route map. The launch readiness snapshot now blocks controlled sharing until the Day 1 practice bank has 25 reviewed READY questions, and the public-launch boundary remains locked until the Day 1 release-pack receipt board, clean first-wave receipts, and live continuity receipts exist. Real Day 1 media, transcript approval, detailed animation depth, final slide modules, and founder-approved fresh MCQs remain the main content gap.",
     evidence: "Geography pilot inventory, Day 1 intake, and release gates",
     nextAction: "Attach final Day 1 lecture media, approve transcript, import fresh advanced MCQs, and run controlled tester receipts.",
     phase: "Day 1",

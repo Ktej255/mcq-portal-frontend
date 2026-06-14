@@ -20,6 +20,7 @@ import {
   readLocalMockIdentity,
   readLocalMockToken,
   saveLocalMockIdentity,
+  saveLocalMockToken,
 } from "../auth/local-testing";
 import {
   activeAuthProvider,
@@ -177,8 +178,7 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
       getIdToken: async () => token,
     };
     if (typeof window !== 'undefined') {
-      (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = token;
-      localStorage.setItem("MOCK_TOKEN", token);
+      saveLocalMockToken(token);
       saveLocalMockIdentity(email, uid);
     }
     setUser(mockUser);
@@ -206,7 +206,7 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
       const savedToken = readLocalMockToken();
       if (savedToken) {
         if (authDebug) console.info("AUTH | Restoring MOCK_TOKEN session");
-        (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = savedToken;
+        saveLocalMockToken(savedToken);
         
         const mockUser = buildLocalMockUser(savedToken);
 
@@ -218,50 +218,7 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    if (activeAuthProvider === "supabase") {
-      if (!supabase) {
-        console.error(`AUTH | Supabase auth is not initialized. Missing: ${missingSupabaseEnvVars.join(", ")}`);
-        window.setTimeout(() => setLoading(false), 0);
-        return;
-      }
-
-      let cancelled = false;
-      supabase.auth.getSession().then(({ data }) => {
-        if (cancelled) return;
-        const mockUser = buildLocalMockUser(readLocalMockToken());
-        if (mockUser) {
-          setUser(mockUser);
-          setLoading(false);
-          return;
-        }
-        reconcileLocalUpscLearnerIdentity(data.session?.user.id);
-        setUser(data.session?.user ? mapSupabaseUser(data.session.user, data.session.access_token) : null);
-        setLoading(false);
-      });
-
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
-        const mockUser = buildLocalMockUser(readLocalMockToken());
-        if (!session && mockUser) {
-          setUser(mockUser);
-          setLoading(false);
-          return;
-        }
-        reconcileLocalUpscLearnerIdentity(session?.user.id);
-        setUser(session?.user ? mapSupabaseUser(session.user, session.access_token) : null);
-        setLoading(false);
-        if (session?.user && window.location.pathname.startsWith("/login")) {
-          const params = new URLSearchParams(window.location.search);
-          replaceRoute(params.get("redirect") || "/dashboard");
-        }
-      });
-
-      return () => {
-        cancelled = true;
-        subscription.unsubscribe();
-      };
-    }
+    // Supabase auth block removed (Supabase auth disabled)
 
     if (!auth) {
       if (!mockAuthEnabled) {
@@ -318,23 +275,7 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signInWithGoogle = async (redirectPath = "/dashboard") => {
     if (authDebug) console.info("AUTH | signInWithGoogle triggered");
-    if (activeAuthProvider === "supabase") {
-      if (!supabase) {
-        console.error(`AUTH | Supabase auth is not initialized in signInWithGoogle. Missing: ${missingSupabaseEnvVars.join(", ")}`);
-        return;
-      }
-      await assertSupabaseAuthReachable();
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}${normalizeInternalRedirectPath(redirectPath)}`
-          : undefined;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo },
-      });
-      if (error) throw error;
-      return;
-    }
+    // Supabase auth checks removed (Supabase auth disabled)
 
     if (!auth) {
       console.error(`AUTH | Firebase auth is not initialized in signInWithGoogle. Missing: ${missingFirebaseEnvVars.join(", ")}`);
@@ -352,52 +293,11 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const sendEmailOtp = async (email: string, redirectPath = "/dashboard") => {
-    if (activeAuthProvider !== "supabase") {
-      throw new Error("Email login is available after Supabase auth is enabled.");
-    }
-
-    if (!supabase) {
-      throw new Error(`Supabase auth is not initialized. Missing: ${missingSupabaseEnvVars.join(", ")}`);
-    }
-
-    await assertSupabaseAuthReachable();
-
-    const emailRedirectTo =
-      typeof window !== "undefined"
-        ? `${window.location.origin}${normalizeInternalRedirectPath(redirectPath)}`
-        : undefined;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo,
-        shouldCreateUser: true,
-      },
-    });
-
-    if (error) throw error;
+    throw new Error("Email OTP login via Supabase is disabled.");
   };
 
   const verifyEmailOtp = async (email: string, token: string, redirectPath = "/dashboard") => {
-    if (activeAuthProvider !== "supabase") {
-      throw new Error("Email login is available after Supabase auth is enabled.");
-    }
-
-    if (!supabase) {
-      throw new Error(`Supabase auth is not initialized. Missing: ${missingSupabaseEnvVars.join(", ")}`);
-    }
-
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: "email",
-    });
-
-    if (error) throw error;
-
-    reconcileLocalUpscLearnerIdentity(data.user?.id);
-    setUser(data.user ? mapSupabaseUser(data.user, data.session?.access_token) : null);
-    setLoading(false);
-    replaceRoute(redirectPath);
+    throw new Error("Email OTP verification via Supabase is disabled.");
   };
 
   const logout = async () => {
@@ -414,16 +314,7 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    if (activeAuthProvider === "supabase" && supabase) {
-      await supabase.auth.signOut();
-      reconcileLocalUpscLearnerIdentity(null);
-      clearLocalUpscLearnerState();
-      clearLocalMockToken();
-      localStorage.removeItem('mcq-timer-storage');
-      localStorage.removeItem('mcq-exam-storage');
-      pushRoute("/login");
-      return;
-    }
+    // Supabase logout check removed (Supabase auth disabled)
 
     if (!auth) return;
     try {
@@ -491,8 +382,7 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
       getIdToken: async () => token,
     };
     if (typeof window !== "undefined") {
-      (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = token;
-      localStorage.setItem("MOCK_TOKEN", token);
+      saveLocalMockToken(token);
       saveLocalMockIdentity(email, uid);
     }
     setUser(mockUser);
@@ -501,6 +391,50 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [replaceRoute]);
 
   useEffect(() => {
+    if (!isLoaded) {
+      setLoading(true);
+      return;
+    }
+
+    if (isSignedIn && clerkUser) {
+      // Clear mock token as we have a valid Clerk session
+      clearLocalMockToken();
+      
+      // Hydrate local state from Clerk unsafeMetadata
+      const metadata = clerkUser.unsafeMetadata || {};
+      if (metadata.profile && typeof window !== "undefined") {
+        window.localStorage.setItem("sarit-upsc-student-profile-v1", JSON.stringify(metadata.profile));
+      }
+      if (metadata.progress && typeof metadata.progress === "object" && typeof window !== "undefined") {
+        Object.entries(metadata.progress).forEach(([slug, val]) => {
+          window.localStorage.setItem(`sarit-upsc-${slug}-progress-v1`, JSON.stringify(val));
+        });
+      }
+
+      const primaryEmail =
+        clerkUser.primaryEmailAddress?.emailAddress ??
+        clerkUser.emailAddresses?.[0]?.emailAddress ??
+        null;
+      const mappedUser: AuthUser = {
+        email: primaryEmail,
+        uid: clerkUser.id,
+        displayName: clerkUser.fullName ?? clerkUser.username ?? primaryEmail?.split("@")[0] ?? null,
+        photoURL: clerkUser.imageUrl ?? null,
+        getIdToken: async () => (await getClerkToken()) ?? "",
+      };
+
+      reconcileLocalUpscLearnerIdentity(clerkUser.id);
+      setUser(mappedUser);
+      setLoading(false);
+
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/login")) {
+        const params = new URLSearchParams(window.location.search);
+        replaceRoute(params.get("redirect") || "/dashboard");
+      }
+      return;
+    }
+
+    // Clerk is loaded, but not signed in. Check if we have a local mock session fallback.
     if (typeof window !== "undefined") {
       const existingMockToken = readLocalMockToken();
       if (existingMockToken) {
@@ -511,49 +445,9 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    if (!isLoaded) {
-      setLoading(true);
-      return;
-    }
-
-    if (!isSignedIn || !clerkUser) {
-      reconcileLocalUpscLearnerIdentity(null);
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
-    // Hydrate local state from Clerk unsafeMetadata
-    const metadata = clerkUser.unsafeMetadata || {};
-    if (metadata.profile && typeof window !== "undefined") {
-      window.localStorage.setItem("sarit-upsc-student-profile-v1", JSON.stringify(metadata.profile));
-    }
-    if (metadata.progress && typeof metadata.progress === "object" && typeof window !== "undefined") {
-      Object.entries(metadata.progress).forEach(([slug, val]) => {
-        window.localStorage.setItem(`sarit-upsc-${slug}-progress-v1`, JSON.stringify(val));
-      });
-    }
-
-    const primaryEmail =
-      clerkUser.primaryEmailAddress?.emailAddress ??
-      clerkUser.emailAddresses?.[0]?.emailAddress ??
-      null;
-    const mappedUser: AuthUser = {
-      email: primaryEmail,
-      uid: clerkUser.id,
-      displayName: clerkUser.fullName ?? clerkUser.username ?? primaryEmail?.split("@")[0] ?? null,
-      photoURL: clerkUser.imageUrl ?? null,
-      getIdToken: async () => (await getClerkToken()) ?? "",
-    };
-
-    reconcileLocalUpscLearnerIdentity(clerkUser.id);
-    setUser(mappedUser);
+    reconcileLocalUpscLearnerIdentity(null);
+    setUser(null);
     setLoading(false);
-
-    if (typeof window !== "undefined" && window.location.pathname.startsWith("/login")) {
-      const params = new URLSearchParams(window.location.search);
-      replaceRoute(params.get("redirect") || "/dashboard");
-    }
   }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute]);
 
   // Sync profile & progress back to Clerk unsafeMetadata when updated locally

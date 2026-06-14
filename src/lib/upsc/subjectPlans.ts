@@ -27,6 +27,12 @@ import {
   Waves,
 } from "lucide-react";
 
+import {
+  geographySessions,
+  geographyLabs,
+  geographyWeeks,
+} from "./plan";
+
 export type SubjectSession = {
   day: number;
   week: number;
@@ -2275,7 +2281,45 @@ export const historyPlan: SubjectSprintPlan = {
   ],
 };
 
+export const geographyPlan: SubjectSprintPlan = {
+  slug: "geography",
+  title: "Geography",
+  badge: "Geography 30-Day Block",
+  window: "June",
+  headline: "Geography becomes the map-first subject command room.",
+  description: "A 30-day Geography sprint split into physical geography, India map command, world and human geography, and integrated recall.",
+  accent: "#0f766e", // Teal
+  dark: "#115e59",   // Dark Teal
+  light: "#f0fdfa",  // Soft Teal
+  weeks: geographyWeeks.map((w) => ({
+    week: parseInt(w.week.replace("Week ", "")),
+    label: w.title,
+    detail: w.detail,
+  })),
+  sessions: geographySessions.map((session) => ({
+    day: session.day,
+    week: session.week,
+    title: session.title,
+    chapter: session.chapter,
+    anchor: session.anchor,
+    duration: session.duration,
+    watch: session.watch,
+    talk: session.talk,
+    test: session.test,
+    track: session.track,
+    revisit: session.revisit,
+    lab: session.lab,
+  })),
+  labs: geographyLabs.map((l) => ({
+    slug: l.slug,
+    title: l.title,
+    detail: l.detail,
+    icon: l.icon,
+  })),
+};
+
 export const subjectPlans: Record<string, SubjectSprintPlan> = {
+  geography: geographyPlan,
   environment: environmentPlan,
   "disaster-management": disasterManagementPlan,
   economy: economyPlan,

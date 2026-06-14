@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { geographySessions } from "@/lib/upsc/plan";
+import { strategyPracticeHandoffStorageKey, type StrategyPracticeHandoff } from "@/lib/upsc/prelims2027Strategy";
 import { getSubjectBatchCode, subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,9 @@ type BatchState = {
   difficulty: string;
   status: "DRAFT" | "READY";
   updatedAt?: string;
+  strategyBlueprintId?: string;
+  strategyTitle?: string;
+  strategyFormat?: string;
 };
 
 const difficulties = ["EASY", "MEDIUM", "HARD", "PYQ_STYLE"];
@@ -95,11 +99,29 @@ function writeBatchStates(states: Record<string, BatchState>) {
   window.localStorage.setItem(storageKey, JSON.stringify(states));
 }
 
+function readStrategyPracticeHandoffs(): StrategyPracticeHandoff[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(strategyPracticeHandoffStorageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function buildBatchCode(subject: McqSubject, session: SubjectSession) {
   return getSubjectBatchCode(subject.slug, session.day);
 }
 
-function buildTemplateRow(subject: McqSubject, session: SubjectSession, state: BatchState) {
+function buildTemplateRow(
+  subject: McqSubject,
+  session: SubjectSession,
+  state: BatchState,
+  handoff?: StrategyPracticeHandoff
+) {
   return {
     subject: subject.title,
     day: session.day,
@@ -107,24 +129,26 @@ function buildTemplateRow(subject: McqSubject, session: SubjectSession, state: B
     chapter: session.chapter,
     topic: session.title,
     batch_code: buildBatchCode(subject, session),
-    test_title: `${subject.title} Day ${session.day}: ${session.title}`,
+    test_title: handoff ? `${subject.title} 2027 Strategy: ${handoff.title}` : `${subject.title} Day ${session.day}: ${session.title}`,
     difficulty: state.difficulty,
-    question_text_en: `Fresh MCQ stem for ${session.title}`,
+    question_text_en: handoff ? handoff.instruction : `Fresh MCQ stem for ${session.title}`,
     option_a: "Option A",
     option_b: "Option B",
     option_c: "Option C",
     option_d: "Option D",
     correct_option: "A",
-    explanation_en: `Explain the concept, example, and UPSC trap for ${session.title}.`,
-    source: "FRESH_AUTHORING",
-    map_or_case_tag: session.lab,
-    pyq_linked: "No",
+    explanation_en: handoff
+      ? `Gap repaired: ${handoff.matchedGap} Expected output: ${handoff.expectedOutput}`
+      : `Explain the concept, example, and UPSC trap for ${session.title}.`,
+    source: handoff ? "UPSC_2027_STRATEGY" : "FRESH_AUTHORING",
+    map_or_case_tag: handoff ? `${handoff.format} | ${session.lab}` : session.lab,
+    pyq_linked: handoff ? "Pattern linked" : "No",
     status: state.status,
   };
 }
 
-function buildCsv(subject: McqSubject, session: SubjectSession, state: BatchState) {
-  const row = buildTemplateRow(subject, session, state);
+function buildCsv(subject: McqSubject, session: SubjectSession, state: BatchState, handoff?: StrategyPracticeHandoff) {
+  const row = buildTemplateRow(subject, session, state, handoff);
   const headers = Object.keys(row) as Array<keyof typeof row>;
   return `${headers.join(",")}\n${headers.map((header) => csvEscape(row[header])).join(",")}\n`;
 }
@@ -141,7 +165,10 @@ export function UpscMcqCommandCenter({
   initialDay?: number;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedStrategyBlueprint = searchParams.get("strategyBlueprint");
   const [batchStates, setBatchStates] = useState<Record<string, BatchState>>({});
+  const [strategyHandoffs, setStrategyHandoffs] = useState<StrategyPracticeHandoff[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeSubjectSlug, setActiveSubjectSlug] = useState(initialSubjectSlug ?? "geography");
   const [activeDay, setActiveDay] = useState(initialDay ?? 1);
@@ -150,6 +177,7 @@ export function UpscMcqCommandCenter({
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setBatchStates(readBatchStates());
+      setStrategyHandoffs(readStrategyPracticeHandoffs());
       setIsLoaded(true);
     }, 0);
 
@@ -161,10 +189,32 @@ export function UpscMcqCommandCenter({
     activeSubject.sessions.find((session) => session.day === activeDay) ?? activeSubject.sessions[0];
   const activeBatchCode = buildBatchCode(activeSubject, activeSession);
   const activeState = getState(batchStates, activeBatchCode);
-  const completion = activeState.planned > 0 ? Math.min(100, Math.round((activeState.drafted / activeState.planned) * 100)) : 0;
+  const activeStrategyHandoffs = useMemo(
+    () =>
+      strategyHandoffs.filter(
+        (handoff) => handoff.subjectSlug === activeSubject.slug && handoff.day === activeSession.day
+      ),
+    [activeSession.day, activeSubject.slug, strategyHandoffs]
+  );
+  const activeStrategyHandoff =
+    activeStrategyHandoffs.find((handoff) => handoff.blueprintId === requestedStrategyBlueprint) ??
+    activeStrategyHandoffs[0];
+  const activePlanningState = activeStrategyHandoff
+    ? ({
+        ...activeState,
+        planned: activeStrategyHandoff.plannedQuestions,
+        difficulty: activeStrategyHandoff.difficulty,
+        strategyBlueprintId: activeStrategyHandoff.blueprintId,
+        strategyTitle: activeStrategyHandoff.title,
+        strategyFormat: activeStrategyHandoff.format,
+      } satisfies BatchState)
+    : activeState;
+  const completion = activePlanningState.planned > 0
+    ? Math.min(100, Math.round((activePlanningState.drafted / activePlanningState.planned) * 100))
+    : 0;
   const csvPreview = useMemo(
-    () => buildCsv(activeSubject, activeSession, activeState),
-    [activeSubject, activeSession, activeState]
+    () => buildCsv(activeSubject, activeSession, activePlanningState, activeStrategyHandoff),
+    [activeSubject, activeSession, activePlanningState, activeStrategyHandoff]
   );
 
   const batchSummaries = useMemo(
@@ -220,12 +270,12 @@ export function UpscMcqCommandCenter({
 
   const saveBatchState = (patch: Partial<BatchState>) => {
     const nextState = {
-      ...activeState,
+      ...activePlanningState,
       ...patch,
       status:
-        (patch.drafted ?? activeState.drafted) >= (patch.planned ?? activeState.planned)
+        (patch.drafted ?? activePlanningState.drafted) >= (patch.planned ?? activePlanningState.planned)
           ? "READY"
-          : patch.status ?? activeState.status,
+          : patch.status ?? activePlanningState.status,
       updatedAt: new Date().toISOString(),
     } satisfies BatchState;
     const next = {
@@ -258,8 +308,19 @@ export function UpscMcqCommandCenter({
 
   const markReady = () => {
     saveBatchState({
-      drafted: activeState.planned,
+      drafted: activePlanningState.planned,
       status: "READY",
+    });
+  };
+
+  const lockStrategyHandoff = () => {
+    if (!activeStrategyHandoff) return;
+    saveBatchState({
+      planned: activeStrategyHandoff.plannedQuestions,
+      difficulty: activeStrategyHandoff.difficulty,
+      strategyBlueprintId: activeStrategyHandoff.blueprintId,
+      strategyTitle: activeStrategyHandoff.title,
+      strategyFormat: activeStrategyHandoff.format,
     });
   };
 
@@ -416,17 +477,67 @@ export function UpscMcqCommandCenter({
                   variant="outline"
                   className={cn(
                     "rounded-md",
-                    activeState.status === "READY" || activeState.drafted >= activeState.planned
+                    activePlanningState.status === "READY" || activePlanningState.drafted >= activePlanningState.planned
                       ? "border-[#1d9e75]/40 text-[#085041]"
                       : "border-[#ef9f27]/50 text-[#6f4a12]"
                   )}
                 >
-                  {activeState.status === "READY" || activeState.drafted >= activeState.planned ? "READY" : "DRAFT"}
+                  {activePlanningState.status === "READY" || activePlanningState.drafted >= activePlanningState.planned ? "READY" : "DRAFT"}
                 </Badge>
               </div>
 
               <p className="text-lg font-black leading-7 text-[#13251d]">{activeSession.title}</p>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#657066]">{activeSession.chapter}</p>
+
+              {activeStrategyHandoff ? (
+                <div
+                  data-testid="upsc-mcq-strategy-handoff"
+                  data-blueprint-id={activeStrategyHandoff.blueprintId}
+                  data-planned-questions={activeStrategyHandoff.plannedQuestions}
+                  data-difficulty={activeStrategyHandoff.difficulty}
+                  className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">
+                        2027 strategy handoff
+                      </p>
+                      <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">
+                        {activeStrategyHandoff.title}
+                      </h3>
+                    </div>
+                    <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
+                      {activeStrategyHandoff.format}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-sm font-bold leading-6 text-[#31443a]">
+                    {activeStrategyHandoff.instruction}
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <p className="rounded-md bg-white/80 p-3 text-xs font-bold leading-5 text-[#085041]">
+                      Gap: {activeStrategyHandoff.matchedGap}
+                    </p>
+                    <p className="rounded-md bg-white/80 p-3 text-xs font-bold leading-5 text-[#085041]">
+                      Output: {activeStrategyHandoff.plannedQuestions}{" "}
+                      {activeStrategyHandoff.difficulty.replace("_", " ")} questions.{" "}
+                      {activeStrategyHandoff.expectedOutput}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={lockStrategyHandoff}
+                    className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
+                  >
+                    Lock into batch
+                  </button>
+                  <Link
+                    href={`/upsc/question-bank?subject=${activeStrategyHandoff.subjectSlug}&strategyBlueprint=${activeStrategyHandoff.blueprintId}`}
+                    className="ml-2 mt-4 inline-flex min-h-10 items-center rounded-md border border-[#1f5d8f] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1f5d8f] transition hover:bg-[#eef5ff]"
+                  >
+                    Open student practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              ) : null}
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
@@ -437,7 +548,7 @@ export function UpscMcqCommandCenter({
                     type="number"
                     min={1}
                     max={100}
-                    value={activeState.planned}
+                    value={activePlanningState.planned}
                     onChange={(event) => saveBatchState({ planned: Math.max(1, Number(event.target.value) || 1) })}
                     className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
@@ -450,7 +561,7 @@ export function UpscMcqCommandCenter({
                     type="number"
                     min={0}
                     max={100}
-                    value={activeState.drafted}
+                    value={activePlanningState.drafted}
                     onChange={(event) => saveBatchState({ drafted: Math.max(0, Number(event.target.value) || 0) })}
                     className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
@@ -469,7 +580,7 @@ export function UpscMcqCommandCenter({
 
               <div className="mt-5 grid gap-2 sm:grid-cols-4">
                 {difficulties.map((item) => {
-                  const isActive = activeState.difficulty === item;
+                  const isActive = activePlanningState.difficulty === item;
                   return (
                     <button
                       key={item}

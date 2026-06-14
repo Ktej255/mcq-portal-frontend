@@ -37,12 +37,20 @@ export function readLocalMockToken() {
   return token?.startsWith("MOCK_TOKEN") ? token : null;
 }
 
+export function saveLocalMockToken(token: string) {
+  if (typeof window === "undefined") return;
+  (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = token;
+  window.localStorage.setItem("MOCK_TOKEN", token);
+  document.cookie = `MOCK_TOKEN=${token}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
 export function clearLocalMockToken() {
   if (typeof window === "undefined") return;
   delete (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN;
   window.localStorage.removeItem("MOCK_TOKEN");
   window.localStorage.removeItem(mockUserEmailKey);
   window.localStorage.removeItem(mockUserUidKey);
+  document.cookie = "MOCK_TOKEN=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
 }
 
 export function saveLocalMockIdentity(email: string, uid: string) {

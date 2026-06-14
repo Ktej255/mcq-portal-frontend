@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   Layers3,
   LineChart,
+  MessageSquare,
   PlayCircle,
   RefreshCcw,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import type { SubjectSprintPlan } from "@/lib/upsc/subjectPlans";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { cn } from "@/lib/utils";
 
-export type SubjectLoopRoom = "watch" | "talk" | "lab" | "mcq" | "track" | "revisit";
+export type SubjectLoopRoom = "watch" | "talk" | "lab" | "mcq" | "track" | "revisit" | "retro";
 
 type SubjectLoopActionsProps = {
   plan: SubjectSprintPlan;
@@ -95,6 +96,13 @@ export function SubjectLoopActions({
           },
         ]
       : []),
+    {
+      id: "retro" as const,
+      label: "Sunday retro",
+      detail: "Frame repair",
+      href: `${basePath}/retro?day=${boundedDay}`,
+      icon: MessageSquare,
+    },
   ];
   const currentAction = actions.find((action) => action.id === current) ?? actions[0];
   const guidedNextByRoom: Record<SubjectLoopRoom, { label: string; detail: string; href: string; icon: LucideIcon }> = {
@@ -133,6 +141,12 @@ export function SubjectLoopActions({
       detail: "Explain again after the repair note.",
       href: `${basePath}/talk?day=${boundedDay}`,
       icon: BrainCircuit,
+    },
+    retro: {
+      label: "MCQ practice",
+      detail: "Retry the batch after the mental frame audit.",
+      href: `${basePath}/mcq-readiness?day=${boundedDay}`,
+      icon: ClipboardCheck,
     },
   };
   const nextAction = current ? guidedNextByRoom[current] : guidedNextByRoom.watch;

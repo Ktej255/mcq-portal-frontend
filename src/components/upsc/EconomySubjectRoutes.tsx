@@ -2,6 +2,7 @@
 
 import { SubjectLabRoom } from "@/components/upsc/SubjectLabRoom";
 import { SubjectMcqReadinessRoom } from "@/components/upsc/SubjectMcqReadinessRoom";
+import { SubjectRetroRoom } from "@/components/upsc/SubjectRetroRoom";
 import { SubjectRevisitRoom } from "@/components/upsc/SubjectRevisitRoom";
 import { SubjectTalkRoom } from "@/components/upsc/SubjectTalkRoom";
 import { SubjectTrackRoom } from "@/components/upsc/SubjectTrackRoom";
@@ -30,4 +31,8 @@ export function EconomyRevisitRoute({ initialDay }: { initialDay?: number }) {
 
 export function EconomyMcqReadinessRoute({ initialDay }: { initialDay?: number }) {
   return <SubjectMcqReadinessRoom plan={economyPlan} initialDay={initialDay} />;
+}
+
+export function EconomyRetroRoute({ initialDay }: { initialDay?: number }) {
+  return <SubjectRetroRoom plan={economyPlan} initialDay={initialDay} />;
 }
