@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeIndianRupee, CheckCircle2, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,15 +14,43 @@ import {
 } from "@/lib/upsc/yearlyPlanner";
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
+import { useDashboardData } from "@/hooks/useDashboardData";
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
 export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }) {
+  const { profile, saveProfile, isLoaded } = useDashboardData();
+  const [activationSuccess, setActivationSuccess] = useState(false);
+
   const selectedPlan = getProductPricingPlan(planId);
   const savings = selectedPlan.listPrice - selectedPlan.launchPrice;
   const selectedPlanUrl = pricingCheckoutPath(selectedPlan.id);
+
+  if (!isLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
+        <div className="animate-pulse text-sm font-black text-[#13251d]">
+          Loading checkout command...
+        </div>
+      </div>
+    );
+  }
+
+  const handleConfirmActivation = () => {
+    if (profile) {
+      saveProfile({
+        ...profile,
+        subscriptionPlanId: selectedPlan.tier,
+        billingCycle: selectedPlan.cycle,
+        updatedAt: new Date().toISOString(),
+      });
+      setActivationSuccess(true);
+    }
+  };
+
+  const isCurrentlyActive = profile?.subscriptionPlanId === selectedPlan.tier && profile?.billingCycle === selectedPlan.cycle;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -46,7 +77,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {publicCommerceLaunchBoundary.checkoutBadge}
               </div>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">{selectedPlan.title} plan selected</h1>
+              <h1 className="text-3xl font-black tracking-tight md:text-5xl">{selectedPlan.title} selection</h1>
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
                 {publicCommerceLaunchBoundary.studentExplanation} {publicCommerceLaunchBoundary.gateSummary}
               </p>
@@ -99,10 +130,40 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
         >
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Checkout proof</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#31443a]">
-            {money(productMonthlyBasePrice)} x {selectedPlan.months} month
-            {selectedPlan.months === 1 ? "" : "s"} = {money(selectedPlan.listPrice)} list price. Final plan price is{" "}
-            {money(selectedPlan.launchPrice)}, so the student saves {money(savings)}.
+            {selectedPlan.title} at {money(selectedPlan.launchPrice)} for {selectedPlan.months} month
+            {selectedPlan.months === 1 ? "" : "s"}. Saves {money(savings)} compared to base monthly pricing.
           </p>
+        </section>
+
+        {/* Activation Controller */}
+        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+          <h2 className="text-xl font-black text-[#13251d]">Confirm & Activate</h2>
+          <p className="mt-1 text-sm font-semibold text-[#5d675f]">
+            Since you are part of the pilot validation, you can activate this plan directly to your workspace.
+          </p>
+          
+          <div className="mt-4 flex flex-wrap gap-3 items-center">
+            {isCurrentlyActive ? (
+              <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] px-4 py-2 text-xs font-black text-[#085041]">
+                ✓ Plan is currently active on your account
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConfirmActivation}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-5 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
+              >
+                Confirm Pilot Activation <ArrowRight className="ml-2 h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {(activationSuccess || isCurrentlyActive) && (
+            <div className="mt-4 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-sm font-bold text-[#085041]">
+              Active subscription updated to **{selectedPlan.title} ({selectedPlan.cycle})**! 
+              Usage limits have been reallocated according to the tier configuration.
+            </div>
+          )}
         </section>
 
         <UpscPricingIntentRecorder
@@ -118,14 +179,14 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Plan receipt</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">What this plan opens</h2>
             </div>
-            <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
-              {selectedPlan.id === recommendedProductPlanId ? "Recommended" : selectedPlan.title}
+            <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white uppercase">
+              {selectedPlan.tier} Plan
             </Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {[
               "Daily planner, AI discussion, MCQ builder, revision command, and reports.",
-              "Subject-wise syllabus, GS PYQ source rows, yearly planner, and current-affairs gates.",
+              `Hourly rate limits: ${selectedPlan.limits}`,
               "Optional-subject catalog with Paper I and Paper II year-wise source rows.",
               "Local progress works immediately; live payment opens only after the launch gates close.",
             ].map((item) => (
@@ -136,7 +197,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             ))}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/upsc" className="inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
+            <Link href="/upsc/daily-command?tab=today" className="inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
               Open UPSC workspace <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <Link href={selectedPlanUrl} className="inline-flex min-h-10 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a]">
@@ -146,21 +207,23 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
         </section>
 
         <section data-testid="upsc-pricing-checkout-other-plans" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <p className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Switch plan</p>
+          <p className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Switch selection</p>
           <div className="flex flex-wrap gap-2">
-            {productPricingPlans.map((plan) => (
-              <Link
-                key={plan.id}
-                href={pricingCheckoutPath(plan.id)}
-                className={`rounded-md border px-3 py-2 text-xs font-black ${
-                  plan.id === selectedPlan.id
-                    ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                    : "border-[#dcd5c7] bg-[#f7f4ee] text-[#31443a]"
-                }`}
-              >
-                {plan.title} / {money(plan.launchPrice)}
-              </Link>
-            ))}
+            {productPricingPlans
+              .filter((p) => p.cycle === selectedPlan.cycle)
+              .map((plan) => (
+                <Link
+                  key={plan.id}
+                  href={pricingCheckoutPath(plan.id)}
+                  className={`rounded-md border px-3 py-2 text-xs font-black ${
+                    plan.id === selectedPlan.id
+                      ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                      : "border-[#dcd5c7] bg-[#f7f4ee] text-[#31443a]"
+                  }`}
+                >
+                  {plan.title} / {money(plan.launchPrice)}
+                </Link>
+              ))}
           </div>
         </section>
       </div>

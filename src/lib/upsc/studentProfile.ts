@@ -1,4 +1,5 @@
 import { loadRemoteStudentProfile, saveRemoteStudentProfile } from "@/lib/upsc/learnerPersistence";
+import type { PlanTier, BillingCycle } from "./yearlyPlanner";
 
 export type StudentLevel = "beginner" | "intermediate" | "advanced";
 export type PreparationStage = "not-started" | "coaching-complete" | "multiple-attempts";
@@ -27,6 +28,14 @@ export type StudentProfile = {
   inductionQuizCompleted?: boolean;
   inductionCompleted?: boolean;
   retroReflections?: string;
+  subscriptionPlanId?: PlanTier;
+  billingCycle?: BillingCycle;
+  firstAttemptYear?: string;
+  preparationStartMonth?: string;
+  customPlanCompleted?: boolean;
+  points?: number;
+  coins?: number;
+  unlockedBadges?: string[];
 };
 
 export type StudentPlanSummary = {
@@ -61,6 +70,14 @@ export const defaultStudentProfile: StudentProfile = {
   inductionQuizCompleted: false,
   inductionCompleted: false,
   retroReflections: undefined,
+  subscriptionPlanId: "foundation",
+  billingCycle: "monthly",
+  firstAttemptYear: "",
+  preparationStartMonth: "",
+  customPlanCompleted: false,
+  points: 0,
+  coins: 0,
+  unlockedBadges: [],
 };
 
 function isStudentLevel(level: StudentProfile["level"] | undefined): level is StudentLevel {

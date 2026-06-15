@@ -1,9 +1,8 @@
-import { DailyWorkspace } from "@/components/dashboard/DailyWorkspace";
+"use client";
+
+import { ZenDashboard } from "@/components/dashboard/ZenDashboard";
 
 export default function DashboardHome() {
-  return (
-    <div className="min-h-screen bg-white">
-      <DailyWorkspace />
-    </div>
-  );
+  return <ZenDashboard />;
 }
+

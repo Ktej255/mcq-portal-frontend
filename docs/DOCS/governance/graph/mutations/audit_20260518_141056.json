@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-18T14:10:56.579217",
+  "files_to_edit": [
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx",
+    "frontend\\src\\services\\api\\dashboardService.ts",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\dashboardService.ts": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 2,
+  "runtime_status": "All runtime checks PASSED."
+}

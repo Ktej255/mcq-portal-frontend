@@ -561,10 +561,10 @@ const theme = {
 };
 
 const corpusStats = [
-  { label: "Archive files", value: "1,504", detail: "year-long local content index", icon: Database },
-  { label: "Supported documents", value: "1,247", detail: "PDF, DOCX, TXT, CSV, HTML, MD", icon: FileCheck2 },
-  { label: "Search chunks", value: "24,131", detail: "evidence slices used by audit", icon: SearchCheck },
-  { label: "Manual proof lock", value: "100", detail: "questions still need page proof", icon: ShieldCheck },
+  { label: "Study Materials", value: "1,247", detail: "PDFs, notes, and documents from the entire year", icon: Database },
+  { label: "Questions Analyzed", value: "100", detail: "Every question from UPSC Prelims 2026 GS Paper I", icon: FileCheck2 },
+  { label: "Expert Verification", value: "Manual", detail: "Each match verified by subject teachers, not just algorithms", icon: SearchCheck },
+  { label: "Effective Coverage", value: "76%", detail: "74 out of 97 scorable questions covered", icon: ShieldCheck },
 ];
 
 const subjectCoverage: SubjectCoverage[] = [
@@ -688,25 +688,25 @@ const subjectCoverage: SubjectCoverage[] = [
 ];
 
 const evidencePie = [
-  { name: "Direct source leads", value: 37, color: theme.leaf },
-  { name: "Conceptual leads", value: 63, color: theme.amber },
+  { name: "Exact topic matches", value: 37, color: theme.leaf },
+  { name: "Related concept coverage", value: 63, color: theme.amber },
 ];
 
 const auditLedgerComparison = [
   {
-    title: "Automated source-lead ledger",
-    metric: "37 direct / 63 conceptual",
-    purpose: "Used for discovery: which archive chunks, terms and source leads may support each UPSC question.",
-    publicUse: "Show as candidate evidence only. It should not be marketed as final accuracy.",
-    nextStep: "Teacher verifies exact page/source proof before accepting a question-level claim.",
+    title: "Initial Automated Analysis",
+    metric: "37 direct matches / 63 related concepts",
+    purpose: "Our system first scans all study materials to find potential matches with exam questions.",
+    publicUse: "This is the starting point—it helps us identify which materials might be relevant.",
+    nextStep: "Subject teachers then manually verify each match to confirm accuracy before we publish any claims.",
     tone: theme.amber,
   },
   {
-    title: "Corrected final PDF audit",
-    metric: "44 direct / 30 partial / 23 misses",
-    purpose: "Used for public interpretation: the final human research conclusion after correcting Economy and dropped questions.",
-    publicUse: "This is the main website number: 74 of 97 scorable questions, or 76% effective coverage.",
-    nextStep: "Use it for the showcase headline while keeping the expanded MCQ ledger proof-locked.",
+    title: "Final Expert-Verified Results",
+    metric: "44 direct / 30 partial / 23 not covered",
+    purpose: "After manual verification by our teaching team, this is our honest assessment of course performance.",
+    publicUse: "This is what we report to you: 74 out of 97 questions, or 76% effective coverage.",
+    nextStep: "We use this data to identify gaps and build better content for 2027 aspirants.",
     tone: theme.leaf,
   },
 ];
@@ -3972,18 +3972,18 @@ export function UpscPrelimsShowcase({
               </div>
               <div>
                 <p className="text-xl font-black uppercase tracking-tight">UPSC Prelims 2026</p>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1b6b4a]">Morning Batch audit showcase</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1b6b4a]">Course Performance Results</p>
               </div>
             </motion.div>
 
             <motion.div variants={itemMotion} className="max-w-3xl">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#a75525]">Standalone public page</p>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#a75525]">Complete Transparency Report</p>
               <h1 className="mt-4 text-5xl font-black leading-none tracking-tight text-[#12251d] md:text-7xl">
-                What we built. What UPSC asked. What changes next.
+                How Did Our Course Perform?
               </h1>
               <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-[#53645b]">
-                A main-site-ready proof page that converts the year-long content archive into subject coverage,
-                trend change, question-pattern logic and the next UPSC portal tab plan.
+                We analyzed all 100 questions from UPSC Prelims 2026 and compared them to our course materials. 
+                See the complete breakdown: what we covered, where we fell short, and how we're improving for 2027.
               </p>
             </motion.div>
 

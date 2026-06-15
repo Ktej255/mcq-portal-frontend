@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-05-18T21:23:34.926726",
+  "files_to_edit": [
+    "FINAL_LINT_GOVERNANCE_MATRIX.md",
+    "FIREBASE_RUNTIME_VALIDATION.md",
+    "PRODUCTION_INFRASTRUCTURE_AUDIT.md",
+    "PRODUCTION_BROWSER_E2E.md",
+    "RELEASE_CANDIDATE_VERDICT.md",
+    "PRODUCTION_REDEPLOYMENT_PLAN.md",
+    "BUILD_GATE_STATUS.md",
+    "RUNTIME_MISMATCH_LOG.md",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "FINAL_LINT_GOVERNANCE_MATRIX.md": {
+      "count": 0
+    },
+    "FIREBASE_RUNTIME_VALIDATION.md": {
+      "count": 0
+    },
+    "PRODUCTION_INFRASTRUCTURE_AUDIT.md": {
+      "count": 0
+    },
+    "PRODUCTION_BROWSER_E2E.md": {
+      "count": 0
+    },
+    "RELEASE_CANDIDATE_VERDICT.md": {
+      "count": 0
+    },
+    "PRODUCTION_REDEPLOYMENT_PLAN.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    },
+    "RUNTIME_MISMATCH_LOG.md": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 0,
+  "runtime_status": "All runtime checks PASSED."
+}

@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-05-18T21:13:13.723229",
+  "files_to_edit": [
+    "frontend\\src\\app\\admin\\founder\\page.tsx",
+    "frontend\\src\\services\\api\\observabilityService.ts",
+    "frontend\\src\\services\\api\\adminService.ts",
+    "frontend\\src\\app\\admin\\dashboard\\page.tsx",
+    "frontend\\scripts\\prod-validation.cjs",
+    "frontend\\scripts\\runtime-validation-cdp.cjs",
+    "frontend\\src\\app\\admin\\questions\\bulk\\page.tsx",
+    "frontend\\src\\components\\admin\\observability\\MutationTimeline.tsx",
+    "frontend\\src\\components\\ui\\textarea.tsx",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\app\\admin\\founder\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\observabilityService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\adminService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\app\\admin\\dashboard\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\scripts\\prod-validation.cjs": {
+      "count": 0
+    },
+    "frontend\\scripts\\runtime-validation-cdp.cjs": {
+      "count": 0
+    },
+    "frontend\\src\\app\\admin\\questions\\bulk\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\admin\\observability\\MutationTimeline.tsx": {
+      "count": 0
+    },
+    "frontend\\src\\components\\ui\\textarea.tsx": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 5,
+  "runtime_status": "All runtime checks PASSED."
+}

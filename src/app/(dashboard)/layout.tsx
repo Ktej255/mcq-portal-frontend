@@ -16,10 +16,8 @@ const adminShellRoutes = new Set([
   "/upsc/prelims-2026-showcase",
   "/upsc/prelims-review-command",
   "/upsc/prelims-2027-strategy",
-  "/upsc/pricing",
   "/upsc/readiness-audit",
   "/upsc/revision-command",
-  "/upsc/source-library",
   "/upsc/yearly-planner",
 ]);
 

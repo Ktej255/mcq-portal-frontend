@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-05-18T14:03:58.722679",
+  "files_to_edit": [
+    "frontend\\src\\lib\\store\\useExamStore.ts",
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts",
+    "frontend\\src\\services\\api\\examService.ts",
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx",
+    "backend\\app\\schemas\\test_engine.py",
+    "backend\\app\\services\\test_engine_service.py",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\lib\\store\\useExamStore.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\examService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx": {
+      "count": 1
+    },
+    "backend\\app\\schemas\\test_engine.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\test_engine_service.py": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 6,
+  "runtime_status": "All runtime checks PASSED."
+}

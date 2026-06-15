@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-05-13T19:11:29.652945",
+  "files_to_edit": [
+    "backend/scripts/governance/graphify_audit.py",
+    "backend/scripts/governance/service_map.py",
+    "backend/scripts/governance/impact_explorer.py"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend/scripts/governance/graphify_audit.py": {
+      "count": 1,
+      "risk": "NEGLIGIBLE",
+      "impacted": [
+        "backend/scripts/governance/graphify_audit.py"
+      ]
+    },
+    "backend/scripts/governance/service_map.py": {
+      "count": 0,
+      "risk": "NEGLIGIBLE",
+      "impacted": []
+    },
+    "backend/scripts/governance/impact_explorer.py": {
+      "count": 0,
+      "risk": "NEGLIGIBLE",
+      "impacted": []
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "owner": "Governance",
+  "rollback_ref": "git revert HEAD",
+  "registry_id": "mutation_20260513_191129.json"
+}

@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-05-18T20:55:08.244109",
+  "files_to_edit": [
+    "RELEASE_CLEANUP_AUDIT.md",
+    "CONSOLE_ERROR_FORENSICS.md",
+    "LINT_CLASSIFICATION_MATRIX.md",
+    "STATIC_ASSET_FORENSIC_REPORT.md",
+    "RECHARTS_RENDER_AUDIT.md",
+    "FINAL_STUDENT_JOURNEY_VALIDATION.md",
+    "BUILD_GATE_STATUS.md",
+    "RUNTIME_MISMATCH_LOG.md",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "RELEASE_CLEANUP_AUDIT.md": {
+      "count": 0
+    },
+    "CONSOLE_ERROR_FORENSICS.md": {
+      "count": 0
+    },
+    "LINT_CLASSIFICATION_MATRIX.md": {
+      "count": 0
+    },
+    "STATIC_ASSET_FORENSIC_REPORT.md": {
+      "count": 0
+    },
+    "RECHARTS_RENDER_AUDIT.md": {
+      "count": 0
+    },
+    "FINAL_STUDENT_JOURNEY_VALIDATION.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    },
+    "RUNTIME_MISMATCH_LOG.md": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 0,
+  "runtime_status": "All runtime checks PASSED."
+}

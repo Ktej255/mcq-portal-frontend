@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-05-13T19:13:54.965784",
+  "files_to_edit": [
+    "backend/app/services/scoring_engine.py"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend/app/services/scoring_engine.py": {
+      "count": 1
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "runtime_status": "All runtime checks PASSED."
+}

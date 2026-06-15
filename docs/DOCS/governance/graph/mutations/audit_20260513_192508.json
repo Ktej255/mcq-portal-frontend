@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-05-13T19:25:08.091625",
+  "files_to_edit": [
+    "backend/app/services/scoring_engine.py",
+    "backend/app/services/report_service.py",
+    "docs/governance/graph/SYSTEM_STATE.md",
+    "--owner",
+    "USER",
+    "--rollback",
+    "Manual revert of forensic diagnostic injection"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend/app/services/scoring_engine.py": {
+      "count": 1
+    },
+    "backend/app/services/report_service.py": {
+      "count": 1
+    },
+    "docs/governance/graph/SYSTEM_STATE.md": {
+      "count": 0
+    },
+    "--owner": {
+      "count": 0
+    },
+    "USER": {
+      "count": 0
+    },
+    "--rollback": {
+      "count": 0
+    },
+    "Manual revert of forensic diagnostic injection": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 2,
+  "runtime_status": "All runtime checks PASSED."
+}

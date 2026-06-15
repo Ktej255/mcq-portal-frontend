@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-18T14:14:28.524064",
+  "files_to_edit": [
+    "backend\\app\\api\\v1\\tests.py",
+    "backend\\alembic\\versions\\b29e6d8c4a12_quarantine_corrupted_environment_batch1.py",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend\\app\\api\\v1\\tests.py": {
+      "count": 1
+    },
+    "backend\\alembic\\versions\\b29e6d8c4a12_quarantine_corrupted_environment_batch1.py": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "runtime_status": "All runtime checks PASSED."
+}

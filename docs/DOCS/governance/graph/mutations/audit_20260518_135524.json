@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-05-18T13:55:23.446397",
+  "files_to_edit": [
+    "backend\\app\\main.py",
+    "frontend\\src\\services\\api\\examService.ts",
+    "frontend\\src\\services\\api\\client.ts",
+    "frontend\\src\\lib\\contexts\\AuthContext.tsx",
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend\\app\\main.py": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\examService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\client.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\contexts\\AuthContext.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 5,
+  "runtime_status": "All runtime checks PASSED."
+}

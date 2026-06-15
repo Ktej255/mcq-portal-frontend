@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-05-18T14:30:59.620098",
+  "files_to_edit": [
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx",
+    "frontend\\src\\lib\\store\\useExamStore.ts",
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts",
+    "frontend\\src\\services\\api\\examService.ts",
+    "frontend\\src\\services\\api\\dashboardService.ts",
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx",
+    "backend\\app\\api\\v1\\attempts.py",
+    "backend\\app\\api\\v1\\reports.py",
+    "backend\\app\\schemas\\test_engine.py",
+    "backend\\app\\services\\test_engine_service.py",
+    "backend\\app\\services\\scoring_engine.py",
+    "backend\\app\\services\\report_service.py",
+    "backend\\app\\models\\domain.py"
+  ],
+  "violations": [
+    "PATCH SIZE VIOLATION: Batch too large (13 files). Max 10.",
+    "BOUNDARY VIOLATION: Attempting to mutate L0 CORE file: backend/app/models/domain.py"
+  ],
+  "impact_map": {
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\store\\useExamStore.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\examService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\dashboardService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx": {
+      "count": 1
+    },
+    "backend\\app\\api\\v1\\attempts.py": {
+      "count": 1
+    },
+    "backend\\app\\api\\v1\\reports.py": {
+      "count": 1
+    },
+    "backend\\app\\schemas\\test_engine.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\test_engine_service.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\scoring_engine.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\report_service.py": {
+      "count": 1
+    },
+    "backend\\app\\models\\domain.py": {
+      "count": 1
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 13,
+  "runtime_status": "All runtime checks PASSED."
+}

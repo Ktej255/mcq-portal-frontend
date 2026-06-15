@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-05-18T20:30:45.250550",
+  "files_to_edit": [
+    "frontend\\src\\app\\(dashboard)\\simulation\\lobby\\page.tsx",
+    "frontend\\src\\components\\exam\\FeedbackModal.tsx",
+    "frontend\\src\\components\\exam\\QuestionPalette.tsx",
+    "frontend\\src\\components\\exam\\ExamTimer.tsx",
+    "frontend\\src\\components\\exam\\ExamHeader.tsx",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md",
+    "BUILD_GATE_STATUS.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\app\\(dashboard)\\simulation\\lobby\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\exam\\FeedbackModal.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\exam\\QuestionPalette.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\exam\\ExamTimer.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\exam\\ExamHeader.tsx": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 5,
+  "runtime_status": "All runtime checks PASSED."
+}

@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-18T14:08:22.404325",
+  "files_to_edit": [
+    "backend\\app\\schemas\\admin.py",
+    "backend\\alembic\\versions\\a18f2c7d9e41_fix_upsc_batch_marking_scheme.py",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend\\app\\schemas\\admin.py": {
+      "count": 1
+    },
+    "backend\\alembic\\versions\\a18f2c7d9e41_fix_upsc_batch_marking_scheme.py": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "runtime_status": "All runtime checks PASSED."
+}

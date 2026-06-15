@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-05-18T14:15:53.421992",
+  "files_to_edit": [
+    "CONTENT_CORRUPTION_REPORT.md",
+    "VERIFIED_DEPLOYMENT_CHECKLIST.md",
+    "VERIFIED_ENV_VARIABLES.md",
+    "VERIFIED_MIGRATION_ORDER.md",
+    "PRODUCTION_RECOVERY_PLAN.md",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "CONTENT_CORRUPTION_REPORT.md": {
+      "count": 0
+    },
+    "VERIFIED_DEPLOYMENT_CHECKLIST.md": {
+      "count": 0
+    },
+    "VERIFIED_ENV_VARIABLES.md": {
+      "count": 0
+    },
+    "VERIFIED_MIGRATION_ORDER.md": {
+      "count": 0
+    },
+    "PRODUCTION_RECOVERY_PLAN.md": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 0,
+  "runtime_status": "All runtime checks PASSED."
+}

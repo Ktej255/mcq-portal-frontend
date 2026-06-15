@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-05-18T14:38:20.014187",
+  "files_to_edit": [
+    "REPORT_TRUTH_FORENSIC_AUDIT.md",
+    "FRONTEND_DEPENDENCY_MAP.md",
+    "BUILD_GATE_STATUS.md",
+    "EDUCATIONAL_TRUTH_MATRIX.md",
+    "RUNTIME_MISMATCH_LOG.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "REPORT_TRUTH_FORENSIC_AUDIT.md": {
+      "count": 0
+    },
+    "FRONTEND_DEPENDENCY_MAP.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    },
+    "EDUCATIONAL_TRUTH_MATRIX.md": {
+      "count": 0
+    },
+    "RUNTIME_MISMATCH_LOG.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 0,
+  "runtime_status": "All runtime checks PASSED."
+}

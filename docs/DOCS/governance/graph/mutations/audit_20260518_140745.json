@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-18T14:07:44.860372",
+  "files_to_edit": [
+    "backend\\app\\schemas\\admin.py",
+    "backend\\alembic\\versions\\9d91e7261997_fix_db_drift_missing_columns.py",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend\\app\\schemas\\admin.py": {
+      "count": 1
+    },
+    "backend\\alembic\\versions\\9d91e7261997_fix_db_drift_missing_columns.py": {
+      "count": 0
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "runtime_status": "All runtime checks PASSED."
+}

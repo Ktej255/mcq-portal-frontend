@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-05-18T14:31:20.263767",
+  "files_to_edit": [
+    "backend\\app\\api\\v1\\attempts.py",
+    "backend\\app\\api\\v1\\reports.py",
+    "backend\\app\\schemas\\test_engine.py",
+    "backend\\app\\services\\test_engine_service.py",
+    "backend\\app\\services\\scoring_engine.py",
+    "backend\\app\\services\\report_service.py"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend\\app\\api\\v1\\attempts.py": {
+      "count": 1
+    },
+    "backend\\app\\api\\v1\\reports.py": {
+      "count": 1
+    },
+    "backend\\app\\schemas\\test_engine.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\test_engine_service.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\scoring_engine.py": {
+      "count": 1
+    },
+    "backend\\app\\services\\report_service.py": {
+      "count": 1
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 6,
+  "runtime_status": "All runtime checks PASSED."
+}

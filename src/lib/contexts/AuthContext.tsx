@@ -304,7 +304,6 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (authDebug) console.info("AUTH | logout triggered");
     if (readLocalMockToken()) {
       reconcileLocalUpscLearnerIdentity(null);
-      clearLocalUpscLearnerState();
       clearLocalMockToken();
       localStorage.removeItem('mcq-timer-storage');
       localStorage.removeItem('mcq-exam-storage');
@@ -320,7 +319,6 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await signOut(auth);
       reconcileLocalUpscLearnerIdentity(null);
-      clearLocalUpscLearnerState();
       clearLocalMockToken();
       if (authDebug) console.info("AUTH | signOut SUCCESS");
       // Clear persisted stores
@@ -511,7 +509,6 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     reconcileLocalUpscLearnerIdentity(null);
-    clearLocalUpscLearnerState();
     clearLocalMockToken();
     clearExamStores();
     setUser(null);

@@ -52,6 +52,8 @@ import { SUBJECT_RECALL_TARGET } from "@/lib/upsc/subjectLearning";
 import { useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
 import type { SubjectMcqReadinessStatus } from "@/lib/upsc/useSubjectProgress";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
+import { awardGamificationRewards } from "@/lib/upsc/gamification";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { QuestionPayload } from "@/services/api/adminService";
 
@@ -643,6 +645,26 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
             : activeProgress?.confidence,
       activePromptLabel: isRecoveryRetestAttempt ? "MCQ Retest" : "MCQ Practice",
     });
+
+    if (nextIsComplete) {
+      try {
+        const action = nextScorePercent === 100 ? "perfect-score" : "mcq-complete";
+        const rewardResult = awardGamificationRewards(action);
+        if (rewardResult.addedPoints > 0) {
+          toast.success(action === "perfect-score" ? "Perfect MCQ Practice!" : "MCQ Practice Complete!", {
+            description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+          });
+          if (rewardResult.unlockedBadge) {
+            toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+              description: rewardResult.unlockedBadge.description,
+              icon: rewardResult.unlockedBadge.icon,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to award rewards", e);
+      }
+    }
   };
 
   const movePracticeIndex = (nextIndex: number) => {

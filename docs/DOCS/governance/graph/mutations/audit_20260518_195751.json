@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-05-18T19:57:51.402792",
+  "files_to_edit": [
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx",
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx",
+    "frontend\\src\\services\\api\\dashboardService.ts",
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts",
+    "backend\\app\\services\\report_service.py",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md",
+    "RUNTIME_MISMATCH_LOG.md",
+    "BUILD_GATE_STATUS.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\app\\exam\\[testId]\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\services\\api\\dashboardService.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\hooks\\useAutoSave.ts": {
+      "count": 1
+    },
+    "backend\\app\\services\\report_service.py": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    },
+    "RUNTIME_MISMATCH_LOG.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 5,
+  "runtime_status": "All runtime checks PASSED."
+}

@@ -23,6 +23,10 @@ import {
   useSubjectProgress,
 } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
+import { getSubjectBatchCode } from "@/lib/upsc/subjectPlans";
+import { readLocalMcqCommandQuestionsForBatch } from "@/lib/upsc/mcqDraftBank";
+import { awardGamificationRewards } from "@/lib/upsc/gamification";
+import { toast } from "sonner";
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -71,34 +75,87 @@ function buildMentalModelCorrection(session: SubjectSession): string {
   ].join(" ");
 }
 
-function buildRetroInterview(session: SubjectSession, progress?: SubjectDayProgress): RetroQuestion[] {
+function getOptionText(question: any, option: string) {
+  const options = question.options_en;
+  if (!options || typeof options !== "object") return "";
+  return String(options[option] ?? "");
+}
+
+function buildRetroInterview(
+  subjectSlug: string,
+  session: SubjectSession,
+  progress?: SubjectDayProgress
+): RetroQuestion[] {
   const scorePercent = progress?.mcqScorePercent ?? 0;
   const reviewSummary = progress?.mcqReviewSummary?.trim() ?? "";
   const assessmentSummary = progress?.assessmentSummary?.trim() ?? "";
 
-  return [
-    {
+  const batchCode = getSubjectBatchCode(subjectSlug, session.day);
+  let questions: any[] = [];
+  try {
+    questions = readLocalMcqCommandQuestionsForBatch(batchCode) || [];
+  } catch (e) {
+    console.error(e);
+  }
+
+  const answers = progress?.mcqAnswerMap || {};
+  const incorrectList = questions
+    .map((q, idx) => ({ question: q, index: idx, studentAnswer: answers[idx] }))
+    .filter((item) => item.studentAnswer && item.studentAnswer !== item.question.correct_option);
+
+  const retroQuestions: RetroQuestion[] = [];
+
+  // 1. Trap / incorrect options question(s)
+  if (incorrectList.length > 0) {
+    incorrectList.slice(0, 2).forEach((item) => {
+      const q = item.question;
+      const wrongOpt = item.studentAnswer;
+      const correctOpt = q.correct_option;
+      const wrongText = getOptionText(q, wrongOpt);
+      const correctText = getOptionText(q, correctOpt);
+
+      retroQuestions.push({
+        index: retroQuestions.length,
+        type: "trap",
+        frameLabel: `MCQ wrong option analysis (Q${item.index + 1})`,
+        aiPrompt: `In Question ${item.index + 1}: "${q.text_en}", you selected option ${wrongOpt} ("${wrongText}") instead of the correct option ${correctOpt} ("${correctText}"). What was your reasoning at the time? Why did you think option ${wrongOpt} was the right choice over option ${correctOpt}? Please explain the assumption or link you made.`,
+        aiCorrection: `Correct option was ${correctOpt}: "${correctText}". ${q.explanation_en || buildTrapCorrection(session, reviewSummary)}`,
+      });
+    });
+  } else {
+    // Fallback if no wrong options or score is 100%
+    const scoreVal = progress?.mcqScorePercent;
+    const isPerfect = typeof scoreVal === "number" && scoreVal === 100;
+    retroQuestions.push({
       index: 0,
       type: "trap",
       frameLabel: "MCQ trap check",
-      aiPrompt: `Your MCQ session on "${session.title}" scored ${scorePercent}%. A common wrong-answer trap here is to confuse the scope or direction of the core anchor: "${session.anchor}". When you chose the incorrect answer, what was the logical connection you believed was true? Be specific — name the variable, relationship, or claim you relied on.`,
+      aiPrompt: isPerfect
+        ? `Amazing job on achieving a perfect 100% score for "${session.title}"! How did you identify the key UPSC trap option and anchor ("${session.anchor}") to avoid falling for it?`
+        : `Your MCQ session on "${session.title}" scored ${scorePercent}%. A common wrong-answer trap here is to confuse the scope or direction of the core anchor: "${session.anchor}". When you chose the incorrect answer, what was the logical connection you believed was true?`,
       aiCorrection: buildTrapCorrection(session, reviewSummary),
-    },
-    {
-      index: 1,
-      type: "concept",
-      frameLabel: "Concept gap",
-      aiPrompt: `Reconstruct the cause-effect chain inside "${session.title}". The anchor is: "${session.anchor}". In your own words, trace the mechanism from cause through process to consequence. Where exactly does your reasoning break or slow down?`,
-      aiCorrection: buildConceptCorrection(session, assessmentSummary),
-    },
-    {
-      index: 2,
-      type: "mental-model",
-      frameLabel: "Mental model audit",
-      aiPrompt: `Revisit prompt: "${session.revisit}" — Before your next MCQ session on "${session.title}", what one mental model or memory anchor will you build so you can instantly reject an almost-correct wrong statement? Describe the anchor in one specific, concrete sentence.`,
-      aiCorrection: buildMentalModelCorrection(session),
-    },
-  ];
+    });
+  }
+
+  // 2. Concept gap question
+  retroQuestions.push({
+    index: retroQuestions.length,
+    type: "concept",
+    frameLabel: "Concept gap check",
+    aiPrompt: `Reconstruct the cause-effect chain inside "${session.title}". The anchor is: "${session.anchor}". In your own words, trace the mechanism from cause through process to consequence. Where exactly does your reasoning break or slow down?`,
+    aiCorrection: buildConceptCorrection(session, assessmentSummary),
+  });
+
+  // 3. Mental model audit
+  retroQuestions.push({
+    index: retroQuestions.length,
+    type: "mental-model",
+    frameLabel: "Mental model audit",
+    aiPrompt: `Revisit prompt: "${session.revisit}" — Before your next MCQ session on "${session.title}", what one mental model or memory anchor will you build so you can instantly reject an almost-correct wrong statement? Describe the anchor in one specific, concrete sentence.`,
+    aiCorrection: buildMentalModelCorrection(session),
+  });
+
+  return retroQuestions;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -129,8 +186,8 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     plan.sessions.find((session) => session.day === activeDay) ?? plan.sessions[0];
   const activeProgress = getDayProgress(activeSession.day);
   const retroQuestions = useMemo(
-    () => buildRetroInterview(activeSession, activeProgress),
-    [activeSession, activeProgress],
+    () => buildRetroInterview(plan.slug, activeSession, activeProgress),
+    [plan.slug, activeSession, activeProgress],
   );
   const activeQuestion = retroQuestions[activeQuestionIndex];
   const isLastQuestion = activeQuestionIndex === retroQuestions.length - 1;
@@ -200,17 +257,54 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
         studentLogic: submittedAnswers[i] ?? "",
         correction: q.aiCorrection,
       }));
+      
+      let existingReflections: any[] = [];
+      if (profile.retroReflections) {
+        try {
+          const parsed = JSON.parse(profile.retroReflections);
+          existingReflections = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          // Ignore
+        }
+      }
+      
+      const newReflection = {
+        subject: plan.slug,
+        day: activeSession.day,
+        topic: activeSession.title,
+        completedAt: new Date().toISOString(),
+        patterns,
+      };
+      
+      // Filter out duplicate reflection for same day and subject
+      existingReflections = existingReflections.filter(
+        (ref) => !(ref.subject === plan.slug && ref.day === activeSession.day)
+      );
+      existingReflections.push(newReflection);
+
       saveStudentProfile({
         ...profile,
-        retroReflections: JSON.stringify({
-          subject: plan.slug,
-          day: activeSession.day,
-          topic: activeSession.title,
-          completedAt: new Date().toISOString(),
-          patterns,
-        }),
+        retroReflections: JSON.stringify(existingReflections),
         updatedAt: new Date().toISOString(),
       });
+    }
+
+    // Award gamification rewards
+    try {
+      const rewardResult = awardGamificationRewards("retro-complete");
+      if (rewardResult.addedPoints > 0) {
+        toast.success("Retrospective Saved!", {
+          description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+        });
+        if (rewardResult.unlockedBadge) {
+          toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+            description: rewardResult.unlockedBadge.description,
+            icon: rewardResult.unlockedBadge.icon,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to award rewards", e);
     }
 
     setRetroSaved(true);

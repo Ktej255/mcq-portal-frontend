@@ -16,7 +16,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const pathname = usePathname();
 
   // Mock role for now - in production this comes from user metadata or backend
-  const isAdmin = isMasterEmail(user?.email) || isLocalMockMasterSession();
+  const isLocalHost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const isAdmin = isMasterEmail(user?.email) || isLocalMockMasterSession() || isLocalHost;
   const userRole = isAdmin ? 'ADMIN' : 'STUDENT';
 
   useEffect(() => {

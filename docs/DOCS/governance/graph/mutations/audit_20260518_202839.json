@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-05-18T20:28:39.403957",
+  "files_to_edit": [
+    "frontend\\src\\app\\(dashboard)\\dashboard\\page.tsx",
+    "frontend\\src\\app\\(dashboard)\\tests\\page.tsx",
+    "frontend\\src\\app\\(dashboard)\\history\\page.tsx",
+    "frontend\\src\\app\\(dashboard)\\revision\\page.tsx",
+    "frontend\\src\\components\\dashboard\\DailyWorkspace.tsx",
+    "frontend\\src\\components\\dashboard\\ConceptRecoveryModal.tsx",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md",
+    "BUILD_GATE_STATUS.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\app\\(dashboard)\\dashboard\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\tests\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\history\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\revision\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\dashboard\\DailyWorkspace.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\dashboard\\ConceptRecoveryModal.tsx": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    },
+    "BUILD_GATE_STATUS.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 6,
+  "runtime_status": "All runtime checks PASSED."
+}

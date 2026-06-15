@@ -7,6 +7,8 @@ import {
   Archive,
   BookMarked,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Database,
   FileSearch,
@@ -93,6 +95,15 @@ export function UpscSyllabusPyqLibrary() {
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
   const [archiveIntake, setArchiveIntake] = useState<SourceArchiveIntakeResponse | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  const [isArchiveIntakeOpen, setIsArchiveIntakeOpen] = useState(false);
+  const [isPreloadProofOpen, setIsPreloadProofOpen] = useState(false);
+  const [isReadinessMatrixOpen, setIsReadinessMatrixOpen] = useState(false);
+  const [isPaperIndexOpen, setIsPaperIndexOpen] = useState(false);
+  const [isPriorityQueueOpen, setIsPriorityQueueOpen] = useState(false);
+  const [isReadinessGateOpen, setIsReadinessGateOpen] = useState(false);
+  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
+  const [isOptionalSourcePacksOpen, setIsOptionalSourcePacksOpen] = useState(false);
 
   useEffect(() => {
     setPyqRecords(readLocalPyqImportRecords());
@@ -225,191 +236,187 @@ export function UpscSyllabusPyqLibrary() {
           data-proof-rule="local-archive-to-proof-queue-and-2027-course-correction"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
-          <div className="mb-5 grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
+          <button
+            type="button"
+            onClick={() => setIsArchiveIntakeOpen(!isArchiveIntakeOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Morning Batch archive intake
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Local source files can now feed the 2026 proof queue and 2027 rebuild plan.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                This internal scanner reads the configured course archive, summarizes file evidence, and groups
-                candidate material against the same decision tracks used in the 2027 course correction packet.
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Internal Archive</p>
+              <h3 className="text-xl font-black text-[#13251d] tracking-tight">Morning Batch Archive Intake ({isArchiveIntakeOpen ? "Hide" : "Show"})</h3>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void loadArchiveIntake()}
-                className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Rescan archive
-              </button>
-              <Link href="/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue" className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-[#1d9e75] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#126245]">
-                Open proof queue <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </div>
-          </div>
+            {isArchiveIntakeOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
 
-          {archiveStatus === "loading" ? (
-            <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold text-[#5d675f]">
-              Scanning the configured source archive...
-            </div>
-          ) : archiveIntake?.rootExists ? (
-            <div className="grid gap-5">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                {[
-                  ["Files", archiveIntake.totalFiles],
-                  ["PDFs", archiveMetrics.pdfCount],
-                  ["DOCX", archiveMetrics.docxCount],
-                  ["Images", archiveMetrics.imageCount],
-                  ["Folders", archiveIntake.totalDirectories],
-                  ["Size", archiveMetrics.totalSize],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
-                    <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
-                  </div>
-                ))}
+          {isArchiveIntakeOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold leading-6 text-[#5d675f]">
+                  This internal scanner reads the configured course archive, summarizes file evidence, and groups candidate material against the same decision tracks used in the 2027 course correction packet.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void loadArchiveIntake()}
+                    className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Rescan archive
+                  </button>
+                  <Link href="/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue" className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-[#1d9e75] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#126245]">
+                    Open proof queue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-                <div className="grid gap-4">
-                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Archive root</p>
-                        <p className="mt-1 break-words text-sm font-bold leading-6 text-[#31443a]">{archiveIntake.rootPath}</p>
-                      </div>
-                      <Archive className="h-5 w-5 shrink-0 text-[#1a3a2a]" />
-                    </div>
-                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#5d675f]">
-                      {archiveIntake.message}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Top folders</p>
-                      <FolderSearch className="h-5 w-5 text-[#1a3a2a]" />
-                    </div>
-                    <div className="grid gap-2">
-                      {archiveIntake.topFolders.slice(0, 8).map((folder) => (
-                        <div
-                          key={folder.name}
-                          data-testid="upsc-source-archive-folder"
-                          data-folder-name={folder.name}
-                          data-file-count={folder.fileCount}
-                          className="flex items-center justify-between gap-3 rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-bold text-[#31443a]"
-                        >
-                          <span className="min-w-0 break-words">{folder.name}</span>
-                          <span className="shrink-0 text-[#1d9e75]">{folder.fileCount}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">File types</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {archiveIntake.extensions.slice(0, 10).map((extension) => (
-                        <span
-                          key={extension.extension}
-                          data-testid="upsc-source-archive-extension"
-                          data-extension={extension.extension}
-                          data-count={extension.count}
-                          className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#31443a]"
-                        >
-                          {extension.extension}: {extension.count}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+              {archiveStatus === "loading" ? (
+                <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold text-[#5d675f]">
+                  Scanning the configured source archive...
                 </div>
-
-                <div className="grid gap-3">
-                  {archiveIntake.tracks.map((track) => (
-                    <article
-                      key={track.id}
-                      data-testid="upsc-source-archive-track"
-                      data-track-id={track.id}
-                      data-hit-count={track.hitCount}
-                      data-decision={track.decision}
-                      data-sample-count={track.sampleFiles.length}
-                      className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${archiveDecisionTone(track.decision)}`}>
-                            {track.decision}
-                          </span>
-                          <h3 className="mt-3 text-lg font-black tracking-tight text-[#13251d]">{track.label}</h3>
-                        </div>
-                        <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#746f66]">
-                          {track.hitCount} candidate files
-                        </span>
+              ) : archiveIntake?.rootExists ? (
+                <div className="grid gap-5">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                    {[
+                      ["Files", archiveIntake.totalFiles],
+                      ["PDFs", archiveMetrics.pdfCount],
+                      ["DOCX", archiveMetrics.docxCount],
+                      ["Images", archiveMetrics.imageCount],
+                      ["Folders", archiveIntake.totalDirectories],
+                      ["Size", archiveMetrics.totalSize],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                        <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{track.nextAction}</p>
-                      <div className="mt-3 grid gap-2">
-                        {track.sampleFiles.length ? (
-                          track.sampleFiles.slice(0, 3).map((file) => (
+                    ))}
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                    <div className="grid gap-4">
+                      <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Archive root</p>
+                            <p className="mt-1 break-words text-sm font-bold leading-6 text-[#31443a]">{archiveIntake.rootPath}</p>
+                          </div>
+                          <Archive className="h-5 w-5 shrink-0 text-[#1a3a2a]" />
+                        </div>
+                        <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#5d675f]">
+                          {archiveIntake.message}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Top folders</p>
+                          <FolderSearch className="h-5 w-5 text-[#1a3a2a]" />
+                        </div>
+                        <div className="grid gap-2">
+                          {archiveIntake.topFolders.slice(0, 8).map((folder) => (
                             <div
-                              key={`${track.id}-${file.relativePath}`}
-                              data-testid="upsc-source-archive-sample-file"
-                              data-track-id={track.id}
-                              data-extension={file.extension}
-                              data-size-bytes={file.sizeBytes}
-                              data-relative-path={file.relativePath}
-                              className="rounded-md border border-[#dcd5c7] bg-white p-3"
+                              key={folder.name}
+                              data-testid="upsc-source-archive-folder"
+                              data-folder-name={folder.name}
+                              data-file-count={folder.fileCount}
+                              className="flex items-center justify-between gap-3 rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-bold text-[#31443a]"
                             >
-                              <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
-                              <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
-                              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
-                                {file.extension} / {formatArchiveBytes(file.sizeBytes)} / {formatArchiveDate(file.lastModified)}
-                              </p>
+                              <span className="min-w-0 break-words">{folder.name}</span>
+                              <span className="shrink-0 text-[#1d9e75]">{folder.fileCount}</span>
                             </div>
-                          ))
-                        ) : (
-                          <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-semibold text-[#746f66]">
-                            No filename/path match yet. Add source tags or move files into a clearer subject folder.
-                          </p>
-                        )}
+                          ))}
+                        </div>
                       </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
 
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Recent archive additions</p>
-                <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  {archiveIntake.recentFiles.slice(0, 6).map((file) => (
-                    <div
-                      key={`recent-${file.relativePath}`}
-                      data-testid="upsc-source-archive-recent-file"
-                      data-extension={file.extension}
-                      data-size-bytes={file.sizeBytes}
-                      data-relative-path={file.relativePath}
-                      className="rounded-md border border-[#dcd5c7] bg-white p-3"
-                    >
-                      <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
-                      <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
-                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
-                        {file.extension} / {formatArchiveBytes(file.sizeBytes)} / {formatArchiveDate(file.lastModified)}
-                      </p>
+                      <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">File types</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {archiveIntake.extensions.slice(0, 10).map((extension) => (
+                            <span
+                              key={extension.extension}
+                              data-testid="upsc-source-archive-extension"
+                              data-extension={extension.extension}
+                              data-count={extension.count}
+                              className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#31443a]"
+                            >
+                              {extension.extension}: {extension.count}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  ))}
+
+                    <div className="grid gap-3">
+                      {archiveIntake.tracks.map((track) => (
+                        <article
+                          key={track.id}
+                          data-testid="upsc-source-archive-track"
+                          data-track-id={track.id}
+                          data-hit-count={track.hitCount}
+                          data-decision={track.decision}
+                          data-sample-count={track.sampleFiles.length}
+                          className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${archiveDecisionTone(track.decision)}`}>
+                                {track.decision}
+                              </span>
+                              <h3 className="mt-3 text-lg font-black tracking-tight text-[#13251d]">{track.label}</h3>
+                            </div>
+                            <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#746f66]">
+                              {track.hitCount} files
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {track.sampleFiles.map((file) => (
+                              <div
+                                key={`sample-${file.relativePath}`}
+                                data-testid="upsc-source-archive-sample-file"
+                                data-extension={file.extension}
+                                data-size-bytes={file.sizeBytes}
+                                data-relative-path={file.relativePath}
+                                className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold text-[#31443a]"
+                              >
+                                <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
+                                <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Recent files</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {archiveIntake.recentFiles.slice(0, 6).map((file) => (
+                        <div
+                          key={`recent-${file.relativePath}`}
+                          data-testid="upsc-source-archive-recent-file"
+                          data-extension={file.extension}
+                          data-size-bytes={file.sizeBytes}
+                          data-relative-path={file.relativePath}
+                          className="rounded-md border border-[#dcd5c7] bg-white p-3"
+                        >
+                          <p className="break-words text-sm font-black text-[#13251d]">{file.name}</p>
+                          <p className="mt-1 break-words text-xs font-semibold leading-5 text-[#5d675f]">{file.relativePath}</p>
+                          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">
+                            {file.extension} / {formatArchiveBytes(file.sizeBytes)} / {formatArchiveDate(file.lastModified)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-[#ef9f27] bg-[#fff4df] p-5">
-              <p className="text-sm font-black text-[#6f4a12]">Source archive not connected.</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#6f4a12]">
-                {archiveIntake?.message ?? "Configure UPSC_SOURCE_ARCHIVE_ROOT with the Morning Batch folder and rescan."}
-              </p>
+              ) : (
+                <div className="rounded-lg border border-[#ef9f27] bg-[#fff4df] p-5">
+                  <p className="text-sm font-black text-[#6f4a12]">Source archive not connected.</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#6f4a12]">
+                    {archiveIntake?.message ?? "Configure UPSC_SOURCE_ARCHIVE_ROOT with the Morning Batch folder and rescan."}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -429,30 +436,38 @@ export function UpscSyllabusPyqLibrary() {
           data-trend-insight-count={syllabusPyqPreloadAudit.trendInsightCount}
           className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
         >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsPreloadProofOpen(!isPreloadProofOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#085041]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
-                Preload audit proof
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
-                GS and optional source rows are counted from one registry.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
-                {syllabusPyqPreloadAudit.statusRule}
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em]">Audit Proof</p>
+              <h3 className="text-xl font-black tracking-tight">Preload Audit Proof ({isPreloadProofOpen ? "Hide" : "Show"})</h3>
             </div>
-            <Database className="h-6 w-6 text-[#085041]" />
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <AuditMetric label="Year window" value={syllabusPyqPreloadAudit.yearWindow} />
-            <AuditMetric label="GS PYQ rows" value={syllabusPyqPreloadAudit.gsPyqRows} />
-            <AuditMetric label="Optional rows" value={syllabusPyqPreloadAudit.optionalPyqRows} />
-            <AuditMetric label="Total rows" value={syllabusPyqPreloadAudit.totalPyqRows} />
-            <AuditMetric label="Source indexed" value={syllabusPyqPreloadAudit.sourceIndexedRows} />
-            <AuditMetric label="Text pending" value={syllabusPyqPreloadAudit.textImportPendingRows} />
-            <AuditMetric label="Official anchors" value={syllabusPyqPreloadAudit.officialAnchorCount} />
-            <AuditMetric label="Trend insights" value={syllabusPyqPreloadAudit.trendInsightCount} />
-          </div>
+            {isPreloadProofOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isPreloadProofOpen && (
+            <div className="mt-5 border-t border-[#b9d9cd] pt-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <p className="text-xs font-semibold leading-relaxed text-[#49675e]">
+                  {syllabusPyqPreloadAudit.statusRule}
+                </p>
+                <Database className="h-6 w-6 text-[#085041]" />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <AuditMetric label="Year window" value={syllabusPyqPreloadAudit.yearWindow} />
+                <AuditMetric label="GS PYQ rows" value={syllabusPyqPreloadAudit.gsPyqRows} />
+                <AuditMetric label="Optional rows" value={syllabusPyqPreloadAudit.optionalPyqRows} />
+                <AuditMetric label="Total rows" value={syllabusPyqPreloadAudit.totalPyqRows} />
+                <AuditMetric label="Source indexed" value={syllabusPyqPreloadAudit.sourceIndexedRows} />
+                <AuditMetric label="Text pending" value={syllabusPyqPreloadAudit.textImportPendingRows} />
+                <AuditMetric label="Official anchors" value={syllabusPyqPreloadAudit.officialAnchorCount} />
+                <AuditMetric label="Trend insights" value={syllabusPyqPreloadAudit.trendInsightCount} />
+              </div>
+            </div>
+          )}
         </section>
 
         <section
@@ -462,52 +477,59 @@ export function UpscSyllabusPyqLibrary() {
           data-import-pending-rows={importPendingRows}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsReadinessMatrixOpen(!isReadinessMatrixOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Student readiness matrix
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Source coverage is separated from exact PYQ import.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                This matrix keeps the portal honest: route coverage and official paper links can be student-visible,
-                while exact question text and question-level tagging remain gated until verified import is complete.
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Readiness Matrix</p>
+              <h3 className="text-xl font-black tracking-tight">Student Readiness Matrix ({isReadinessMatrixOpen ? "Hide" : "Show"})</h3>
             </div>
-            <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {sourceReadinessRows.map((row) => (
-              <article
-                key={row.id}
-                data-testid="upsc-source-readiness-row"
-                data-readiness-id={row.id}
-                data-status={row.status}
-                data-student-ready={String(row.studentReady)}
-                data-count-label={row.countLabel}
-                data-count-value={String(row.countValue)}
-                className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                      {row.countLabel}: {row.countValue}
-                    </p>
-                    <h3 className="mt-1 text-lg font-black tracking-tight">{row.title}</h3>
-                  </div>
-                  <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${readinessStatusTone(row.status)}`}>
-                    {readinessStatusLabel(row.status)}
-                  </span>
-                </div>
-                <div className="mt-3 grid gap-2 text-xs font-semibold leading-5 text-[#4f5e55]">
-                  <p className="rounded-md bg-white p-2 font-bold text-[#31443a]">Proof: {row.proof}</p>
-                  <p className="rounded-md bg-[#e7f5ee] p-2 font-bold text-[#085041]">Use: {row.productUse}</p>
-                  <p className="rounded-md bg-[#fff4df] p-2 font-bold text-[#6f4a12]">Remaining: {row.remainingWork}</p>
-                </div>
-              </article>
-            ))}
-          </div>
+            {isReadinessMatrixOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isReadinessMatrixOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <p className="text-xs font-semibold leading-relaxed text-[#5d675f]">
+                  This matrix tracks route coverage and official paper links separate from exact question text and question-level tagging verification.
+                </p>
+                <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {sourceReadinessRows.map((row) => (
+                  <article
+                    key={row.id}
+                    data-testid="upsc-source-readiness-row"
+                    data-readiness-id={row.id}
+                    data-status={row.status}
+                    data-student-ready={String(row.studentReady)}
+                    data-count-label={row.countLabel}
+                    data-count-value={String(row.countValue)}
+                    className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                          {row.countLabel}: {row.countValue}
+                        </p>
+                        <h3 className="mt-1 text-lg font-black tracking-tight">{row.title}</h3>
+                      </div>
+                      <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${readinessStatusTone(row.status)}`}>
+                        {readinessStatusLabel(row.status)}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs font-semibold leading-5 text-[#4f5e55]">
+                      <p className="rounded-md bg-white p-2 font-bold text-[#31443a]">Proof: {row.proof}</p>
+                      <p className="rounded-md bg-[#e7f5ee] p-2 font-bold text-[#085041]">Use: {row.productUse}</p>
+                      <p className="rounded-md bg-[#fff4df] p-2 font-bold text-[#6f4a12]">Remaining: {row.remainingWork}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section
@@ -552,53 +574,59 @@ export function UpscSyllabusPyqLibrary() {
           data-exact-question-text-rows={exactPyqReadiness.exactQuestionTextRows}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsPaperIndexOpen(!isPaperIndexOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Official paper index
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Paper sources are loaded before exact question import.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                {exactPyqReadiness.exactQuestionTextRows > 0
-                  ? `${exactPyqReadiness.exactQuestionTextRows} exact verified question row${
-                      exactPyqReadiness.exactQuestionTextRows === 1 ? "" : "s"
-                    } are staged from the admin import ledger. ${exactPyqReadiness.nextQueueRule}`
-                  : `${officialPaperIndexSummary.exactImportRule} ${officialPaperIndexSummary.nextAction}`}
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Paper Index</p>
+              <h3 className="text-xl font-black tracking-tight">Official Paper Index ({isPaperIndexOpen ? "Hide" : "Show"})</h3>
             </div>
-            <ClipboardList className="h-6 w-6 text-[#1a3a2a]" />
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <AuditMetric label="Prelims papers" value={officialPaperIndexSummary.prelimsPaperRows} />
-            <AuditMetric label="Mains GS papers" value={officialPaperIndexSummary.gsMainsPaperRows} />
-            <AuditMetric label="Optional papers" value={officialPaperIndexSummary.optionalPaperIndexRows} />
-            <AuditMetric label="Total papers" value={officialPaperIndexSummary.totalPaperIndexRows} />
-            <AuditMetric label="Direct linked" value={officialPaperIndexSummary.directLinkedPaperRows} />
-            <AuditMetric label="Index linked" value={officialPaperIndexSummary.indexPagePaperRows} />
-            <AuditMetric label="Exact text rows" value={exactPyqReadiness.exactQuestionTextRows} />
-            <AuditMetric label="Window" value={officialPaperIndexSummary.yearWindow} />
-          </div>
-          <div className="mt-4 grid gap-2 lg:grid-cols-2">
-            {directPaperPreviewRows.map((row) => (
-              <a
-                key={row.id}
-                href={row.sourceHref}
-                data-testid="upsc-official-paper-index-row"
-                data-stage={row.stage}
-                data-year={row.year}
-                data-status={row.status}
-                className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                  {row.year} / {row.stage} / {row.status.replaceAll("-", " ")}
+            {isPaperIndexOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isPaperIndexOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <p className="text-xs font-semibold leading-relaxed text-[#5d675f]">
+                  {exactPyqReadiness.exactQuestionTextRows > 0
+                    ? `${exactPyqReadiness.exactQuestionTextRows} exact verified question rows are staged from the admin import ledger.`
+                    : `${officialPaperIndexSummary.exactImportRule} ${officialPaperIndexSummary.nextAction}`}
                 </p>
-                <h3 className="mt-1 text-sm font-black">{row.paper}</h3>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.nextAction}</p>
-              </a>
-            ))}
-          </div>
+                <ClipboardList className="h-6 w-6 text-[#1a3a2a]" />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <AuditMetric label="Prelims papers" value={officialPaperIndexSummary.prelimsPaperRows} />
+                <AuditMetric label="Mains GS papers" value={officialPaperIndexSummary.gsMainsPaperRows} />
+                <AuditMetric label="Optional papers" value={officialPaperIndexSummary.optionalPaperIndexRows} />
+                <AuditMetric label="Total papers" value={officialPaperIndexSummary.totalPaperIndexRows} />
+                <AuditMetric label="Direct linked" value={officialPaperIndexSummary.directLinkedPaperRows} />
+                <AuditMetric label="Index linked" value={officialPaperIndexSummary.indexPagePaperRows} />
+                <AuditMetric label="Exact text rows" value={exactPyqReadiness.exactQuestionTextRows} />
+                <AuditMetric label="Window" value={officialPaperIndexSummary.yearWindow} />
+              </div>
+              <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                {directPaperPreviewRows.map((row) => (
+                  <a
+                    key={row.id}
+                    href={row.sourceHref}
+                    data-testid="upsc-official-paper-index-row"
+                    data-stage={row.stage}
+                    data-year={row.year}
+                    data-status={row.status}
+                    className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      {row.year} / {row.stage} / {row.status.replaceAll("-", " ")}
+                    </p>
+                    <h3 className="mt-1 text-sm font-black">{row.paper}</h3>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.nextAction}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section
@@ -610,56 +638,63 @@ export function UpscSyllabusPyqLibrary() {
           data-next-queue-rule={exactPyqReadiness.nextQueueRule}
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsPriorityQueueOpen(!isPriorityQueueOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Exact PYQ extraction queue
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Start from direct official paper pages, then work backward.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                {exactPyqReadiness.nextQueueRule} This queue is admin-facing evidence; it does not claim exact
-                question coverage until verified text rows enter the import ledger.
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Extraction Queue</p>
+              <h3 className="text-xl font-black tracking-tight">Exact PYQ Extraction Queue ({isPriorityQueueOpen ? "Hide" : "Show"})</h3>
             </div>
-            <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <AuditMetric label="Queue shown" value={highPriorityImportQueueRows.length} />
-            <AuditMetric label="Direct paper pages" value={directHighPriorityRows} />
-            <AuditMetric label="High priority total" value={exactPyqReadiness.highPriorityPaperRows} />
-          </div>
-          <div className="mt-4 grid gap-2 lg:grid-cols-2">
-            {highPriorityImportQueueRows.map((row, index) => (
-              <a
-                key={row.id}
-                href={row.sourceHref}
-                data-testid="upsc-pyq-extraction-queue-row"
-                data-queue-index={index + 1}
-                data-stage={row.stage}
-                data-year={row.year}
-                data-status={row.status}
-                data-extraction-priority={row.extractionPriority}
-                data-subject-slug={row.subjectSlug ?? ""}
-                className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
-              >
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                    {String(index + 1).padStart(2, "0")} / {row.year} / {row.stage}
-                  </p>
-                  <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${statusTone(row.status === "direct-paper-page-linked" ? "source-indexed" : "text-import-pending")}`}>
-                    {row.status === "direct-paper-page-linked" ? "Direct source" : "Index source"}
-                  </span>
-                </div>
-                <h3 className="text-sm font-black leading-5 text-[#13251d]">{row.paper}</h3>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.studentUse}</p>
-                <p className="mt-2 rounded-md bg-[#fff4df] p-2 text-[11px] font-bold leading-4 text-[#6f4a12]">
-                  Next: {row.nextAction}
+            {isPriorityQueueOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isPriorityQueueOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <p className="text-xs font-semibold leading-relaxed text-[#5d675f]">
+                  {exactPyqReadiness.nextQueueRule} Direct official papers list used for staging verified question text.
                 </p>
-              </a>
-            ))}
-          </div>
+                <FileSearch className="h-6 w-6 text-[#1a3a2a]" />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <AuditMetric label="Queue shown" value={highPriorityImportQueueRows.length} />
+                <AuditMetric label="Direct paper pages" value={directHighPriorityRows} />
+                <AuditMetric label="High priority total" value={exactPyqReadiness.highPriorityPaperRows} />
+              </div>
+              <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                {highPriorityImportQueueRows.map((row, index) => (
+                  <a
+                    key={row.id}
+                    href={row.sourceHref}
+                    data-testid="upsc-pyq-extraction-queue-row"
+                    data-queue-index={index + 1}
+                    data-stage={row.stage}
+                    data-year={row.year}
+                    data-status={row.status}
+                    data-extraction-priority={row.extractionPriority}
+                    data-subject-slug={row.subjectSlug ?? ""}
+                    className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {String(index + 1).padStart(2, "0")} / {row.year} / {row.stage}
+                      </p>
+                      <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${statusTone(row.status === "direct-paper-page-linked" ? "source-indexed" : "text-import-pending")}`}>
+                        {row.status === "direct-paper-page-linked" ? "Direct source" : "Index source"}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-black leading-5 text-[#13251d]">{row.paper}</h3>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{row.studentUse}</p>
+                    <p className="mt-2 rounded-md bg-[#fff4df] p-2 text-[11px] font-bold leading-4 text-[#6f4a12]">
+                      Next: {row.nextAction}
+                    </p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section
@@ -675,57 +710,68 @@ export function UpscSyllabusPyqLibrary() {
           data-needs-review-rows={exactPyqReadiness.needsReviewRows}
           data-strict-coverage-percent={exactPyqReadiness.strictCoveragePercent}
           data-student-ready={String(exactPyqReadiness.studentReady)}
-          className="rounded-lg border border-[#ef9f27] bg-[#fff4df] p-5 shadow-sm md:p-7"
+          className="rounded-lg border border-[#ef9f27] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
-          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <button
+            type="button"
+            onClick={() => setIsReadinessGateOpen(!isReadinessGateOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6f4a12]">
-                Exact PYQ student gate
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
-                Official index is ready; exact question drills stay gated.
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d3a05]">
-                {exactPyqReadiness.studentReadyLabel} {exactPyqReadiness.nextQueueRule}
-              </p>
-              <Link
-                href="/admin/pyq-import"
-                className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-              >
-                Open exact import room <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ef9f27]">Student Gate</p>
+              <h3 className="text-xl font-black tracking-tight text-[#13251d]">Exact PYQ Student Gate ({isReadinessGateOpen ? "Hide" : "Show"})</h3>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <AuditMetric label="Official queue" value={exactPyqReadiness.officialPaperIndexRows} />
-              <AuditMetric label="Direct links" value={exactPyqReadiness.directLinkedOfficialPapers} />
-              <AuditMetric label="High priority" value={exactPyqReadiness.highPriorityPaperRows} />
-              <AuditMetric label="Exact imported" value={exactPyqReadiness.exactQuestionTextRows} />
-              <AuditMetric label="Mapped exact" value={exactPyqReadiness.mappedExactQuestionRows} />
-              <AuditMetric label="Strict coverage" value={`${exactPyqReadiness.strictCoveragePercent}%`} />
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 lg:grid-cols-5">
-            {exactPyqReadiness.stages.map((stage) => (
-              <article
-                key={stage.id}
-                data-testid="upsc-exact-pyq-pipeline-stage"
-                data-stage-id={stage.id}
-                data-stage-status={stage.status}
-                data-row-count={stage.rowCount}
-                className={`rounded-lg border p-4 ${exactStageTone(stage.status)}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-md border border-current/20 bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]">
-                    {stage.status}
-                  </span>
-                  <span className="font-mono text-sm font-black">{stage.rowCount}</span>
+            {isReadinessGateOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isReadinessGateOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start text-[#13251d]">
+                <div>
+                  <h4 className="text-lg font-black text-[#ef9f27]">Official Index Ready; Exact drills gated.</h4>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">
+                    {exactPyqReadiness.studentReadyLabel} {exactPyqReadiness.nextQueueRule}
+                  </p>
+                  <Link
+                    href="/admin/pyq-import"
+                    className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    Open exact import room <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </div>
-                <h3 className="mt-3 text-sm font-black tracking-tight">{stage.title}</h3>
-                <p className="mt-2 text-xs font-semibold leading-5">{stage.proof}</p>
-                <p className="mt-2 text-xs font-bold leading-5 opacity-80">{stage.studentImpact}</p>
-              </article>
-            ))}
-          </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <AuditMetric label="Official queue" value={exactPyqReadiness.officialPaperIndexRows} />
+                  <AuditMetric label="Direct links" value={exactPyqReadiness.directLinkedOfficialPapers} />
+                  <AuditMetric label="High priority" value={exactPyqReadiness.highPriorityPaperRows} />
+                  <AuditMetric label="Exact imported" value={exactPyqReadiness.exactQuestionTextRows} />
+                  <AuditMetric label="Mapped exact" value={exactPyqReadiness.mappedExactQuestionRows} />
+                  <AuditMetric label="Strict coverage" value={`${exactPyqReadiness.strictCoveragePercent}%`} />
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3 lg:grid-cols-5">
+                {exactPyqReadiness.stages.map((stage) => (
+                  <article
+                    key={stage.id}
+                    data-testid="upsc-exact-pyq-pipeline-stage"
+                    data-stage-id={stage.id}
+                    data-stage-status={stage.status}
+                    data-row-count={stage.rowCount}
+                    className={`rounded-lg border p-4 ${exactStageTone(stage.status)}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-md border border-current/20 bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em]">
+                        {stage.status}
+                      </span>
+                      <span className="font-mono text-sm font-black">{stage.rowCount}</span>
+                    </div>
+                    <h3 className="mt-3 text-sm font-black tracking-tight">{stage.title}</h3>
+                    <p className="mt-2 text-xs font-semibold leading-5">{stage.proof}</p>
+                    <p className="mt-2 text-xs font-bold leading-5 opacity-80">{stage.studentImpact}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section data-testid="upsc-official-source-anchors" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
@@ -975,33 +1021,45 @@ export function UpscSyllabusPyqLibrary() {
         </section>
 
         <section data-testid="upsc-optional-source-packs" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional paper preload</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">All optional subjects have Paper I/II source rows</h2>
+          <button
+            type="button"
+            onClick={() => setIsOptionalSourcePacksOpen(!isOptionalSourcePacksOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
+            <span className="flex items-center gap-2 text-base">
+              <BookMarked className="h-5 w-5 text-[#1d9e75]" />
+              Optional Paper Preloads ({isOptionalSourcePacksOpen ? "Hide" : "Show"})
+            </span>
+            {isOptionalSourcePacksOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isOptionalSourcePacksOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <p className="text-xs font-semibold text-[#5d675f] mb-4">
+                All optional subjects have preloaded Paper I & II source rows:
+              </p>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {optionalSourcePacks.map((subject) => (
+                  <Link
+                    key={subject.slug}
+                    href={subject.route}
+                    data-testid="upsc-optional-source-pack-link"
+                    data-optional-slug={subject.slug}
+                    data-paper-row-count={subject.paperRows.length}
+                    data-year-count={subject.yearRows.length}
+                    data-readiness-score={subject.readinessScore}
+                    className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{subject.group}</p>
+                    <h3 className="mt-1 text-sm font-black">{subject.title}</h3>
+                    <p className="mt-1 text-xs font-semibold text-[#5d675f]">
+                      {subject.paperRows.length} Paper I/II rows / {subject.readinessScore}% source indexed
+                    </p>
+                  </Link>
+                ))}
+              </div>
             </div>
-            <BookMarked className="h-6 w-6 text-[#1a3a2a]" />
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {optionalSourcePacks.map((subject) => (
-              <Link
-                key={subject.slug}
-                href={subject.route}
-                data-testid="upsc-optional-source-pack-link"
-                data-optional-slug={subject.slug}
-                data-paper-row-count={subject.paperRows.length}
-                data-year-count={subject.yearRows.length}
-                data-readiness-score={subject.readinessScore}
-                className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-3 transition hover:border-[#1d9e75]"
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{subject.group}</p>
-                <h3 className="mt-1 text-sm font-black">{subject.title}</h3>
-                <p className="mt-1 text-xs font-semibold text-[#5d675f]">
-                  {subject.paperRows.length} Paper I/II rows / {subject.readinessScore}% source indexed
-                </p>
-              </Link>
-            ))}
-          </div>
+          )}
         </section>
       </div>
     </main>

@@ -1,0 +1,17 @@
+{
+  "locked_files": [
+    "backend/app/services/scoring_engine.py",
+    "backend/app/services/report_service.py",
+    "backend/app/models/domain.py",
+    "backend/app/core/pedagogy/reliability_engine.py",
+    "backend/app/api/v1/attempts.py",
+    "backend/app/services/attempt_reconciliation_engine.py"
+  ],
+  "frozen_directories": [
+    "backend/app/core/inference",
+    "backend/app/core/observability",
+    "backend/app/api/v1/observability.py"
+  ],
+  "last_updated": "2026-05-13T14:15:00Z",
+  "authority": "Chat #2 (System Protection Engine)"
+}

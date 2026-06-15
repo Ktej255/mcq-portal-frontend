@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-13T19:11:32.899619",
+  "files_to_edit": [
+    "docs/governance/graph/SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "docs/governance/graph/SYSTEM_STATE.md": {
+      "count": 0,
+      "risk": "NEGLIGIBLE",
+      "impacted": []
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 0,
+  "owner": "Governance",
+  "rollback_ref": "git revert HEAD",
+  "registry_id": "mutation_20260513_191132.json"
+}

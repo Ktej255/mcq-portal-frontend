@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-05-18T20:15:24.942870",
+  "files_to_edit": [
+    "frontend\\src\\lib\\contexts\\AuthContext.tsx",
+    "frontend\\src\\env.ts",
+    "frontend\\src\\lib\\firebase\\config.ts",
+    "frontend\\src\\lib\\auth\\token-strategy.ts",
+    "frontend\\src\\services\\api\\client.ts",
+    "frontend\\src\\app\\(auth)\\login\\[[...login]]\\page.tsx",
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx",
+    "frontend\\public\\noise.svg"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\lib\\contexts\\AuthContext.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\env.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\firebase\\config.ts": {
+      "count": 1
+    },
+    "frontend\\src\\lib\\auth\\token-strategy.ts": {
+      "count": 0
+    },
+    "frontend\\src\\services\\api\\client.ts": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(auth)\\login\\[[...login]]\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\public\\noise.svg": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 6,
+  "runtime_status": "All runtime checks PASSED."
+}

@@ -57,6 +57,8 @@ import {
   useSubjectProgress,
 } from "@/lib/upsc/useSubjectProgress";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
+import { awardGamificationRewards } from "@/lib/upsc/gamification";
+import { toast } from "sonner";
 import { requestAdaptiveTeacherDiscussion } from "@/services/upscTeacherService";
 import { requestUpscSpeechTranscription, requestUpscSpeechTranscriptionStatus } from "@/services/upscSpeechService";
 import { cn } from "@/lib/utils";
@@ -794,6 +796,26 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       teacherFollowUpAnswer: includeChallenge ? challengeDraft.trim() : undefined,
       incrementSavedCount: true,
     });
+
+    if (nextAssessment && nextAssessment.score >= SUBJECT_RECALL_TARGET) {
+      try {
+        const rewardResult = awardGamificationRewards("recall-clear");
+        if (rewardResult.addedPoints > 0) {
+          toast.success("Active Recall Clear!", {
+            description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+          });
+          if (rewardResult.unlockedBadge) {
+            toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+              description: rewardResult.unlockedBadge.description,
+              icon: rewardResult.unlockedBadge.icon,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to award rewards", e);
+      }
+    }
+
     setTeacherCoach(null);
     setTeacherConnection("checking");
     const requestId = teacherRequestId.current + 1;

@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-18T20:18:18.703926",
+  "files_to_edit": [
+    "frontend\\src\\components\\report\\LongitudinalGrowth.tsx",
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\components\\report\\LongitudinalGrowth.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\(dashboard)\\reports\\page.tsx": {
+      "count": 1
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 2,
+  "runtime_status": "All runtime checks PASSED."
+}

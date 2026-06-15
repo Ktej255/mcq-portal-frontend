@@ -4,9 +4,9 @@ import { UpscPrelimsShowcase } from "@/components/marketing/UpscPrelimsShowcase"
 import { buildPrelims2026ShowcaseEvidence } from "@/lib/upsc/prelims2026ShowcaseEvidence";
 
 export const metadata: Metadata = {
-  title: "UPSC Prelims 2026 Showcase | Morning Batch Audit",
+  title: "UPSC Prelims 2026 Results | Course Performance Analysis",
   description:
-    "Standalone UPSC Prelims 2026 audit showcase for main-site proof, content coverage, pattern shift, and portal activation planning.",
+    "Complete transparency on our UPSC Prelims 2026 course performance. 76% coverage, 74 out of 97 questions analyzed. See subject-wise breakdown and our 2027 improvement plan.",
 };
 
 export default function UpscPrelims2026ShowcasePage() {

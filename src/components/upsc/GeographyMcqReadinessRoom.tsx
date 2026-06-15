@@ -19,6 +19,8 @@ import { getGeographyBatchCode } from "@/lib/upsc/mcqContract";
 import { readLocalMcqCommandQuestionsForBatch, readMcqCommandBatchState } from "@/lib/upsc/mcqDraftBank";
 import { geographySessions, type GeographySession } from "@/lib/upsc/plan";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
+import { awardGamificationRewards } from "@/lib/upsc/gamification";
+import { toast } from "sonner";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
 import type { QuestionPayload } from "@/services/api/adminService";
 import { cn } from "@/lib/utils";
@@ -282,6 +284,26 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
       revisitQueued: nextComplete && nextOutcome === "Revisit",
       confidence: nextComplete ? (nextOutcome === "Command" ? "Command" : "Shaky") : progress?.confidence,
     });
+
+    if (nextComplete) {
+      try {
+        const action = nextScorePercent === 100 ? "perfect-score" : "mcq-complete";
+        const rewardResult = awardGamificationRewards(action);
+        if (rewardResult.addedPoints > 0) {
+          toast.success(action === "perfect-score" ? "Perfect MCQ Practice!" : "MCQ Practice Complete!", {
+            description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+          });
+          if (rewardResult.unlockedBadge) {
+            toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+              description: rewardResult.unlockedBadge.description,
+              icon: rewardResult.unlockedBadge.icon,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to award rewards", e);
+      }
+    }
   };
 
   const resetPractice = () => {

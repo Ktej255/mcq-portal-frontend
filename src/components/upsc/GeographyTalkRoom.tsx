@@ -42,6 +42,8 @@ import {
 } from "@/lib/upsc/geographyLearning";
 import { GEOGRAPHY_RECALL_TARGET } from "@/lib/upsc/guidedStudy";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
+import { awardGamificationRewards } from "@/lib/upsc/gamification";
+import { toast } from "sonner";
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 import { useAuth } from "@/lib/contexts/AuthContext";
@@ -799,6 +801,26 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
     setDiscussion(nextDiscussion);
     setChallengeOpen(nextChallengeOpen);
     persistTalk(nextAssessment, nextDiscussion, nextChallengeOpen, nextModuleRecall, answerForAssessment);
+
+    if (nextAssessment && nextAssessment.score >= GEOGRAPHY_RECALL_TARGET) {
+      try {
+        const rewardResult = awardGamificationRewards("recall-clear");
+        if (rewardResult.addedPoints > 0) {
+          toast.success("Active Recall Clear!", {
+            description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+          });
+          if (rewardResult.unlockedBadge) {
+            toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+              description: rewardResult.unlockedBadge.description,
+              icon: rewardResult.unlockedBadge.icon,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to award rewards", e);
+      }
+    }
+
     setTeacherCoach(null);
     setTeacherConnection("checking");
     const requestId = teacherRequestId.current + 1;

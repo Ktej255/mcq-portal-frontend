@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowRight,
   BadgeIndianRupee,
@@ -6,6 +9,8 @@ import {
   BrainCircuit,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Gauge,
   Layers3,
@@ -24,6 +29,7 @@ import {
   productPricingPlans,
   threeDayLaunchItems,
   yearlyPlannerBlocks,
+  getDynamicYearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
 import { getOptionalSourcePack, syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
 import {
@@ -31,6 +37,7 @@ import {
   strategyReallocationPlan,
   strategySprintCalendar,
 } from "@/lib/upsc/prelims2027Strategy";
+import { useDashboardData } from "@/hooks/useDashboardData";
 
 function statusTone(status: string) {
   if (status === "ready") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
@@ -57,6 +64,9 @@ const strategyOverlayRows = prelims2027Priorities
   }))
   .sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority]);
 
+/**********************************************************************************
+ * Priority Color Tone Helper
+ **********************************************************************************/
 function priorityTone(priority: (typeof prelims2027Priorities)[number]["priority"]) {
   if (priority === "Critical") return "border-[#d95f43] bg-[#fff0ec] text-[#9d3824]";
   if (priority === "High") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
@@ -65,16 +75,64 @@ function priorityTone(priority: (typeof prelims2027Priorities)[number]["priority
   return "border-[#dcd5c7] bg-[#f7f4ee] text-[#5d675f]";
 }
 
+/**********************************************************************************
+ * Primary UpscYearlyPlanner Component
+ **********************************************************************************/
 export function UpscYearlyPlanner() {
-  const monthly = productPricingPlans[0];
+  const { profile } = useDashboardData();
+  const plannerBlocks = getDynamicYearlyPlannerBlocks(profile);
   const optionalGroups = optionalSubjects.reduce<Record<string, number>>((groups, subject) => {
     groups[subject.group] = (groups[subject.group] ?? 0) + 1;
     return groups;
   }, {});
 
+  // Collapsible section states for a minimalist dashboard
+  const [isStrategyOpen, setIsStrategyOpen] = useState(false);
+  const [isBlueprintsOpen, setIsBlueprintsOpen] = useState(false);
+  const [isEngineOpen, setIsEngineOpen] = useState(false);
+  const [isOptionalsOpen, setIsOptionalsOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isLaunchOpen, setIsLaunchOpen] = useState(false);
+
+  const currentPlanId = profile?.subscriptionPlanId ?? "foundation";
+  const currentPlanCycle = profile?.billingCycle ?? "monthly";
+  const activePlanPrice = productPricingPlans.find(
+    (p) => p.tier === currentPlanId && p.cycle === currentPlanCycle
+  )?.launchPrice ?? 399;
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+        
+        {/* Active subscription summary displaying current plan */}
+        <section className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">
+                Active Subscription status
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-[#13251d] capitalize">
+                {currentPlanId} Plan
+                <span className="ml-2 text-sm font-semibold text-[#085041]/75">
+                  ({currentPlanCycle === "monthly" ? "Billed Monthly" : `${currentPlanCycle} cycle`})
+                </span>
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-[#49675e]">
+                Pilot pricing of {money(activePlanPrice)} active. Includes: {currentPlanId === "ultimate" ? "Unlimited AI hours" : currentPlanId === "pro" ? "6 hours AI" : currentPlanId === "plus" ? "3 hours AI" : "1 hour daily AI interaction"}.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/upsc/pricing"
+                className="rounded-lg border border-[#1a3a2a] bg-white px-4 py-2 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition"
+              >
+                Manage / Upgrade Subscription
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Hero Section */}
         <section
           data-testid="upsc-yearly-planner-hero"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
@@ -88,7 +146,7 @@ export function UpscYearlyPlanner() {
                 One path, one price ladder, one student loop.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                The product plan now binds the yearly subject sequence, PYQ preload target, optional-subject catalog,
+                The product plan binds the yearly subject sequence, PYQ preload target, optional-subject catalog,
                 pricing, gap analysis, revision, reports, and AI discussion loop into one visible operating map.
               </p>
               <Link href="/upsc/pricing" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
@@ -99,7 +157,7 @@ export function UpscYearlyPlanner() {
               {[
                 ["GS subjects", coreSubjectBlueprints.length],
                 ["Optional pages", optionalSubjects.length],
-                ["Monthly base", money(monthly.launchPrice)],
+                ["Current Plan Price", money(activePlanPrice)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -110,28 +168,7 @@ export function UpscYearlyPlanner() {
           </div>
         </section>
 
-        <section data-testid="upsc-pricing-ladder" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {productPricingPlans.map((plan) => (
-            <article key={plan.id} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                  <BadgeIndianRupee className="h-4 w-4" />
-                </div>
-                <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
-                  {plan.discountPercent > 0 ? `${plan.discountPercent}% off` : "Base plan"}
-                </Badge>
-              </div>
-              <h2 className="mt-4 text-xl font-black tracking-tight">{plan.title}</h2>
-              <p className="mt-1 text-3xl font-black">{money(plan.launchPrice)}</p>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[#746f66]">
-                List {money(plan.listPrice)} / {money(plan.effectiveMonthly)} effective monthly
-              </p>
-              <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{plan.audience}</p>
-              <p className="mt-2 text-xs font-bold leading-5 text-[#31443a]">{plan.promise}</p>
-            </article>
-          ))}
-        </section>
-
+        {/* Core Subject Calendar (Open by default since it is the yearly timeline) */}
         <section data-testid="upsc-yearly-timeline" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -141,7 +178,7 @@ export function UpscYearlyPlanner() {
             <CalendarDays className="h-6 w-6 text-[#1a3a2a]" />
           </div>
           <div className="grid gap-3">
-            {yearlyPlannerBlocks.map((block, index) => (
+            {plannerBlocks.map((block, index) => (
               <Link
                 key={`${block.window}-${block.title}`}
                 href={block.route}
@@ -162,287 +199,308 @@ export function UpscYearlyPlanner() {
           </div>
         </section>
 
+        {/* Collapsible Section 1: 2027 Strategy Overlay */}
         <section
           id="upsc-2027-strategy-overlay"
           data-testid="upsc-2027-strategy-overlay"
           data-priority-count={strategyOverlayRows.length}
           data-sprint-count={strategySprintCalendar.length}
-          className="rounded-lg border border-[#b9d9cd] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+          className="rounded-lg border border-[#b9d9cd] bg-[#fffdf8] p-4 shadow-sm"
         >
-          <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <button
+            type="button"
+            onClick={() => setIsStrategyOpen(!isStrategyOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                2027 correction overlay
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                The yearly planner now shows what changes after the 2026 Prelims audit.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                This layer keeps the existing subject calendar visible, but marks the course corrections: build IR and
-                new-domain S&T first, patch legal-current and map intelligence, keep Economy in maintenance, and cap
-                Medieval expansion.
-              </p>
-              <p className="mt-3 max-w-3xl rounded-md border border-[#d9c8a4] bg-[#fff4df] p-3 text-sm font-black leading-6 text-[#6f4a12]">
-                Proof locked: every 2027 planner change needs retained source/page evidence before it becomes a public
-                claim or student-facing proof example.
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">2027 correction overlay</p>
+              <h3 className="text-lg">2027 Strategic Reallocations & Sprints ({isStrategyOpen ? "Hide" : "Show"})</h3>
             </div>
-            <Link
-              href="/upsc/prelims-2027-strategy#prelims-2027-reallocation-board"
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
-            >
-              Open strategy command <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
+            {isStrategyOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
 
-          <div className="grid gap-3 md:grid-cols-4">
-            {[
-              ["Critical rebuilds", strategyOverlayRows.filter((row) => row.priority === "Critical").length],
-              ["High-priority patch", strategyOverlayRows.filter((row) => row.priority === "High").length],
-              ["12-week sprints", strategySprintCalendar.length],
-              ["Release gate", "Proof locked"],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
-                <p className="mt-1 text-2xl font-black text-[#13251d]">{value}</p>
+          {isStrategyOpen && (
+            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
+              <p className="text-sm font-semibold leading-6 text-[#5d675f] mb-4">
+                This layer marks course corrections: build IR and new-domain S&T first, patch legal-current, 
+                keep Economy in maintenance, and cap Medieval expansion. Proof locked under official source anchors.
+              </p>
+              
+              <div className="grid gap-3 md:grid-cols-4 mb-5">
+                {[
+                  ["Critical rebuilds", strategyOverlayRows.filter((row) => row.priority === "Critical").length],
+                  ["High-priority patch", strategyOverlayRows.filter((row) => row.priority === "High").length],
+                  ["12-week sprints", strategySprintCalendar.length],
+                  ["Release gate", "Proof locked"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
+                    <p className="mt-0.5 text-xl font-black text-[#13251d]">{value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="grid gap-3">
-              {strategyOverlayRows.map((row) => (
-                <article
-                  key={row.id}
-                  data-testid="upsc-2027-strategy-priority-row"
-                  data-priority-id={row.id}
-                  data-priority={row.priority}
-                  data-decision={row.reallocation?.decision ?? "Plan"}
-                  className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
-                >
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="grid gap-3">
+                  {strategyOverlayRows.map((row) => (
+                    <article
+                      key={row.id}
+                      data-testid="upsc-2027-strategy-priority-row"
+                      data-priority-id={row.id}
+                      data-priority={row.priority}
+                      data-decision={row.reallocation?.decision ?? "Plan"}
+                      className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#746f66]">
+                            {row.window}
+                          </p>
+                          <h4 className="mt-0.5 text-base font-black tracking-tight text-[#13251d]">{row.subject}</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] ${priorityTone(row.priority)}`}>
+                            {row.priority}
+                          </span>
+                          <span className="rounded border border-[#dcd5c7] bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#31443a]">
+                            {row.reallocation?.decision ?? "Plan"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">{row.action}</p>
+                      <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        <p className="rounded border border-[#dcd5c7] bg-white p-2.5 text-[11px] font-bold text-[#31443a]">
+                          <span className="font-black text-[#13251d]">Shift:</span> {row.reallocation?.allocation ?? row.evidence}
+                        </p>
+                        <p className="rounded border border-[#dcd5c7] bg-white p-2.5 text-[11px] font-bold text-[#31443a]">
+                          <span className="font-black text-[#13251d]">Target:</span> {row.reallocation?.mcqTarget ?? row.action}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h4 className="text-base font-black text-[#13251d]">12-week Sprint Phase Order</h4>
+                    <Gauge className="h-4 w-4 text-[#1a3a2a]" />
+                  </div>
+                  <div className="grid gap-2">
+                    {strategySprintCalendar.map((sprint) => (
+                      <Link
+                        key={sprint.id}
+                        href={sprint.route}
+                        data-testid="upsc-2027-strategy-sprint-row"
+                        data-sprint-id={sprint.id}
+                        className="rounded-lg border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
+                      >
+                        <p className="text-[9px] font-black uppercase text-[#1d9e75]">
+                          {sprint.window} / {sprint.phase}
+                        </p>
+                        <h5 className="mt-0.5 text-xs font-black text-[#13251d]">{sprint.title}</h5>
+                        <p className="mt-1 text-[11px] font-semibold text-[#5d675f]">{sprint.focus}</p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Collapsible Section 2: GS Coverage Subject Blueprints */}
+        <section data-testid="upsc-gs-coverage" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsBlueprintsOpen(!isBlueprintsOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">GS blueprints</p>
+              <h3 className="text-lg">Core GS Subject Blueprints & Coverage ({isBlueprintsOpen ? "Hide" : "Show"})</h3>
+            </div>
+            {isBlueprintsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isBlueprintsOpen && (
+            <div className="mt-5 grid gap-3 xl:grid-cols-2 border-t border-[#e8e2d5] pt-5">
+              {coreSubjectBlueprints.map((subject) => (
+                <article key={subject.slug} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#746f66]">
-                        {row.window}
+                      <p className="text-[9px] font-black uppercase text-[#1d9e75]">
+                        {subject.plannerWindow} / {subject.totalDays} days
                       </p>
-                      <h3 className="mt-1 text-lg font-black tracking-tight text-[#13251d]">{row.subject}</h3>
+                      <h4 className="mt-0.5 text-base font-black">{subject.title}</h4>
+                      <p className="text-[10px] font-black uppercase text-[#746f66]">{subject.primaryPaper}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${priorityTone(row.priority)}`}>
-                        {row.priority}
-                      </span>
-                      <span className="rounded-md border border-[#dcd5c7] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#31443a]">
-                        {row.reallocation?.decision ?? "Plan"}
-                      </span>
-                    </div>
+                    <Link href={subject.route} className="inline-flex min-h-8 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] transition">
+                      Open
+                    </Link>
                   </div>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{row.action}</p>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#31443a]">
-                      <span className="font-black text-[#13251d]">Planner shift:</span>{" "}
-                      {row.reallocation?.allocation ?? row.evidence}
-                    </p>
-                    <p className="rounded-md border border-[#dcd5c7] bg-white p-3 text-xs font-bold leading-5 text-[#31443a]">
-                      <span className="font-black text-[#13251d]">MCQ target:</span>{" "}
-                      {row.reallocation?.mcqTarget ?? row.action}
-                    </p>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">{subject.syllabusDemand}</p>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {subject.coverageLayers.map((layer) => (
+                      <span key={layer} className="rounded border border-[#dcd5c7] bg-[#f7f4ee] px-2 py-0.5 text-[9px] font-bold text-[#31443a]">
+                        {layer}
+                      </span>
+                    ))}
                   </div>
-                  <p className="mt-3 rounded-md border border-[#b9d9cd] bg-[#e7f5ee] p-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]">
-                    Release gate: {row.reallocation?.releaseGate ?? "Keep proof locked until exact source evidence exists."}
-                  </p>
                 </article>
               ))}
             </div>
-
-            <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">12-week execution</p>
-                  <h3 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">Sprint order</h3>
-                </div>
-                <Gauge className="h-5 w-5 text-[#1a3a2a]" />
-              </div>
-              <div className="grid gap-3">
-                {strategySprintCalendar.map((sprint) => (
-                  <Link
-                    key={sprint.id}
-                    href={sprint.route}
-                    data-testid="upsc-2027-strategy-sprint-row"
-                    data-sprint-id={sprint.id}
-                    className="rounded-lg border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                        {sprint.window} / {sprint.phase}
-                      </p>
-                      <ArrowRight className="h-4 w-4 text-[#1a3a2a]" />
-                    </div>
-                    <h4 className="mt-1 text-sm font-black tracking-tight text-[#13251d]">{sprint.title}</h4>
-                    <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{sprint.focus}</p>
-                    <p className="mt-2 rounded-md bg-[#fff4df] p-2 text-[11px] font-bold leading-5 text-[#6f4a12]">
-                      {sprint.releaseSignal}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </section>
 
-        <section data-testid="upsc-gs-coverage" className="grid gap-3 xl:grid-cols-2">
-          {coreSubjectBlueprints.map((subject) => (
-            <article key={subject.slug} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
-                    {subject.plannerWindow} / {subject.totalDays} days
-                  </p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight">{subject.title}</h2>
-                  <p className="mt-1 text-xs font-black uppercase tracking-[0.1em] text-[#746f66]">
-                    {subject.primaryPaper}
-                  </p>
-                </div>
-                <Link href={subject.route} className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
-                  Open
-                </Link>
-              </div>
-              <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">{subject.syllabusDemand}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {subject.coverageLayers.map((layer) => (
-                  <span key={layer} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#31443a]">
-                    {layer}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <p className="rounded-md bg-[#e7f5ee] p-3 text-xs font-bold leading-5 text-[#085041]">{subject.pyqPreloadTarget}</p>
-                <p className="rounded-md bg-[#fff4df] p-3 text-xs font-bold leading-5 text-[#6f4a12]">{subject.currentAffairsRule}</p>
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section data-testid="upsc-product-engine" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        {/* Collapsible Section 3: Product Platform Engine Roadmap */}
+        <section data-testid="upsc-product-engine" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsEngineOpen(!isEngineOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Product engine</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">Feature readiness against the three-day vision</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Product engine</p>
+              <h3 className="text-lg">Feature Roadmap & Readiness Logs ({isEngineOpen ? "Hide" : "Show"})</h3>
             </div>
-            <Target className="h-6 w-6 text-[#1a3a2a]" />
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {productEngineFeatures.map((feature) => (
-              <article
-                key={feature.title}
-                data-testid="upsc-product-engine-feature"
-                data-feature-title={feature.title}
-                data-feature-status={feature.status}
-                data-owner-surface={feature.ownerSurface}
-                className={`rounded-lg border p-4 ${statusTone(feature.status)}`}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.14em]">{feature.status}</span>
-                </div>
-                <h3 className="text-base font-black tracking-tight">{feature.title}</h3>
-                <p className="mt-2 text-xs font-black uppercase tracking-[0.1em] opacity-80">{feature.ownerSurface}</p>
-                <p className="mt-2 text-sm font-semibold leading-6">{feature.studentOutcome}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+            {isEngineOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
 
-        <section data-testid="upsc-optional-summary" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-          <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional subjects</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">All optional pages are seeded</h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">
-                Each optional has a route target for Paper I, Paper II, year-wise PYQs, syllabus demand, trend map,
-                and the same recall-first discussion loop.
-              </p>
-              <Link href="/upsc/optional-subjects" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
-                Open optional catalog <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {Object.entries(optionalGroups).map(([group, count]) => (
-                <div key={group} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{group}</p>
-                  <p className="mt-1 text-3xl font-black">{count}</p>
-                  <p className="mt-1 text-xs font-bold text-[#746f66]">Paper I and Paper II route pages</p>
-                </div>
+          {isEngineOpen && (
+            <div className="mt-5 grid gap-3 md:grid-cols-3 border-t border-[#e8e2d5] pt-5">
+              {productEngineFeatures.map((feature) => (
+                <article
+                  key={feature.title}
+                  data-testid="upsc-product-engine-feature"
+                  data-feature-title={feature.title}
+                  data-feature-status={feature.status}
+                  data-owner-surface={feature.ownerSurface}
+                  className={`rounded-lg border p-4 ${statusTone(feature.status)}`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span className="text-[9px] font-black uppercase tracking-wider">{feature.status}</span>
+                  </div>
+                  <h4 className="text-sm font-black tracking-tight">{feature.title}</h4>
+                  <p className="mt-1 text-[10px] font-semibold opacity-75">{feature.ownerSurface}</p>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed opacity-90">{feature.studentOutcome}</p>
+                </article>
               ))}
             </div>
-          </div>
+          )}
         </section>
 
-        <section data-testid="upsc-source-library-link" className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7">
-          <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        {/* Collapsible Section 4: Seeded Optional Subject Catalog */}
+        <section data-testid="upsc-optional-summary" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsOptionalsOpen(!isOptionalsOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
             <div>
-              <div className="mb-3 flex items-center gap-3">
-                <LibraryBig className="h-5 w-5 text-[#085041]" />
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
-                  Syllabus and PYQ preload ledger
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Optional subjects</p>
+              <h3 className="text-lg">All Optional Subject Seed Catalogs ({isOptionalsOpen ? "Hide" : "Show"})</h3>
+            </div>
+            {isOptionalsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isOptionalsOpen && (
+            <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr] border-t border-[#e8e2d5] pt-5">
+              <div>
+                <h4 className="text-base font-black">All Optional Seeds Are Configured</h4>
+                <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">
+                  Each subject holds a direct route for Paper I, Paper II, syllabus requirements, trend mapping, 
+                  and discussion portals.
+                </p>
+                <Link href="/upsc/optional-subjects" className="mt-4 inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
+                  Open Optional catalog <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {Object.entries(optionalGroups).map(([group, count]) => (
+                  <div key={group} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                    <p className="text-[9px] font-black uppercase text-[#1d9e75]">{group}</p>
+                    <p className="mt-0.5 text-xl font-black">{count} subjects</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Collapsible Section 5: Syllabus & PYQ Preload Ledger */}
+        <section data-testid="upsc-source-library-link" className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsLibraryOpen(!isLibraryOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#085041]"
+          >
+            <span className="flex items-center gap-2">
+              <LibraryBig className="h-4 w-4" />
+              Syllabus and PYQ Preload Registry Ledger ({isLibraryOpen ? "Hide" : "Show"})
+            </span>
+            {isLibraryOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+
+          {isLibraryOpen && (
+            <div className="mt-5 border-t border-[#b9d9cd] pt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between text-[#13251d]">
+              <div>
+                <h4 className="text-base font-black">Official Source Rows Are Preloaded</h4>
+                <p className="mt-2 text-xs font-semibold leading-relaxed text-[#49675e]">
+                  {syllabusPyqRegistrySummary.gsPyqRows} GS rows and {syllabusPyqRegistrySummary.optionalPyqRows} optional 
+                  Paper I/II rows are seeded against official UPSC anchors.
                 </p>
               </div>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Official source rows are now inside the product.</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
-                {syllabusPyqRegistrySummary.gsPyqRows} GS rows and {syllabusPyqRegistrySummary.optionalPyqRows} optional Paper I/II rows
-                are seeded against official UPSC anchors. The remaining work is PDF text extraction and topic mapping.
-              </p>
+              <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
+                Open source library <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
-            <Link href="/upsc/source-library" className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
-              Open source library <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
+          )}
         </section>
 
-        <section data-testid="upsc-three-day-launch" className="grid gap-3 lg:grid-cols-3">
-          {threeDayLaunchItems.map((item) => (
-            <article key={item.day} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{item.day}</p>
-                  <h3 className="text-lg font-black tracking-tight">{item.title}</h3>
-                </div>
-              </div>
-              <ul className="space-y-2">
-                {item.mustShip.map((task) => (
-                  <li key={task} className="flex gap-2 text-sm font-semibold leading-6 text-[#49675e]">
-                    <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                    <span>{task}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 rounded-md bg-[#f7f4ee] p-3 text-xs font-black uppercase tracking-[0.1em] text-[#31443a]">
-                Proof: {item.proof}
-              </p>
-            </article>
-          ))}
-        </section>
+        {/* Collapsible Section 6: Launch Milestones */}
+        <section data-testid="upsc-three-day-launch" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setIsLaunchOpen(!isLaunchOpen)}
+            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-[#1d9e75]" />
+              Platform Milestone & Proof Log Checklist ({isLaunchOpen ? "Hide" : "Show"})
+            </span>
+            {isLaunchOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
 
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-3">
-            <FileText className="h-5 w-5 text-[#1a3a2a]" />
-            <h2 className="text-lg font-black tracking-tight">Official source anchors</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {officialUpscSourceLinks.map((source) => (
-              <a key={source.href} href={source.href} className="rounded-md border border-[#dcd5c7] px-3 py-2 text-xs font-black text-[#1a3a2a]">
-                {source.title}
-              </a>
-            ))}
-          </div>
+          {isLaunchOpen && (
+            <div className="mt-5 grid gap-3 lg:grid-cols-3 border-t border-[#e8e2d5] pt-5">
+              {threeDayLaunchItems.map((item) => (
+                <article key={item.day} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[9px] font-black uppercase text-[#1d9e75]">{item.day}</span>
+                    <h4 className="text-sm font-black tracking-tight">{item.title}</h4>
+                  </div>
+                  <ul className="space-y-1">
+                    {item.mustShip.map((task) => (
+                      <li key={task} className="flex gap-2 text-xs font-semibold leading-relaxed text-[#49675e]">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1d9e75]" />
+                        <span>{task}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
   );
 }
 
+/**********************************************************************************
+ * Exporting Remaining Sub-Components intact
+ **********************************************************************************/
 export function OptionalSubjectsCatalog() {
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">

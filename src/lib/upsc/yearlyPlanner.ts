@@ -1,8 +1,14 @@
 import { geographySessions } from "@/lib/upsc/plan";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
+import type { StudentProfile } from "./studentProfile";
+
+export type PlanTier = "foundation" | "plus" | "pro" | "ultimate";
+export type BillingCycle = "monthly" | "yearly" | "two-year" | "three-year";
 
 export type ProductPlan = {
   id: string;
+  tier: PlanTier;
+  cycle: BillingCycle;
   title: string;
   months: number;
   listPrice: number;
@@ -11,6 +17,8 @@ export type ProductPlan = {
   effectiveMonthly: number;
   audience: string;
   promise: string;
+  features: string[];
+  limits: string;
 };
 
 export type YearlyPlannerBlock = {
@@ -70,37 +78,126 @@ export type ThreeDayLaunchItem = {
 
 export const productMonthlyBasePrice = 399;
 
-function pricingPlan(id: string, title: string, months: number, launchPrice: number, audience: string, promise: string): ProductPlan {
-  const listPrice = productMonthlyBasePrice * months;
+export const planBases = [
+  {
+    tier: "foundation" as const,
+    title: "Foundation Plan",
+    baseMonthlyPrice: 399,
+    audience: "Trial and self-paced beginners",
+    promise: "Build baseline habits before you commit to higher tiers.",
+    features: [
+      "Core UPSC GS Subject Path",
+      "Daily Planner & Workspace notes",
+      "Standard MCQ Generator (50/day limit)",
+      "1 Spaced Weak-Topic repair run",
+      "Basic Syllabus check sheet",
+    ],
+    limits: "1 hour daily AI interaction. Generous rate limits apply.",
+  },
+  {
+    tier: "plus" as const,
+    title: "Plus Plan",
+    baseMonthlyPrice: 699,
+    audience: "Standard aspirants ready for structural study",
+    promise: "Structural prep including optional subject libraries.",
+    features: [
+      "Everything in Foundation",
+      "Full Optional Subject Catalog (Academic/Lit)",
+      "Advanced MCQ Generator (200/day limit)",
+      "5 Spaced Weak-Topics repair runs",
+      "Priority Syllabus & PYQ library",
+    ],
+    limits: "3 hours daily AI interaction. Generous rate limits apply.",
+  },
+  {
+    tier: "pro" as const,
+    title: "Pro Plan",
+    baseMonthlyPrice: 999,
+    audience: "Serious candidates demanding deep diagnostics",
+    promise: "Priority AI queues, unlimited testing, and mains uploading.",
+    features: [
+      "Everything in Plus",
+      "Unlimited MCQ Generator & practice tests",
+      "Unlimited Weak-Topic diagnostic analytics",
+      "Spaced Revision priority queueing",
+      "Auto-Stitched Mobile Mains Uploads",
+    ],
+    limits: "6 hours daily AI interaction. Generous rate limits apply.",
+  },
+  {
+    tier: "ultimate" as const,
+    title: "Ultimate Plan",
+    baseMonthlyPrice: 1299,
+    audience: "Full-time candidates looking for zero friction",
+    promise: "No limits whatsoever. Complete command and direct support.",
+    features: [
+      "Everything in Pro",
+      "Unlimited AI interaction hours",
+      "No hourly or daily rate limits at all",
+      "Priority AI text and talk model response",
+      "Direct guidance channel with Sarit Classes",
+    ],
+    limits: "Unlimited everything. Zero limits apply.",
+  },
+];
+
+export const billingCycles = [
+  { cycle: "monthly" as const, months: 1, discountPercent: 0, label: "Monthly" },
+  { cycle: "yearly" as const, months: 12, discountPercent: 15, label: "Yearly" },
+  { cycle: "two-year" as const, months: 24, discountPercent: 25, label: "2-Year" },
+  { cycle: "three-year" as const, months: 36, discountPercent: 35, label: "3-Year" },
+];
+
+function buildPlan(
+  tierInfo: typeof planBases[number],
+  cycleInfo: typeof billingCycles[number]
+): ProductPlan {
+  const months = cycleInfo.months;
+  const listPrice = tierInfo.baseMonthlyPrice * months;
+  const discountMultiplier = 1 - cycleInfo.discountPercent / 100;
+  const launchPrice = Math.round((listPrice * discountMultiplier) / 10) * 10;
+  const effectiveMonthly = Math.round(launchPrice / months);
+
   return {
-    id,
-    title,
+    id: `${tierInfo.tier}-${cycleInfo.cycle}`,
+    tier: tierInfo.tier,
+    cycle: cycleInfo.cycle,
+    title: tierInfo.title,
     months,
     listPrice,
     launchPrice,
-    discountPercent: Math.round(((listPrice - launchPrice) / listPrice) * 100),
-    effectiveMonthly: Math.round(launchPrice / months),
-    audience,
-    promise,
+    discountPercent: cycleInfo.discountPercent,
+    effectiveMonthly,
+    audience: tierInfo.audience,
+    promise: tierInfo.promise,
+    features: tierInfo.features,
+    limits: tierInfo.limits,
   };
 }
 
-export const productPricingPlans: ProductPlan[] = [
-  pricingPlan("monthly", "Monthly", 1, 399, "Trial and short-cycle learners", "No lock-in. Best for first validation batches."),
-  pricingPlan("yearly", "Yearly", 12, 3999, "One full prelims-to-mains cycle", "Covers the planned yearly path with revision and reports."),
-  pricingPlan("eighteen-month", "18 Month", 18, 5499, "Late starters and mains carry-forward learners", "Keeps the student through mains, revision, and next prelims reset."),
-  pricingPlan("three-year", "Three Year", 36, 8999, "Foundation learners and college students", "Lowest effective monthly price for complete UPSC foundation plus optional."),
-];
+export const productPricingPlans: ProductPlan[] = [];
+planBases.forEach((tier) => {
+  billingCycles.forEach((cycle) => {
+    productPricingPlans.push(buildPlan(tier, cycle));
+  });
+});
 
-export const recommendedProductPlanId = "eighteen-month";
+export const recommendedProductPlanId = "plus-yearly";
 
 export function getProductPricingPlan(planId?: string | null) {
-  return productPricingPlans.find((plan) => plan.id === planId) ?? productPricingPlans[0];
+  if (!planId) return productPricingPlans.find(p => p.id === "foundation-monthly")!;
+  let lookupId = planId;
+  if (lookupId === "monthly") lookupId = "foundation-monthly";
+  if (lookupId === "yearly") lookupId = "foundation-yearly";
+  if (lookupId === "eighteen-month") lookupId = "plus-yearly";
+  if (lookupId === "three-year") lookupId = "foundation-three-year";
+  return productPricingPlans.find((plan) => plan.id === lookupId) ?? productPricingPlans.find(p => p.id === "foundation-monthly")!;
 }
 
 export function pricingCheckoutPath(planId: string) {
   return `/upsc/pricing/checkout?plan=${encodeURIComponent(planId)}`;
 }
+
 
 export const yearlyPlannerBlocks: YearlyPlannerBlock[] = [
   {
@@ -419,3 +516,62 @@ export const officialUpscSourceLinks = [
     href: "https://upsc.gov.in/examinations/Civil%20Services%20%28Main%29%20Examination%2C%202025",
   },
 ];
+
+export function getDynamicYearlyPlannerBlocks(profile: StudentProfile | null): YearlyPlannerBlock[] {
+  if (!profile || !profile.firstAttemptYear) return yearlyPlannerBlocks;
+
+  const targetYear = profile.firstAttemptYear;
+  let multiplier = 1.0;
+  let bufferText = "";
+
+  if (targetYear === "2026") {
+    multiplier = 0.6;
+    bufferText = " + 1-day buffer";
+  } else if (targetYear === "2028" || targetYear === "2029") {
+    multiplier = 2.0;
+    bufferText = " + 4-day buffer";
+  } else {
+    multiplier = 1.0;
+    bufferText = " + 2-day buffer";
+  }
+
+  const startMonthStr = profile.preparationStartMonth || "June";
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  
+  let startIdx = months.indexOf(startMonthStr);
+  if (startIdx === -1) startIdx = 5;
+
+  const subjects = [
+    { title: "Geography", baseDays: 30, route: "/upsc/geography", focus: "Map-first GS geography, physical geography, India geography, and PYQ pattern reading." },
+    { title: "Environment", baseDays: 20, route: "/upsc/environment", focus: "Ecology, biodiversity, pollution, climate agreements, laws, institutions, and current affairs." },
+    { title: "Disaster Management", baseDays: 11, route: "/upsc/disaster-management", focus: "Risk, vulnerability, NDMA architecture, hazards, response chain, and case-study answer writing." },
+    { title: "Economy", baseDays: 30, route: "/upsc/economy", focus: "NCERT basics to reference-level macro, budget, banking, external sector, schemes, and survey links." },
+    { title: "Science and Technology", baseDays: 30, route: "/upsc/science-tech", focus: "Space, biotech, health, defence, AI, cyber, energy, and applied current affairs." },
+    { title: "Polity and Governance", baseDays: 31, route: "/upsc/polity-governance", focus: "Constitution, institutions, rights, federalism, Parliament, judiciary, governance, and schemes." },
+    { title: "Internal Security and Indian Society", baseDays: 30, route: "/upsc/internal-security-society", focus: "Security frameworks, society themes, vulnerable sections, social change, and governance linkages." },
+    { title: "History", baseDays: 60, route: "/upsc/history", focus: "Modern, ancient, medieval, and art and culture study." },
+  ];
+
+  let currentMonthIndex = startIdx;
+
+  return subjects.map((sub, idx) => {
+    const calculatedDays = Math.round(sub.baseDays * multiplier);
+    const totalDays = calculatedDays + (targetYear === "2026" ? 1 : targetYear === "2028" || targetYear === "2029" ? 4 : 2);
+    
+    const monthName = months[currentMonthIndex % 12];
+    const yearSuffix = targetYear === "2028" || targetYear === "2029" ? ` (Year ${Math.floor(idx / 4) + 1})` : "";
+    const windowLabel = `${monthName}${yearSuffix}`;
+    
+    const monthsNeeded = Math.max(1, Math.round(totalDays / 30));
+    currentMonthIndex += monthsNeeded;
+
+    return {
+      window: windowLabel,
+      title: sub.title,
+      days: `${calculatedDays} study days${bufferText}`,
+      route: sub.route,
+      focus: sub.focus,
+      output: `Student target year: ${targetYear}. Dynamic pacing allocated ${calculatedDays} days with appropriate buffers.`,
+    };
+  });
+}

@@ -42,6 +42,7 @@ import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
 import { type SubjectWatchMediaAssetMap, type SubjectWatchState, useSubjectProgress } from "@/lib/upsc/useSubjectProgress";
 import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
+import { FragmentedSlideViewer } from "@/components/upsc/FragmentedSlideViewer";
 
 const watchStates: Array<{ label: SubjectWatchState; detail: string }> = [
   { label: "Queued", detail: "Focused topic is planned for this subject day." },
@@ -85,6 +86,9 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [fallbackTimerCount, setFallbackTimerCount] = useState(0);
   const [userDoubt, setUserDoubt] = useState("");
   const [aiDoubtResponse, setAiDoubtResponse] = useState("");
+  const [dismissCount, setDismissCount] = useState(0);
+  const [sentimentLog, setSentimentLog] = useState<string[]>([]);
+  const [voiceHeuristicPaused, setVoiceHeuristicPaused] = useState(false);
 
   const requestCamera = async () => {
     try {
@@ -137,6 +141,69 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     }
     return () => clearInterval(interval);
   }, [isDemoPlaying, cameraStatus, simulatedDistraction, fallbackQuizAnswered, durationMinutes]);
+
+  // Background Audio Monitor for Voice Interruption during lesson
+  useEffect(() => {
+    if (!isDemoPlaying) return;
+
+    let audioCtx: AudioContext | null = null;
+    let stream: MediaStream | null = null;
+    let interval: NodeJS.Timeout | null = null;
+
+    const startBackgroundVoiceListener = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        let activeTimeMs = 0;
+
+        interval = setInterval(() => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / dataArray.length;
+
+          // human speech threshold
+          if (average > 18) {
+            activeTimeMs += 300;
+            // Ignore sounds under 12 seconds; trigger popup only at 15-30s (we choose 16s)
+            if (activeTimeMs >= 16000) {
+              if (!voiceHeuristicPaused) {
+                setIsDemoPlaying(false);
+                setShowInterventionDrawer(true);
+                setSentimentLog((curr) => [...curr, `Detected conversation at: ${new Date().toLocaleTimeString()}`]);
+              }
+              activeTimeMs = 0;
+            }
+          } else {
+            activeTimeMs = Math.max(0, activeTimeMs - 150);
+          }
+        }, 300);
+      } catch (err) {
+        console.warn("Could not start background voice listener:", err);
+      }
+    };
+
+    void startBackgroundVoiceListener();
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (audioCtx) {
+        void audioCtx.close();
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [isDemoPlaying, voiceHeuristicPaused]);
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
   const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
   const handoffTimersRef = useRef<number[]>([]);
@@ -1010,93 +1077,19 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             </span>
           </summary>
           <div className="hidden border-t border-[var(--subject-border)] p-5 group-open:block md:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">One repair checkpoint</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--subject-heading)]">
-                  {`${activeSceneIndex + 1}. ${activeScene?.title ?? "Class proof"}`}
-                </h2>
-                <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">{activeScene?.narration}</p>
-              </div>
-              <span className="rounded-md bg-[var(--subject-light)] px-3 py-2 text-xs font-black text-[var(--subject-dark)]">
-                {completedSceneIds.length}/{watchScenes.length} complete
-              </span>
-            </div>
-
-            <div className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--subject-accent)]">Checkpoint</p>
-              <p className="mt-2 text-sm font-bold leading-6 text-[var(--subject-heading)]">{activeScene?.checkpoint}</p>
-            </div>
-
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#eee6d8]">
-              <div className="h-full rounded-full bg-[var(--subject-accent)]" style={{ width: `${sceneProgress}%` }} />
-            </div>
-
-            <div className="mt-4">
-              <button
-                type="button"
-                data-testid="subject-watch-scene-complete"
-                onClick={completeActiveScene}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
-              >
-                <CheckCircle2 className="h-4 w-4" /> Save repair checkpoint
-              </button>
-            </div>
-
-            <details
-              data-testid="subject-watch-scene-list"
-              className="mt-4 rounded-md border border-[var(--subject-border)] bg-[var(--subject-bg)] p-3"
-            >
-              <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.14em] text-[var(--subject-dark)]">
-                Scene checklist and navigation
-              </summary>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => selectScene(activeSceneIndex - 1)}
-                  disabled={activeSceneIndex === 0}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous checkpoint
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectScene(activeSceneIndex + 1)}
-                  disabled={activeSceneIndex === watchScenes.length - 1}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--subject-border)] bg-white px-3 text-sm font-black text-[var(--subject-dark)] transition hover:bg-[var(--subject-light)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-                >
-                  Next checkpoint <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="mt-3 grid gap-2 md:grid-cols-5">
-                {watchScenes.map((scene, index) => {
-                  const isActive = activeSceneIndex === index;
-                  const isComplete = completedSceneIds.includes(scene.id);
-                  return (
-                    <button
-                      key={scene.id}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => selectScene(index)}
-                      className={cn(
-                        "min-h-20 rounded-md border p-3 text-left transition",
-                        isActive
-                          ? "border-[var(--subject-dark)] bg-[var(--subject-dark)] text-white"
-                          : isComplete
-                            ? "border-[var(--subject-accent)] bg-[var(--subject-light)] text-[var(--subject-dark)] hover:border-[var(--subject-dark)]"
-                            : "border-[var(--subject-border)] bg-white text-[var(--subject-text)] hover:border-[var(--subject-accent)]"
-                      )}
-                    >
-                      <span className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em]">
-                        Scene {index + 1}
-                        {isComplete && <CheckCircle2 className="h-4 w-4" />}
-                      </span>
-                      <span className="mt-2 block text-sm font-bold leading-5">{scene.title}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </details>
+            <FragmentedSlideViewer
+              slides={watchScenes.map((scene) => ({
+                id: scene.id,
+                title: scene.title,
+                body: scene.narration,
+                bullets: [scene.checkpoint],
+                expectedKeywords: learningPack?.keywords || [],
+              }))}
+              subjectAccent="var(--subject-accent)"
+              subjectDark="var(--subject-dark)"
+              subjectLight="var(--subject-light)"
+              onComplete={completeAndDiscuss}
+            />
           </div>
           </details>
         )}
@@ -1768,6 +1761,13 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                     setIsDemoPlaying(true);
                     setUserDoubt("");
                     setAiDoubtResponse("");
+                    
+                    const nextDismiss = dismissCount + 1;
+                    setDismissCount(nextDismiss);
+                    if (nextDismiss >= 2) {
+                      setVoiceHeuristicPaused(true);
+                      setSentimentLog((curr) => [...curr, "Marked as Frustrated. Voice diagnostics backed off."]);
+                    }
                   }}
                   className="flex-1 rounded-md bg-[#1a3a2a] py-3 text-sm font-black text-white hover:bg-[#10291d] transition text-center"
                 >

@@ -84,8 +84,8 @@ export function reconcileLocalUpscLearnerIdentity(userId?: string | null) {
 
   const previousUserId = window.localStorage.getItem(upscAuthUserStorageKey);
   if (!userId) {
-    if (previousUserId) clearLocalUpscLearnerState();
-    window.localStorage.removeItem(upscAuthUserStorageKey);
+    // Do not clear progress on logout so that the same user can resume progress when logging back in.
+    // We keep the last authenticated user ID in upscAuthUserStorageKey for comparison on next login.
     return;
   }
 

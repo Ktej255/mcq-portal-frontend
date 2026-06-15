@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BrainDumpModal } from "@/components/upsc/BrainDumpModal";
+import { UpscYearlyPlanner } from "@/components/upsc/UpscYearlyPlanner";
+import { UpscSyllabusPyqLibrary } from "@/components/upsc/UpscSyllabusPyqLibrary";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,12 +27,20 @@ import {
   LockKeyhole,
   Sparkles,
   UploadCloud,
+  ChevronDown,
+  ChevronUp,
+  FolderTree,
+  LibraryBig,
+  CalendarCheck,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
   AUTO_SESSION_HANDOFF_STORAGE_KEY,
   buildDailyPlannerDecision,
+  readLocalAutoSessionHandoff,
   type AutoSessionHandoffRecord,
   type DailyPlannerProgress,
 } from "@/lib/upsc/dailyPlannerEngine";
@@ -55,6 +66,8 @@ import {
   type StudentProfile,
 } from "@/lib/upsc/studentProfile";
 import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
+import { AchievementBadge } from "@/components/upsc/AchievementBadge";
+import { BADGE_DEFINITIONS } from "@/lib/upsc/gamification";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
@@ -275,6 +288,30 @@ export function UpscDailyMissionControl() {
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
   const [autoHandoffSavedAt, setAutoHandoffSavedAt] = useState("");
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+  const [showPlanningDetails, setShowPlanningDetails] = useState(false);
+  
+  // Collapsible states for Gaps & Revision tabs decluttering
+  const [isSessionReadinessOpen, setIsSessionReadinessOpen] = useState(false);
+  const [isNextSessionProofOpen, setIsNextSessionProofOpen] = useState(false);
+  const [isAutoHandoffOpen, setIsAutoHandoffOpen] = useState(false);
+  const [isSimplePathOpen, setIsSimplePathOpen] = useState(false);
+  const [isOperatingContractOpen, setIsOperatingContractOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const validTabs = ["today", "yearly", "gaps", "revision", "history", "syllabus"] as const;
+  type TabId = (typeof validTabs)[number];
+  const tabFromUrl = searchParams.get("tab") as TabId | null;
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (tabFromUrl && validTabs.includes(tabFromUrl)) return tabFromUrl;
+    return "today";
+  });
+
+  // Sync tab when URL query changes (e.g. sidebar click from another page)
+  useEffect(() => {
+    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabFromUrl]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -323,7 +360,7 @@ export function UpscDailyMissionControl() {
     });
   };
 
-  const completeInduction = (skipped: boolean = false) => {
+  const completeInduction = (skipped: boolean = false, customData?: Partial<StudentProfile>) => {
     if (!profile) return;
     saveProfile({
       ...profile,
@@ -331,6 +368,7 @@ export function UpscDailyMissionControl() {
       inductionBooklistCompleted: skipped ? true : profile.inductionBooklistCompleted,
       inductionQuizCompleted: skipped ? true : profile.inductionQuizCompleted,
       inductionCompleted: true,
+      ...customData
     });
   };
 
@@ -358,7 +396,10 @@ export function UpscDailyMissionControl() {
   const basePath = `/upsc/${activeSubject.slug}`;
   const activeBatchCode = batchCode(activeSubject, activeSession);
   const activeMcqCommand = isUpscMcqCommandCleared(activeProgress, activeBatchCode);
-  const activeQuestionBankAttempts = isLoaded ? readLocalQuestionBankAttempts(activeSubject.slug) : [];
+  const activeQuestionBankAttempts = useMemo(() => {
+    if (!isLoaded) return [];
+    return readLocalQuestionBankAttempts(activeSubject.slug);
+  }, [isLoaded, activeSubject.slug, evidenceRefresh]);
   const activeDayQuestionBankAttempts = activeQuestionBankAttempts.filter(
     (attempt) => attempt.linkedDay === activeSession.day
   );
@@ -465,6 +506,16 @@ export function UpscDailyMissionControl() {
 
   useEffect(() => {
     if (!isLoaded) return;
+
+    const currentSaved = readLocalAutoSessionHandoff();
+    if (
+      currentSaved &&
+      currentSaved.id === automaticHandoff.id &&
+      currentSaved.selectedDay === activeSession.day &&
+      currentSaved.selectedSubjectSlug === activeSubject.slug
+    ) {
+      return;
+    }
 
     const generatedAt = new Date().toISOString();
     const record: AutoSessionHandoffRecord = {
@@ -635,1207 +686,1519 @@ export function UpscDailyMissionControl() {
             />
           </div>
         ) : null}
-        <section
-          data-testid="daily-command-student-focus"
-          data-visible-mode="single-action-planner-proof"
-          data-active-subject={activeSubject.slug}
-          data-active-day={activeSession.day}
-          data-next-action-href={dailyPlanner.sessionReadiness.href}
-          data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
-          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
-          data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
-          data-learning-gap={dailyPlanner.learningGap.title}
-          data-revision-href={dailyPlanner.revision.href}
-          data-after-this-decision={dailyPlanner.nextSessionProof.decision}
-          data-after-this-route={dailyPlanner.tomorrowAdjustment.href}
-          data-yesterday-decision={dailyPlanner.todayOriginProof.statusLabel}
-          data-yesterday-source-day={dailyPlanner.todayOriginProof.sourceDay}
-          data-yesterday-target-day={dailyPlanner.todayOriginProof.targetDay}
-          data-question-bank-attempts={activeDayQuestionBankAttempts.length}
-          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
-        >
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Daily command</Badge>
-                <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
-                  {activeSubject.title} / Day {activeSession.day}
-                </span>
-                <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
-                  {dailyPlanner.sessionReadiness.scorePercent}% ready
-                </span>
-              </div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Do this now</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
-                {dailyPlanner.sessionReadiness.title}
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
-                {dailyPlanner.sessionReadiness.detail}
-              </p>
-              <div className="mt-4 grid gap-2 md:grid-cols-3">
-                {[
-                  ["Gap", dailyPlanner.learningGap.title],
-                  ["Revision", dailyPlanner.revision.dueLabel],
-                  ["After this", dailyPlanner.tomorrowAdjustment.statusLabel],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">{label}</p>
-                    <p className="mt-1 text-xs font-black leading-5 text-[#13251d]">{value}</p>
-                  </div>
-                ))}
-              </div>
-              <details
-                data-testid="daily-command-focus-proof"
-                className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3"
-              >
-                <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
-                  Why this action?
-                </summary>
-                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                  {dailyPlanner.nextSessionProof.evidenceSummary}
-                </p>
-                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                  Why today: {dailyPlanner.todayOriginProof.title}. {dailyPlanner.todayOriginProof.evidenceSummary}
-                </p>
-                <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                  After this: {dailyPlanner.tomorrowAdjustment.title}
-                </p>
-              </details>
-            </div>
-            {profile && !profile.inductionCompleted ? (
-              <button
-                type="button"
-                disabled
-                data-testid="daily-command-locked"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-5 text-sm font-black text-[#756f64] cursor-not-allowed lg:w-auto"
-              >
-                Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
-              </button>
-            ) : (
-              <Link
-                href={dailyPlanner.sessionReadiness.href}
-                data-testid="daily-command-primary-action"
-                data-next-action-href={dailyPlanner.sessionReadiness.href}
-                data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
-                data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
-              >
-                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-              </Link>
-            )}
-          </div>
-        </section>
 
-        <section
-          data-testid="daily-student-learning-funnel"
-          data-active-subject={activeSubject.slug}
-          data-active-day={activeSession.day}
-          data-step-count={learningFunnelSteps.length}
-          data-gap-title={dailyPlanner.learningGap.title}
-          data-today-task={dailyPlanner.sessionReadiness.title}
-          data-revision-label={dailyPlanner.revision.dueLabel}
-          data-next-route={dailyPlanner.tomorrowAdjustment.href}
-          data-decision={dailyPlanner.nextSessionProof.decision}
-          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
-        >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Today&apos;s simple path
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
-                {activeSubject.title} Day {activeSession.day}
-              </h2>
+        {/* Premium Shortcut Navigation Header */}
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+          <div className="mr-4 flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded bg-[#1a3a2a] text-white text-[11px] font-black">
+              U
             </div>
-            {profile && !profile.inductionCompleted ? (
-              <button
-                type="button"
-                disabled
-                data-testid="daily-funnel-locked"
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
-              >
-                Locked (Complete Induction) <LockKeyhole className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <Link
-                href={dailyPlanner.sessionReadiness.href}
-                data-testid="daily-funnel-primary-action"
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
-              >
-                {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            )}
+            <span className="text-xs font-black uppercase tracking-wider text-[#13251d] hidden sm:inline">
+              UPSC Command
+            </span>
           </div>
-          <div className="grid gap-2 md:grid-cols-4">
-            {learningFunnelSteps.map((step, index) => (
-              <article
-                key={step.id}
-                data-testid="daily-funnel-step"
-                data-step-id={step.id}
-                className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
-              >
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                  {index + 1}. {step.label}
-                </p>
-                <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{step.title}</h3>
-                <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{step.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section
-          data-testid="daily-new-day-operating-contract"
-          data-contract-rule="me-time-recall-gap-class-discussion-mcq-revision-report-next-day"
-          data-row-count={dailyOperatingContractRows.length}
-          data-active-subject={activeSubject.slug}
-          data-active-day={activeSession.day}
-          data-question-bank-difficulty={questionBankRecommendation.recommendedDifficulty}
-          data-question-bank-count={questionBankRecommendation.recommendedCount}
-          data-question-bank-level={questionBankRecommendation.adaptiveLevel}
-          data-question-bank-score={questionBankRecommendation.adaptiveReadinessScore}
-          data-question-bank-mix={questionBankMixLabel}
-          data-exact-pyq-total-rows={exactPyqQuestions.length}
-          data-exact-pyq-active-subject-rows={activeSubjectExactPyqs.length}
-          data-exact-pyq-active-day-rows={activeDayExactPyqs.length}
-          data-exact-pyq-selected-rows={selectedExactPyqCount}
-          data-report-href="/reports"
-          data-next-day-route={dailyPlanner.tomorrowAdjustment.href}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
-        >
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                New-day operating contract
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
-                The portal chooses the next action from evidence.
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                One chain connects mind-state, recall gap, class/discussion, MCQ difficulty, revision reports, and tomorrow&apos;s adjustment.
-              </p>
-            </div>
-            <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">
-              {questionBankRecommendation.recommendedDifficulty.replace("_", " ")}
-            </Badge>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {dailyOperatingContractRows.map((row, index) => {
-              const isGated = profile && !profile.inductionCompleted;
-              const CardContent = (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">
-                        {index + 1}. {row.label}
-                      </p>
-                      <h3 className="mt-2 text-sm font-black uppercase tracking-[0.12em]">{row.status}</h3>
-                    </div>
-                    {isGated ? (
-                      <LockKeyhole className="h-4 w-4 shrink-0 text-[#756f64]" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4 shrink-0" />
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs font-bold leading-5 opacity-85">
-                    {isGated ? "Locked (Complete Induction)" : row.proof}
-                  </p>
-                </>
-              );
-
-              return isGated ? (
-                <div
-                  key={row.id}
-                  data-testid="daily-operating-contract-row-locked"
-                  data-contract-id={row.id}
-                  className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-[#756f64] cursor-not-allowed opacity-80"
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: "today", name: "Today's Study", icon: CalendarCheck },
+              { id: "yearly", name: "Yearly Planner", icon: FolderTree },
+              { id: "gaps", name: "Study Gaps", icon: Target },
+              { id: "revision", name: "Revision Board", icon: RefreshCcw },
+              { id: "history", name: "Progress History", icon: BarChart3 },
+              { id: "syllabus", name: "Syllabus & PYQs", icon: LibraryBig },
+            ].map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all active:scale-95",
+                    isActive
+                      ? "border-[#1d9e75] bg-[#e7f5ee] text-[#13251d]"
+                      : "border-[#e8e2d5] bg-white text-[#495c52] hover:border-[#1d9e75]/40 hover:bg-[#e7f5ee] hover:text-[#13251d]"
+                  )}
                 >
-                  {CardContent}
-                </div>
-              ) : (
-                <Link
-                  key={row.id}
-                  href={row.href}
-                  data-testid="daily-operating-contract-row"
-                  data-contract-id={row.id}
-                  data-status={row.status}
-                  data-href={row.href}
-                  className={cn("min-h-28 rounded-md border p-3 transition hover:-translate-y-0.5", operatingContractTone(row.status))}
-                >
-                  {CardContent}
-                </Link>
+                  <item.icon className={cn("h-3.5 w-3.5", isActive ? "text-[#1d9e75]" : "text-[#495c52]")} />
+                  <span>{item.name}</span>
+                </button>
               );
             })}
           </div>
-        </section>
 
-        <section
-          data-testid="daily-exact-pyq-readiness"
-          data-proof-rule="daily-command-uses-mapped-exact-pyq-imports"
-          data-active-subject={activeSubject.slug}
-          data-active-day={activeSession.day}
-          data-total-exact-pyq-rows={exactPyqQuestions.length}
-          data-active-subject-exact-pyq-rows={activeSubjectExactPyqs.length}
-          data-active-day-exact-pyq-rows={activeDayExactPyqs.length}
-          data-selected-exact-pyq-rows={selectedExactPyqCount}
-          data-question-bank-href={`/upsc/question-bank?subject=${activeSubject.slug}`}
-          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
-        >
-          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#085041]">
-                Exact PYQ readiness
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
-                Daily MCQs now read the verified import bank.
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
-                Only rows marked exact verified and mapped can enter today&apos;s practice. If the count is zero, the
-                student still receives PYQ-style pattern practice without any false exact-PYQ claim.
-              </p>
-              {profile && !profile.inductionCompleted ? (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
-                >
-                  Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
-                </button>
-              ) : (
-                <Link
-                  href={`/upsc/question-bank?subject=${activeSubject.slug}`}
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
-                >
-                  Open PYQ practice lane <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {[
-                ["All exact rows", exactPyqQuestions.length],
-                [`${activeSubject.title} exact rows`, activeSubjectExactPyqs.length],
-                [`Day ${activeSession.day} exact rows`, activeDayExactPyqs.length],
-                ["Selected in set", selectedExactPyqCount],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/80 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
-                  <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
- 
-        <section
-          data-testid="daily-today-origin-proof"
-          data-source-day={dailyPlanner.todayOriginProof.sourceDay}
-          data-target-day={dailyPlanner.todayOriginProof.targetDay}
-          data-origin-status={dailyPlanner.todayOriginProof.statusLabel}
-          data-origin-route={dailyPlanner.todayOriginProof.href}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
-        >
-          <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <div>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                <CalendarDays className="h-5 w-5" />
+          {profile && typeof profile.points === "number" && (
+            <div className="ml-auto flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-[#fff4df] border border-[#ef9f27]/30 rounded-lg px-2.5 py-1 text-xs font-black text-[#6f4a12]">
+                <span>🪙</span>
+                <span>{profile.coins ?? 0} Coins</span>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Why this is today&apos;s task
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                {dailyPlanner.todayOriginProof.title}
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                {dailyPlanner.todayOriginProof.evidenceSummary}
-              </p>
-              {profile && !profile.inductionCompleted ? (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64] cursor-not-allowed"
-                >
-                  Locked <LockKeyhole className="h-4 w-4" />
-                </button>
-              ) : (
-                <Link
-                  href={dailyPlanner.todayOriginProof.href}
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
-                >
-                  {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {dailyPlanner.todayOriginProof.evidence.map((item) => (
-                <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
-                  <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
-                  <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-            <Link href="/upsc" className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
-              <ArrowLeft className="h-4 w-4" /> UPSC command home
-            </Link>
-
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Daily Mission</Badge>
-              <span className="text-sm font-bold text-[#776f64]">Student launch control</span>
-            </div>
-
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">{activeSubject.window}</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
-              {activeSubject.title}: Day {activeSession.day}
-            </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#5d675f]">{activeSession.anchor}</p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {[
-                ["Batch", activeBatchCode],
-                ["Chapter", activeSession.chapter],
-                ["Duration", activeSession.duration],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
-                  <p className="mt-2 break-words text-sm font-black leading-5 text-[#13251d]">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            {[
-              { label: "Watched", value: totals.watched, icon: PlayCircle },
-              { label: "Talk notes", value: totals.reflected, icon: BrainCircuit },
-              { label: "Revisit", value: totals.revisit, icon: RefreshCcw },
-              { label: "Content ready", value: totals.contentReady, icon: BookOpen },
-              { label: "Batch ready", value: totals.mcqBatchReady, icon: ClipboardCheck },
-              { label: "MCQ command", value: totals.mcqCommand, icon: CheckCircle2 },
-            ].map((item) => (
-              <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
-                  <item.icon className="h-5 w-5" />
-                </div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</p>
-                <p className="mt-3 text-3xl font-black tracking-tight text-[#13251d]">{item.value}</p>
+              <div className="flex items-center gap-1.5 bg-[#e7f5ee] border border-[#1d9e75]/30 rounded-lg px-2.5 py-1 text-xs font-black text-[#085041]">
+                <span>⚡</span>
+                <span>{profile.points ?? 0} XP</span>
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          data-testid="daily-learning-dashboard"
-          className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4"
-        >
-          <article
-            data-testid="daily-learning-gap"
-            className={cn("rounded-lg border p-5 shadow-sm", gapTone(dailyPlanner.learningGap.tone))}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
-                <BrainCircuit className="h-5 w-5" />
-              </div>
-              <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                {dailyPlanner.learningGap.scoreLabel}
-              </span>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Learning gap</p>
-            <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.learningGap.title}</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.learningGap.detail}</p>
-          </article>
-
-          {profile && !profile.inductionCompleted ? (
-            <div
-              data-testid="daily-revision-signal-locked"
-              className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
-                  <LockKeyhole className="h-5 w-5" />
-                </div>
-                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                  Locked
-                </span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
-              <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
-            </div>
-          ) : (
-            <Link
-              data-testid="daily-revision-signal"
-              href={dailyPlanner.revision.href}
-              className={cn(
-                "rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5",
-                dailyPlanner.revision.urgent
-                  ? "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
-                  : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]"
-              )}
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
-                  <RefreshCcw className="h-5 w-5" />
-                </div>
-                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                  {dailyPlanner.revision.dueLabel}
-                </span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
-              <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.revision.title}</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.revision.detail}</p>
-            </Link>
           )}
-
-          {profile && !profile.inductionCompleted ? (
-            <div
-              data-testid="daily-today-task-locked"
-              className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
+        </div>
+        {activeTab === "today" && (
+          <>
+            <section
+              data-testid="daily-command-student-focus"
+              data-visible-mode="single-action-planner-proof"
+              data-active-subject={activeSubject.slug}
+              data-active-day={activeSession.day}
+              data-next-action-href={dailyPlanner.sessionReadiness.href}
+              data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
+              data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+              data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
+              data-learning-gap={dailyPlanner.learningGap.title}
+              data-revision-href={dailyPlanner.revision.href}
+              data-after-this-decision={dailyPlanner.nextSessionProof.decision}
+              data-after-this-route={dailyPlanner.tomorrowAdjustment.href}
+              data-yesterday-decision={dailyPlanner.todayOriginProof.statusLabel}
+              data-yesterday-source-day={dailyPlanner.todayOriginProof.sourceDay}
+              data-yesterday-target-day={dailyPlanner.todayOriginProof.targetDay}
+              data-question-bank-attempts={activeDayQuestionBankAttempts.length}
+              className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
             >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
-                  <LockKeyhole className="h-5 w-5" />
-                </div>
-                <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                  Locked
-                </span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Today&apos;s task</p>
-              <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
-            </div>
-          ) : (
-            <Link
-              data-testid="daily-today-task"
-              href={dailyPlanner.todayTask.href}
-              className="rounded-lg border border-[#1a3a2a] bg-[#1a3a2a] p-5 text-white shadow-sm transition hover:-translate-y-0.5"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/15">
-                  <Target className="h-5 w-5" />
-                </div>
-                <span className="rounded-md bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                  {dailyPlanner.todayTask.actionLabel}
-                </span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">Today&apos;s task</p>
-              <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.todayTask.title}</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-white/80">{dailyPlanner.todayTask.detail}</p>
-            </Link>
-          )}
-
-          <article
-            data-testid="daily-growth-signal"
-            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 text-[#34453b] shadow-sm"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                <LineChart className="h-5 w-5" />
-              </div>
-              <span className="rounded-md bg-[#f7f4ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                {dailyPlanner.growth.meTimeLabel}
-              </span>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Growth trend</p>
-            <h2 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">{dailyPlanner.growth.title}</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{dailyPlanner.growth.detail}</p>
-            <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
-              {dailyPlanner.growth.metricLabel}
-            </p>
-          </article>
-        </section>
-
-        <section
-          data-testid="daily-session-readiness"
-          data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
-          data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
-          className={cn("rounded-lg border p-5 shadow-sm md:p-6", readinessTone(dailyPlanner.sessionReadiness.tone))}
-        >
-          <div className="grid gap-5 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
-            <div>
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-white/80">
-                  <ClipboardCheck className="h-5 w-5" />
-                </div>
-                <span className="rounded-md bg-white/80 px-2.5 py-1.5 text-xs font-black uppercase tracking-[0.12em]">
-                  {dailyPlanner.sessionReadiness.scorePercent}%
-                </span>
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">
-                Before session readiness
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                {dailyPlanner.sessionReadiness.title}
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 opacity-85">
-                {dailyPlanner.sessionReadiness.detail}
-              </p>
-              {profile && !profile.inductionCompleted ? (
-                <button
-                  type="button"
-                  disabled
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-4 text-sm font-black text-[#756f64] cursor-not-allowed"
-                >
-                  Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
-                </button>
-              ) : (
-                <Link
-                  href={dailyPlanner.sessionReadiness.href}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-                >
-                  {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              {dailyPlanner.sessionReadiness.checklist.map((item) => (
-                <div key={item.label} className={cn("min-h-28 rounded-md border p-3", checklistTone(item.status))}>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
-                    {item.status === "done" ? (
-                      <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" />
-                    ) : item.status === "repair" ? (
-                      <RefreshCcw className="h-4 w-4 text-[#ef9f27]" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-[#8a8174]" />
-                    )}
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="min-w-0">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Daily command</Badge>
+                    <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                      {activeSubject.title} / Day {activeSession.day}
+                    </span>
+                    <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                      {dailyPlanner.sessionReadiness.scorePercent}% ready
+                    </span>
                   </div>
-                  <h3 className="text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
-                  <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Do this now</p>
+                  <h1 className="mt-2 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
+                    {dailyPlanner.sessionReadiness.title}
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
+                    {dailyPlanner.sessionReadiness.detail}
+                  </p>
+                  <div className="mt-4 grid gap-2 md:grid-cols-3">
+                    {[
+                      ["Gap", dailyPlanner.learningGap.title],
+                      ["Revision", dailyPlanner.revision.dueLabel],
+                      ["After this", dailyPlanner.tomorrowAdjustment.statusLabel],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">{label}</p>
+                        <p className="mt-1 text-xs font-black leading-5 text-[#13251d]">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <details
+                    data-testid="daily-command-focus-proof"
+                    className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3"
+                  >
+                    <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+                      Why this action?
+                    </summary>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                      {dailyPlanner.nextSessionProof.evidenceSummary}
+                    </p>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                      Why today: {dailyPlanner.todayOriginProof.title}. {dailyPlanner.todayOriginProof.evidenceSummary}
+                    </p>
+                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
+                      After this: {dailyPlanner.tomorrowAdjustment.title}
+                    </p>
+                  </details>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+                {profile && !profile.inductionCompleted ? (
+                  <button
+                    type="button"
+                    disabled
+                    data-testid="daily-command-locked"
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-5 text-sm font-black text-[#756f64] cursor-not-allowed lg:w-auto"
+                  >
+                    Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <Link
+                    href={dailyPlanner.sessionReadiness.href}
+                    data-testid="daily-command-primary-action"
+                    data-next-action-href={dailyPlanner.sessionReadiness.href}
+                    data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
+                    data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
+                  >
+                    {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+            </section>
 
-        {profile && !profile.inductionCompleted ? (
-          <div
-            data-testid="daily-tomorrow-adjustment-locked"
-            className="grid gap-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 text-[#756f64] shadow-sm cursor-not-allowed md:grid-cols-[auto_1fr_auto] md:items-center md:p-5 opacity-85"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#756f64]">
-              <LockKeyhole className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#756f64]/80">
-                Tomorrow auto-adjusts from today&apos;s evidence (Locked)
-              </span>
-              <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#756f64]">
-                Tomorrow Auto-Adjustment Locked
-              </span>
-              <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#756f64]/80">
-                Complete onboarding induction to unlock planning tracks.
-              </span>
-            </span>
-            <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64]">
-              Locked <LockKeyhole className="h-4 w-4" />
-            </span>
-          </div>
-        ) : (
-          <Link
-            data-testid="daily-tomorrow-adjustment"
-            data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
-            href={dailyPlanner.tomorrowAdjustment.href}
-            className="grid gap-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 text-[#085041] shadow-sm transition hover:-translate-y-0.5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-5"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
-              <CalendarDays className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Tomorrow auto-adjusts from today&apos;s evidence
-              </span>
-              <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#13251d]">
-                {dailyPlanner.tomorrowAdjustment.title}
-              </span>
-              <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#49675e]">
-                {dailyPlanner.tomorrowAdjustment.detail}
-              </span>
-            </span>
-            <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
-              {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
-            </span>
-          </Link>
+            <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+                <Link href="/upsc" className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
+                  <ArrowLeft className="h-4 w-4" /> UPSC command home
+                </Link>
+
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Daily Mission</Badge>
+                  <span className="text-sm font-bold text-[#776f64]">Student launch control</span>
+                </div>
+
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">{activeSubject.window}</p>
+                <h1 className="mt-3 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
+                  {activeSubject.title}: Day {activeSession.day}
+                </h1>
+                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#5d675f]">{activeSession.anchor}</p>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ["Batch", activeBatchCode],
+                    ["Chapter", activeSession.chapter],
+                    ["Duration", activeSession.duration],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
+                      <p className="mt-2 break-words text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid min-w-0 gap-5">
+                <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Today loop</p>
+                      <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Move through the class sequence</h2>
+                    </div>
+                    <Target className="h-6 w-6 text-[#085041]" />
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      {
+                        label: "Watch",
+                        detail: activeProgress?.watched ? "Watched" : contentReady ? "Ready to watch" : "Content pending",
+                        href: `${basePath}/watch?day=${activeSession.day}`,
+                        icon: PlayCircle,
+                        active: true,
+                      },
+                      {
+                        label: "Talk",
+                        detail: activeProgress?.reflection ? "Reflection saved" : "Explain after watch",
+                        href: `${basePath}/talk?day=${activeSession.day}`,
+                        icon: BrainCircuit,
+                        active: Boolean(activeProgress?.watched),
+                      },
+                      {
+                        label: "Lab",
+                        detail: activeSession.lab,
+                        href: `${basePath}/lab?mode=${activeLabSlug}&day=${activeSession.day}`,
+                        icon: Layers3,
+                        active: Boolean(activeLabSlug),
+                      },
+                      {
+                        label: "MCQ",
+                        detail: activeMcqCommand
+                          ? `Command ${activeProgress?.mcqScorePercent ?? 0}%`
+                          : activeProgress?.mcqOutcome === "Revisit"
+                            ? "Revisit required"
+                            : activeMcqBatch.ready
+                              ? "Practice pending"
+                              : `${activeMcqBatch.drafted}/${activeMcqBatch.planned} drafted`,
+                        href: `${basePath}/mcq-readiness?day=${activeSession.day}`,
+                        icon: ClipboardCheck,
+                        active: true,
+                      },
+                      {
+                        label: "Retro",
+                        detail: activeProgress?.retroCompleted ? "Retrospective completed" : "Review Saturday test",
+                        href: `${basePath}/retro?day=${activeSession.day}`,
+                        icon: Sparkles,
+                        active: profile ? Boolean(profile.inductionCompleted) : true,
+                      },
+                      {
+                        label: "Mains",
+                        detail: "Frictionless Answer Uploader",
+                        href: "/upsc/answer-upload",
+                        icon: UploadCloud,
+                        active: profile ? Boolean(profile.inductionCompleted) : true,
+                      },
+                      {
+                        label: "Track",
+                        detail: "Subject progress",
+                        href: `${basePath}/track`,
+                        icon: LineChart,
+                        active: true,
+                      },
+                      {
+                        label: "Revisit",
+                        detail: activeProgress?.revisitQueued ? "Repair now" : "Recovery room",
+                        href: `${basePath}/revisit?day=${activeSession.day}`,
+                        icon: RefreshCcw,
+                        active: true,
+                      },
+                    ].map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        className={cn(
+                          "group flex min-h-16 items-center gap-3 rounded-md border px-3 text-left transition hover:-translate-y-0.5",
+                          item.active
+                            ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#1a3a2a] hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+                            : "pointer-events-none border-[#dcd5c7] bg-[#f7f4ee] text-[#8a8174] opacity-60"
+                        )}
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-[#085041] group-hover:bg-[#1d9e75] group-hover:text-white">
+                          <item.icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-black leading-5">{item.label}</span>
+                          <span className="mt-0.5 block break-words text-xs font-semibold opacity-70">{item.detail}</span>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#ef9f27] text-[#13251d]">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-[#13251d]">Daily note</p>
+                      <p className="text-xs font-semibold text-[#746f66]">Saved locally for the selected mission</p>
+                    </div>
+                  </div>
+
+                  <textarea
+                    value={dailyState.note ?? ""}
+                    onChange={(event) => {
+                      setDailyState((current) => ({ ...current, note: event.target.value }));
+                      setSaved(false);
+                    }}
+                    placeholder="Write today's target, doubt, or class instruction here."
+                    className="min-h-28 w-full resize-y rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={saveNote}
+                    className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
+                  >
+                    <Save className="h-4 w-4" /> Save daily mission
+                  </button>
+                  {saved && (
+                    <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                      <p className="text-sm font-bold leading-6 text-[#085041]">Daily mission saved locally.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section
+              id="daily-me-time-checkin"
+              data-testid="daily-me-time-checkin"
+              data-active-mood={activeProgress?.meTimeMood ?? "pending"}
+              data-completed={activeProgress?.meTimeCompletedAt ? "true" : "false"}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+            >
+              <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <div>
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <HeartPulse className="h-5 w-5" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    Me-time before class
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                    Start with the student&apos;s mind-state.
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                    This check-in is saved to the selected subject/day and becomes part of growth reports.
+                  </p>
+                  <div className="mt-4 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Current reset</p>
+                    <p className="mt-1 text-sm font-bold leading-6 text-[#31443a]">
+                      {activeMeTimeOption?.resetPlan ?? "Choose a state once before opening the next class action."}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {meTimeOptions.map((option) => {
+                    const isActive = activeProgress?.meTimeMood === option.mood;
+
+                    return (
+                      <button
+                        key={option.mood}
+                        type="button"
+                        data-testid={`daily-me-time-${option.mood}`}
+                        aria-pressed={isActive}
+                        onClick={() => saveMeTime(option)}
+                        className={cn(
+                          "min-h-24 rounded-md border p-3 text-left transition hover:-translate-y-0.5",
+                          isActive
+                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                            : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                        )}
+                      >
+                        <span className="block text-sm font-black leading-5">{option.label}</span>
+                        <span className="mt-2 block text-xs font-semibold leading-5 opacity-80">{option.detail}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {(meTimeSaved || activeProgress?.meTimeCompletedAt) && (
+                <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                  <p className="text-sm font-bold leading-6 text-[#085041]">
+                    Me-time saved for {activeSubject.title} Day {activeSession.day}. Growth and reports will include this check.
+                  </p>
+                </div>
+              )}
+            </section>
+          </>
         )}
 
-        <section
-          data-testid="daily-next-session-proof"
-          data-source-day={dailyPlanner.nextSessionProof.sourceDay}
-          data-target-day={dailyPlanner.nextSessionProof.targetDay}
-          data-decision={dailyPlanner.nextSessionProof.decision}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
-        >
-          <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <div>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                <ClipboardCheck className="h-5 w-5" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Next-session proof
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                Day {dailyPlanner.nextSessionProof.sourceDay} evidence chose Day {dailyPlanner.nextSessionProof.targetDay}
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                {dailyPlanner.nextSessionProof.evidenceSummary}
-              </p>
-              <p className="mt-3 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#31443a]">
-                Rule: {dailyPlanner.nextSessionProof.adjustmentRule}
-              </p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              {dailyPlanner.nextSessionProof.evidence.map((item) => (
-                <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
-                  <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
-                  <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {activeTab === "yearly" && (
+          <UpscYearlyPlanner />
+        )}
 
-        <section
-          data-testid="daily-auto-session-handoff"
-          data-proof-rule={automaticHandoff.proofRule}
-          data-handoff-id={automaticHandoff.id}
-          data-subject-slug={automaticHandoff.subjectSlug}
-          data-source-day={automaticHandoff.sourceDay}
-          data-target-day={automaticHandoff.targetDay}
-          data-target-title={automaticHandoff.targetTitle}
-          data-status-label={automaticHandoff.statusLabel}
-          data-href={automaticHandoff.href}
-          data-action-label={automaticHandoff.actionLabel}
-          data-can-advance={String(automaticHandoff.canAdvance)}
-          data-evidence-used={automaticHandoff.evidenceUsed}
-          data-evidence-missing={automaticHandoff.evidenceMissing}
-          data-blockers={automaticHandoff.blockers}
-          data-readiness-status={automaticHandoff.readinessStatus}
-          data-readiness-score={automaticHandoff.readinessScorePercent}
-          data-learning-gap={automaticHandoff.learningGapTitle}
-          data-revision-due={automaticHandoff.revisionDueLabel}
-          data-report-href={automaticHandoff.reportHref}
-          data-question-bank-href={automaticHandoff.questionBankHref}
-          data-saved-at={autoHandoffSavedAt}
-          className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
-        >
-          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-            <div>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
-                <Save className="h-5 w-5" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Auto-created next session
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                {automaticHandoff.canAdvance
-                  ? `Day ${automaticHandoff.targetDay} is ready to open`
-                  : `Stay on ${automaticHandoff.statusLabel}`}
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
-                {automaticHandoff.studentInstruction}
-              </p>
-              <p className="mt-3 rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#31443a]">
-                Saved handoff: {automaticHandoff.id}
-                {autoHandoffSavedAt ? ` at ${new Date(autoHandoffSavedAt).toLocaleTimeString("en-IN")}` : ""}
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                ["Target", `Day ${automaticHandoff.targetDay}: ${automaticHandoff.targetTitle}`],
-                ["Evidence", `${automaticHandoff.evidenceUsed} used / ${automaticHandoff.evidenceMissing} missing`],
-                ["Blockers", automaticHandoff.blockers],
-                ["Readiness", `${automaticHandoff.readinessStatus} / ${automaticHandoff.readinessScorePercent}%`],
-                ["Gap", automaticHandoff.learningGapTitle],
-                ["Revision", automaticHandoff.revisionDueLabel],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/75 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
-                  <p className="mt-1 text-sm font-black leading-5 text-[#13251d]">{value}</p>
-                </div>
-              ))}
-              <Link
-                href={automaticHandoff.href}
-                data-testid="daily-auto-session-handoff-action"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
+        {activeTab === "gaps" && (
+          <>
+            <section
+              data-testid="daily-learning-dashboard"
+              className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4"
+            >
+              <article
+                data-testid="daily-learning-gap"
+                className={cn("rounded-lg border p-5 shadow-sm", gapTone(dailyPlanner.learningGap.tone))}
               >
-                {automaticHandoff.actionLabel} <ArrowRight className="h-4 w-4" />
-              </Link>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Link
-                  href={automaticHandoff.reportHref}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-white"
-                >
-                  Reports <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-                <Link
-                  href={automaticHandoff.questionBankHref}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-white"
-                >
-                  MCQ bank <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {dailyPlanner.teacherDoubt ? (
-          <section
-            data-testid="daily-teacher-doubt-plan"
-            className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-5 text-[#5d3a05] shadow-sm md:p-6"
-          >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9a6a16]">
-                  AI teacher gap
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                  Day {dailyPlanner.teacherDoubt.day}: {dailyPlanner.teacherDoubt.category}
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6">{dailyPlanner.teacherDoubt.reason}</p>
-              </div>
-              <Link
-                href={dailyPlanner.teacherDoubt.href}
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-              >
-                {labelForDailyDoubt(dailyPlanner.teacherDoubt.href)} <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Repair action</p>
-                <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.repairAction}</p>
-              </div>
-              <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Mastery check</p>
-                <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.masteryCheck}</p>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section
-          id="daily-me-time-checkin"
-          data-testid="daily-me-time-checkin"
-          data-active-mood={activeProgress?.meTimeMood ?? "pending"}
-          data-completed={activeProgress?.meTimeCompletedAt ? "true" : "false"}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
-        >
-          <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-            <div>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                <HeartPulse className="h-5 w-5" />
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                Me-time before class
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                Start with the student&apos;s mind-state.
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                This check-in is saved to the selected subject/day and becomes part of growth reports.
-              </p>
-              <div className="mt-4 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Current reset</p>
-                <p className="mt-1 text-sm font-bold leading-6 text-[#31443a]">
-                  {activeMeTimeOption?.resetPlan ?? "Choose a state once before opening the next class action."}
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {meTimeOptions.map((option) => {
-                const isActive = activeProgress?.meTimeMood === option.mood;
-
-                return (
-                  <button
-                    key={option.mood}
-                    type="button"
-                    data-testid={`daily-me-time-${option.mood}`}
-                    aria-pressed={isActive}
-                    onClick={() => saveMeTime(option)}
-                    className={cn(
-                      "min-h-24 rounded-md border p-3 text-left transition hover:-translate-y-0.5",
-                      isActive
-                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                    )}
-                  >
-                    <span className="block text-sm font-black leading-5">{option.label}</span>
-                    <span className="mt-2 block text-xs font-semibold leading-5 opacity-80">{option.detail}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {(meTimeSaved || activeProgress?.meTimeCompletedAt) && (
-            <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-              <p className="text-sm font-bold leading-6 text-[#085041]">
-                Me-time saved for {activeSubject.title} Day {activeSession.day}. Growth and reports will include this check.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <section
-          data-testid="daily-prelims-2027-ops-queue"
-          data-source-orders={strategyOpsTotals.sourceOrders}
-          data-unresolved-orders={strategyOpsTotals.unresolved}
-          data-drafted-orders={strategyOpsTotals.drafted}
-          data-action-count={strategyOpsQueue.length}
-          className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
-        >
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#d95f43]">2027 strategy work</p>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Source gaps and proof gates</h2>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              {[
-                ["Orders", strategyOpsTotals.sourceOrders],
-                ["Open", strategyOpsTotals.unresolved],
-                ["Drafted", strategyOpsTotals.drafted],
-              ].map(([label, value]) => (
-                <div key={label} className="min-w-20 rounded-md border border-[#dcd5c7] bg-[#fdfaf3] px-3 py-2">
-                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#9d3824]">{label}</p>
-                  <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            {strategyOpsQueue.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                data-testid="daily-prelims-2027-ops-row"
-                data-action-key={item.key}
-                data-status-label={item.statusLabel}
-                className={cn("min-h-36 rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
+                    <BrainCircuit className="h-5 w-5" />
+                  </div>
                   <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                    {item.badge}
+                    {dailyPlanner.learningGap.scoreLabel}
                   </span>
-                  <ArrowRight className="h-4 w-4" />
                 </div>
-                <p className="text-base font-black leading-5">{item.title}</p>
-                <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] opacity-75">{item.statusLabel}</p>
-                <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Learning gap</p>
+                <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.learningGap.title}</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.learningGap.detail}</p>
+              </article>
 
-        <section
-          data-testid="global-next-action-queue"
-          className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
-        >
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Global next action</p>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">What should be done now?</h2>
-            </div>
-            <Target className="h-6 w-6 text-[#085041]" />
-          </div>
-
-          {actionQueue.length === 0 ? (
-            <div className="rounded-md border border-dashed border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold leading-6 text-[#746f66]">
-              No pending action found in local storage. The queue will populate as subjects, labs, Talk checks, and fresh MCQ batches move.
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {actionQueue.map((item, index) => (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={cn("min-h-36 rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
+              {profile && !profile.inductionCompleted ? (
+                <div
+                  data-testid="daily-revision-signal-locked"
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
                 >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
-                        {index + 1}. {item.subjectWindow}
-                      </p>
-                      <h3 className="mt-1 break-words text-sm font-black leading-5">{item.subjectTitle}</h3>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
+                      <LockKeyhole className="h-5 w-5" />
                     </div>
-                    <span className="shrink-0 rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                      {item.badge}
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                      Locked
                     </span>
                   </div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] opacity-80">
-                    Day {item.day} / {item.room}
-                  </p>
-                  <p className="mt-2 break-words text-sm font-black leading-5">{item.statusLabel}</p>
-                  <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
-                  <p className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.12em]">
-                    {item.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
-                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
+                </div>
+              ) : (
+                <Link
+                  data-testid="daily-revision-signal"
+                  href={dailyPlanner.revision.href}
+                  className={cn(
+                    "rounded-lg border p-5 shadow-sm transition hover:-translate-y-0.5",
+                    dailyPlanner.revision.urgent
+                      ? "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
+                      : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b]"
+                  )}
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/70">
+                      <RefreshCcw className="h-5 w-5" />
+                    </div>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                      {dailyPlanner.revision.dueLabel}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Revise next</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.revision.title}</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 opacity-80">{dailyPlanner.revision.detail}</p>
                 </Link>
-              ))}
-            </div>
-          )}
-        </section>
+              )}
 
-        <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              {profile && !profile.inductionCompleted ? (
+                <div
+                  data-testid="daily-today-task-locked"
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5 text-[#756f64] shadow-sm cursor-not-allowed opacity-85"
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#dcd5c7]">
+                      <LockKeyhole className="h-5 w-5" />
+                    </div>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                      Locked
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">Today&apos;s task</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-[#756f64]">Locked</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 opacity-85">Complete onboarding induction first</p>
+                </div>
+              ) : (
+                <Link
+                  data-testid="daily-today-task"
+                  href={dailyPlanner.todayTask.href}
+                  className="rounded-lg border border-[#1a3a2a] bg-[#1a3a2a] p-5 text-white shadow-sm transition hover:-translate-y-0.5"
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/15">
+                      <Target className="h-5 w-5" />
+                    </div>
+                    <span className="rounded-md bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                      {dailyPlanner.todayTask.actionLabel}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/75">Today&apos;s task</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight">{dailyPlanner.todayTask.title}</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-white/80">{dailyPlanner.todayTask.detail}</p>
+                </Link>
+              )}
+
+              <article
+                data-testid="daily-growth-signal"
+                className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 text-[#34453b] shadow-sm"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <LineChart className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-md bg-[#f7f4ee] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                    {dailyPlanner.growth.meTimeLabel}
+                  </span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Growth trend</p>
+                <h2 className="mt-2 text-xl font-black tracking-tight text-[#13251d]">{dailyPlanner.growth.title}</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{dailyPlanner.growth.detail}</p>
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
+                  {dailyPlanner.growth.metricLabel}
+                </p>
+              </article>
+            </section>
+
+            {dailyPlanner.teacherDoubt ? (
+              <section
+                data-testid="daily-teacher-doubt-plan"
+                className="rounded-lg border border-[#ef9f27]/50 bg-[#fff8e8] p-5 text-[#5d3a05] shadow-sm md:p-6"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9a6a16]">
+                      AI teacher gap
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                      Day {dailyPlanner.teacherDoubt.day}: {dailyPlanner.teacherDoubt.category}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6">{dailyPlanner.teacherDoubt.reason}</p>
+                  </div>
+                  <Link
+                    href={dailyPlanner.teacherDoubt.href}
+                    className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    {labelForDailyDoubt(dailyPlanner.teacherDoubt.href)} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Repair action</p>
+                    <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.repairAction}</p>
+                  </div>
+                  <div className="rounded-md border border-[#ef9f27]/35 bg-white/70 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9a6a16]">Mastery check</p>
+                    <p className="mt-2 text-sm font-bold leading-6 text-[#34453b]">{dailyPlanner.teacherDoubt.masteryCheck}</p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            <section
+              data-testid="daily-session-readiness"
+              data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+              data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
+              className={cn("rounded-lg border p-5 shadow-sm md:p-6", readinessTone(dailyPlanner.sessionReadiness.tone))}
+            >
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Mission selector</p>
-                <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Choose subject and day</h2>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="max-w-2xl">
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white/85 text-[#1a3a2a]">
+                        <ClipboardCheck className="h-5 w-5" />
+                      </div>
+                      <span className="rounded-md bg-white/85 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]">
+                        {dailyPlanner.sessionReadiness.scorePercent}% Readiness Score
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">
+                      Before session readiness
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                      {dailyPlanner.sessionReadiness.title}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6 opacity-85">
+                      {dailyPlanner.sessionReadiness.detail}
+                    </p>
+                  </div>
+                  <div>
+                    {profile && !profile.inductionCompleted ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-4 text-sm font-black text-[#756f64] cursor-not-allowed"
+                      >
+                        Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <Link
+                        href={dailyPlanner.sessionReadiness.href}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                      >
+                        {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                {/* Checklist progress tracker row */}
+                <div className="mt-4 border-t border-current/10 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">Checklist Progress</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {dailyPlanner.sessionReadiness.checklist.map((item) => (
+                          <span
+                            key={item.label}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-bold",
+                              item.status === "done"
+                                ? "border-[#b9d9cd] bg-white/65 text-[#085041]"
+                                : item.status === "repair"
+                                  ? "border-[#ef9f27]/50 bg-white/65 text-[#6f4a12]"
+                                  : "border-[#dcd5c7] bg-white/65 text-[#5d675f]"
+                            )}
+                          >
+                            {item.status === "done" ? (
+                              <CheckCircle2 className="h-3 w-3 text-[#1d9e75]" />
+                            ) : item.status === "repair" ? (
+                              <RefreshCcw className="h-3 w-3 text-[#ef9f27]" />
+                            ) : (
+                              <Clock className="h-3 w-3 text-[#8a8174]" />
+                            )}
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsSessionReadinessOpen(!isSessionReadinessOpen)}
+                      className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                    >
+                      {isSessionReadinessOpen ? "Hide Details" : "Show Details"}
+                    </button>
+                  </div>
+                </div>
+
+                {isSessionReadinessOpen && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5 border-t border-current/10 pt-4">
+                    {dailyPlanner.sessionReadiness.checklist.map((item) => (
+                      <div key={item.label} className={cn("min-h-28 rounded-md border p-3", checklistTone(item.status))}>
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                          {item.status === "done" ? (
+                            <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" />
+                          ) : item.status === "repair" ? (
+                            <RefreshCcw className="h-4 w-4 text-[#ef9f27]" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-[#8a8174]" />
+                          )}
+                        </div>
+                        <h3 className="text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                        <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <CalendarDays className="h-6 w-6 text-[#085041]" />
-            </div>
+            </section>
 
-            <div className="mb-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {dailySubjects.map((subject) => {
-                const isActive = activeSubject.slug === subject.slug;
-                return (
+            <section
+              data-testid="daily-next-session-proof"
+              data-source-day={dailyPlanner.nextSessionProof.sourceDay}
+              data-target-day={dailyPlanner.nextSessionProof.targetDay}
+              data-decision={dailyPlanner.nextSessionProof.decision}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+            >
+              <div>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div className="max-w-2xl">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                      <ClipboardCheck className="h-5 w-5" />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                      Next-session proof
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                      Day {dailyPlanner.nextSessionProof.sourceDay} evidence chose Day {dailyPlanner.nextSessionProof.targetDay}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                      {dailyPlanner.nextSessionProof.evidenceSummary}
+                    </p>
+                    <p className="mt-3 inline-block rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-bold leading-5 text-[#31443a]">
+                      Rule: {dailyPlanner.nextSessionProof.adjustmentRule}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Evidence summary tracker row */}
+                <div className="mt-4 border-t border-[#e8e2d5] pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">Evidence Status</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {dailyPlanner.nextSessionProof.evidence.map((item) => (
+                          <span
+                            key={item.label}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-bold",
+                              item.status === "used"
+                                ? "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]"
+                                : item.status === "blocked"
+                                  ? "border-[#ef9f27]/50 bg-[#fff4df] text-[#6f4a12]"
+                                  : "border-[#dcd5c7] bg-[#f7f4ee] text-[#5d675f]"
+                            )}
+                          >
+                            {item.label}: {item.value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsNextSessionProofOpen(!isNextSessionProofOpen)}
+                      className="inline-flex min-h-8 items-center rounded-md border border-[#1d9e75] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#1d9e75] hover:text-white transition"
+                    >
+                      {isNextSessionProofOpen ? "Hide Evidence" : "Show Evidence"}
+                    </button>
+                  </div>
+                </div>
+
+                {isNextSessionProofOpen && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5 border-t border-[#e8e2d5] pt-4">
+                    {dailyPlanner.nextSessionProof.evidence.map((item) => (
+                      <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
+                        <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                        <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                        <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section
+              data-testid="daily-auto-session-handoff"
+              data-proof-rule={automaticHandoff.proofRule}
+              data-handoff-id={automaticHandoff.id}
+              data-subject-slug={automaticHandoff.subjectSlug}
+              data-source-day={automaticHandoff.sourceDay}
+              data-target-day={automaticHandoff.targetDay}
+              data-target-title={automaticHandoff.targetTitle}
+              data-status-label={automaticHandoff.statusLabel}
+              data-href={automaticHandoff.href}
+              data-action-label={automaticHandoff.actionLabel}
+              data-can-advance={String(automaticHandoff.canAdvance)}
+              data-evidence-used={automaticHandoff.evidenceUsed}
+              data-evidence-missing={automaticHandoff.evidenceMissing}
+              data-blockers={automaticHandoff.blockers}
+              data-readiness-status={automaticHandoff.readinessStatus}
+              data-readiness-score={automaticHandoff.readinessScorePercent}
+              data-learning-gap={automaticHandoff.learningGapTitle}
+              data-revision-due={automaticHandoff.revisionDueLabel}
+              data-report-href={automaticHandoff.reportHref}
+              data-question-bank-href={automaticHandoff.questionBankHref}
+              data-saved-at={autoHandoffSavedAt}
+              className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
+            >
+              <div>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div className="max-w-2xl">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-white text-[#085041]">
+                      <Save className="h-5 w-5" />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                      Auto-created next session
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
+                      {automaticHandoff.canAdvance
+                        ? `Day ${automaticHandoff.targetDay} is ready to open`
+                        : `Stay on ${automaticHandoff.statusLabel}`}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                      {automaticHandoff.studentInstruction}
+                    </p>
+                    <p className="mt-3 inline-block rounded-md border border-[#b9d9cd] bg-white/75 p-3 text-xs font-bold leading-5 text-[#31443a]">
+                      Saved handoff: {automaticHandoff.id}
+                      {autoHandoffSavedAt ? ` at ${new Date(autoHandoffSavedAt).toLocaleTimeString("en-IN")}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Link
+                      href={automaticHandoff.href}
+                      data-testid="daily-auto-session-handoff-action"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+                    >
+                      {automaticHandoff.actionLabel} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        href={automaticHandoff.reportHref}
+                        className="flex-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
+                      >
+                        Reports
+                      </Link>
+                      <Link
+                        href={automaticHandoff.questionBankHref}
+                        className="flex-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
+                      >
+                        MCQ bank
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Handoff metrics toggle */}
+                <div className="mt-4 border-t border-[#b9d9cd] pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2 text-xs font-bold text-[#085041]">
+                      <span className="rounded-md border border-[#b9d9cd] bg-white/60 px-2 py-0.5">
+                        Target: Day {automaticHandoff.targetDay}
+                      </span>
+                      <span className="rounded-md border border-[#b9d9cd] bg-white/60 px-2 py-0.5">
+                        Readiness: {automaticHandoff.readinessScorePercent}%
+                      </span>
+                      <span className="rounded-md border border-[#b9d9cd] bg-white/60 px-2 py-0.5">
+                        Blockers: {automaticHandoff.blockers === 0 ? "None" : `${automaticHandoff.blockers} blocker(s)`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoHandoffOpen(!isAutoHandoffOpen)}
+                      className="inline-flex min-h-8 items-center rounded-md border border-[#085041] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#085041] hover:text-white transition"
+                    >
+                      {isAutoHandoffOpen ? "Hide Metrics" : "Show Handoff Metrics"}
+                    </button>
+                  </div>
+                </div>
+
+                {isAutoHandoffOpen && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 border-t border-[#b9d9cd] pt-4">
+                    {[
+                      ["Target", `Day ${automaticHandoff.targetDay}: ${automaticHandoff.targetTitle}`],
+                      ["Evidence", `${automaticHandoff.evidenceUsed} used / ${automaticHandoff.evidenceMissing} missing`],
+                      ["Blockers", automaticHandoff.blockers],
+                      ["Readiness", `${automaticHandoff.readinessStatus} / ${automaticHandoff.readinessScorePercent}%`],
+                      ["Gap", automaticHandoff.learningGapTitle],
+                      ["Revision", automaticHandoff.revisionDueLabel],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/75 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                        <p className="mt-1 text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "revision" && (
+          <>
+            <section
+              data-testid="daily-student-learning-funnel"
+              data-active-subject={activeSubject.slug}
+              data-active-day={activeSession.day}
+              data-step-count={learningFunnelSteps.length}
+              data-gap-title={dailyPlanner.learningGap.title}
+              data-today-task={dailyPlanner.sessionReadiness.title}
+              data-revision-label={dailyPlanner.revision.dueLabel}
+              data-next-route={dailyPlanner.tomorrowAdjustment.href}
+              data-decision={dailyPlanner.nextSessionProof.decision}
+              data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    Today&apos;s simple path
+                  </p>
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                    {activeSubject.title} Day {activeSession.day}
+                  </h2>
+                </div>
+                {profile && !profile.inductionCompleted ? (
                   <button
-                    key={subject.slug}
                     type="button"
-                    aria-pressed={isActive}
-                    onClick={() => selectSubject(subject.slug)}
-                    className={cn(
-                      "min-h-20 rounded-md border p-3 text-left transition",
-                      isActive
-                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                        : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                    )}
+                    disabled
+                    data-testid="daily-funnel-locked"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
                   >
-                    <span className="block text-xs font-black uppercase tracking-[0.14em]">{subject.window}</span>
-                    <span className="mt-2 block text-sm font-black leading-5">{subject.title}</span>
-                    <span className="mt-2 block text-xs font-semibold opacity-75">{subject.sessions.length} days</span>
+                    Locked (Complete Induction) <LockKeyhole className="h-3.5 w-3.5" />
                   </button>
-                );
-              })}
-            </div>
+                ) : (
+                  <Link
+                    href={dailyPlanner.sessionReadiness.href}
+                    data-testid="daily-funnel-primary-action"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </div>
 
-            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-              {activeSubject.sessions.map((session) => {
-                const progress = getProgress(activeSubject, session);
-                const contentReadyForDay = isContentReady(getContentState(activeSubject, session));
-                const mcqCommandForDay = isUpscMcqCommandCleared(progress, batchCode(activeSubject, session));
-                const isActive = activeSession.day === session.day;
+              {/* Simple path steps summary row */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-current/10 pt-3">
+                <div className="flex flex-wrap gap-2">
+                  {learningFunnelSteps.map((step, index) => (
+                    <span
+                      key={step.id}
+                      className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-2.5 py-1 text-xs font-bold text-[#13251d]"
+                    >
+                      {index + 1}. {step.label}: {step.title}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSimplePathOpen(!isSimplePathOpen)}
+                  className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                >
+                  {isSimplePathOpen ? "Hide Details" : "Show Details"}
+                </button>
+              </div>
 
-                return (
+              {isSimplePathOpen && (
+                <div className="mt-4 grid gap-2 md:grid-cols-4 border-t border-current/10 pt-4">
+                  {learningFunnelSteps.map((step, index) => (
+                    <article
+                      key={step.id}
+                      data-testid="daily-funnel-step"
+                      data-step-id={step.id}
+                      className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3"
+                    >
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                        {index + 1}. {step.label}
+                      </p>
+                      <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{step.title}</h3>
+                      <p className="mt-2 text-xs font-semibold leading-5 text-[#5d675f]">{step.detail}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section
+              data-testid="daily-new-day-operating-contract"
+              data-contract-rule="me-time-recall-gap-class-discussion-mcq-revision-report-next-day"
+              data-row-count={dailyOperatingContractRows.length}
+              data-active-subject={activeSubject.slug}
+              data-active-day={activeSession.day}
+              data-question-bank-difficulty={questionBankRecommendation.recommendedDifficulty}
+              data-question-bank-count={questionBankRecommendation.recommendedCount}
+              data-question-bank-level={questionBankRecommendation.adaptiveLevel}
+              data-question-bank-score={questionBankRecommendation.adaptiveReadinessScore}
+              data-question-bank-mix={questionBankMixLabel}
+              data-exact-pyq-total-rows={exactPyqQuestions.length}
+              data-exact-pyq-active-subject-rows={activeSubjectExactPyqs.length}
+              data-exact-pyq-active-day-rows={activeDayExactPyqs.length}
+              data-exact-pyq-selected-rows={selectedExactPyqCount}
+              data-report-href="/reports"
+              data-next-day-route={dailyPlanner.tomorrowAdjustment.href}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm md:p-5"
+            >
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    New-day operating contract
+                  </p>
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                    The portal chooses the next action from evidence.
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
+                    One chain connects mind-state, recall gap, class/discussion, MCQ difficulty, revision reports, and tomorrow&apos;s adjustment.
+                  </p>
+                </div>
+                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">
+                  {questionBankRecommendation.recommendedDifficulty.replace("_", " ")}
+                </Badge>
+              </div>
+
+              {/* Operating Contract summary row */}
+              <div className="mt-4 border-t border-current/10 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    {dailyOperatingContractRows.map((row, index) => (
+                      <span
+                        key={row.id}
+                        className="rounded-md border border-[#dcd5c7] bg-[#fdfaf3] px-2 py-0.5 text-xs font-bold text-[#34453b]"
+                      >
+                        {index + 1}. {row.label}: {row.status}
+                      </span>
+                    ))}
+                  </div>
                   <button
-                    key={session.day}
                     type="button"
-                    aria-pressed={isActive}
-                    onClick={() => selectDay(session.day)}
-                    className={cn(
-                      "min-h-24 min-w-0 rounded-md border p-3 text-left transition",
-                      isActive
-                        ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                        : progress?.revisitQueued
-                          ? "border-[#ef9f27]/50 bg-[#fff4df] text-[#6f4a12] hover:border-[#ef9f27]"
-                          : contentReadyForDay && mcqCommandForDay
-                            ? "border-[#1d9e75]/40 bg-[#e7f5ee] text-[#085041] hover:border-[#1d9e75]"
+                    onClick={() => setIsOperatingContractOpen(!isOperatingContractOpen)}
+                    className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                  >
+                    {isOperatingContractOpen ? "Hide Contract" : "Show Full Contract"}
+                  </button>
+                </div>
+              </div>
+
+              {isOperatingContractOpen && (
+                <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3 border-t border-current/10 pt-4">
+                  {dailyOperatingContractRows.map((row, index) => {
+                    const isGated = profile && !profile.inductionCompleted;
+                    const CardContent = (
+                      <>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-75">
+                              {index + 1}. {row.label}
+                            </p>
+                            <h3 className="mt-2 text-sm font-black uppercase tracking-[0.12em]">{row.status}</h3>
+                          </div>
+                          {isGated ? (
+                            <LockKeyhole className="h-4 w-4 shrink-0 text-[#756f64]" />
+                          ) : (
+                            <ArrowRight className="h-4 w-4 shrink-0" />
+                          )}
+                        </div>
+                        <p className="mt-2 text-xs font-bold leading-5 opacity-85">
+                          {isGated ? "Locked (Complete Induction)" : row.proof}
+                        </p>
+                      </>
+                    );
+
+                    return isGated ? (
+                      <div
+                        key={row.id}
+                        data-testid="daily-operating-contract-row-locked"
+                        data-contract-id={row.id}
+                        className="min-h-28 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-[#756f64] cursor-not-allowed opacity-80"
+                      >
+                        {CardContent}
+                      </div>
+                    ) : (
+                      <Link
+                        key={row.id}
+                        href={row.href}
+                        data-testid="daily-operating-contract-row"
+                        data-contract-id={row.id}
+                        data-status={row.status}
+                        data-href={row.href}
+                        className={cn("min-h-28 rounded-md border p-3 transition hover:-translate-y-0.5", operatingContractTone(row.status))}
+                      >
+                        {CardContent}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {profile && !profile.inductionCompleted ? (
+              <div
+                data-testid="daily-tomorrow-adjustment-locked"
+                className="grid gap-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 text-[#756f64] shadow-sm cursor-not-allowed md:grid-cols-[auto_1fr_auto] md:items-center md:p-5 opacity-85"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#756f64]">
+                  <LockKeyhole className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#756f64]/80">
+                    Tomorrow auto-adjusts from today&apos;s evidence (Locked)
+                  </span>
+                  <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#756f64]">
+                    Tomorrow Auto-Adjustment Locked
+                  </span>
+                  <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#756f64]/80">
+                    Complete onboarding induction to unlock planning tracks.
+                  </span>
+                </span>
+                <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64]">
+                  Locked <LockKeyhole className="h-4 w-4" />
+                </span>
+              </div>
+            ) : (
+              <Link
+                data-testid="daily-tomorrow-adjustment"
+                data-adjustment-status={dailyPlanner.tomorrowAdjustment.statusLabel}
+                href={dailyPlanner.tomorrowAdjustment.href}
+                className="grid gap-4 rounded-lg border border-[#cfe5dc] bg-[#e7f5ee] p-4 text-[#085041] shadow-sm transition hover:-translate-y-0.5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-5"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-md bg-white text-[#085041]">
+                  <CalendarDays className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    Tomorrow auto-adjusts from today&apos;s evidence
+                  </span>
+                  <span className="mt-1 block break-words text-xl font-black tracking-tight text-[#13251d]">
+                    {dailyPlanner.tomorrowAdjustment.title}
+                  </span>
+                  <span className="mt-1 block break-words text-sm font-semibold leading-6 text-[#49675e]">
+                    {dailyPlanner.tomorrowAdjustment.detail}
+                  </span>
+                </span>
+                <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
+                  {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
+                </span>
+              </Link>
+            )}
+          </>
+        )}
+
+        {activeTab === "history" && (
+          <>
+            <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+                <Link href="/upsc" className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
+                  <ArrowLeft className="h-4 w-4" /> UPSC command home
+                </Link>
+
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Daily Mission</Badge>
+                  <span className="text-sm font-bold text-[#776f64]">Student launch control</span>
+                </div>
+
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">{activeSubject.window}</p>
+                <h1 className="mt-3 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
+                  {activeSubject.title}: Day {activeSession.day}
+                </h1>
+                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#5d675f]">{activeSession.anchor}</p>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ["Batch", activeBatchCode],
+                    ["Chapter", activeSession.chapter],
+                    ["Duration", activeSession.duration],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
+                      <p className="mt-2 break-words text-sm font-black leading-5 text-[#13251d]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                {[
+                  { label: "Watched", value: totals.watched, icon: PlayCircle },
+                  { label: "Talk notes", value: totals.reflected, icon: BrainCircuit },
+                  { label: "Revisit", value: totals.revisit, icon: RefreshCcw },
+                  { label: "Content ready", value: totals.contentReady, icon: BookOpen },
+                  { label: "Batch ready", value: totals.mcqBatchReady, icon: ClipboardCheck },
+                  { label: "MCQ command", value: totals.mcqCommand, icon: CheckCircle2 },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                    <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
+                      <item.icon className="h-5 w-5" />
+                    </div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</p>
+                    <p className="mt-3 text-3xl font-black tracking-tight text-[#13251d]">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Mission selector</p>
+                    <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Choose subject and day</h2>
+                  </div>
+                  <CalendarDays className="h-6 w-6 text-[#085041]" />
+                </div>
+
+                <div className="mb-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {dailySubjects.map((subject) => {
+                    const isActive = activeSubject.slug === subject.slug;
+                    return (
+                      <button
+                        key={subject.slug}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => selectSubject(subject.slug)}
+                        className={cn(
+                          "min-h-20 rounded-md border p-3 text-left transition",
+                          isActive
+                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                             : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                    )}
-                  >
-                    <span className="block break-words text-xs font-black uppercase tracking-[0.16em]">
-                      {batchCode(activeSubject, session)}
-                    </span>
-                    <span className="mt-2 block break-words text-sm font-bold leading-5">{session.title}</span>
-                    <span className="mt-2 block text-xs font-semibold opacity-75">
-                      {progress?.revisitQueued
-                        ? "Revisit queued"
-                        : progress?.watched
-                          ? "Watched"
-                          : contentReadyForDay
-                            ? "Content ready"
-                            : "Start here"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                        )}
+                      >
+                        <span className="block text-xs font-black uppercase tracking-[0.14em]">{subject.window}</span>
+                        <span className="mt-2 block text-sm font-black leading-5">{subject.title}</span>
+                        <span className="mt-2 block text-xs font-semibold opacity-75">{subject.sessions.length} days</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-          <div className="grid min-w-0 gap-5">
-            <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+                  {activeSubject.sessions.map((session) => {
+                    const progress = getProgress(activeSubject, session);
+                    const contentReadyForDay = isContentReady(getContentState(activeSubject, session));
+                    const mcqCommandForDay = isUpscMcqCommandCleared(progress, batchCode(activeSubject, session));
+                    const isActive = activeSession.day === session.day;
+
+                    return (
+                      <button
+                        key={session.day}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => selectDay(session.day)}
+                        className={cn(
+                          "min-h-24 min-w-0 rounded-md border p-3 text-left transition",
+                          isActive
+                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
+                            : progress?.revisitQueued
+                              ? "border-[#ef9f27]/50 bg-[#fff4df] text-[#6f4a12] hover:border-[#ef9f27]"
+                              : contentReadyForDay && mcqCommandForDay
+                                ? "border-[#1d9e75]/40 bg-[#e7f5ee] text-[#085041] hover:border-[#1d9e75]"
+                                : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                        )}
+                      >
+                        <span className="block break-words text-xs font-black uppercase tracking-[0.16em]">
+                          {batchCode(activeSubject, session)}
+                        </span>
+                        <span className="mt-2 block break-words text-sm font-bold leading-5">{session.title}</span>
+                        <span className="mt-2 block text-xs font-semibold opacity-75">
+                          {progress?.revisitQueued
+                            ? "Revisit queued"
+                            : progress?.watched
+                              ? "Watched"
+                              : contentReadyForDay
+                                ? "Content ready"
+                                : "Start here"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+
+            <section
+              data-testid="global-next-action-queue"
+              className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Today loop</p>
-                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Move through the class sequence</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Global next action</p>
+                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">What should be done now?</h2>
                 </div>
                 <Target className="h-6 w-6 text-[#085041]" />
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[
-                  {
-                    label: "Watch",
-                    detail: activeProgress?.watched ? "Watched" : contentReady ? "Ready to watch" : "Content pending",
-                    href: `${basePath}/watch?day=${activeSession.day}`,
-                    icon: PlayCircle,
-                    active: true,
-                  },
-                  {
-                    label: "Talk",
-                    detail: activeProgress?.reflection ? "Reflection saved" : "Explain after watch",
-                    href: `${basePath}/talk?day=${activeSession.day}`,
-                    icon: BrainCircuit,
-                    active: Boolean(activeProgress?.watched),
-                  },
-                  {
-                    label: "Lab",
-                    detail: activeSession.lab,
-                    href: `${basePath}/lab?mode=${activeLabSlug}&day=${activeSession.day}`,
-                    icon: Layers3,
-                    active: Boolean(activeLabSlug),
-                  },
-                  {
-                    label: "MCQ",
-                    detail: activeMcqCommand
-                      ? `Command ${activeProgress?.mcqScorePercent ?? 0}%`
-                      : activeProgress?.mcqOutcome === "Revisit"
-                        ? "Revisit required"
-                        : activeMcqBatch.ready
-                          ? "Practice pending"
-                          : `${activeMcqBatch.drafted}/${activeMcqBatch.planned} drafted`,
-                    href: `${basePath}/mcq-readiness?day=${activeSession.day}`,
-                    icon: ClipboardCheck,
-                    active: true,
-                  },
-                  {
-                    label: "Retro",
-                    detail: activeProgress?.retroCompleted ? "Retrospective completed" : "Review Saturday test",
-                    href: `${basePath}/retro?day=${activeSession.day}`,
-                    icon: Sparkles,
-                    active: profile ? Boolean(profile.inductionCompleted) : true,
-                  },
-                  {
-                    label: "Mains",
-                    detail: "Frictionless Answer Uploader",
-                    href: "/upsc/answer-upload",
-                    icon: UploadCloud,
-                    active: profile ? Boolean(profile.inductionCompleted) : true,
-                  },
-                  {
-                    label: "Track",
-                    detail: "Subject progress",
-                    href: `${basePath}/track`,
-                    icon: LineChart,
-                    active: true,
-                  },
-                  {
-                    label: "Revisit",
-                    detail: activeProgress?.revisitQueued ? "Repair now" : "Recovery room",
-                    href: `${basePath}/revisit?day=${activeSession.day}`,
-                    icon: RefreshCcw,
-                    active: true,
-                  },
-                ].map((item) => (
+              {actionQueue.length === 0 ? (
+                <div className="rounded-md border border-dashed border-[#dcd5c7] bg-[#fdfaf3] p-5 text-sm font-bold leading-6 text-[#746f66]">
+                  No pending action found in local storage. The queue will populate as subjects, labs, Talk checks, and fresh MCQ batches move.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {actionQueue.map((item, index) => (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      className={cn("min-h-36 rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">
+                            {index + 1}. {item.subjectWindow}
+                          </p>
+                          <h3 className="mt-1 break-words text-sm font-black leading-5">{item.subjectTitle}</h3>
+                        </div>
+                        <span className="shrink-0 rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                          {item.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs font-black uppercase tracking-[0.14em] opacity-80">
+                        Day {item.day} / {item.room}
+                      </p>
+                      <p className="mt-2 break-words text-sm font-black leading-5">{item.statusLabel}</p>
+                      <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
+                      <p className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.12em]">
+                        {item.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {profile && (
+              <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[#cfe5dc] pb-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Milestone Achievements</p>
+                    <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Your Badges & Rewards</h2>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="rounded bg-[#fff4df] border border-[#ef9f27]/30 px-3 py-1.5 text-xs font-black text-[#6f4a12]">
+                      🪙 {profile.coins ?? 0} Coins
+                    </span>
+                    <span className="rounded bg-[#e7f5ee] border border-[#1d9e75]/30 px-3 py-1.5 text-xs font-black text-[#085041]">
+                      ⚡ {profile.points ?? 0} XP
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                  {Object.values(BADGE_DEFINITIONS).map((badge) => {
+                    const isUnlocked = profile.unlockedBadges?.includes(badge.id) ?? false;
+                    return (
+                      <AchievementBadge
+                        key={badge.id}
+                        title={badge.title}
+                        description={badge.description}
+                        icon={badge.icon}
+                        color={badge.color}
+                        isUnlocked={isUnlocked}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+
+        {activeTab === "syllabus" && (
+          <>
+            <UpscSyllabusPyqLibrary />
+
+            <section
+              data-testid="daily-exact-pyq-readiness"
+              data-proof-rule="daily-command-uses-mapped-exact-pyq-imports"
+              data-active-subject={activeSubject.slug}
+              data-active-day={activeSession.day}
+              data-total-exact-pyq-rows={exactPyqQuestions.length}
+              data-active-subject-exact-pyq-rows={activeSubjectExactPyqs.length}
+              data-active-day-exact-pyq-rows={activeDayExactPyqs.length}
+              data-selected-exact-pyq-rows={selectedExactPyqCount}
+              data-question-bank-href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+              className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm md:p-5"
+            >
+              <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#085041]">
+                    Exact PYQ readiness
+                  </p>
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
+                    Daily MCQs now read the verified import bank.
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
+                    Only rows marked exact verified and mapped can enter today&apos;s practice. If the count is zero, the
+                    student still receives PYQ-style pattern practice without any false exact-PYQ claim.
+                  </p>
+                  {profile && !profile.inductionCompleted ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
+                    >
+                      Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+                    >
+                      Open PYQ practice lane <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["All exact rows", exactPyqQuestions.length],
+                    [`${activeSubject.title} exact rows`, activeSubjectExactPyqs.length],
+                    [`Day ${activeSession.day} exact rows`, activeDayExactPyqs.length],
+                    ["Selected in set", selectedExactPyqCount],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-[#b9d9cd] bg-white/80 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">{label}</p>
+                      <p className="mt-1 text-xl font-black text-[#13251d]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section
+              data-testid="daily-today-origin-proof"
+              data-source-day={dailyPlanner.todayOriginProof.sourceDay}
+              data-target-day={dailyPlanner.todayOriginProof.targetDay}
+              data-origin-status={dailyPlanner.todayOriginProof.statusLabel}
+              data-origin-route={dailyPlanner.todayOriginProof.href}
+              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+            >
+              <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+                <div>
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <CalendarDays className="h-5 w-5" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    Why this is today&apos;s task
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
+                    {dailyPlanner.todayOriginProof.title}
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                    {dailyPlanner.todayOriginProof.evidenceSummary}
+                  </p>
+                  {profile && !profile.inductionCompleted ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64] cursor-not-allowed"
+                    >
+                      Locked <LockKeyhole className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <Link
+                      href={dailyPlanner.todayOriginProof.href}
+                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
+                    >
+                      {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {dailyPlanner.todayOriginProof.evidence.map((item) => (
+                    <div key={item.label} className={cn("min-h-24 rounded-md border p-3", proofTone(item.status))}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.12em]">{item.status}</p>
+                      <h3 className="mt-2 text-sm font-black leading-5 text-[#13251d]">{item.label}</h3>
+                      <p className="mt-1 text-xs font-semibold leading-5 opacity-80">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section
+              data-testid="daily-prelims-2027-ops-queue"
+              data-source-orders={strategyOpsTotals.sourceOrders}
+              data-unresolved-orders={strategyOpsTotals.unresolved}
+              data-drafted-orders={strategyOpsTotals.drafted}
+              data-action-count={strategyOpsQueue.length}
+              className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+            >
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#d95f43]">2027 strategy work</p>
+                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Source gaps and proof gates</h2>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["Orders", strategyOpsTotals.sourceOrders],
+                    ["Open", strategyOpsTotals.unresolved],
+                    ["Drafted", strategyOpsTotals.drafted],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-20 rounded-md border border-[#dcd5c7] bg-[#fdfaf3] px-3 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#9d3824]">{label}</p>
+                      <p className="mt-1 text-lg font-black text-[#13251d]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {strategyOpsQueue.map((item) => (
                   <Link
-                    key={item.label}
+                    key={item.key}
                     href={item.href}
-                    className={cn(
-                      "group flex min-h-16 items-center gap-3 rounded-md border px-3 text-left transition hover:-translate-y-0.5",
-                      item.active
-                        ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#1a3a2a] hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
-                        : "pointer-events-none border-[#dcd5c7] bg-[#f7f4ee] text-[#8a8174] opacity-60"
-                    )}
+                    data-testid="daily-prelims-2027-ops-row"
+                    data-action-key={item.key}
+                    data-status-label={item.statusLabel}
+                    className={cn("min-h-36 rounded-md border p-4 transition hover:-translate-y-0.5", item.tone)}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-[#085041] group-hover:bg-[#1d9e75] group-hover:text-white">
-                      <item.icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-black leading-5">{item.label}</span>
-                      <span className="mt-0.5 block break-words text-xs font-semibold opacity-70">{item.detail}</span>
-                    </span>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <span className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                        {item.badge}
+                      </span>
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                    <p className="text-base font-black leading-5">{item.title}</p>
+                    <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] opacity-75">{item.statusLabel}</p>
+                    <p className="mt-2 text-xs font-semibold leading-5 opacity-80">{item.detail}</p>
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#ef9f27] text-[#13251d]">
-                  <FileText className="h-5 w-5" />
-                </div>
+            <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black text-[#13251d]">Daily note</p>
-                  <p className="text-xs font-semibold text-[#746f66]">Saved locally for the selected mission</p>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Global controls</p>
+                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Jump to command centers</h2>
                 </div>
+                <Gauge className="h-6 w-6 text-[#085041]" />
               </div>
-
-              <textarea
-                value={dailyState.note ?? ""}
-                onChange={(event) => {
-                  setDailyState((current) => ({ ...current, note: event.target.value }));
-                  setSaved(false);
-                }}
-                placeholder="Write today's target, doubt, or class instruction here."
-                className="min-h-28 w-full resize-y rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
-              />
-
-              <button
-                type="button"
-                onClick={saveNote}
-                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
-              >
-                <Save className="h-4 w-4" /> Save daily mission
-              </button>
-              {saved && (
-                <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                  <p className="text-sm font-bold leading-6 text-[#085041]">Daily mission saved locally.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Global controls</p>
-              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Jump to command centers</h2>
-            </div>
-            <Gauge className="h-6 w-6 text-[#085041]" />
-          </div>
-          <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-            {[
-              { label: "Prelims Showcase", href: "/upsc/prelims-2026-showcase", gated: false },
-              { label: "2027 Strategy", href: "/upsc/prelims-2027-strategy", gated: false },
-              { label: "Content Command", href: "/upsc/content-command", gated: false },
-              { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
-              { label: "Revision Command", href: "/upsc/revision-command", gated: false },
-              { label: "Sunday AI Retro", href: `/upsc/${activeSubject.slug}/retro`, gated: true },
-              { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
-            ].map((item) => {
-              const isLocked = item.gated && profile && !profile.inductionCompleted;
-              if (isLocked) {
-                return (
-                  <button
-                    key={item.label}
-                    disabled
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#756f64] opacity-65 cursor-not-allowed"
-                  >
-                    {item.label} <LockKeyhole className="h-4 w-4" />
-                  </button>
-                );
-              }
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#e7f5ee]"
-                >
-                  {item.label} <ArrowRight className="h-4 w-4" />
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
+                {[
+                  { label: "Prelims Showcase", href: "/upsc/prelims-2026-showcase", gated: false },
+                  { label: "2027 Strategy", href: "/upsc/prelims-2027-strategy", gated: false },
+                  { label: "Content Command", href: "/upsc/content-command", gated: false },
+                  { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
+                  { label: "Revision Command", href: "/upsc/revision-command", gated: false },
+                  { label: "Sunday AI Retro", href: `/upsc/${activeSubject.slug}/retro`, gated: true },
+                  { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+                ].map((item) => {
+                  const isLocked = item.gated && profile && !profile.inductionCompleted;
+                  if (isLocked) {
+                    return (
+                      <button
+                        key={item.label}
+                        disabled
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#756f64] opacity-65 cursor-not-allowed"
+                      >
+                        {item.label} <LockKeyhole className="h-4 w-4" />
+                      </button>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-[#f7f4ee] px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#e7f5ee]"
+                    >
+                      {item.label} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       {/* ── Phase 5: Brain Dump FAB ── */}

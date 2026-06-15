@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-05-13T19:17:11.768702",
+  "files_to_edit": [
+    "backend/app/services/report_service.py",
+    "--owner",
+    "USER",
+    "--rollback",
+    "Manual revert of logging change"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend/app/services/report_service.py": {
+      "count": 1
+    },
+    "--owner": {
+      "count": 0
+    },
+    "USER": {
+      "count": 0
+    },
+    "--rollback": {
+      "count": 0
+    },
+    "Manual revert of logging change": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 1,
+  "runtime_status": "All runtime checks PASSED."
+}

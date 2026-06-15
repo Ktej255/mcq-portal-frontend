@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-13T19:26:55.502187",
+  "files_to_edit": [
+    "backend/app/services/scoring_engine.py",
+    "backend/app/services/report_service.py"
+  ],
+  "violations": [],
+  "impact_map": {
+    "backend/app/services/scoring_engine.py": {
+      "count": 1
+    },
+    "backend/app/services/report_service.py": {
+      "count": 1
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 2,
+  "runtime_status": "All runtime checks PASSED."
+}

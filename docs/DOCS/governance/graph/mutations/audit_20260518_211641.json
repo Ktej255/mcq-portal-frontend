@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-05-18T21:16:41.106414",
+  "files_to_edit": [
+    "frontend\\src\\components\\dashboard\\StudentTrajectoryCard.tsx",
+    "frontend\\src\\components\\dashboard\\RevisionHistory.tsx",
+    "frontend\\src\\components\\shared\\LanguageSwitcher.tsx",
+    "frontend\\src\\components\\layout\\DashboardSidebar.tsx",
+    "frontend\\src\\components\\dashboard\\EnergyMonitor.tsx",
+    "frontend\\src\\app\\admin\\questions\\page.tsx",
+    "frontend\\src\\app\\admin\\observability\\page.tsx",
+    "frontend\\src\\components\\admin\\observability\\GovernanceGraph.tsx",
+    "frontend\\src\\components\\admin\\AdminMissionControl.tsx",
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md"
+  ],
+  "violations": [],
+  "impact_map": {
+    "frontend\\src\\components\\dashboard\\StudentTrajectoryCard.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\dashboard\\RevisionHistory.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\shared\\LanguageSwitcher.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\layout\\DashboardSidebar.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\dashboard\\EnergyMonitor.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\admin\\questions\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\app\\admin\\observability\\page.tsx": {
+      "count": 1
+    },
+    "frontend\\src\\components\\admin\\observability\\GovernanceGraph.tsx": {
+      "count": 0
+    },
+    "frontend\\src\\components\\admin\\AdminMissionControl.tsx": {
+      "count": 1
+    },
+    "DOCS\\governance\\graph\\SYSTEM_STATE.md": {
+      "count": 0
+    }
+  },
+  "risk_level": "LOW",
+  "total_blast_radius": 8,
+  "runtime_status": "All runtime checks PASSED."
+}
