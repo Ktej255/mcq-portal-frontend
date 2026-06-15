@@ -425,3 +425,100 @@ To keep students in flow state and remove navigation friction:
 3. The viewport automatically transitions to the next queued subtopic in the syllabus path.
 4. If a revision item is due, the view shifts to the revision dashboard, prompting immediate spaced retrieval.
 
+
+---
+
+## 15. Daily Mission Control — Authoritative Student Walkthrough (Founder Brain Dump, 2026-06-15)
+
+> This section consolidates and supersedes the scattered onboarding/loop notes above into a single, ordered, end-to-end spec for the **UPSC Daily Mission Control** experience. The guiding principle is **"command in the student's hand"**: the student drives every step by tapping/clicking; the system reacts. On mobile, taps; on desktop, clicks. The current brain dump is written for the **Intermediate** segment (the reference segment for the pilot).
+
+### 15.1 Guiding Principle
+The student is always in command. Nothing auto-plays the plan *at* the student — the student taps to reveal the next box, the next domain, the next subject. Every action returns a *visible* result.
+
+### 15.2 Sequence Overview
+```
+Welcome Video (done)
+  -> 3-Step Induction (done)
+    -> Subject brief + 3 BASELINE MCQs  [MUST become dynamic, not static]
+      -> "Let's Start the Journey" button
+        -> Full-screen takeover animation
+          -> Interactive Yearly Plan Visualizer (tap box -> arrow -> next box)
+            -> Domains shown: Content -> Communication -> Personality   [PENDING: confirm domain names]
+              -> "Which year is your first attempt?" (2026 / 2027 / 2028)
+              -> "Which month are you starting?" (e.g. Sept / July)
+                -> Background: customized plan generated (pace + 2-3 day buffers after each subject)
+                  -> Subject sequence cards (tap each): duration + WRITTEN justification "why this subject first"
+                    -> Joyful Completion screen (adaptive, student-tuned wording)
+                      -> Enter first subject
+```
+
+### 15.3 Post-Induction Brief + Baseline MCQs
+- After induction, the student receives a **short brief** on the subject/sector.
+- Then **3 baseline MCQs**. **Current state: these are static and must be reworked.** Baseline MCQs should be drawn dynamically based on the student's declared level and target year so the baseline is *measured*, not decorative. (See PENDING DECISION #2 on dynamic strategy: verified-bank selection vs AI generation.)
+
+### 15.4 "Let's Start the Journey" -> Screen Takeover -> Yearly Plan Visualizer
+- A prominent **"Let's Start the Journey"** button triggers a **full-screen takeover animation** (coded, not video).
+- The takeover opens the **Interactive Yearly Plan Visualizer**: animated boxes connected by animated arrows. The student **taps a box, an arrow animates, the next box appears**. (Implementation may be a simple box->arrow->box reveal, or a more creative spatial/timeline visualization — designer's discretion, but it must feel premium and student-driven.)
+- The visualizer communicates the three audit domains we coach toward the UPSC goal: **Content -> Communication -> Personality** (i.e., gaps in *learning*, *understanding*, and *personality*). Messaging: "Here is where we will check and close your gaps to reach your UPSC goal."
+
+### 15.5 Dynamic Plan Generation (Year + Month Driven)
+- The visualizer asks: **first-attempt year** (2026/2027/2028) and **start month**.
+- In the background the system generates a **customized calendar**: how much time to devote and when, scaled by months available (see Section 13 Pacing Guard).
+- **Buffers are mandatory**: 2-3 days after every subject block. Rationale: the longer the runway (e.g., 2026 student targeting 2028), the lower the adherence; buffers absorb health issues, family functions, and other responsibilities, keeping the student on-plan.
+
+### 15.6 Subject Sequence Cards
+- The student taps through subject cards **step by step**. Each card shows: **subject name + duration** (e.g., "Geography: 30 days").
+- Tapping a card reveals a short **written justification** (video later; written content for now) explaining **why this subject is sequenced first/next**, tuned to the months available for *that* student.
+- This sequence is **highly dynamic** and student-specific. On submit, the student's choices update their plan and are highlighted.
+
+### 15.7 Joyful Completion
+- A **celebratory, joyful-color completion screen**: "You've completed the first step of your journey — let's start the UPSC journey!"
+- Psychological wording is **adaptive, not fixed** — tuned by student interaction, not hardcoded.
+
+### 15.8 Subject Room -> Topic -> Subtopic (Intermediate Loop)
+1. Student enters the subject and sees all **major topics** (e.g., *Universe*).
+2. Tapping a major topic opens an **accordion dropdown** of **subtopics**.
+3. Tapping a subtopic opens a **focus window (pop-up)** containing the **active-recall canvas**.
+
+### 15.9 Speak-First Gap Detection
+- The recall canvas shows a **microphone**. The student **speaks** their understanding; speech is transcribed live.
+- On submit, the AI **evaluates the explanation against the Master Content** for that subtopic and computes the **gap**.
+  - **Dependency:** Master Content does not yet exist as gradable content (only a topic list). The master-content ingestion system must be built. See `MASTER_CONTENT_GEOGRAPHY_UNIVERSE.md` for the seeded Universe topic hierarchy (460+ nodes).
+- A **"Fill the Gap"** (Bridge the Gap) button appears.
+
+### 15.10 Fragmented Reveal Repair (Multi-Sensory)
+- "Fill the Gap" opens a **slide/PPT-like deck of only the gap concepts**.
+- **Content is never dumped at once** (multi-sensory engagement): the student taps to reveal the **first half**, then the next portion, then the next — until the slide is complete.
+- The student then taps **Next**, and on the next slide must **speak back** what they just learned. The speak-back is captured and evaluated.
+- A **visual validation progress bar** animates: "You spent 3 minutes -> 10% gap closed." Effort must always produce a visible result.
+- This repeats slide-by-slide until the subtopic gap is fully closed.
+
+### 15.11 Subtopic MCQs + Progression Report
+- On closing the gap, the student gets **subtopic-specific MCQs** (e.g., Dark Matter, 2026-aligned).
+- **MCQ format is strict**: multi-statement items must use proper multi-statement layout (numbered statements + "How many are correct?" style), **never a paragraph blob**.
+- On submit, a **report** is generated showing not just MCQ results but the **command progression**: e.g., "30 minutes ago you were at 10% -> now you are at 60-70% on this topic."
+
+### 15.12 Addictive Auto-Scroll to Next Subtopic
+- Modeled on social-media infinite scroll, but for study: closing the report **auto-scrolls** the student straight into the **next queued subtopic**, removing navigation friction and building a daily study habit/flow state. Over time this conditions the study reflex.
+
+### 15.13 Behavioral Safety Rules for the AI Pop-Up (Critical — must not backfire)
+The "Ask AI Teacher" intervention pop-up is a **feature, not a disruption**. It must never become a barrier:
+- **Ignore short audio**: voice/ambient activity under ~12 seconds is ignored (coughs, sighs, brief talk).
+- **Trigger window**: only sustained voice activity of roughly **15-30 seconds** triggers the intervention.
+- **Emotion/frustration tracking**: when the pop-up appears, detect whether the student is **frustrated** (repeated dismissals, high speech rate, stressed tone). On frustration, the AI **backs off**, reduces checkpoint frequency, and shows a comforting micro-message.
+- **Silent behavioral logging**: the triggering words and emotional markers are logged silently (behavioral profile) to refine future coaching. This is a behavioral-data feature and must be treated as privacy-sensitive (see Me-Time opt-out rules).
+
+### 15.14 Pricing (Reconciliation Note)
+The implemented product now uses a **4-tier model** — Foundation ₹399, Plus ₹699, Pro ₹999, Ultimate ₹1299/mo — with compounding annual discounts (15% / 25% / 35% for 1/2/3 years), defaulting new students to **Foundation**. This supersedes the single ₹399 plan in Section 6 *if confirmed* (see PENDING DECISION #7).
+
+---
+
+## 16. Pending Decisions (Open — do NOT implement assumptions until resolved)
+
+1. ~~**Segments — 3 or 4?**~~ **RESOLVED (2026-06-15):** There are exactly **3 learner LEVELS** — Beginner / Intermediate / Advanced — and **4 PRICING TIERS** — Foundation / Plus / Pro / Ultimate. The "4" referred to pricing, not learner segments.
+2. **Baseline MCQ dynamism** — verified-bank selection (recommended for a measurable baseline) vs AI generation.
+3. **Master Content authoring** — build ingestion system for human-authored content vs AI-drafted-then-verified content. The 460-topic Universe list is a table of contents, not gradable content.
+4. **AI cost/latency ceiling** — target cost-per-student-per-month for the multi-call speak/grade/repair/speak-back loop; caching + model-tier strategy.
+5. **Camera attention monitoring** — defer to voice/idle signals for pilot (recommended) vs build camera gaze now.
+6. **Domain naming** — "Content -> Communication -> Personality" (latest) vs "Learning -> Understanding -> Personality" (Section 7). Lock one.
+7. ~~**Pricing canonical**~~ **RESOLVED (2026-06-15):** The **4-tier model is canonical** — Foundation ₹399 / Plus ₹699 / Pro ₹999 / Ultimate ₹1299 per month, with compounding annual discounts (15% / 25% / 35% for 1 / 2 / 3 years), defaulting new students to Foundation. This supersedes the single ₹399 plan in Section 6.
