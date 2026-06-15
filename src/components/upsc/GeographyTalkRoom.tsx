@@ -1178,7 +1178,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
               >
                 {talkLevelCopy.modeLabel}
               </p>
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#5d675f]/5 rounded px-1 -mx-1" title="Hover to reveal full details">
+              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
                 {talkLevelCopy.panelDetail}
               </p>
             </div>
@@ -1196,7 +1196,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                       <h2 className="mt-2 text-xl font-black tracking-tight">
                         {talkLevelCopy.question}
                       </h2>
-                      <p className="mt-3 text-base font-black leading-7 text-[#13251d] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#13251d]/5 rounded px-1 -mx-1" title="Hover to reveal full prompt">{activeSession.talk}</p>
+                      <p className="mt-3 text-base font-bold leading-7 text-[#13251d]">{activeSession.talk}</p>
                       {activeModule && activeModuleSection ? (
                         <div
                           data-testid="geography-talk-module-cumulative-prompt"
@@ -1208,19 +1208,19 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#085041]">
                             Module recall rule
                           </p>
-                          <p className="mt-1 text-sm font-bold leading-5 text-[#34453b] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#34453b]/5 rounded px-1 -mx-1" title="Hover to reveal all slides">
+                          <p className="mt-1 text-sm font-bold leading-5 text-[#34453b]">
                             Recall slides 1-{activeModuleSectionIds.length}:{" "}
                             {activeModuleSections.map((section) => section.title).join(", ")}.
                           </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-[#657066] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#657066]/5 rounded px-1 -mx-1">
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#657066]">
                             If an earlier slide is skipped, the next slide stays locked.
                           </p>
                         </div>
                       ) : null}
-                      <p data-testid="talk-level-teacher-hint" className="mt-3 text-sm font-semibold leading-6 text-[#49675e] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#49675e]/5 rounded px-1 -mx-1" title="Hover to reveal hint">
+                      <p data-testid="talk-level-teacher-hint" className="mt-3 text-sm font-semibold leading-6 text-[#49675e]">
                         {talkLevelCopy.teacherHint}
                       </p>
-                      <p data-testid="talk-level-repair-frame" className="mt-2 text-xs font-bold leading-5 text-[#657066] line-clamp-1 hover:line-clamp-none transition-all duration-300 cursor-pointer hover:bg-[#657066]/5 rounded px-1 -mx-1">
+                      <p data-testid="talk-level-repair-frame" className="mt-2 text-xs font-bold leading-5 text-[#657066]">
                         {talkLevelCopy.repairFrame}
                       </p>
                     </div>
