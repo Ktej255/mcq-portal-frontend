@@ -1356,7 +1356,7 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
             </div>
             </div>
 
-            <section
+            <details
               data-testid="talk-four-signal-grid"
               data-signal-count="4"
               data-flow-state={talkState}
@@ -1364,8 +1364,12 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
               data-visible-recall-score={visibleRecallScore}
               data-next-action-route={primaryActionHref}
               data-next-action-label={primaryActionLabel}
-              className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-2"
             >
+              <summary className="cursor-pointer list-none rounded-md bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] text-[#5d675f]">
+                At a glance: question, recall gap, repair focus, next route
+              </summary>
+              <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div
                 data-testid="talk-signal-teacher-question"
                 data-signal="teacher-question"
@@ -1446,7 +1450,8 @@ export function GeographyTalkRoom({ initialDay, initialModuleId, initialSectionI
                   </p>
                 </div>
               )}
-            </section>
+              </div>
+            </details>
 
             <details
               data-testid="talk-recall-loop-strip"
