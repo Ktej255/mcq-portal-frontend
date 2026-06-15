@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity,
   BadgeIndianRupee,
@@ -29,10 +29,10 @@ import {
 } from 'lucide-react';
 
 const studentNavItems = [
-  { name: 'Today', href: '/upsc/daily-command?tab=today', icon: CalendarCheck },
-  { name: 'Gaps', href: '/upsc/daily-command?tab=gaps', icon: Target },
-  { name: 'Revise', href: '/upsc/daily-command?tab=revision', icon: RefreshCcw },
-  { name: 'Progress', href: '/upsc/daily-command?tab=history', icon: BarChart3 },
+  { name: 'Today', href: '/upsc', icon: CalendarCheck },
+  { name: 'Gaps', href: '/reports', icon: Target },
+  { name: 'Revise', href: '/revision', icon: RefreshCcw },
+  { name: 'Progress', href: '/history', icon: BarChart3 },
 ];
 
 const adminNavItems = [
@@ -68,11 +68,9 @@ interface SidebarProps {
 export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const currentSearchParams = useSearchParams();
   const { user, logout } = useAuth();
   const hasMasterAccess = isAdmin || isMasterEmail(user?.email) || isLocalMockMasterSession();
   const navItems = hasMasterAccess ? adminNavItems : studentNavItems;
-  const currentTab = currentSearchParams.get('tab');
 
   const openMasterPass = () => {
     activateUpscMasterPass(user?.email, { notify: true });
@@ -111,23 +109,12 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
             <p className="mb-4 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-[#7b7469]">Study</p>
             <nav className="space-y-1">
               {navItems.map((item) => {
-                // For student nav: all items share /upsc/daily-command, differentiate by ?tab= param
-                const itemUrl = new URL(item.href, 'http://x');
-                const itemTab = itemUrl.searchParams.get('tab');
-                const itemPath = itemUrl.pathname;
-                let isActive: boolean;
-                if (itemTab) {
-                  // Exact tab match on the daily-command page
-                  const onDailyCommand = pathname === itemPath || pathname.startsWith('/upsc');
-                  if (itemTab === 'today') {
-                    // "Today" is active when: exact tab=today, no tab param on daily-command, or any /upsc sub-page
-                    isActive = onDailyCommand && (!currentTab || currentTab === 'today');
-                  } else {
-                    isActive = onDailyCommand && currentTab === itemTab;
-                  }
-                } else {
-                  isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                }
+                // "Today" (/upsc) stays highlighted across all study sub-pages.
+                // Every other destination matches its own route exactly (or nested children).
+                const isActive =
+                  item.href === '/upsc'
+                    ? pathname === '/upsc' || pathname.startsWith('/upsc/')
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link 
                     key={item.name} 
