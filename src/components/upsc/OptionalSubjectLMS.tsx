@@ -25,10 +25,13 @@ import {
   geographyGapAreas,
   geographyPyqYears,
   geographyResources,
+  geographyTrendByYear,
   geographyTrendWindows,
   getGeographyPapers,
   practiceLevels,
+  trendTypeColors,
 } from "@/lib/upsc/optionalGeographyLms";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 type LmsTab = "learn" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
 
@@ -60,6 +63,8 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
   const [pyqPaper, setPyqPaper] = useState<"Paper I" | "Paper II">("Paper I");
   const [openYear, setOpenYear] = useState<number | null>(geographyPyqYears[0]?.year ?? null);
   const [practiceTopic, setPracticeTopic] = useState<string | null>(null);
+  const [trendYear, setTrendYear] = useState<number>(geographyTrendByYear[0]?.year ?? 0);
+  const trendData = geographyTrendByYear.find((t) => t.year === trendYear)?.distribution ?? [];
 
   const activePaper = papers[paperIndex];
   const activeModule = activePaper?.modules.find((m) => m.id === active?.mi);
@@ -307,14 +312,40 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
             <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Trend analysis</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">How the paper is evolving</h2>
-            </div>
-            {geographyTrendWindows.map((row) => (
-              <div key={row.window} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{row.window}</p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-[#34453b]">{row.insight}</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Click a year to see its question-type mix (direct vs conceptual vs applied).</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {geographyTrendByYear.map((t) => (
+                  <button key={t.year} type="button" onClick={() => setTrendYear(t.year)}
+                    className={`rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition ${trendYear === t.year ? "bg-[#1a3a2a] text-white" : "border border-[#dcd5c7] bg-white text-[#31443a] hover:border-[#1d9e75]"}`}>
+                    {t.year}
+                  </button>
+                ))}
               </div>
-            ))}
-            <p className="text-[11px] font-semibold leading-5 text-[#8a8174]">Per-topic 15-year question counts and direct→conceptual→applied shift appear on each topic&apos;s Read page.</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{trendYear} question mix</p>
+                <div className="mt-2 h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={trendData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={3} animationDuration={700}>
+                        {trendData.map((d) => <Cell key={d.name} fill={trendTypeColors[d.name] ?? "#1d9e75"} />)}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {geographyTrendWindows.map((row) => (
+                  <div key={row.window} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{row.window}</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-[#34453b]">{row.insight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

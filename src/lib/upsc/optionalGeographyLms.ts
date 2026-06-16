@@ -115,13 +115,45 @@ export function getPyqQuestion(id: string): PyqQuestion | null {
 }
 
 
-// ─── AI evaluation tiers (consume credits; pick model in the background) ───
-export type EvaluationLevel = { id: string; label: string; credits: number; model: string; note: string };
+// ─── AI evaluation tiers — shown by NUMBER OF PARAMETERS checked (not credits/model) ───
+export type EvaluationLevel = { id: string; label: string; parameterCount: number; note: string; parameters: string[] };
 export const evaluationLevels: EvaluationLevel[] = [
-  { id: "easy", label: "Easy", credits: 5, model: "fast", note: "Quick structure + keyword check." },
-  { id: "medium", label: "Medium", credits: 10, model: "balanced", note: "Structure, content depth, and gaps." },
-  { id: "tough", label: "Tough", credits: 20, model: "advanced", note: "Strict examiner-style critique with model linkages." },
-  { id: "upsc", label: "UPSC-like", credits: 35, model: "premium", note: "Full UPSC rubric: concept, structure, language, diagrams, value-addition." },
+  {
+    id: "easy",
+    label: "Easy",
+    parameterCount: 5,
+    note: "Quick check on the essentials.",
+    parameters: ["Intro-body-conclusion structure", "Keyword coverage", "Directive compliance (discuss/examine)", "Word limit adherence", "Legibility"],
+  },
+  {
+    id: "medium",
+    label: "Medium",
+    parameterCount: 11,
+    note: "Adds content depth, examples and gaps.",
+    parameters: ["All Easy parameters", "Concept accuracy", "Examples / case studies", "Diagram presence", "Syllabus linkage", "Balance of view", "Redundant-word detection"],
+  },
+  {
+    id: "tough",
+    label: "Tough",
+    parameterCount: 20,
+    note: "Strict examiner-style critique.",
+    parameters: ["All Medium parameters", "Scholar / model citation", "Inter-linkage of dimensions", "Map accuracy", "Data & facts recency", "Flow & coherence", "Marks-per-segment breakdown"],
+  },
+  {
+    id: "upsc",
+    label: "UPSC-like",
+    parameterCount: 35,
+    note: "Full UPSC rubric, marks-oriented.",
+    parameters: ["All Tough parameters", "Examiner empathy & lift-value", "Value-addition / way-forward", "Answer-to-demand precision", "Diagram quality & labelling", "Time-pressure realism", "Predicted score band"],
+  },
+];
+
+// Per-year PYQ question-type distribution (for the animated Trends charts).
+export const trendTypeColors: Record<string, string> = { Direct: "#1d9e75", Conceptual: "#1a3a2a", Applied: "#ef9f27" };
+export const geographyTrendByYear: Array<{ year: number; distribution: Array<{ name: string; value: number }> }> = [
+  { year: 2023, distribution: [{ name: "Direct", value: 3 }, { name: "Conceptual", value: 5 }, { name: "Applied", value: 6 }] },
+  { year: 2022, distribution: [{ name: "Direct", value: 4 }, { name: "Conceptual", value: 6 }, { name: "Applied", value: 4 }] },
+  { year: 2021, distribution: [{ name: "Direct", value: 6 }, { name: "Conceptual", value: 5 }, { name: "Applied", value: 3 }] },
 ];
 
 // ─── Subjective practice (UPSC is descriptive, NOT MCQ) ───
