@@ -32,6 +32,7 @@ import {
   trendTypeColors,
 } from "@/lib/upsc/optionalGeographyLms";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { GeographyMapRoom } from "@/components/upsc/GeographyMapRoom";
 
 type LmsTab = "learn" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
 
@@ -277,35 +278,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
         )}
 
 
-        {tab === "maps" && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Geography edge</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">Maps & Diagrams</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Map work and diagrams are the highest-scoring edge in Geography optional. This space will hold map practice and topic-wise diagrams (including AI-generated handwritten / 3D diagrams).</p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Mapping practice</p>
-                <ul className="mt-2 space-y-1.5 text-sm font-semibold leading-6 text-[#34453b]">
-                  {["World physical & political marking", "India relief, drainage & climate", "Resource & industrial belts", "Geopolitical hotspots & corridors"].map((t) => (
-                    <li key={t} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#1d9e75]" />{t}</li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[11px] font-semibold text-[#8a8174]">Interactive map drills attach here.</p>
-              </div>
-              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Diagram bank</p>
-                <ul className="mt-2 space-y-1.5 text-sm font-semibold leading-6 text-[#34453b]">
-                  {["Geomorphic cycle & landforms", "Atmospheric circulation & monsoon", "Ocean currents & salinity", "Settlement & central place models"].map((t) => (
-                    <li key={t} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#1d9e75]" />{t}</li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[11px] font-semibold text-[#8a8174]">AI-generated handwritten / 3D diagrams planned here.</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {tab === "maps" && <GeographyMapRoom />}
 
         {tab === "trends" && (
           <div className="space-y-3">
