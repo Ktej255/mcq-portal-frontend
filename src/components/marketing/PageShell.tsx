@@ -41,7 +41,7 @@ export function PageHero({
 export function StartFreeCta({ label = "Start free — no card" }: { label?: string }) {
   return (
     <Link
-      href="/login?redirect=/upsc"
+      href="/start"
       className="inline-flex h-12 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
     >
       {label}

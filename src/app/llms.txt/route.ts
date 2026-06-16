@@ -17,6 +17,7 @@ export function GET() {
     "",
     "## Core pages",
     `- [Home](${SITE_URL}/): The connected daily loop (Watch, Talk, Visual Lab, MCQ, Track, Revisit) and how it works.`,
+    `- [Get started](${SITE_URL}/start): A free 2-minute diagnostic that builds a personalized UPSC starting plan.`,
     `- [Features](${SITE_URL}/features): Personalized plan, ask-the-teacher AI, weakness map, spaced revision, PYQs, Mains answer evaluation.`,
     `- [Pricing](${SITE_URL}/pricing): Free plan vs Pro membership; what each unlocks.`,
     `- [Free PYQs](${SITE_URL}/pyqs): UPSC Prelims & Mains previous year questions, year-wise and subject-wise, free.`,

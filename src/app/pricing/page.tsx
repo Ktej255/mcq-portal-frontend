@@ -76,7 +76,7 @@ export default function PricingPage() {
               ))}
             </ul>
             <Link
-              href="/login?redirect=/upsc"
+              href="/start"
               className="mt-6 inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-5 text-sm font-black text-[#1a3a2a] transition hover:bg-[#1a3a2a] hover:text-white"
             >
               Start free

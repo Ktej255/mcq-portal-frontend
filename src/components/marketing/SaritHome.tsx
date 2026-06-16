@@ -227,7 +227,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
 
           <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/login?redirect=/upsc"
+              href="/start"
               className="inline-flex h-12 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
               Start free — no card
@@ -624,7 +624,7 @@ function PricingSection() {
               ))}
             </ul>
             <Link
-              href="/login?redirect=/upsc"
+              href="/start"
               className="mt-6 inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-5 text-sm font-black text-[#1a3a2a] transition hover:bg-[#1a3a2a] hover:text-white"
             >
               Start free
@@ -802,7 +802,7 @@ function FinalCta() {
           Take the 2-minute diagnostic and get a personalized plan today — free.
         </p>
         <Link
-          href="/login?redirect=/upsc"
+          href="/start"
           className="mt-8 inline-flex h-12 items-center justify-center rounded-md bg-[#ef9f27] px-7 text-sm font-black text-[#3a2706] transition hover:bg-[#f4b04b]"
         >
           Start free

@@ -50,7 +50,7 @@ export function SiteNav() {
             Log in
           </Link>
           <Link
-            href="/login?redirect=/upsc"
+            href="/start"
             className="inline-flex h-10 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
           >
             Start free
@@ -87,7 +87,7 @@ export function SiteNav() {
                 </Link>
               ))}
               <Link
-                href="/login?redirect=/upsc"
+                href="/start"
                 className="mt-2 inline-flex h-10 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
               >
                 Start free
