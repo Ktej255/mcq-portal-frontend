@@ -56,3 +56,13 @@ See `INTEGRATION.md` (backend repo) for the full API/CORS/auth contract.
 
 Deployment is owned by the project's Vercel/Supabase setup (or the designated
 deployment agent). This repository is ready; no code changes are required to deploy.
+
+
+## Analytics (optional, env-gated)
+
+Set these in Vercel to enable analytics (the app loads them only when present):
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_GA_ID` | Google Analytics 4 measurement ID (e.g. `G-XXXXXXX`) — loads gtag |
+| `NEXT_PUBLIC_GSC_VERIFICATION` | Google Search Console `google-site-verification` token (adds the meta tag) |

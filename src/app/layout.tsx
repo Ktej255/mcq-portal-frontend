@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { SITE_URL, organizationSchema, websiteSchema } from "@/lib/seo";
+import { Analytics } from "@/components/analytics/Analytics";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +27,9 @@ export const metadata: Metadata = {
   description:
     "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
   alternates: { canonical: "/", types: { "text/plain": "/llms.txt" } },
+  ...(process.env.NEXT_PUBLIC_GSC_VERIFICATION
+    ? { verification: { google: process.env.NEXT_PUBLIC_GSC_VERIFICATION } }
+    : {}),
 };
 
 export const viewport: Viewport = {
@@ -69,6 +73,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationSchema} />
         <JsonLd data={websiteSchema} />
+        <Analytics />
         {content}
       </body>
     </html>
