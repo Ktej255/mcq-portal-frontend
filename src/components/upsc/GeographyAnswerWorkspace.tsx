@@ -6,8 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Highlighter, MessageCircle, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
 
 import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
+import { evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
 
-const FILLERS = ["basically", "actually", "in order to", "very", "really", "just", "the fact that", "needless to say", "it is important to note"];
 const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
 export function GeographyAnswerWorkspace() {
@@ -28,11 +28,13 @@ export function GeographyAnswerWorkspace() {
   const [evalSource, setEvalSource] = useState<"typed" | "pdf" | null>(null);
   const [saved, setSaved] = useState(false);
   const [doubtOpen, setDoubtOpen] = useState(false);
+  const [report, setReport] = useState<EvaluationResult | null>(null);
+  const [discussPrompt, setDiscussPrompt] = useState(false);
 
   const selectedEval = useMemo(() => evaluationLevels.find((e) => e.id === evalId), [evalId]);
+  const expectedWords = (level ?? "").toLowerCase().includes("easy") ? 150 : 250;
   const typed = `${parts.Introduction} ${parts.Body} ${parts.Conclusion}`.trim();
   const hasTyped = typed.length > 20;
-  const fillers = useMemo(() => FILLERS.filter((f) => typed.toLowerCase().includes(f)), [typed]);
 
   const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -42,7 +44,14 @@ export function GeographyAnswerWorkspace() {
     setEvalSource(source);
     setEvalState("evaluating");
     setSaved(false);
-    window.setTimeout(() => setEvalState("done"), 1500);
+    setReport(null);
+    window.setTimeout(() => {
+      if (source === "typed") {
+        setReport(evaluateAnswer({ question: questionText, parts, parameters: selectedEval?.parameters ?? [], expectedWords }));
+      }
+      setEvalState("done");
+      setDiscussPrompt(true);
+    }, 1200);
   };
 
 
@@ -146,67 +155,83 @@ export function GeographyAnswerWorkspace() {
               Evaluation report · {selectedEval?.label} · {selectedEval?.parameterCount} parameters · {evalSource === "pdf" ? "uploaded copy" : "typed answer"}
             </p>
 
-            {evalSource === "typed" && (
+            {evalSource === "pdf" ? (
+              <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
+                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Uploaded copy — OCR pending</p>
+                <p className="mt-2 text-xs font-semibold leading-6 text-[#34453b]">Content-aware scoring of a handwritten copy needs OCR (digitising your writing), which connects to the backend. Until then, use the <span className="font-black">typed answer</span> above for a real, parameter-wise evaluation.</p>
+                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} — queued for OCR + copy-marking.</p>
+              </div>
+            ) : report ? (
               <>
-                <div className="mt-3 rounded-lg border border-[#e7e0d2] bg-[#fdfaf3] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a8174]">Your answer</p>
-                  {(["Introduction", "Body", "Conclusion"] as const).map((k) => parts[k].trim() && (
-                    <p key={k} className="mt-1.5 text-xs font-semibold leading-6 text-[#34453b]"><span className="font-black text-[#085041]">{k} ({wordCount(parts[k])}w): </span>{parts[k]}</p>
-                  ))}
+                {/* Verdict banner — colour reflects real status */}
+                <div className={`mt-3 rounded-lg border p-3 ${report.status === "strong" || report.status === "ontrack" ? "border-[#b9d9cd] bg-[#e7f5ee]" : report.status === "weak" ? "border-[#ef9f27]/50 bg-[#fff4df]" : "border-[#f0c5b8] bg-[#fff1ed]"}`}>
+                  <p className={`text-sm font-black leading-6 ${report.status === "strong" || report.status === "ontrack" ? "text-[#085041]" : report.status === "weak" ? "text-[#6f4a12]" : "text-[#7d3827]"}`}>{report.verdict}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.1em]">
+                    <span className="rounded bg-white px-2 py-1 text-[#13251d]">Overall {report.overall}/100</span>
+                    <span className="rounded bg-white px-2 py-1 text-[#13251d]">Question relevance {report.relevance}%</span>
+                    <span className="rounded bg-white px-2 py-1 text-[#13251d]">Band {report.marksBand}</span>
+                  </div>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {(["Introduction", "Body", "Conclusion"] as const).map((k) => (
-                    <div key={k} className="rounded-md border border-[#dcd5c7] bg-white p-2 text-center">
+
+                {/* Word stats */}
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {[["Intro", report.wordStats.intro], ["Body", report.wordStats.body], ["Concl.", report.wordStats.conclusion], ["Total", report.wordStats.total]].map(([k, v]) => (
+                    <div key={String(k)} className="rounded-md border border-[#dcd5c7] bg-white p-2 text-center">
                       <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">{k}</p>
-                      <p className="text-lg font-black text-[#13251d]">{wordCount(parts[k])}</p>
-                      <p className="text-[9px] font-bold text-[#8a8174]">words</p>
+                      <p className="text-lg font-black text-[#13251d]">{v}</p>
                     </div>
                   ))}
                 </div>
+                <p className="mt-1 text-[10px] font-bold text-[#8a8174]">Expected ~{report.wordStats.expected} words.</p>
+
+                {/* Keyword coverage — proves it read your content */}
                 <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
-                  <p className="text-xs font-black text-[#13251d]">Redundant words (removable without changing meaning)</p>
-                  {fillers.length ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">{fillers.map((f) => <span key={f} className="rounded bg-[#fff1ed] px-2 py-1 text-[10px] font-black text-[#7d3827] line-through">{f}</span>)}</div>
-                  ) : <p className="mt-1 text-xs font-semibold text-[#5d675f]">No obvious filler detected.</p>}
+                  <p className="text-xs font-black text-[#13251d]">Question coverage</p>
+                  {report.matchedKeywords.length > 0 && (
+                    <div className="mt-1.5"><span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">Addressed: </span>{report.matchedKeywords.map((k) => <span key={k} className="mr-1 inline-block rounded bg-[#e7f5ee] px-1.5 py-0.5 text-[10px] font-bold text-[#085041]">{k}</span>)}</div>
+                  )}
+                  {report.missingKeywords.length > 0 && (
+                    <div className="mt-1.5"><span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#7d3827]">Missing from your answer: </span>{report.missingKeywords.map((k) => <span key={k} className="mr-1 inline-block rounded bg-[#fff1ed] px-1.5 py-0.5 text-[10px] font-bold text-[#7d3827]">{k}</span>)}</div>
+                  )}
+                  {report.redundant.length > 0 && (
+                    <div className="mt-1.5"><span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#8a8174]">Redundant (removable): </span>{report.redundant.map((f) => <span key={f} className="mr-1 inline-block rounded bg-[#f7f4ee] px-1.5 py-0.5 text-[10px] font-bold text-[#8a8174] line-through">{f}</span>)}</div>
+                  )}
                 </div>
+
+                {/* Parameter-wise — REAL per-parameter scores + feedback */}
+                <div className="mt-3 space-y-1.5">
+                  <p className="text-xs font-black text-[#13251d]">Parameter-wise assessment ({report.params.length} checked)</p>
+                  {report.params.map((p) => (
+                    <div key={p.label} className="rounded-md border border-[#e7e0d2] bg-white p-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-black leading-5 text-[#34453b]">{p.label}</span>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-black ${p.score >= 7 ? "bg-[#e7f5ee] text-[#085041]" : p.score >= 4 ? "bg-[#fff4df] text-[#6f4a12]" : "bg-[#fff1ed] text-[#7d3827]"}`}>{p.score}/{p.max}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] font-semibold leading-5 text-[#66736b]">{p.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <button type="button" onClick={() => setSaved(true)} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-xs font-black uppercase tracking-[0.12em] text-white">
+                  <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save to profile, gap & progress"}
+                </button>
+                {saved && <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#085041]"><CheckCircle2 className="h-3.5 w-3.5" /> Recorded in analytics, gap page and reports.</p>}
               </>
-            )}
-
-            {evalSource === "pdf" && (
-              <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
-                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Marked copy (digitised)</p>
-                <p className="mt-2 text-xs font-semibold leading-6 text-[#34453b]">
-                  Your introduction is <span className="underline decoration-[#be4444] decoration-2">too generic</span>; the body needs a <span className="rounded-full px-1 ring-2 ring-[#be4444]">diagram</span>; the conclusion is <span className="bg-[#fff4df]">missing a way-forward</span>.
-                </p>
-                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} — auto-marked. Full annotated copy renders here once OCR + marking is wired.</p>
-              </div>
-            )}
-
-            <div className="mt-3 space-y-1.5">
-              <p className="text-xs font-black text-[#13251d]">Parameter-wise assessment (sample)</p>
-              {(selectedEval?.parameters.slice(0, 6) ?? []).map((p, i) => {
-                const score = [7, 6, 8, 5, 6, 7][i % 6];
-                return (
-                  <div key={p} className="flex items-center justify-between gap-3 rounded-md border border-[#e7e0d2] bg-white p-2.5">
-                    <span className="text-xs font-semibold leading-5 text-[#34453b]">{p}</span>
-                    <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-black ${score >= 7 ? "bg-[#e7f5ee] text-[#085041]" : "bg-[#fff4df] text-[#6f4a12]"}`}>{score}/10</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-3 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3 text-xs font-semibold leading-6 text-[#34453b]">
-              <p><span className="font-black text-[#085041]">Lift suggestion:</span> Add a one-line definition + data point in the intro and a labelled diagram in the body for +2 marks.</p>
-              <p className="mt-1"><span className="font-black text-[#085041]">Predicted band:</span> 9-11 / 15 at current quality.</p>
-            </div>
-
-            <button type="button" onClick={() => setSaved(true)} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-xs font-black uppercase tracking-[0.12em] text-white">
-              <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save to profile, gap & progress"}
-            </button>
-            {saved && <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#085041]"><CheckCircle2 className="h-3.5 w-3.5" /> Recorded in analytics, gap page and reports.</p>}
+            ) : null}
           </section>
         )}
       </div>
+
+      {discussPrompt && !doubtOpen && (
+        <div className="fixed bottom-24 right-5 z-40 w-[18rem] max-w-[calc(100vw-2.5rem)] rounded-xl border border-[#1d9e75] bg-[#fffdf8] p-3 shadow-2xl">
+          <p className="text-xs font-black text-[#13251d]">Your report is ready.</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[#5d675f]">Want to discuss what it means and how to improve your score?</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => { setDoubtOpen(true); setDiscussPrompt(false); }} className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-md bg-[#1a3a2a] text-[10px] font-black uppercase tracking-[0.1em] text-white"><Sparkles className="h-3 w-3" /> Discuss report</button>
+            <button type="button" onClick={() => setDiscussPrompt(false)} className="inline-flex h-8 items-center justify-center rounded-md border border-[#dcd5c7] px-2 text-[10px] font-black uppercase text-[#5d675f]">Later</button>
+          </div>
+        </div>
+      )}
 
       {doubtOpen ? (
         <div className="fixed bottom-5 right-5 z-40 w-[20rem] max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-xl border border-[#dcd5c7] bg-[#fffdf8] shadow-2xl">
