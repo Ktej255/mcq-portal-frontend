@@ -128,3 +128,44 @@
     @apply font-sans;
   }
 }
+
+
+/* ===========================================================
+   Sarit Learn — UPSC brand tokens (marketing site)
+   =========================================================== */
+:root {
+  --sl-paper: #f7f4ee;       /* warm cream background */
+  --sl-surface: #fffdf8;     /* off-white card */
+  --sl-ink: #13251d;         /* near-black green heading */
+  --sl-body: #536259;        /* muted slate-green text */
+  --sl-primary: #1a3a2a;     /* deep forest green */
+  --sl-primary-hover: #10291d;
+  --sl-emerald: #1d9e75;     /* accent / success */
+  --sl-emerald-deep: #085041;
+  --sl-mint: #e7f5ee;        /* accent surface */
+  --sl-saffron: #ef9f27;     /* signal / India cue */
+  --sl-saffron-deep: #8c5d14;
+  --sl-border: #dcd5c7;      /* warm sand border */
+  --sl-border-mint: #bfd7cf;
+  --sl-sky: #d8edf7;         /* soft info pop */
+}
+
+@keyframes sl-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes sl-dash {
+  to { stroke-dashoffset: 0; }
+}
+
+.sl-grad-text {
+  background: linear-gradient(92deg, #1a3a2a 0%, #1d9e75 60%, #8c5d14 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-float { animation: none !important; }
+}

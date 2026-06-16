@@ -1,5 +1,5 @@
-import { UpscProductEntry } from "@/components/marketing/UpscProductEntry";
+import { SaritHome } from "@/components/marketing/SaritHome";
 
 export default function Home() {
-  return <UpscProductEntry />;
+  return <SaritHome />;
 }
