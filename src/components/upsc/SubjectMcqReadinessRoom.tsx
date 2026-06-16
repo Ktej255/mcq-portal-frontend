@@ -24,6 +24,9 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { SubjectLoopActions } from "@/components/upsc/SubjectLoopActions";
+import { McqUsageMeter } from "@/components/upsc/McqUsageMeter";
+import { McqUsageNudge } from "@/components/upsc/McqUsageNudge";
+import { recordMcqUsage } from "@/lib/upsc/dailyUsage";
 import { getDisasterManagementMcqTemplateHints } from "@/lib/upsc/disasterManagementLearningDecks";
 import { getEconomyMcqTemplateHints } from "@/lib/upsc/economyLearningDecks";
 import { getHistoryMcqTemplateHints } from "@/lib/upsc/historyLearningDecks";
@@ -556,6 +559,7 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
   const startLocalPractice = () => {
     if (!canStartPractice) return;
     setPracticeStarted(true);
+    recordMcqUsage(localBatchQuestions.length);
     const firstUnansweredIndex = localBatchQuestions.findIndex((_, index) => !practiceAnswers[index]);
     const nextIndex = firstUnansweredIndex >= 0 ? firstUnansweredIndex : 0;
     setCurrentPracticeIndex(nextIndex);
@@ -749,6 +753,8 @@ export function SubjectMcqReadinessRoom({ plan, initialDay }: { plan: SubjectSpr
       className="min-h-screen bg-[var(--subject-bg)] text-[var(--subject-text)]"
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
+        <McqUsageMeter />
+        <McqUsageNudge />
         <section data-testid="mcq-simple-step" className="rounded-lg border border-[var(--subject-border)] bg-[var(--subject-card)] p-5 shadow-sm md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
