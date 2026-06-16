@@ -12,6 +12,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { GeographyRoomCompass } from "@/components/upsc/GeographyRoomCompass";
+import { recordMcqUsage } from "@/lib/upsc/dailyUsage";
 import { GEOGRAPHY_DAY1_MINIMUM_FRESH_MCQ_COUNT } from "@/lib/upsc/geographyLaunchReadiness";
 import { hasGeographyTalkClearance } from "@/lib/upsc/geographyLoopState";
 import { GEOGRAPHY_RECALL_TARGET, getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
@@ -568,7 +569,10 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
                   <button
                     type="button"
                     data-testid="mcq-start-local-practice"
-                    onClick={() => setPracticeStarted(true)}
+                    onClick={() => {
+                      recordMcqUsage(freshQuestions.length || plannedQuestionCount);
+                      setPracticeStarted(true);
+                    }}
                     className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
                   >
                     Start practice <ArrowRight className="ml-2 h-4 w-4" />
