@@ -69,6 +69,7 @@ export const footerColumns: { heading: string; links: { label: string; href: str
     heading: "Company",
     links: [
       { label: "About", href: "/about" },
+      { label: "How we measure", href: "/methodology" },
       { label: "Contact", href: "/contact" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },

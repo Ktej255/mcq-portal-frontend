@@ -27,6 +27,7 @@ export function GET() {
     `- [Study resources](${SITE_URL}/resources): NCERT booklist, standard references, current affairs, mind maps, Mains frameworks.`,
     `- [Subjects](${SITE_URL}/subjects): All General Studies and Optional subjects.`,
     `- [Guides](${SITE_URL}/guides): Practical UPSC guides on starting prep, the syllabus, books, current affairs and Prelims strategy.`,
+    `- [How we measure coverage](${SITE_URL}/methodology): Our transparent method for measuring and reporting exam coverage.`,
     "",
     "## Subjects",
     ...subjects.map((s) => `- [${s.name}](${SITE_URL}/subjects/${s.slug}): ${s.tagline}`),

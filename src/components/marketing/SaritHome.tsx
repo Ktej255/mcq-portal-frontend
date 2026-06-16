@@ -493,6 +493,15 @@ function TransparencySection({ reduce }: { reduce: boolean | null }) {
               See the question-by-question breakdown
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
+            <div className="mt-2">
+              <Link
+                href="/methodology"
+                className="inline-flex items-center text-sm font-bold text-[#536259] underline-offset-4 hover:text-[#13251d] hover:underline"
+              >
+                How we measure coverage
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </motion.div>
       </div>

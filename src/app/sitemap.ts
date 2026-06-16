@@ -19,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/tests",
     "/resources",
     "/guides",
+    "/methodology",
     "/about",
     "/contact",
     "/privacy",
