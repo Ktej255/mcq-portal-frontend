@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   description:
     "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
   alternates: { canonical: "/", types: { "text/plain": "/llms.txt" } },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1a3a2a",
 };
 
 export default function RootLayout({
