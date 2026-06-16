@@ -1,4 +1,5 @@
 import { UpscMcqCommandCenter } from "@/components/upsc/UpscMcqCommandCenter";
+import { McqUsageNudge } from "@/components/upsc/McqUsageNudge";
 
 type UpscMcqCommandPageProps = {
   searchParams?: Promise<{
@@ -12,9 +13,12 @@ export default async function UpscMcqCommandPage({ searchParams }: UpscMcqComman
   const day = Number(params?.day);
 
   return (
-    <UpscMcqCommandCenter
-      initialSubjectSlug={params?.subject}
-      initialDay={Number.isFinite(day) ? day : undefined}
-    />
+    <>
+      <McqUsageNudge />
+      <UpscMcqCommandCenter
+        initialSubjectSlug={params?.subject}
+        initialDay={Number.isFinite(day) ? day : undefined}
+      />
+    </>
   );
 }

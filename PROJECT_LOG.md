@@ -117,3 +117,12 @@ machine routes: `/llms.txt`, `/llms-full.txt`, `/sitemap.xml`, `/robots.txt`, `/
 - Wired `<UpgradeNudge>` into the real dashboard hub (`UpscDailyMissionControl`), driven by the student's `subscriptionPlanId` / `billingCycle` / `firstAttemptYear` from `studentProfile`. Free→paid upgrade prompts now appear in‑app (the engine lives in `src/lib/upsc/entitlements.ts`).
 - **Build gate:** TypeScript is the build gate and is green (`tsc --noEmit` passes). The app has substantial **pre‑existing** ESLint debt (e.g., `set-state-in-effect`, `no-explicit-any`); Next 16's `NextConfig` no longer accepts an `eslint` key (ESLint is decoupled from `next build`), so it isn't configured there. **Follow‑up:** clean up app‑wide lint. If the deployment's build step runs lint and fails, run it with linting disabled for the initial deploy.
 - **Next sub‑steps for entitlements:** enforce daily MCQ cap in `UpscMcqCommandCenter` (needs per‑day usage tracking) and pass `blockedFeature` when a user taps a gated feature (optional subjects / mains upload / unlimited tests).
+
+
+---
+
+## 2026-06-16 · MCQ cap enforcement (client primitive) + backend payments
+
+- **Frontend:** `src/lib/upsc/dailyUsage.ts` (`getMcqUsedToday` / `recordMcqUsage`) + `McqUsageNudge` (reads tier + today's usage, shows the upgrade nudge when the cap is hit). Wired at the `mcq-command` page level (no refactor of the 689-line center). **To finish enforcement:** call `recordMcqUsage(n)` wherever MCQs are actually generated/served (e.g., MCQ readiness rooms / generate handlers) and block generation when `isMcqLimitReached(getMcqUsedToday(), tier)`. Mirror authoritatively on the server at the generation endpoint.
+- **Backend (PR #2):** added `/api/v1/payments/cashfree/order` + signed `/cashfree/webhook` (activates the Subscription), `app/core/pricing.py`, and Cashfree config in `config.py`. Env-gated: set `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_ENV`, `FRONTEND_BASE_URL`, `BACKEND_BASE_URL`. **Test in Cashfree sandbox** (couldn't run live here) and run the subscriptions migration.
+- **Next:** frontend checkout (Cashfree JS SDK on `/pricing` → POST `/payments/cashfree/order` → `cashfree.checkout(payment_session_id)`); dashboard UI/mobile density; Geography; website 6-box polish.
