@@ -561,4 +561,138 @@ export const geomorphology: OptionalTopic = {
       ],
     },
   ],
+  trendAnalysis: {
+    overview:
+      "Geomorphology is the opening and single most heavily-weighted unit of Paper I, Section A. In a typical Paper I it yields 35–55 marks: at least one short note (~10 marks) in the compulsory Section A question, plus one analytical 15- or 20-mark question — and in many years two long questions. It is effectively un-skippable.",
+    marksPattern:
+      "Two predictable slots: (1) a 10-mark short note testing a single concept (isostasy, denudation chronology, graded profile, dynamic equilibrium); and (2) a 15–20 mark analytical/comparative question demanding a model, a critique, a diagram and an applied or Indian example. Diagram-bearing answers consistently out-score prose-only ones.",
+    evolution: [
+      {
+        period: "Up to ~2012 (descriptive era)",
+        shift:
+          "Largely definitional — 'describe the cycle of erosion', 'explain isostasy', 'describe karst landforms'. Reproduction of standard models sufficed.",
+      },
+      {
+        period: "2013–2018 (analytical/comparative turn)",
+        shift:
+          "Shift to 'critically examine' and 'compare' — Davis vs Penck, geosyncline vs plate tectonics, Airy vs Pratt. Examiner began rewarding a named critic and a reasoned judgement, not just the model.",
+      },
+      {
+        period: "2019–2025 (applied, quantitative & contemporary)",
+        shift:
+          "Decisive move to applied geomorphology (geohydrology, hazards, watershed), quantitative/tectonic geomorphology (morphometry, neotectonics) and human-induced change. Plate tectonics is now expected to be applied to a real orogen, and answers must close with management/relevance.",
+      },
+    ],
+    questionFormats: [
+      "Critically examine / Critically evaluate (a model or theory — expects a verdict)",
+      "Compare and contrast (Davis–Penck–King; Airy–Pratt; geosyncline–plate tectonics)",
+      "Bring out / Account for (cause-and-process explanation)",
+      "Discuss the relevance/application of (applied geomorphology, geohydrology)",
+      "Short notes (~10 marks, single concept, diagram expected)",
+      "Diagram-based / sketch-and-explain (profiles, boundaries, column diagrams)",
+    ],
+    themeTable: [
+      {
+        theme: "Plate tectonics, continental drift & mountain building",
+        frequency: "Very High",
+        marksBand: "15–20",
+        years: ["2013", "2015", "2017", "2019", "2022"],
+        note: "Almost every cycle. Increasingly applied to the Himalaya/an orogen and set against geosyncline & drift as critique.",
+      },
+      {
+        theme: "Cycle of erosion & slope development (Davis/Penck/King)",
+        frequency: "High",
+        marksBand: "15–20",
+        years: ["2014", "2016", "2018", "2021"],
+        note: "Comparative/critique format. A named critic (Hack) and the climatic assumption lift the answer.",
+      },
+      {
+        theme: "Applied geomorphology (geohydrology, hazards, watershed)",
+        frequency: "High",
+        marksBand: "15–20",
+        years: ["2018", "2020", "2021", "2023"],
+        note: "The fastest-rising head; most under-prepared, so a strong differentiator.",
+      },
+      {
+        theme: "Isostasy (Airy vs Pratt) & earth's interior",
+        frequency: "Medium",
+        marksBand: "10–15",
+        years: ["2015", "2019", "2022"],
+        note: "Stable short note. Column diagram + a modern qualifier (rebound, gravity anomaly) is enough.",
+      },
+      {
+        theme: "Channel morphology, fluvial & denudation chronology",
+        frequency: "Medium",
+        marksBand: "10–20",
+        years: ["2016", "2020", "2023"],
+        note: "Now asked through quantitative/fluvial geomorphology — morphometry, graded profile, erosion surfaces.",
+      },
+      {
+        theme: "Geomorphic processes, magnitude–frequency, dynamic equilibrium",
+        frequency: "Medium",
+        marksBand: "10–15",
+        years: ["2017", "2020"],
+        note: "Conceptual short notes; Hack's dynamic equilibrium and the magnitude–frequency idea recur.",
+      },
+      {
+        theme: "Vulcanicity, earthquakes & tsunamis",
+        frequency: "Medium",
+        marksBand: "10–15",
+        years: ["2014", "2018", "2021"],
+        note: "Often current-affairs linked; tie distribution to plate boundaries and add a mitigation line.",
+      },
+    ],
+    examinerExpectations: [
+      "A clean, labelled diagram for any process/landform/model question.",
+      "Named theorists and their critics (Davis–Hack, Penck, King, Wegener, Holmes, Hess, Airy, Pratt).",
+      "A real, preferably Indian, example (Himalaya, Kosi megafan, Western Ghats landslides).",
+      "Analysis and a verdict in 'critically examine' answers — not pure description.",
+      "A closing applied/relevance line (management, hazard, resource) in higher-mark answers.",
+    ],
+    commonPitfalls: [
+      "Describing a model without critiquing it or naming a critic.",
+      "Omitting the diagram on a process/landform question.",
+      "Treating plate tectonics theoretically without applying it to an actual orogen.",
+      "Ignoring the applied dimension that newer papers explicitly reward.",
+      "Confusing orogeny with epeirogeny, or weathering with erosion.",
+    ],
+    predictedFocus: [
+      "Applied geomorphology & geohydrology (watershed, groundwater, landslide-susceptibility).",
+      "Tectonic geomorphology / neotectonics and plate tectonics applied to the Himalaya.",
+      "Channel morphology & drainage morphometry (quantitative geomorphology).",
+      "Comparative slope/landscape-evolution models with a critique.",
+      "Human-induced geomorphic change and geomorphic hazards (climate-linked).",
+    ],
+  },
+  pyqBank: [
+    // Plate tectonics, drift & mountain building
+    { year: "2019", marks: 20, theme: "Plate tectonics & mountain building", q: "Bring out the role of plate tectonics in the evolution of the present-day continents and ocean basins." },
+    { theme: "Plate tectonics & mountain building", q: "Examine the relevance of the geosynclinal theory of mountain building in the light of plate tectonics." },
+    { theme: "Plate tectonics & mountain building", q: "Discuss the salient features of plate tectonics and explain the origin of the Himalaya in its light." },
+    { theme: "Plate tectonics & mountain building", q: "Explain how plate tectonics accounts for the global distribution of earthquakes and volcanoes." },
+    { theme: "Plate tectonics & mountain building", q: "Critically evaluate the theory of continental drift and the evidences advanced in its support." },
+    // Isostasy & interior
+    { theme: "Isostasy & earth's interior", q: "Compare and contrast the views of Airy and Pratt on isostasy." },
+    { theme: "Isostasy & earth's interior", q: "Discuss the concept of isostasy and the idea of isostatic adjustment with examples." },
+    // Cycle of erosion & slope
+    { theme: "Geomorphic cycle & slope development", q: "Critically examine the Davisian concept of the geographical cycle of erosion." },
+    { theme: "Geomorphic cycle & slope development", q: "Compare the models of landscape development proposed by Davis and Penck." },
+    { theme: "Geomorphic cycle & slope development", q: "Explain the process of pediplanation as proposed by L. C. King in semi-arid regions." },
+    { theme: "Geomorphic cycle & slope development", q: "Discuss the elements of a hillslope and the processes of slope development." },
+    // Channel morphology, fluvial, denudation chronology
+    { theme: "Channel morphology & denudation chronology", q: "Discuss the concept of channel morphology and the factors controlling channel patterns." },
+    { theme: "Channel morphology & denudation chronology", q: "What do you understand by denudation chronology? Explain with reference to erosion surfaces." },
+    { theme: "Channel morphology & denudation chronology", q: "Explain the concept of the graded river and the development of a graded profile." },
+    // Processes & concepts
+    { theme: "Geomorphic processes & concepts", q: "Discuss the role of magnitude and frequency of geomorphic events in landform development." },
+    { theme: "Geomorphic processes & concepts", q: "Examine the concept of dynamic equilibrium in landform development (Hack)." },
+    { theme: "Geomorphic processes & concepts", q: "Distinguish between endogenetic and exogenetic forces in shaping the earth's surface." },
+    // Vulcanicity & earthquakes
+    { theme: "Vulcanicity, earthquakes & tsunamis", q: "Account for the global distribution of volcanoes in relation to plate boundaries." },
+    { theme: "Vulcanicity, earthquakes & tsunamis", q: "Examine the causes and distribution of earthquakes and their relationship with plate margins." },
+    // Applied geomorphology
+    { year: "2018", marks: 15, theme: "Applied geomorphology", q: "Discuss the relevance of applied geomorphology in watershed management." },
+    { theme: "Applied geomorphology", q: "Explain the role of geomorphology in groundwater exploration (geohydrology) and economic geology." },
+    { theme: "Applied geomorphology", q: "Bring out the significance of geomorphology in landslide-hazard and environmental management." },
+  ],
 };

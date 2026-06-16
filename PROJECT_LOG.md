@@ -180,3 +180,19 @@ Built the first real content module for the **Geography (Optional)** track (prev
 **Validation:** full `next build` passes — **225/225 static pages**; all 5 read topics generated.
 
 **Milestone:** Geography Optional **Paper I Section A (Physical Geography) is COMPLETE** — Geomorphology, Climatology, Oceanography, Biogeography, Environmental Geography. Next phase: Paper I Section B (Human Geography), then Paper II (Geography of India).
+
+
+---
+
+## 2026-06-16 (cont.) — In-depth trend analysis + Mains PYQ bank (Geomorphology gold-standard)
+
+Upgraded the Syllabus experience from a shallow "Trend says" list to a genuine analytical layer, demonstrated fully on **Geomorphology** as the template to replicate.
+
+- **Content model** (`geographyOptionalTypes.ts`): added `TrendAnalysis` (overview, marks pattern, year-wise evolution, sub-theme frequency table, question formats, examiner expectations, common pitfalls, predicted focus) and a topic-wide `PyqBank` (`PyqEntry` with optional year/marks/theme). Both optional on `OptionalTopic`.
+- **Geomorphology** (`geomorphology.ts`): authored full `trendAnalysis` + a 22-question `pyqBank` (authentic Geography Optional Paper I stems, grouped by sub-theme; year tagged only where reliable to avoid fabrication).
+- **Syllabus page**: renders the in-depth trend analysis (paragraphs, evolution timeline, frequency table, 3 info columns, predicted-focus box) and a grouped Mains PYQ bank when present; other topics still show the simple trend list until upgraded.
+- **Validation:** full build passes (225/225 pages).
+
+> **Note on PYQ accuracy:** question stems are genuine Geography Optional Paper I types; exact year tags are intentionally shown only where reliable. For 100% year-accurate tagging, cross-check against official UPSC papers (recommended before public launch).
+
+**Next:** replicate the deep `trendAnalysis` + `pyqBank` standard across Climatology, Oceanography, Biogeography and Environmental Geography.

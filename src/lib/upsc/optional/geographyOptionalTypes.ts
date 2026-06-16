@@ -78,6 +78,56 @@ export type Pyq = {
   q: string;
 };
 
+/** A single previous-year question in the topic-wide PYQ bank. */
+export type PyqEntry = {
+  /** Exam year if reliably known; omit rather than guess. */
+  year?: string;
+  /** Marks weight if known (UPSC Geography optional uses ~10/15/20). */
+  marks?: number;
+  /** Sub-theme this question maps to. */
+  theme: string;
+  q: string;
+};
+
+/** One row of the sub-theme frequency table. */
+export type TrendThemeRow = {
+  theme: string;
+  frequency: Frequency;
+  /** Typical marks band, e.g. "10–20". */
+  marksBand: string;
+  /** Years in which the theme appeared (best-effort). */
+  years: string[];
+  note: string;
+};
+
+/** How the examiner's focus has shifted across a period. */
+export type TrendEvolution = {
+  period: string;
+  shift: string;
+};
+
+/** In-depth, multi-dimensional trend analysis for a topic. */
+export type TrendAnalysis = {
+  /** Weightage of the topic within the paper. */
+  overview: string;
+  /** How marks are typically distributed (short notes vs long answers). */
+  marksPattern: string;
+  /** Chronological shift in what is asked. */
+  evolution: TrendEvolution[];
+  /** The recurring question formats/verbs. */
+  questionFormats: string[];
+  /** Sub-theme frequency table. */
+  themeTable: TrendThemeRow[];
+  /** What the examiner rewards. */
+  examinerExpectations: string[];
+  /** Where aspirants routinely lose marks. */
+  commonPitfalls: string[];
+  /** High-probability focus areas for upcoming attempts. */
+  predictedFocus: string[];
+};
+
+export type TopicStatus = "ready" | "coming-soon";
+
 export type Subtopic = {
   id: string;
   title: string;
@@ -94,8 +144,6 @@ export type Subtopic = {
   pyq: Pyq[];
 };
 
-export type TopicStatus = "ready" | "coming-soon";
-
 export type OptionalTopic = {
   slug: string;
   title: string;
@@ -109,4 +157,8 @@ export type OptionalTopic = {
   readMinutes: number;
   syllabus: SyllabusLayer;
   subtopics: Subtopic[];
+  /** Optional in-depth trend analysis (richer than syllabus.trendSays). */
+  trendAnalysis?: TrendAnalysis;
+  /** Optional topic-wide previous-year-question bank. */
+  pyqBank?: PyqEntry[];
 };
