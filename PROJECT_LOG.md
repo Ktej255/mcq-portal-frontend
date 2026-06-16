@@ -50,8 +50,10 @@ next**. Keep this file updated when you ship something.
 | 15 | Copy honesty fix: "Start free" → "Take the free diagnostic" | FE | `83f92cd` |
 | 16 | **Lead magnet:** diagnostic gated by email capture → `/api/lead` (Resend) | FE | `c65f647` |
 | B1 | Backend cloned; API mapped; `INTEGRATION.md` added | BE · docs/integration-guide | `d44a52b` (PR #1) |
+| 17 | Merge PR #2 (`feat/marketing-website`) and fix Resend sender email to support `RESEND_FROM_EMAIL` | FE · main | `ba4f280` |
+| B2 | Merge PR #1 (`docs/integration-guide`) into main | BE · main | `9b7f236` |
 
-**Open PRs:** Frontend [PR #2](https://github.com/Ktej255/mcq-portal-frontend/pull/2) · Backend [PR #1](https://github.com/Ktej255/mcq-portal-backend/pull/1) — approved for merge by owner.
+**Open PRs:** None (PR #1 and PR #2 merged).
 
 ---
 
@@ -66,20 +68,19 @@ machine routes: `/llms.txt`, `/llms-full.txt`, `/sitemap.xml`, `/robots.txt`, `/
 
 ## Current status
 
-**Done:** full public marketing + content + SEO/AX + diagnostic lead magnet + dashboard demo + real pricing; backend API documented.
+**Done:** full public marketing + content + SEO/AX + diagnostic lead magnet + dashboard demo + real pricing; backend API documented; frontend PR #2 & backend PR #1 successfully merged into `main`; Resend `from` configured to be environment-variable-backed.
 
 **Open / needs input or another owner:**
-- Deployment to live URLs (Vercel + Supabase + Clerk) — see `DEPLOYMENT.md`; requires owner credentials.
-- `RESEND_API_KEY` + `LEADS_NOTIFY_EMAIL` to activate lead delivery.
-- Backend auth/data alignment if standardising on Supabase + Clerk.
-- Real analytics (GA4 + Google Search Console) for a data-backed SEO audit.
-- Deepening the authed dashboard `(dashboard)/upsc` (already exists; not duplicated).
+- Deploy the backend (`Dockerfile`) to production host (e.g. Render, Railway, or Google Cloud Run) and set env vars.
+- Deploy the frontend to Vercel and point the `upsccommand.com` domain.
+- Set environment variables (`NEXT_PUBLIC_API_BASE_URL`, Clerk, Supabase, Resend credentials).
+- Confirm live verification checklist once hostnames are finalized.
 
 ---
 
 ## Next-up backlog
 
-1. Connect Vercel project + env, deploy frontend; deploy/confirm backend; set CORS to live domain.
-2. Wire lead delivery (Resend) and confirm leads arrive.
-3. Decide final hero CTA copy.
-4. Optional: a specific live frontend↔backend data integration (e.g., public subjects/PYQ feed).
+1. Deploy backend container and configure database connectivity.
+2. Complete Vercel frontend deployment.
+3. Verify live endpoints (check sitemaps, `/start` lead submission, Clerk auth loop).
+4. Register the sitemap on Google Search Console.
