@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 
-import { geographyMapPoints, mapTabs, type MapType } from "@/lib/upsc/optionalGeographyMapping";
+import { geographyDiagrams, geographyMapPoints, mapTabs, type MapType } from "@/lib/upsc/optionalGeographyMapping";
 
 const PIN_TONE: Record<MapType, string> = {
   river: "#1d9e75",
@@ -128,7 +128,17 @@ export function GeographyMapRoom() {
       {/* Diagram bank stays below the map */}
       <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Diagram bank</p>
-        <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Topic-wise labelled diagrams (and AI-generated handwritten / 3D diagrams) will attach here.</p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[#8a8174]">Topic-wise labelled diagrams. AI-generated handwritten / 3D versions will render inside each card.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {geographyDiagrams.map((d) => (
+            <div key={d.id} className="rounded-md border border-[#e7e0d2] bg-white p-3">
+              <div className="flex h-20 items-center justify-center rounded bg-[#eef6f1] text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">Diagram preview</div>
+              <p className="mt-2 text-sm font-black leading-5 text-[#13251d]">{d.title}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">{d.topic}</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{d.note}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

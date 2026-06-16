@@ -8,6 +8,8 @@ import { ArrowLeft, CheckCircle2, ChevronDown, Highlighter, Lightbulb, MessageCi
 import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
 import { buildAnswerFramework, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
 import { evaluateOptionalAnswer } from "@/services/optionalEvaluationService";
+import { digitiseAnswerImage, fileToBase64 } from "@/services/optionalOcrService";
+import { askOptionalDoubt } from "@/services/optionalDiscussService";
 import { practiceRefId, recordOptionalAttempt } from "@/lib/upsc/optionalProgress";
 
 const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
@@ -27,10 +29,14 @@ export function GeographyAnswerWorkspace() {
   const [evalId, setEvalId] = useState("medium");
   const [showParams, setShowParams] = useState(false);
   const [uploadName, setUploadName] = useState<string | null>(null);
+  const [uploadData, setUploadData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [evalState, setEvalState] = useState<"idle" | "evaluating" | "done">("idle");
   const [evalSource, setEvalSource] = useState<"typed" | "pdf" | null>(null);
   const [saved, setSaved] = useState(false);
   const [doubtOpen, setDoubtOpen] = useState(false);
+  const [doubtInput, setDoubtInput] = useState("");
+  const [doubtReply, setDoubtReply] = useState<string | null>(null);
+  const [doubtSending, setDoubtSending] = useState(false);
   const [showFramework, setShowFramework] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [report, setReport] = useState<EvaluationResult | null>(null);
@@ -42,9 +48,17 @@ export function GeographyAnswerWorkspace() {
   const hasTyped = typed.length > 20;
   const framework = useMemo(() => buildAnswerFramework(questionText), [questionText]);
 
-  const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) { setUploadName(file.name); setEvalState("idle"); setSaved(false); }
+    if (!file) return;
+    setUploadName(file.name);
+    setEvalState("idle");
+    setSaved(false);
+    try {
+      setUploadData(await fileToBase64(file));
+    } catch {
+      setUploadData(null);
+    }
   };
   const runEval = async (source: "typed" | "pdf") => {
     setEvalSource(source);
@@ -55,7 +69,11 @@ export function GeographyAnswerWorkspace() {
       const result = await evaluateOptionalAnswer({ subject, question: questionText, parts, parameters: selectedEval?.parameters ?? [], expectedWords });
       setReport(result);
     } else {
-      await new Promise((resolve) => window.setTimeout(resolve, 600));
+      const ocr = uploadData ? await digitiseAnswerImage(uploadData.base64, uploadData.mimeType) : { text: null, live: false };
+      if (ocr.text) {
+        const result = await evaluateOptionalAnswer({ subject, question: questionText, parts: { Introduction: "", Body: ocr.text, Conclusion: "" }, parameters: selectedEval?.parameters ?? [], expectedWords });
+        setReport(result);
+      }
     }
     setEvalState("done");
     setDiscussPrompt(true);
@@ -72,6 +90,15 @@ export function GeographyAnswerWorkspace() {
       at: Date.now(),
     });
     setSaved(true);
+  };
+
+  const sendDoubt = async () => {
+    if (!doubtInput.trim()) return;
+    setDoubtSending(true);
+    const ctx = `Question: ${questionText}. ${report ? `Report verdict: ${report.verdict} (overall ${report.overall}/100).` : ""}`;
+    const { reply } = await askOptionalDoubt({ subject, context: ctx, message: doubtInput });
+    setDoubtReply(reply);
+    setDoubtSending(false);
   };
 
 
@@ -312,8 +339,9 @@ export function GeographyAnswerWorkspace() {
           </div>
           <div className="p-3">
             <p className="text-xs font-semibold leading-5 text-[#5d675f]">Ask anything about this question or your evaluation report.</p>
-            <textarea rows={3} placeholder="Type your question…" className="mt-2 w-full resize-none rounded-md border border-[#dcd5c7] bg-white p-2 text-sm font-semibold text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20" />
-            <button type="button" className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#1d9e75] text-xs font-black uppercase tracking-[0.1em] text-white"><Send className="h-3.5 w-3.5" /> Send</button>
+            {doubtReply && <div className="mt-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-2 text-xs font-semibold leading-5 text-[#34453b]">{doubtReply}</div>}
+            <textarea value={doubtInput} onChange={(e) => setDoubtInput(e.target.value)} rows={3} placeholder="Type your question…" className="mt-2 w-full resize-none rounded-md border border-[#dcd5c7] bg-white p-2 text-sm font-semibold text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20" />
+            <button type="button" onClick={sendDoubt} disabled={doubtSending || !doubtInput.trim()} className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#1d9e75] text-xs font-black uppercase tracking-[0.1em] text-white disabled:opacity-50"><Send className="h-3.5 w-3.5" /> {doubtSending ? "Sending…" : "Send"}</button>
           </div>
         </div>
       ) : (

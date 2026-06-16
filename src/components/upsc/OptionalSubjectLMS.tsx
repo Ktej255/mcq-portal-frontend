@@ -275,12 +275,22 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
               <h2 className="mt-1 text-2xl font-black tracking-tight">Write answers, not MCQs</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Pick a topic; each opens three levels — Easy, Moderate, and UPSC-like. Attempt one or all; a report is generated and the AI discussion stays with you.</p>
             </div>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {activePaper?.modules.flatMap((m) => m.lessons).slice(0, 18).map((les) => (
-                <button key={les.id} type="button" onClick={() => setPracticeTopic(practiceTopic === les.title ? null : les.title)}
-                  className={`rounded-md border p-3 text-left text-sm font-bold leading-5 transition ${practiceTopic === les.title ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : "border-[#dcd5c7] bg-[#fffdf8] text-[#34453b] hover:border-[#1d9e75]"}`}>
-                  {les.title}
-                </button>
+            <div className="space-y-3">
+              {activePaper?.modules.map((m) => (
+                <div key={m.id} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-3 shadow-sm">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{m.title}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.lessons.map((les) => {
+                      const done = buildTopicPractice(les.title).some((row) => attemptedIds.has(practiceRefId(row.prompt)));
+                      return (
+                        <button key={les.id} type="button" onClick={() => setPracticeTopic(practiceTopic === les.title ? null : les.title)}
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold transition ${practiceTopic === les.title ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : "border-[#dcd5c7] bg-white text-[#34453b] hover:border-[#1d9e75]"}`}>
+                          {done && <span className="text-[#1d9e75]">✓</span>}{les.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
             {practiceTopic && (

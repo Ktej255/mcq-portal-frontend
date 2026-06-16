@@ -52,3 +52,15 @@ export const geographyMapPoints: MapPoint[] = [
   { id: "lakshadweep", name: "Lakshadweep", type: "ca", x: 25, y: 70, note: "Coral atolls; tourism vs ecology.", pyq: "Coral/island PYQs.", isNew: true },
   { id: "katchatheevu", name: "Katchatheevu", type: "ca", x: 57, y: 79, note: "Palk Strait islet; fishing rights.", pyq: "Maritime geography." },
 ];
+
+
+// Topic-wise diagram bank (AI handwritten / 3D versions render per card later).
+export type DiagramItem = { id: string; title: string; topic: string; note: string };
+export const geographyDiagrams: DiagramItem[] = [
+  { id: "geomorphic-cycle", title: "Davisian cycle of erosion", topic: "Geomorphology", note: "Youth → mature → old stages; label peneplain & monadnock." },
+  { id: "atm-circulation", title: "Tri-cellular atmospheric circulation", topic: "Climatology", note: "Hadley, Ferrel, Polar cells + global pressure belts." },
+  { id: "monsoon", title: "Indian monsoon mechanism", topic: "Climatology", note: "ITCZ shift, jet streams, SW monsoon branches." },
+  { id: "ocean-currents", title: "World ocean currents", topic: "Oceanography", note: "Warm & cold currents; subtropical gyres." },
+  { id: "central-place", title: "Christaller's central place", topic: "Settlement", note: "Hexagonal hinterlands; k = 3, 4, 7." },
+  { id: "dem-transition", title: "Demographic transition", topic: "Population", note: "Stages I–V; birth, death & growth-rate curves." },
+];
