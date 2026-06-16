@@ -34,7 +34,7 @@ import {
 import { buildStudyPlan, getOptionalCoursePapers } from "@/lib/upsc/optionalCourse";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { GeographyMapRoom } from "@/components/upsc/GeographyMapRoom";
-import { getOptionalAttempts, getOptionalStats, practiceRefId } from "@/lib/upsc/optionalProgress";
+import { getOptionalAttempts, getOptionalStats, practiceRefId, type OptionalAttempt } from "@/lib/upsc/optionalProgress";
 
 type LmsTab = "learn" | "plan" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
 
@@ -72,9 +72,12 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
   const trendData = geographyTrendByYear.find((t) => t.year === trendYear)?.distribution ?? [];
   const [stats, setStats] = useState({ total: 0, pyq: 0, practice: 0, avgScore: 0, lastAt: 0 });
   const [attemptedIds, setAttemptedIds] = useState<Set<string>>(new Set());
+  const [attempts, setAttempts] = useState<OptionalAttempt[]>([]);
   useEffect(() => {
     setStats(getOptionalStats(slug));
-    setAttemptedIds(new Set(getOptionalAttempts(slug).map((a) => a.refId)));
+    const list = getOptionalAttempts(slug);
+    setAttempts(list);
+    setAttemptedIds(new Set(list.map((a) => a.refId)));
   }, [tab, slug]);
 
   const activePaper = papers[paperIndex];
@@ -354,14 +357,32 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
             <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional gap</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">What UPSC expects vs. your readiness</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">For optional-only learners this is your standalone gap view; it fills as you attempt practice and PYQs.</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Personalised from your saved attempts. Attempt PYQs / practice and Save them to populate this.</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.12em]">
+                <span className="rounded-md bg-[#1a3a2a] px-2.5 py-1 text-white">Readiness {stats.total ? `${stats.avgScore}%` : "—"}</span>
+                <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[#085041]">{stats.total} attempts</span>
+                <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[#085041]">{stats.pyq} PYQ · {stats.practice} practice</span>
+              </div>
             </div>
+            {attempts.length > 0 && (
+              <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Your weakest attempts — focus here</p>
+                <div className="mt-2 space-y-1.5">
+                  {[...attempts].sort((a, b) => a.score - b.score).slice(0, 5).map((a, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 rounded-md border border-[#e7e0d2] bg-white p-2.5">
+                      <span className="line-clamp-1 text-xs font-semibold leading-5 text-[#34453b]">{a.title}</span>
+                      <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-black ${a.score >= 70 ? "bg-[#e7f5ee] text-[#085041]" : a.score >= 40 ? "bg-[#fff4df] text-[#6f4a12]" : "bg-[#fff1ed] text-[#7d3827]"}`}>{a.score}/100</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               {geographyGapAreas.map((g) => (
                 <div key={g.area} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
                   <p className="text-sm font-black tracking-tight text-[#13251d]">{g.area}</p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">Expectation: {g.expectation}</p>
-                  <span className="mt-2 inline-flex rounded bg-[#fff4df] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#6f4a12]">{g.status}</span>
+                  <span className={`mt-2 inline-flex rounded px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${stats.total && stats.avgScore < 60 ? "bg-[#fff1ed] text-[#7d3827]" : "bg-[#fff4df] text-[#6f4a12]"}`}>{stats.total && stats.avgScore < 60 ? "Needs work" : g.status}</span>
                 </div>
               ))}
             </div>
