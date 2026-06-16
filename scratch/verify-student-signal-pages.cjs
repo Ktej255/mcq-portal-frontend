@@ -8,7 +8,7 @@ const routes = [
   ["/reports", "student-gap-primary-action"],
   ["/revision", "student-revision-primary-action"],
   ["/history", "student-progress-primary-action"],
-  ["/tests", "student-practice-primary-action"],
+  ["/practice", "student-practice-primary-action"],
 ];
 
 async function seed(page, progress = null) {
@@ -119,11 +119,11 @@ async function run() {
       updatedAt: new Date().toISOString(),
     },
   });
-  await page.goto(`${baseUrl}/tests`, { waitUntil: "networkidle", timeout: 45000 });
+  await page.goto(`${baseUrl}/practice`, { waitUntil: "networkidle", timeout: 45000 });
   const mcqHref = await page.getByTestId("student-practice-primary-action").getAttribute("href");
-  checks.push({ label: "mcq-ready", route: "/tests", href: mcqHref });
+  checks.push({ label: "mcq-ready", route: "/practice", href: mcqHref });
   if (mcqHref !== "/upsc/geography/mcq-readiness?day=1") {
-    throw new Error(`mcq-ready /tests: expected MCQ room, got ${mcqHref}`);
+    throw new Error(`mcq-ready /practice: expected MCQ room, got ${mcqHref}`);
   }
 
   await page.setViewportSize({ width: 390, height: 844 });

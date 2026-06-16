@@ -84,3 +84,54 @@ machine routes: `/llms.txt`, `/llms-full.txt`, `/sitemap.xml`, `/robots.txt`, `/
 2. Complete Vercel frontend deployment.
 3. Verify live endpoints (check sitemaps, `/start` lead submission, Clerk auth loop).
 4. Register the sitemap on Google Search Console.
+
+
+---
+
+## 2026-06-16 — Geography Optional "Read" + "Syllabus" experience (Geomorphology live)
+
+Built the first real content module for the **Geography (Optional)** track (previously only a "Planned" stub). Topic-by-topic build, starting with **Geomorphology** (Paper I, Section A).
+
+**What shipped**
+- New dedicated, static route segment `/upsc/optional-subjects/geography-optional` (overrides the generic `[slug]` stub):
+  - `…/geography-optional` — landing page. **Syllabus button is placed before the Read button**, as specified.
+  - `…/geography-optional/syllabus` — three-layer Syllabus map: **Official says / Trend says / Hidden topics**.
+  - `…/geography-optional/read` — topic index (Geomorphology live; Climatology → Oceanography → Biogeography → Environmental Geography queued).
+  - `…/geography-optional/read/geomorphology` — full handwritten "personal notes" reader.
+- **Authentic UPSC-grade content** for Geomorphology, 6 subtopics: factors & endo/exogenetic forces; plate tectonics & mountain building; isostasy; geomorphic cycles & slope theories; channel morphology & denudation chronology; applied geomorphology. Each carries concept notes, exam keywords, UPSC answer-phrasing, PYQs, and hand-drawn diagrams.
+- **Three-layer syllabus** grounded in the official UPSC Geography Optional Paper I syllabus + 25-year PYQ trend, including surfaced "hidden" topics (drainage morphometry, Hjulström, etchplanation, neotectonics, mantle plumes, GIS/RS).
+- **Handwritten aesthetic**: Caveat + Kalam Google fonts (scoped via section layout), notebook-paper background, highlighter/marker accents, and pencil-style inline **SVG** diagrams (Remotion/Hyperframe skills were not available in this environment, so hand-authored SVG was used to achieve the "handmade diagram" look).
+
+**Files**
+- Content/data: `src/lib/upsc/optional/{geographyOptionalTypes.ts, geomorphology.ts, geographyOptionalTopics.ts}`
+- UI: `src/components/upsc/optional/{GeoOptionalDiagrams.tsx, GeographyOptionalReader.tsx}`
+- Routes: `src/app/(dashboard)/upsc/optional-subjects/geography-optional/{layout.tsx, page.tsx, syllabus/page.tsx, read/page.tsx, read/[topic]/page.tsx}`
+- Styling: `src/app/globals.css` (`.go-*` handwritten classes)
+- `src/app/(dashboard)/upsc/optional-subjects/[slug]/page.tsx` — excluded `geography-optional` from `generateStaticParams` to avoid a route clash.
+
+**Validation**
+- `npm ci` (node_modules was absent), `tsc --noEmit` clean for all new/changed files.
+- Production build compiles and prerenders all four new routes (incl. `/read/geomorphology`).
+
+**⚠️ Pre-existing build blocker (not introduced here):** `main` has two pages resolving to `/tests` — `src/app/tests/page.tsx` and `src/app/(dashboard)/tests/page.tsx`. `next build` fails on this conflict. Validation above was done by temporarily moving the duplicate aside. **This should be resolved separately** (delete/merge one of the `/tests` pages) before deployment.
+
+**Next:** author Climatology using the same model; then Oceanography, Biogeography, Environmental Geography.
+
+
+---
+
+## 2026-06-16 (cont.) — Climatology module + `/tests` build-blocker fixed
+
+**Climatology (Paper I) shipped** — second Read module, same model/depth as Geomorphology:
+- `/upsc/optional-subjects/geography-optional/read/climatology` — 6 subtopics: heat budget & pressure belts; atmospheric circulation, winds & stability; monsoons & jet streams; air masses, fronts & cyclones; precipitation & climate classification (Köppen/Thornthwaite/Trewartha); climate change & applied/urban climatology.
+- Three-layer syllabus (Official/Trend/Hidden) added; hidden topics incl. lapse rates, ENSO/IOD teleconnections, jet-stream monsoon theory, Bergeron process, radiation laws, Milankovitch cycles.
+- 5 new pencil-style SVG diagrams: heat budget, tri-cellular circulation, mid-latitude cyclone/fronts, Köppen groups, urban heat island.
+- Files: `src/lib/upsc/optional/climatology.ts`; registered in `geographyOptionalTopics.ts` (moved from coming-soon → ready). Diagram IDs added in `geographyOptionalTypes.ts` + `GeoOptionalDiagrams.tsx`.
+
+**Resolved the pre-existing `/tests` build conflict** (was blocking the whole app build):
+- Root cause: two pages resolved to `/tests` — the public marketing page (`src/app/tests/page.tsx`, in the SEO site map + public nav) and a dashboard student-practice page (`src/app/(dashboard)/tests/page.tsx`).
+- Fix: kept the public `/tests`; **moved the dashboard page to `/practice`** (`src/app/(dashboard)/practice/page.tsx`). The dashboard sidebar never linked to `/tests`, so no nav change was needed; updated the lone reference in `scratch/verify-student-signal-pages.cjs` (`/tests` → `/practice`).
+
+**Validation:** full `next build` now succeeds — **222/222 static pages**, including `/tests`, `/practice`, and both `…/read/geomorphology` and `…/read/climatology`. No route conflicts.
+
+**Geography Optional progress:** 2 of 5 physical-geography topics live (Geomorphology, Climatology). Next: Oceanography → Biogeography → Environmental Geography.
