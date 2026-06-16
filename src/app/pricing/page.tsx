@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
-import { pricingStats, billingOptions, pricingTiers } from "@/components/marketing/site-data";
+import { pricingStats, billingOptions, pricingTiers, freeTier } from "@/components/marketing/site-data";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
@@ -55,8 +55,35 @@ export default function PricingPage() {
           </div>
         </div>
 
+        {/* free entry */}
+        <div className="mt-8 flex flex-col gap-5 rounded-3xl border border-[#1d9e75]/40 bg-[#e7f5ee] p-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-baseline gap-2">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#085041]">{freeTier.name} · start here</p>
+              <span className="text-2xl font-black text-[#13251d]">{freeTier.price}</span>
+              <span className="text-xs font-bold text-[#536259]">{freeTier.cadence}</span>
+            </div>
+            <p className="mt-1.5 max-w-xl text-sm font-semibold leading-6 text-[#3a4f45]">{freeTier.tagline}</p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+              {freeTier.features.map((f) => (
+                <span key={f} className="inline-flex items-center gap-1.5 text-xs font-bold text-[#33443b]">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#1d9e75]" />
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+          <Link
+            href="/start"
+            className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
+          >
+            Start free
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </div>
+
         {/* tiers */}
-        <div className="mt-10 grid gap-5 lg:grid-cols-4">
+        <div className="mt-6 grid gap-5 lg:grid-cols-4">
           {pricingTiers.map((tier) => (
             <div
               key={tier.name}

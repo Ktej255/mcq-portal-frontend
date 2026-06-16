@@ -541,3 +541,20 @@ export const pricingTiers: PricingTier[] = [
     ],
   },
 ];
+
+
+/** Free entry tier — the top of the funnel (no card required). */
+export const freeTier = {
+  name: "Free",
+  price: "₹0",
+  cadence: "to start",
+  tagline: "Explore the system and build the habit before you commit — no card required.",
+  features: [
+    "2-minute diagnostic + personalized plan",
+    "Geography daily loop (capped)",
+    "10 practice MCQs per day",
+    "Daily current affairs + quiz",
+    "Free previous year questions & study resources",
+    "Guides & full syllabus",
+  ],
+};

@@ -15,6 +15,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { UpgradeNudge } from "@/components/upsc/UpgradeNudge";
+
 const STORAGE_KEY = "sarit-diagnostic-plan-v1";
 
 type Plan = {
@@ -76,7 +78,17 @@ export function DashboardPreview() {
         </Link>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <UpgradeNudge
+        signals={{
+          tier: "free",
+          billingCycle: "monthly",
+          mcqUsedToday: dailyMcqs,
+          targetYear: plan?.year,
+          streakDays: 12,
+        }}
+      />
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         {/* Today's loop */}
         <div className="rounded-3xl border border-[#cadfd6] bg-[#fffdf8] p-6 shadow-sm">
           <div className="flex items-center justify-between">

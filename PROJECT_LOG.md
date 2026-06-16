@@ -83,3 +83,28 @@ machine routes: `/llms.txt`, `/llms-full.txt`, `/sitemap.xml`, `/robots.txt`, `/
 2. Wire lead delivery (Resend) and confirm leads arrive.
 3. Decide final hero CTA copy.
 4. Optional: a specific live frontend↔backend data integration (e.g., public subjects/PYQ feed).
+
+
+---
+
+## 2026-06-16 · Paid system: entitlements, upgrade engine, Free tier
+
+**Pricing correction:** marketing aligned to the system — Foundation ₹399, Plus ₹699, Pro ₹999, Ultimate ₹1299; discounts Yearly 15% / 2-Year 25% / 3-Year 35%. (The system in `yearlyPlanner.ts` was already correct; only the marketing page was rounded.)
+
+**New (additive, no breaking changes):**
+- `src/lib/upsc/entitlements.ts` — canonical per-tier capabilities **including a `free` tier** (`free → foundation → plus → pro → ultimate`) with daily MCQ caps, AI minutes, weak-topic runs, optional/mains/tests/all-subjects flags. Plus `getEntitlements`, `nextTier`, `isMcqLimitReached`, and **`evaluateUpgradePrompt(signals)`** — the upgrade-trigger engine (limit-hit → tier nudge; 7-day streak / month-2 on monthly → yearly; target year ≥ 2027 → 2-year; renewal window → cycle upgrade).
+- `src/components/upsc/UpgradeNudge.tsx` — reusable, dismissible, frequency-capped (6-day cooldown via localStorage) nudge that renders the engine's suggestion. Live demo in `/demo`.
+- Marketing: **Free tier** (`freeTier` in `site-data.ts`) shown on `/pricing` and the homepage as the funnel entry.
+
+**How to wire into the authed dashboard (next step for any agent):**
+1. Read the user's `tier` + `billingCycle` from profile/subscription (`useDashboardData`).
+2. Enforce `getEntitlements(tier)` in the MCQ generator (`mcq-command`) and AI usage guards (block/curtail at the cap).
+3. Render `<UpgradeNudge signals={…} />` on `daily-command` / subject loop pages, and pass `blockedFeature` when a user taps a gated feature (optional subjects, mains upload, unlimited tests).
+4. Add a Free (₹0) entitlement to the backend/`yearlyPlanner` plan set so the funnel entry is a real account state (currently lowest paid tier is Foundation).
+
+**Still open (larger follow-ons):**
+- Real entitlement enforcement in the dashboard (the engine exists; per-screen wiring pending).
+- Payments/checkout is pre-launch ("Record Intent" + commerce launch boundary) — wire Razorpay when going live.
+- Diagnostic → dashboard handoff (place a beginner using their saved plan).
+- Per-subject content depth beyond Geography (7 GS subjects scaffolded).
+- Dashboard UI: usage meter ("32/50 MCQs today"), mobile density of pricing/plan cards.

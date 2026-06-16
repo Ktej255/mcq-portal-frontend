@@ -28,7 +28,7 @@ import {
 import { SiteNav } from "./SiteNav";
 import { SiteFooter } from "./SiteFooter";
 import { JsonLd } from "./JsonLd";
-import { pricingTiers } from "./site-data";
+import { pricingTiers, freeTier } from "./site-data";
 
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
@@ -591,7 +591,17 @@ function PricingSection() {
           sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Free resources stay open to everyone."
         />
 
-        <div className="mx-auto mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-3 rounded-2xl border border-[#1d9e75]/30 bg-[#e7f5ee] p-5 text-center sm:flex-row sm:max-w-none sm:justify-between sm:text-left">
+          <p className="text-sm font-bold text-[#085041]">
+            <span className="font-black">{freeTier.name} · {freeTier.price}</span> — {freeTier.tagline}
+          </p>
+          <Link href="/start" className="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
+            Start free
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mx-auto mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {pricingTiers.map((tier, i) => (
             <motion.div
               key={tier.name}
