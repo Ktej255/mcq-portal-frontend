@@ -15,6 +15,8 @@ import {
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { startCashfreeCheckout } from "@/lib/upsc/cashfree";
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -23,6 +25,9 @@ function money(value: number) {
 export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }) {
   const { profile, saveProfile, isLoaded } = useDashboardData();
   const [activationSuccess, setActivationSuccess] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const { getToken } = useAuth();
 
   const selectedPlan = getProductPricingPlan(planId);
   const savings = selectedPlan.listPrice - selectedPlan.launchPrice;
@@ -47,6 +52,19 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
         updatedAt: new Date().toISOString(),
       });
       setActivationSuccess(true);
+    }
+  };
+
+  const handlePayNow = async () => {
+    setPaying(true);
+    setPayError(null);
+    try {
+      const token = await getToken();
+      await startCashfreeCheckout({ tier: selectedPlan.tier, cycle: selectedPlan.cycle, token });
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Payment could not be started.");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -157,6 +175,21 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
               </button>
             )}
           </div>
+
+          {publicCommerceLaunchBoundary.readyForPayment ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handlePayNow}
+                disabled={paying}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] disabled:opacity-50"
+              >
+                {paying ? "Starting secure checkout…" : `Pay ${money(selectedPlan.launchPrice)} with Cashfree`}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </button>
+              {payError ? <p className="mt-2 text-xs font-bold text-[#b4543a]">{payError}</p> : null}
+            </div>
+          ) : null}
 
           {(activationSuccess || isCurrentlyActive) && (
             <div className="mt-4 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-sm font-bold text-[#085041]">

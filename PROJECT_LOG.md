@@ -126,3 +126,12 @@ machine routes: `/llms.txt`, `/llms-full.txt`, `/sitemap.xml`, `/robots.txt`, `/
 - **Frontend:** `src/lib/upsc/dailyUsage.ts` (`getMcqUsedToday` / `recordMcqUsage`) + `McqUsageNudge` (reads tier + today's usage, shows the upgrade nudge when the cap is hit). Wired at the `mcq-command` page level (no refactor of the 689-line center). **To finish enforcement:** call `recordMcqUsage(n)` wherever MCQs are actually generated/served (e.g., MCQ readiness rooms / generate handlers) and block generation when `isMcqLimitReached(getMcqUsedToday(), tier)`. Mirror authoritatively on the server at the generation endpoint.
 - **Backend (PR #2):** added `/api/v1/payments/cashfree/order` + signed `/cashfree/webhook` (activates the Subscription), `app/core/pricing.py`, and Cashfree config in `config.py`. Env-gated: set `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_ENV`, `FRONTEND_BASE_URL`, `BACKEND_BASE_URL`. **Test in Cashfree sandbox** (couldn't run live here) and run the subscriptions migration.
 - **Next:** frontend checkout (Cashfree JS SDK on `/pricing` → POST `/payments/cashfree/order` → `cashfree.checkout(payment_session_id)`); dashboard UI/mobile density; Geography; website 6-box polish.
+
+
+---
+
+## 2026-06-16 · Frontend Cashfree checkout
+
+- `src/lib/upsc/cashfree.ts` — loads the Cashfree v3 SDK and runs `POST /api/v1/payments/cashfree/order` (with the `useAuth().getToken()` Bearer) → `cashfree.checkout(payment_session_id)`.
+- Wired a **"Pay with Cashfree"** button into `UpscPricingCheckoutIntent`, shown only when `publicCommerceLaunchBoundary.readyForPayment` is true (keeps the existing pilot-activation flow intact). Friendly error if payments aren't enabled (backend 503).
+- **To go live:** set backend Cashfree keys, flip `publicCommerceLaunchBoundary.readyForPayment`, run the subscriptions migration, and test the full order → checkout → webhook → active-subscription loop in Cashfree **sandbox**.
