@@ -2,6 +2,7 @@ import type { OptionalTopic, TopicStatus } from "./geographyOptionalTypes";
 import { geomorphology } from "./geomorphology";
 import { climatology } from "./climatology";
 import { oceanography } from "./oceanography";
+import { biogeography } from "./biogeography";
 
 /**
  * Registry of Geography Optional topics.
@@ -24,28 +25,6 @@ type ComingSoonTopic = {
 
 export const comingSoonTopics: ComingSoonTopic[] = [
   {
-    slug: "biogeography",
-    title: "Biogeography",
-    paper: "Paper I",
-    section: "Section A — Physical Geography",
-    order: 4,
-    status: "coming-soon",
-    summary:
-      "Soils — genesis & classification, biomes & ecosystems, biodiversity and conservation.",
-    readMinutes: 28,
-  },
-  {
-    slug: "biogeography",
-    title: "Biogeography",
-    paper: "Paper I",
-    section: "Section A — Physical Geography",
-    order: 4,
-    status: "coming-soon",
-    summary:
-      "Soils — genesis & classification, biomes & ecosystems, biodiversity and conservation.",
-    readMinutes: 28,
-  },
-  {
     slug: "environmental-geography",
     title: "Environmental Geography",
     paper: "Paper I",
@@ -59,7 +38,7 @@ export const comingSoonTopics: ComingSoonTopic[] = [
 ];
 
 /** Fully-authored topics (Read content ready). */
-export const readyTopics: OptionalTopic[] = [geomorphology, climatology, oceanography];
+export const readyTopics: OptionalTopic[] = [geomorphology, climatology, oceanography, biogeography];
 
 export type TopicCard = {
   slug: string;

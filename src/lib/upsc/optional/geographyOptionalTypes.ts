@@ -64,7 +64,11 @@ export type DiagramId =
   | "salinity-profile"
   | "ocean-gyres"
   | "coral-reef-types"
-  | "tides-spring-neap";
+  | "tides-spring-neap"
+  | "soil-profile"
+  | "world-biomes"
+  | "ecological-pyramid"
+  | "soil-conservation";
 
 export type Pyq = {
   year?: string;

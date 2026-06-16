@@ -34,11 +34,11 @@ For each topic the student gets:
   - **Hidden topics** — themes never printed in the syllabus but repeatedly required to answer questions.
 - A landing page where the **Syllabus button is placed before the Read button** (as specified by the founder).
 
-**Topics live now (3 of 5 in Paper I Physical Geography):**
+**Topics live now (4 of 5 in Paper I Physical Geography):**
 1. ✅ **Geomorphology**
 2. ✅ **Climatology**
 3. ✅ **Oceanography**
-4. ⏳ Biogeography (queued)
+4. ✅ **Biogeography**
 5. ⏳ Environmental Geography (queued)
 
 ---
@@ -53,6 +53,7 @@ For each topic the student gets:
 | Read — Geomorphology | `/upsc/optional-subjects/geography-optional/read/geomorphology` |
 | Read — Climatology | `/upsc/optional-subjects/geography-optional/read/climatology` |
 | Read — Oceanography | `/upsc/optional-subjects/geography-optional/read/oceanography` |
+| Read — Biogeography | `/upsc/optional-subjects/geography-optional/read/biogeography` |
 
 > These pages sit inside the authenticated dashboard shell. See §5 for how to open them on a deployed (non-localhost) host without a full login.
 
@@ -163,6 +164,16 @@ For each topic the student gets:
 
 **Hidden topics surfaced:** thermohaline circulation (global conveyor belt); Ekman transport, geostrophic flow & upwelling; El Niño/La Niña & Walker circulation; ocean acidification; UNCLOS maritime zones & Blue Economy; active vs passive continental margins.
 
+### Biogeography (`/read/biogeography`) — 6 subtopics
+1. Genesis of soils & the soil profile (CLORPT, pedogenic processes, horizons)
+2. Classification & distribution of soils (zonal/azonal/intrazonal, USDA, world map)
+3. Soil erosion, degradation & conservation (types, desertification, watershed)
+4. Factors influencing world distribution of plants & animals (biomes, succession)
+5. Deforestation, social forestry & agro-forestry
+6. Wildlife & major gene-pool centres (Vavilov centres, hotspots, in-situ/ex-situ)
+
+**Hidden topics surfaced:** Jenny's CLORPT soil-forming factors; pedogenic processes (laterization/podzolization/calcification/salinization/gleization); ecological succession & climatic climax; biodiversity hotspots (Myers) & Vavilov centres; Wallace's zoogeographic realms; ecosystem energy flow & biogeochemical cycles.
+
 ---
 
 ## 8. Notes & known limitations
@@ -175,7 +186,7 @@ For each topic the student gets:
 
 ## 9. Roadmap (remaining Geography Optional content)
 
-- **Paper I, Section A (Physical):** Biogeography → Environmental Geography (next build targets)
+- **Paper I, Section A (Physical):** Environmental Geography (final Section-A build target)
 - **Paper I, Section B (Human Geography)** and **Paper II (Geography of India)**: to be scoped after Section A is complete.
 
 ---

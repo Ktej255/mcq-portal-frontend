@@ -150,3 +150,18 @@ Built the first real content module for the **Geography (Optional)** track (prev
 **Validation:** full `next build` passes — **223/223 static pages**, incl. `/read/oceanography`.
 
 **Geography Optional progress:** 3 of 5 physical-geography topics live (Geomorphology, Climatology, Oceanography). Next: Biogeography → Environmental Geography. Deployment handoff doc updated: `docs/GEOGRAPHY_OPTIONAL_BUILD_HANDOFF.md`.
+
+
+---
+
+## 2026-06-16 (cont.) — Biogeography module (Geography Optional, 4 of 5 physical topics)
+
+**Biogeography (Paper I) shipped** — fourth Read module, same model/depth:
+- `/upsc/optional-subjects/geography-optional/read/biogeography` — 6 subtopics: genesis of soils & soil profile; classification & distribution of soils; soil erosion, degradation & conservation; factors of plant/animal distribution (biomes); deforestation, social & agro-forestry; wildlife & major gene-pool centres.
+- Three-layer syllabus; hidden topics incl. Jenny's CLORPT, pedogenic processes, ecological succession, biodiversity hotspots & Vavilov centres, Wallace's realms, ecosystem energy flow.
+- 4 new pencil-style SVG diagrams: soil profile (O-A-E-B-C-R), world biomes, trophic energy pyramid, slope soil-conservation.
+- Files: `src/lib/upsc/optional/biogeography.ts`; registered ready in `geographyOptionalTopics.ts` (also de-duplicated a stray coming-soon entry); diagram IDs added to `geographyOptionalTypes.ts` + `GeoOptionalDiagrams.tsx`.
+
+**Validation:** full `next build` passes — **224/224 static pages**, incl. `/read/biogeography`.
+
+**Geography Optional progress:** 4 of 5 physical-geography topics live (Geomorphology, Climatology, Oceanography, Biogeography). Final Section-A target: Environmental Geography.

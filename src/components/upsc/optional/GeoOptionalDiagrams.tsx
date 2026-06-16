@@ -373,6 +373,91 @@ function TidesSpringNeap() {
   );
 }
 
+function SoilProfile() {
+  return (
+    <svg viewBox="0 0 320 250" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      {[
+        ["O", "humus / litter", 40, 22, "go-pencil-fill-green"],
+        ["A", "topsoil (eluviation)", 62, 34, "go-pencil-fill-amber"],
+        ["E", "leached zone", 96, 22, "go-pencil-fill-amber"],
+        ["B", "subsoil (illuviation)", 118, 40, "go-pencil-fill-red"],
+        ["C", "weathered parent", 158, 34, "go-pencil-fill-blue"],
+        ["R", "bedrock", 192, 26, "go-pencil-fill-blue"],
+      ].map(([code, label, y, h, fill]) => (
+        <g key={code as string}>
+          <path className={`go-pencil ${fill}`} d={`M60 ${y as number} L210 ${y as number} L210 ${(y as number) + (h as number)} L60 ${(y as number) + (h as number)} Z`} />
+          <text x="36" y={(y as number) + (h as number) / 2 + 4} className="go-ink-label" fontSize="14">{code as string}</text>
+          <text x="218" y={(y as number) + (h as number) / 2 + 4} className="go-ink-label" fontSize="11">{label as string}</text>
+        </g>
+      ))}
+      <text x="50" y="238" className="go-ink-label go-hand" fontSize="15">soil profile — O A E B C R horizons</text>
+    </svg>
+  );
+}
+
+function WorldBiomes() {
+  return (
+    <svg viewBox="0 0 360 240" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      <path className="go-pencil" d="M40 30 L40 200 L330 200" />
+      <text x="14" y="120" className="go-ink-label" fontSize="11" transform="rotate(-90 14 120)">latitude / altitude →</text>
+      {[
+        ["Tundra", 48, "go-pencil-fill-blue"],
+        ["Taiga (boreal)", 76, "go-pencil-fill-green"],
+        ["Temperate forest", 104, "go-pencil-fill-green"],
+        ["Grassland / steppe", 132, "go-pencil-fill-amber"],
+        ["Desert", 160, "go-pencil-fill-amber"],
+        ["Tropical rainforest", 188, "go-pencil-fill-green"],
+      ].map(([name, y, fill]) => (
+        <g key={name as string}>
+          <path className={`go-pencil ${fill}`} d={`M44 ${(y as number) - 10} L120 ${(y as number) - 10} L120 ${(y as number) + 4} L44 ${(y as number) + 4} Z`} />
+          <text x="128" y={(y as number)} className="go-ink-label" fontSize="11">{name as string}</text>
+        </g>
+      ))}
+      <text x="50" y="226" className="go-ink-label go-hand" fontSize="14">biomes shift with temperature & rainfall</text>
+    </svg>
+  );
+}
+
+function EcologicalPyramid() {
+  return (
+    <svg viewBox="0 0 360 230" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      <path className="go-pencil go-pencil-fill-green" d="M40 190 L320 190 L300 150 L60 150 Z" />
+      <text x="120" y="178" className="go-ink-label" fontSize="11">producers (autotrophs)</text>
+      <path className="go-pencil go-pencil-fill-amber" d="M70 150 L290 150 L265 110 L95 110 Z" />
+      <text x="120" y="138" className="go-ink-label" fontSize="11">primary consumers</text>
+      <path className="go-pencil go-pencil-fill-red" d="M105 110 L255 110 L230 75 L130 75 Z" />
+      <text x="135" y="98" className="go-ink-label" fontSize="11">secondary consumers</text>
+      <path className="go-pencil go-pencil-fill-blue" d="M140 75 L220 75 L195 45 L165 45 Z" />
+      <text x="150" y="64" className="go-ink-label" fontSize="10">top carnivores</text>
+      <text x="300" y="120" className="go-ink-label" fontSize="11">~10% energy ↑</text>
+      <text x="55" y="218" className="go-ink-label go-hand" fontSize="15">trophic energy pyramid</text>
+    </svg>
+  );
+}
+
+function SoilConservation() {
+  return (
+    <svg viewBox="0 0 380 220" className="h-auto w-full max-w-lg">
+      <RoughDefs />
+      {/* hill slope */}
+      <path className="go-pencil" d="M30 180 Q120 60 350 50" />
+      {/* contour terraces (steps) */}
+      <path className="go-pencil go-pencil-fill-green" d="M70 150 q40 -6 80 -2" />
+      <path className="go-pencil go-pencil-fill-green" d="M110 120 q40 -6 80 -2" />
+      <path className="go-pencil go-pencil-fill-green" d="M150 92 q40 -6 80 -2" />
+      <text x="190" y="150" className="go-ink-label" fontSize="11">contour bunds / terraces</text>
+      {/* shelter trees */}
+      <path className="go-pencil go-pencil-fill-green" d="M60 180 l8 -16 l8 16 Z" />
+      <path className="go-pencil go-pencil-fill-green" d="M300 60 l8 -16 l8 16 Z" />
+      <text x="260" y="40" className="go-ink-label" fontSize="11">afforestation / shelter belt</text>
+      <text x="50" y="208" className="go-ink-label go-hand" fontSize="15">soil conservation on slopes</text>
+    </svg>
+  );
+}
+
 const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "endo-exo-balance": EndoExoBalance,
   "plate-boundaries": PlateBoundaries,
@@ -390,6 +475,10 @@ const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "ocean-gyres": OceanGyres,
   "coral-reef-types": CoralReefTypes,
   "tides-spring-neap": TidesSpringNeap,
+  "soil-profile": SoilProfile,
+  "world-biomes": WorldBiomes,
+  "ecological-pyramid": EcologicalPyramid,
+  "soil-conservation": SoilConservation,
 };
 
 export function GeoDiagram({ id, caption }: { id: DiagramId; caption: string }) {
