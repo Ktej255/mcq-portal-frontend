@@ -12,11 +12,9 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Flame,
-  GraduationCap,
   LineChart,
   Map,
   MessageSquareText,
-  Menu,
   PenLine,
   PlayCircle,
   Repeat2,
@@ -24,11 +22,11 @@ import {
   Sparkles,
   Target,
   Users,
-  X,
   type LucideIcon,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { SiteNav } from "./SiteNav";
+import { SiteFooter } from "./SiteFooter";
 
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
@@ -190,111 +188,6 @@ const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 } as const;
-
-/* ------------------------------------------------------------------ */
-/* Nav                                                                 */
-/* ------------------------------------------------------------------ */
-
-function SiteNav() {
-  const [scrolled, setScrolled] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const links = [
-    { href: "#loop", label: "Daily loop" },
-    { href: "#features", label: "Features" },
-    { href: "#results", label: "Results" },
-    { href: "#pricing", label: "Pricing" },
-    { href: "#faq", label: "FAQ" },
-  ];
-
-  return (
-    <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "border-b border-[#dcd5c7] bg-[#f7f4ee]/85 backdrop-blur-md shadow-[0_2px_20px_rgba(19,37,29,0.06)]"
-          : "border-b border-transparent bg-transparent"
-      }`}
-    >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
-            <GraduationCap className="h-5 w-5" />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-base font-black tracking-tight text-[#13251d]">Sarit Learn</span>
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">UPSC Command</span>
-          </span>
-        </Link>
-
-        <div className="hidden items-center gap-7 md:flex">
-          {links.map((l) => (
-            <a key={l.href} href={l.href} className="text-sm font-bold text-[#536259] transition hover:text-[#13251d]">
-              {l.label}
-            </a>
-          ))}
-        </div>
-
-        <div className="hidden items-center gap-3 md:flex">
-          <Link href="/login?redirect=/upsc" className="text-sm font-black text-[#13251d] transition hover:text-[#085041]">
-            Log in
-          </Link>
-          <Link
-            href="/login?redirect=/upsc"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-          >
-            Start free
-          </Link>
-        </div>
-
-        <button
-          type="button"
-          aria-label="Toggle menu"
-          onClick={() => setOpen((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-[#fffdf8] text-[#13251d] md:hidden"
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </nav>
-
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden border-t border-[#dcd5c7] bg-[#f7f4ee] md:hidden"
-          >
-            <div className="flex flex-col gap-1 px-4 py-3">
-              {links.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className="rounded-md px-3 py-2 text-sm font-bold text-[#33443b] hover:bg-[#e7f5ee]"
-                >
-                  {l.label}
-                </a>
-              ))}
-              <Link
-                href="/login?redirect=/upsc"
-                className="mt-2 inline-flex h-10 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
-              >
-                Start free
-              </Link>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </header>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Hero                                                                */
@@ -916,45 +809,6 @@ function FinalCta() {
         </Link>
       </div>
     </section>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer className="border-t border-[#dcd5c7] bg-[#f7f4ee] py-12">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
-              <GraduationCap className="h-5 w-5" />
-            </span>
-            <span className="text-base font-black tracking-tight text-[#13251d]">Sarit Learn</span>
-          </div>
-          <p className="mt-3 max-w-xs text-sm font-semibold leading-6 text-[#536259]">
-            One connected system to learn, practise and revise for UPSC — honestly.
-          </p>
-        </div>
-        {[
-          { h: "Product", items: ["Daily loop", "Features", "Pricing", "Results"] },
-          { h: "Subjects", items: ["Geography", "Environment", "Economy", "Polity"] },
-          { h: "Company", items: ["About", "Contact", "Privacy", "Terms"] },
-        ].map((col) => (
-          <div key={col.h}>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8c5d14]">{col.h}</p>
-            <ul className="mt-3 space-y-2">
-              {col.items.map((it) => (
-                <li key={it}>
-                  <span className="text-sm font-semibold text-[#536259] transition hover:text-[#13251d]">{it}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <div className="mx-auto mt-10 max-w-7xl border-t border-[#dcd5c7] px-4 pt-6 text-xs font-semibold text-[#8a8173] md:px-8">
-        © {new Date().getFullYear()} Sarit Learn · UPSC Command. Built for aspirants, honestly.
-      </div>
-    </footer>
   );
 }
 

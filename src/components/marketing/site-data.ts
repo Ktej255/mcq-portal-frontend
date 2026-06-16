@@ -1,0 +1,379 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Map,
+  Leaf,
+  IndianRupee,
+  Landmark,
+  ScrollText,
+  Palette,
+  FlaskConical,
+  Globe2,
+  Scale,
+  Calculator,
+  Newspaper,
+  PenLine,
+  Users2,
+  Building2,
+  Brain,
+  Sigma,
+  BookMarked,
+  Briefcase,
+  Languages,
+} from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/* Navigation + footer                                                 */
+/* ------------------------------------------------------------------ */
+
+export const navLinks: { href: string; label: string }[] = [
+  { href: "/subjects", label: "Subjects" },
+  { href: "/pyqs", label: "Free PYQs" },
+  { href: "/resources", label: "Resources" },
+  { href: "/pricing", label: "Pricing" },
+];
+
+export const footerColumns: { heading: string; links: { label: string; href: string }[] }[] = [
+  {
+    heading: "Product",
+    links: [
+      { label: "Daily loop", href: "/#loop" },
+      { label: "Features", href: "/features" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Results", href: "/upsc-prelims-2026-showcase" },
+    ],
+  },
+  {
+    heading: "Subjects",
+    links: [
+      { label: "Geography", href: "/subjects/geography" },
+      { label: "Environment", href: "/subjects/environment" },
+      { label: "Economy", href: "/subjects/economy" },
+      { label: "All subjects", href: "/subjects" },
+    ],
+  },
+  {
+    heading: "Free",
+    links: [
+      { label: "Previous year questions", href: "/pyqs" },
+      { label: "Study resources", href: "/resources" },
+      { label: "Current affairs", href: "/subjects/current-affairs" },
+      { label: "Optional subjects", href: "/subjects#optional" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Subjects (GS + Optional)                                            */
+/* ------------------------------------------------------------------ */
+
+export type SubjectStatus = "Live" | "Building" | "Planned";
+
+export type Subject = {
+  slug: string;
+  name: string;
+  category: "GS" | "Optional";
+  icon: LucideIcon;
+  tagline: string;
+  status: SubjectStatus;
+  topics?: string[];
+};
+
+export const subjects: Subject[] = [
+  // ---- General Studies ----
+  {
+    slug: "geography",
+    name: "Geography",
+    category: "GS",
+    icon: Map,
+    tagline: "Physical, Indian & world geography taught through interactive maps.",
+    status: "Live",
+    topics: [
+      "Geomorphology & plate tectonics",
+      "Climatology & oceanography",
+      "Indian physiography & drainage",
+      "Resources, agriculture & industries",
+      "Map-based & location questions",
+    ],
+  },
+  {
+    slug: "environment",
+    name: "Environment & Ecology",
+    category: "GS",
+    icon: Leaf,
+    tagline: "Ecology, biodiversity, climate change and the conventions that matter.",
+    status: "Building",
+    topics: [
+      "Ecosystems & biodiversity",
+      "Climate change & conventions",
+      "Pollution & environmental laws",
+      "Conservation efforts & species in news",
+    ],
+  },
+  {
+    slug: "economy",
+    name: "Indian Economy",
+    category: "GS",
+    icon: IndianRupee,
+    tagline: "Macro concepts linked to the Budget, Economic Survey and current data.",
+    status: "Planned",
+    topics: [
+      "Growth, inflation & national income",
+      "Money, banking & financial markets",
+      "Fiscal policy, Budget & taxation",
+      "External sector & trade",
+    ],
+  },
+  {
+    slug: "polity",
+    name: "Polity & Governance",
+    category: "GS",
+    icon: Landmark,
+    tagline: "Constitution, institutions and governance, the mega scoring chapter.",
+    status: "Planned",
+    topics: [
+      "Constitutional framework & rights",
+      "Union & state government",
+      "Judiciary & constitutional bodies",
+      "Governance, transparency & schemes",
+    ],
+  },
+  {
+    slug: "history",
+    name: "History",
+    category: "GS",
+    icon: ScrollText,
+    tagline: "Ancient, medieval, modern India and the freedom struggle.",
+    status: "Planned",
+  },
+  {
+    slug: "art-culture",
+    name: "Art & Culture",
+    category: "GS",
+    icon: Palette,
+    tagline: "Architecture, art forms, literature and India's cultural heritage.",
+    status: "Planned",
+  },
+  {
+    slug: "science-tech",
+    name: "Science & Technology",
+    category: "GS",
+    icon: FlaskConical,
+    tagline: "Applied science, space, defence, biotech and tech in the news.",
+    status: "Planned",
+  },
+  {
+    slug: "international-relations",
+    name: "International Relations",
+    category: "GS",
+    icon: Globe2,
+    tagline: "India and the world, groupings, treaties and foreign policy.",
+    status: "Planned",
+  },
+  {
+    slug: "ethics",
+    name: "Ethics (GS-IV)",
+    category: "GS",
+    icon: Scale,
+    tagline: "Ethics, integrity, aptitude and case studies for Mains Paper IV.",
+    status: "Planned",
+  },
+  {
+    slug: "csat",
+    name: "CSAT (Paper II)",
+    category: "GS",
+    icon: Calculator,
+    tagline: "Comprehension, reasoning and quantitative aptitude for the qualifying paper.",
+    status: "Planned",
+  },
+  {
+    slug: "current-affairs",
+    name: "Current Affairs",
+    category: "GS",
+    icon: Newspaper,
+    tagline: "Daily news filtered to the exam, with monthly consolidations.",
+    status: "Live",
+    topics: [
+      "Daily current affairs + editorials",
+      "Daily current-affairs MCQs",
+      "Monthly magazine & revision",
+      "Government schemes tracker",
+    ],
+  },
+  {
+    slug: "essay",
+    name: "Essay",
+    category: "GS",
+    icon: PenLine,
+    tagline: "Structured essay practice with model frameworks and feedback.",
+    status: "Planned",
+  },
+
+  // ---- Optional subjects ----
+  {
+    slug: "psir",
+    name: "Political Science & IR",
+    category: "Optional",
+    icon: Globe2,
+    tagline: "One of the most popular optionals, strong GS-II overlap.",
+    status: "Planned",
+  },
+  {
+    slug: "sociology",
+    name: "Sociology",
+    category: "Optional",
+    icon: Users2,
+    tagline: "Concise syllabus, high overlap with Essay and GS-I society.",
+    status: "Planned",
+  },
+  {
+    slug: "public-administration",
+    name: "Public Administration",
+    category: "Optional",
+    icon: Building2,
+    tagline: "Administrative theory and Indian administration.",
+    status: "Planned",
+  },
+  {
+    slug: "anthropology",
+    name: "Anthropology",
+    category: "Optional",
+    icon: Brain,
+    tagline: "Science-flavoured optional favoured for its diagram-friendly answers.",
+    status: "Planned",
+  },
+  {
+    slug: "geography-optional",
+    name: "Geography (Optional)",
+    category: "Optional",
+    icon: Map,
+    tagline: "Deep geography with strong GS overlap and map-based answers.",
+    status: "Planned",
+  },
+  {
+    slug: "history-optional",
+    name: "History (Optional)",
+    category: "Optional",
+    icon: ScrollText,
+    tagline: "Comprehensive history optional with GS-I synergy.",
+    status: "Planned",
+  },
+  {
+    slug: "philosophy",
+    name: "Philosophy",
+    category: "Optional",
+    icon: BookMarked,
+    tagline: "Short syllabus optional with strong Ethics overlap.",
+    status: "Planned",
+  },
+  {
+    slug: "economics-optional",
+    name: "Economics (Optional)",
+    category: "Optional",
+    icon: IndianRupee,
+    tagline: "Analytical optional for candidates with a quantitative bent.",
+    status: "Planned",
+  },
+  {
+    slug: "mathematics",
+    name: "Mathematics",
+    category: "Optional",
+    icon: Sigma,
+    tagline: "Scoring, deterministic optional for strong math backgrounds.",
+    status: "Planned",
+  },
+  {
+    slug: "commerce-accountancy",
+    name: "Commerce & Accountancy",
+    category: "Optional",
+    icon: Briefcase,
+    tagline: "Specialised optional for commerce graduates.",
+    status: "Planned",
+  },
+  {
+    slug: "literature",
+    name: "Literature optionals",
+    category: "Optional",
+    icon: Languages,
+    tagline: "Hindi, English and regional-language literature optionals.",
+    status: "Planned",
+  },
+];
+
+export function getSubject(slug: string): Subject | undefined {
+  return subjects.find((s) => s.slug === slug);
+}
+
+export const gsSubjects = subjects.filter((s) => s.category === "GS");
+export const optionalSubjects = subjects.filter((s) => s.category === "Optional");
+
+/* ------------------------------------------------------------------ */
+/* Previous Year Questions (free hub)                                  */
+/* ------------------------------------------------------------------ */
+
+export const pyqYears: { year: string; prelims: string; mains: string }[] = [
+  { year: "2025", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+  { year: "2024", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+  { year: "2023", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+  { year: "2022", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+  { year: "2021", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+  { year: "2020", prelims: "GS Paper I + CSAT", mains: "GS I–IV + Essay" },
+];
+
+export const pyqBySubject: { subject: string; count: string }[] = [
+  { subject: "Polity & Governance", count: "10 yrs" },
+  { subject: "History & Culture", count: "10 yrs" },
+  { subject: "Geography", count: "10 yrs" },
+  { subject: "Economy", count: "10 yrs" },
+  { subject: "Environment & Ecology", count: "10 yrs" },
+  { subject: "Science & Technology", count: "10 yrs" },
+  { subject: "Current Affairs", count: "10 yrs" },
+  { subject: "CSAT", count: "10 yrs" },
+];
+
+/* ------------------------------------------------------------------ */
+/* Free study resources                                                */
+/* ------------------------------------------------------------------ */
+
+export const resourceGroups: { heading: string; items: { title: string; detail: string }[] }[] = [
+  {
+    heading: "Foundation reading",
+    items: [
+      { title: "NCERT booklist (6–12)", detail: "Subject-wise NCERT order with what to read and what to skip." },
+      { title: "Standard reference books", detail: "The trusted standard book for each GS subject." },
+      { title: "UPSC syllabus (Prelims & Mains)", detail: "The official syllabus, annotated topic by topic." },
+    ],
+  },
+  {
+    heading: "Current affairs",
+    items: [
+      { title: "Daily current affairs", detail: "Exam-filtered news and editorial gist, every day." },
+      { title: "Monthly magazine", detail: "Consolidated monthly current affairs for revision." },
+      { title: "Government schemes tracker", detail: "Flagship schemes with objectives and outcomes." },
+    ],
+  },
+  {
+    heading: "Revision & practice",
+    items: [
+      { title: "Mind maps", detail: "One-glance visual summaries for fast revision." },
+      { title: "Daily MCQ quiz", detail: "Free daily practice with instant explanations." },
+      { title: "Previous year questions", detail: "Year-wise and subject-wise PYQ browser." },
+    ],
+  },
+  {
+    heading: "Mains toolkit",
+    items: [
+      { title: "Answer-writing frameworks", detail: "Intro–body–conclusion templates by question type." },
+      { title: "Model answers", detail: "Sample answers showing structure and value addition." },
+      { title: "Essay frameworks", detail: "Thematic essay structures with fodder material." },
+    ],
+  },
+];
