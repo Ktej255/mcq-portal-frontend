@@ -1,4 +1,5 @@
 import { subjects } from "@/components/marketing/site-data";
+import { guides } from "@/components/marketing/guides-data";
 import { SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-static";
@@ -23,9 +24,13 @@ export function GET() {
     `- [Tests & practice](${SITE_URL}/tests): Daily quizzes, Prelims mocks, CSAT practice and Mains answer writing with analytics.`,
     `- [Study resources](${SITE_URL}/resources): NCERT booklist, standard references, current affairs, mind maps, Mains frameworks.`,
     `- [Subjects](${SITE_URL}/subjects): All General Studies and Optional subjects.`,
+    `- [Guides](${SITE_URL}/guides): Practical UPSC guides on starting prep, the syllabus, books, current affairs and Prelims strategy.`,
     "",
     "## Subjects",
     ...subjects.map((s) => `- [${s.name}](${SITE_URL}/subjects/${s.slug}): ${s.tagline}`),
+    "",
+    "## Guides",
+    ...guides.map((g) => `- [${g.title}](${SITE_URL}/guides/${g.slug}): ${g.excerpt}`),
     "",
     "## Company",
     `- [About](${SITE_URL}/about): Mission and approach.`,

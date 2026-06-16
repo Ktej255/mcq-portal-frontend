@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { subjects } from "@/components/marketing/site-data";
+import { guides } from "@/components/marketing/guides-data";
 import { SITE_URL } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -15,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/pyqs",
     "/tests",
     "/resources",
+    "/guides",
     "/about",
     "/contact",
     "/privacy",
@@ -35,5 +37,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticEntries, ...subjectEntries];
+  const guideEntries: MetadataRoute.Sitemap = guides.map((g) => ({
+    url: `${SITE_URL}/guides/${g.slug}`,
+    lastModified: now,
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  return [...staticEntries, ...subjectEntries, ...guideEntries];
 }

@@ -60,6 +60,7 @@ export const footerColumns: { heading: string; links: { label: string; href: str
       { label: "Previous year questions", href: "/pyqs" },
       { label: "Study resources", href: "/resources" },
       { label: "Current affairs", href: "/current-affairs" },
+      { label: "UPSC guides", href: "/guides" },
       { label: "Optional subjects", href: "/subjects#optional" },
     ],
   },
