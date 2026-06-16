@@ -34,10 +34,10 @@ For each topic the student gets:
   - **Hidden topics** — themes never printed in the syllabus but repeatedly required to answer questions.
 - A landing page where the **Syllabus button is placed before the Read button** (as specified by the founder).
 
-**Topics live now (2 of 5 in Paper I Physical Geography):**
+**Topics live now (3 of 5 in Paper I Physical Geography):**
 1. ✅ **Geomorphology**
 2. ✅ **Climatology**
-3. ⏳ Oceanography (queued)
+3. ✅ **Oceanography**
 4. ⏳ Biogeography (queued)
 5. ⏳ Environmental Geography (queued)
 
@@ -52,6 +52,7 @@ For each topic the student gets:
 | Read — topic index | `/upsc/optional-subjects/geography-optional/read` |
 | Read — Geomorphology | `/upsc/optional-subjects/geography-optional/read/geomorphology` |
 | Read — Climatology | `/upsc/optional-subjects/geography-optional/read/climatology` |
+| Read — Oceanography | `/upsc/optional-subjects/geography-optional/read/oceanography` |
 
 > These pages sit inside the authenticated dashboard shell. See §5 for how to open them on a deployed (non-localhost) host without a full login.
 
@@ -152,6 +153,16 @@ For each topic the student gets:
 
 **Hidden topics surfaced:** lapse rates (ELR/DALR/SALR); ENSO, Walker circulation, IOD teleconnections; jet-stream & Tibetan-plateau monsoon theory; condensation/precipitation micro-physics (Bergeron, coalescence); radiation laws & greenhouse mechanism; Milankovitch cycles & palaeoclimate.
 
+### Oceanography (`/read/oceanography`) — 6 subtopics
+1. Ocean bottom relief & deposits (Atlantic/Pacific/Indian basins)
+2. Temperature, salinity, and the heat & salt budgets (thermohaline circulation)
+3. Waves, currents & tides (gyres, upwelling, spring/neap)
+4. Marine resources — biotic, mineral & energy (UNCLOS, Blue Economy)
+5. Coral reefs & coral bleaching (Darwin's theory, acidification)
+6. Sea-level changes, law of the sea & marine pollution
+
+**Hidden topics surfaced:** thermohaline circulation (global conveyor belt); Ekman transport, geostrophic flow & upwelling; El Niño/La Niña & Walker circulation; ocean acidification; UNCLOS maritime zones & Blue Economy; active vs passive continental margins.
+
 ---
 
 ## 8. Notes & known limitations
@@ -164,5 +175,5 @@ For each topic the student gets:
 
 ## 9. Roadmap (remaining Geography Optional content)
 
-- **Paper I, Section A (Physical):** Oceanography → Biogeography → Environmental Geography (next build targets)
+- **Paper I, Section A (Physical):** Biogeography → Environmental Geography (next build targets)
 - **Paper I, Section B (Human Geography)** and **Paper II (Geography of India)**: to be scoped after Section A is complete.

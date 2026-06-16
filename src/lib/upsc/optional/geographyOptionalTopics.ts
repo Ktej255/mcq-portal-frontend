@@ -1,6 +1,7 @@
 import type { OptionalTopic, TopicStatus } from "./geographyOptionalTypes";
 import { geomorphology } from "./geomorphology";
 import { climatology } from "./climatology";
+import { oceanography } from "./oceanography";
 
 /**
  * Registry of Geography Optional topics.
@@ -23,15 +24,15 @@ type ComingSoonTopic = {
 
 export const comingSoonTopics: ComingSoonTopic[] = [
   {
-    slug: "oceanography",
-    title: "Oceanography",
+    slug: "biogeography",
+    title: "Biogeography",
     paper: "Paper I",
     section: "Section A — Physical Geography",
-    order: 3,
+    order: 4,
     status: "coming-soon",
     summary:
-      "Ocean relief, temperature & salinity, currents, tides, marine resources and coral environments.",
-    readMinutes: 30,
+      "Soils — genesis & classification, biomes & ecosystems, biodiversity and conservation.",
+    readMinutes: 28,
   },
   {
     slug: "biogeography",
@@ -58,7 +59,7 @@ export const comingSoonTopics: ComingSoonTopic[] = [
 ];
 
 /** Fully-authored topics (Read content ready). */
-export const readyTopics: OptionalTopic[] = [geomorphology, climatology];
+export const readyTopics: OptionalTopic[] = [geomorphology, climatology, oceanography];
 
 export type TopicCard = {
   slug: string;

@@ -135,3 +135,18 @@ Built the first real content module for the **Geography (Optional)** track (prev
 **Validation:** full `next build` now succeeds — **222/222 static pages**, including `/tests`, `/practice`, and both `…/read/geomorphology` and `…/read/climatology`. No route conflicts.
 
 **Geography Optional progress:** 2 of 5 physical-geography topics live (Geomorphology, Climatology). Next: Oceanography → Biogeography → Environmental Geography.
+
+
+---
+
+## 2026-06-16 (cont.) — Oceanography module (Geography Optional, 3 of 5 physical topics)
+
+**Oceanography (Paper I) shipped** — third Read module, same model/depth:
+- `/upsc/optional-subjects/geography-optional/read/oceanography` — 6 subtopics: ocean bottom relief & deposits; temperature, salinity & heat/salt budgets (thermohaline circulation); waves, currents & tides; marine resources (UNCLOS, Blue Economy); coral reefs & coral bleaching; sea-level changes, law of the sea & marine pollution.
+- Three-layer syllabus (Official/Trend/Hidden); hidden topics incl. thermohaline conveyor, Ekman transport/upwelling, ENSO, ocean acidification, UNCLOS zones, active/passive margins.
+- 5 new pencil-style SVG diagrams: ocean-floor relief, thermocline profile, wind-driven gyre, coral reef types (Darwin), spring/neap tides.
+- Files: `src/lib/upsc/optional/oceanography.ts`; registered ready in `geographyOptionalTopics.ts`; diagram IDs added to `geographyOptionalTypes.ts` + `GeoOptionalDiagrams.tsx`.
+
+**Validation:** full `next build` passes — **223/223 static pages**, incl. `/read/oceanography`.
+
+**Geography Optional progress:** 3 of 5 physical-geography topics live (Geomorphology, Climatology, Oceanography). Next: Biogeography → Environmental Geography. Deployment handoff doc updated: `docs/GEOGRAPHY_OPTIONAL_BUILD_HANDOFF.md`.

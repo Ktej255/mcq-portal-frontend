@@ -59,7 +59,12 @@ export type DiagramId =
   | "tricellular-circulation"
   | "air-mass-fronts"
   | "koppen-climate"
-  | "urban-heat-island";
+  | "urban-heat-island"
+  | "ocean-relief"
+  | "salinity-profile"
+  | "ocean-gyres"
+  | "coral-reef-types"
+  | "tides-spring-neap";
 
 export type Pyq = {
   year?: string;

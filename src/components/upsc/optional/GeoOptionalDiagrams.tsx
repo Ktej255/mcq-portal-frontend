@@ -273,6 +273,106 @@ function UrbanHeatIsland() {
   );
 }
 
+function OceanRelief() {
+  return (
+    <svg viewBox="0 0 470 220" className="h-auto w-full max-w-2xl">
+      <RoughDefs />
+      {/* sea level */}
+      <path className="go-pencil" d="M20 40 L450 40" strokeDasharray="3 5" />
+      <text x="20" y="34" className="go-ink-label" fontSize="10">sea level</text>
+      {/* profile: shelf -> slope -> rise -> abyssal plain -> trench -> ridge */}
+      <path className="go-pencil go-pencil-fill-blue" d="M20 40 L20 70 L90 78 L150 150 L210 168 L300 170 L330 200 L360 168 L400 150 L430 165 L450 165 L450 40 Z" />
+      <text x="30" y="92" className="go-ink-label" fontSize="11">cont. shelf</text>
+      <text x="120" y="120" className="go-ink-label" fontSize="11">slope</text>
+      <text x="225" y="160" className="go-ink-label" fontSize="11">abyssal plain</text>
+      <text x="310" y="215" className="go-ink-label" fontSize="11">trench</text>
+      <text x="385" y="140" className="go-ink-label" fontSize="11">mid-ocean ridge</text>
+      <text x="60" y="20" className="go-ink-label go-hand" fontSize="15">ocean-floor relief profile</text>
+    </svg>
+  );
+}
+
+function SalinityProfile() {
+  return (
+    <svg viewBox="0 0 360 220" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      <path className="go-pencil" d="M50 30 L50 190 L330 190" />
+      <text x="20" y="110" className="go-ink-label" fontSize="11" transform="rotate(-90 20 110)">depth →</text>
+      <text x="150" y="208" className="go-ink-label" fontSize="11">temperature →</text>
+      {/* warm mixed layer, thermocline, cold deep */}
+      <path className="go-pencil go-pencil-fill-red" d="M250 40 L250 80" />
+      <path className="go-pencil go-pencil-fill-amber" d="M250 80 Q170 110 90 150" />
+      <path className="go-pencil go-pencil-fill-blue" d="M90 150 L90 190" />
+      <text x="255" y="60" className="go-ink-label" fontSize="11">mixed layer (warm)</text>
+      <text x="150" y="120" className="go-ink-label" fontSize="11">thermocline</text>
+      <text x="95" y="175" className="go-ink-label" fontSize="11">deep (cold)</text>
+      <text x="70" y="22" className="go-ink-label go-hand" fontSize="15">thermocline / halocline</text>
+    </svg>
+  );
+}
+
+function OceanGyres() {
+  return (
+    <svg viewBox="0 0 420 230" className="h-auto w-full max-w-lg">
+      <RoughDefs />
+      {/* basin */}
+      <path className="go-pencil" d="M40 30 L380 30 L380 200 L40 200 Z" />
+      {/* equator */}
+      <path className="go-pencil" d="M40 150 L380 150" strokeDasharray="4 5" />
+      <text x="385" y="153" className="go-ink-label" fontSize="10">eq</text>
+      {/* N gyre clockwise */}
+      <path className="go-pencil go-pencil-fill-red" d="M120 60 Q300 55 300 100 Q300 135 130 130 Q90 95 120 60 Z" />
+      <text x="160" y="100" className="go-ink-label" fontSize="11">subtropical gyre (CW)</text>
+      <path className="go-pencil" d="M300 80 l6 8 l-9 3" />
+      {/* warm/cold labels */}
+      <text x="95" y="55" className="go-ink-label" fontSize="10">warm W-boundary →</text>
+      <text x="305" y="125" className="go-ink-label" fontSize="10">cold E-boundary</text>
+      <text x="60" y="222" className="go-ink-label go-hand" fontSize="15">wind-driven gyre + Coriolis</text>
+    </svg>
+  );
+}
+
+function CoralReefTypes() {
+  return (
+    <svg viewBox="0 0 460 200" className="h-auto w-full max-w-2xl">
+      <RoughDefs />
+      {/* fringing */}
+      <path className="go-pencil go-pencil-fill-green" d="M40 120 L90 70 L140 120 Z" />
+      <path className="go-pencil go-pencil-fill-amber" d="M30 120 L150 120" />
+      <text x="55" y="140" className="go-ink-label" fontSize="11">fringing</text>
+      {/* barrier */}
+      <path className="go-pencil go-pencil-fill-green" d="M190 120 L225 80 L260 120 Z" />
+      <path className="go-pencil" d="M170 120 L290 120" />
+      <path className="go-pencil go-pencil-fill-amber" d="M175 120 l6 -8 m120 8 l-6 -8" />
+      <text x="195" y="140" className="go-ink-label" fontSize="11">barrier (+ lagoon)</text>
+      {/* atoll */}
+      <path className="go-pencil go-pencil-fill-amber" d="M360 120 a40 16 0 1 0 0.1 0 Z" />
+      <path className="go-pencil go-pencil-fill-blue" d="M385 120 a14 6 0 1 0 0.1 0 Z" />
+      <text x="345" y="150" className="go-ink-label" fontSize="11">atoll (ring)</text>
+      <text x="60" y="185" className="go-ink-label go-hand" fontSize="15">Darwin's subsidence theory</text>
+    </svg>
+  );
+}
+
+function TidesSpringNeap() {
+  return (
+    <svg viewBox="0 0 440 220" className="h-auto w-full max-w-lg">
+      <RoughDefs />
+      {/* earth */}
+      <path className="go-pencil go-pencil-fill-blue" d="M190 90 a30 30 0 1 0 0.1 0 Z" />
+      <text x="205" y="95" className="go-ink-label" fontSize="11">Earth</text>
+      {/* spring: sun-moon aligned */}
+      <path className="go-pencil go-pencil-fill-amber" d="M40 90 a14 14 0 1 0 0.1 0 Z" />
+      <text x="30" y="70" className="go-ink-label" fontSize="10">Sun</text>
+      <path className="go-pencil" d="M300 90 a10 10 0 1 0 0.1 0 Z" />
+      <text x="300" y="72" className="go-ink-label" fontSize="10">Moon</text>
+      <path className="go-pencil" d="M70 90 L160 90 M250 90 L290 90" strokeDasharray="3 4" />
+      <text x="60" y="150" className="go-ink-label" fontSize="11">SPRING tide: Sun–Moon aligned (new/full)</text>
+      <text x="60" y="200" className="go-ink-label go-hand" fontSize="14">NEAP tide: Sun–Moon at right angles</text>
+    </svg>
+  );
+}
+
 const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "endo-exo-balance": EndoExoBalance,
   "plate-boundaries": PlateBoundaries,
@@ -285,6 +385,11 @@ const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "air-mass-fronts": AirMassFronts,
   "koppen-climate": KoppenClimate,
   "urban-heat-island": UrbanHeatIsland,
+  "ocean-relief": OceanRelief,
+  "salinity-profile": SalinityProfile,
+  "ocean-gyres": OceanGyres,
+  "coral-reef-types": CoralReefTypes,
+  "tides-spring-neap": TidesSpringNeap,
 };
 
 export function GeoDiagram({ id, caption }: { id: DiagramId; caption: string }) {
