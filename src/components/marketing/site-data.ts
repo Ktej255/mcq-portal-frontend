@@ -467,9 +467,9 @@ export const pricingStats: { label: string; value: string }[] = [
 
 export const billingOptions: { label: string; save?: string }[] = [
   { label: "Monthly" },
-  { label: "Yearly", save: "-19%" },
-  { label: "2-Year", save: "-29%" },
-  { label: "3-Year", save: "-38%" },
+  { label: "Yearly", save: "-15%" },
+  { label: "2-Year", save: "-25%" },
+  { label: "3-Year", save: "-35%" },
 ];
 
 export type PricingTier = {
@@ -485,7 +485,7 @@ export type PricingTier = {
 export const pricingTiers: PricingTier[] = [
   {
     name: "Foundation",
-    price: "₹400",
+    price: "₹399",
     cadence: "/mo effective",
     tagline: "Build baseline habits before you commit to higher tiers.",
     usage: "1 hour daily AI interaction. Generous rate limits apply.",
@@ -499,7 +499,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Plus",
-    price: "₹700",
+    price: "₹699",
     cadence: "/mo effective",
     tagline: "Structural prep including optional subject libraries.",
     usage: "3 hours daily AI interaction. Generous rate limits apply.",
@@ -513,7 +513,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Pro",
-    price: "₹1,000",
+    price: "₹999",
     cadence: "/mo effective",
     tagline: "Priority AI queues, unlimited testing, and mains uploading.",
     usage: "6 hours daily AI interaction. Generous rate limits apply.",
@@ -528,7 +528,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Ultimate",
-    price: "₹1,300",
+    price: "₹1,299",
     cadence: "/mo effective",
     tagline: "No limits whatsoever. Complete command and direct support.",
     usage: "Unlimited everything. Zero limits apply.",

@@ -6,9 +6,9 @@ import { pricingStats, billingOptions, pricingTiers } from "@/components/marketi
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Pricing — UPSC Plans from ₹400/mo | Sarit Learn",
+  title: "Pricing — UPSC Plans from ₹399/mo | Sarit Learn",
   description:
-    "Flexible UPSC plans — Foundation, Plus, Pro and Ultimate — starting at ₹400/mo. Deeper discounts on yearly, 2-year and 3-year commitments. Free resources for everyone.",
+    "Flexible UPSC plans — Foundation, Plus, Pro and Ultimate — starting at ₹399/mo. Deeper discounts on yearly, 2-year and 3-year commitments. Free resources for everyone.",
   path: "/pricing",
 });
 
@@ -51,7 +51,7 @@ export default function PricingPage() {
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-xs font-semibold text-[#536259]">Save up to 38% with a 3-year commitment.</p>
+            <p className="mt-3 text-xs font-semibold text-[#536259]">Save up to 35% with a 3-year commitment.</p>
           </div>
         </div>
 

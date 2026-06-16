@@ -128,7 +128,7 @@ const roadmap: { window: string; subject: string; status: string }[] = [
 const faqs: { q: string; a: string }[] = [
   {
     q: "Is it free to try?",
-    a: "Previous year questions, study resources, daily current affairs, guides and the 2-minute diagnostic are free for everyone. Full subject plans start at ₹400/mo.",
+    a: "Previous year questions, study resources, daily current affairs, guides and the 2-minute diagnostic are free for everyone. Full subject plans start at ₹399/mo.",
   },
   {
     q: "How is this different from other UPSC platforms?",
@@ -136,7 +136,7 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "What do the paid plans include?",
-    a: "Plans run from Foundation (₹400/mo) to Ultimate (₹1,300/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
+    a: "Plans run from Foundation (₹399/mo) to Ultimate (₹1,299/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
   },
   {
     q: "Do you cover Hindi medium?",
@@ -587,7 +587,7 @@ function PricingSection() {
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <SectionHeading
           eyebrow="Plans for every stage"
-          title="From ₹400/mo — match your tier to your prep."
+          title="From ₹399/mo — match your tier to your prep."
           sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Free resources stay open to everyone."
         />
 
