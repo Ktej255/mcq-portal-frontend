@@ -169,3 +169,98 @@
 @media (prefers-reduced-motion: reduce) {
   .sl-float { animation: none !important; }
 }
+
+
+/* =====================================================================
+   Geography Optional — "personal notes" handwritten reading aesthetic
+   Fonts are loaded via next/font in the geography-optional layout and
+   exposed as --font-hand (display) and --font-hand-body (running notes).
+   ===================================================================== */
+
+.go-notes {
+  --ink: #1f2a44;
+  --ink-soft: #44506b;
+  --pencil-red: #c0392b;
+  --pencil-blue: #2a5db0;
+  --pencil-green: #2e7d4f;
+  --pencil-amber: #b9770e;
+  --paper: #fbf7ec;
+  --margin-line: #e3a9a1;
+  font-family: var(--font-hand-body), "Comic Sans MS", cursive;
+  color: var(--ink);
+}
+
+.go-notes .go-hand {
+  font-family: var(--font-hand), "Comic Sans MS", cursive;
+}
+
+/* Ruled + margin "notebook paper" */
+.go-paper {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, transparent 38px, var(--margin-line) 38px, var(--margin-line) 39px, transparent 39px),
+    repeating-linear-gradient(180deg, transparent 0 31px, #cfe0ee 31px 32px);
+  background-position: 0 0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 30px rgba(31, 42, 68, 0.08);
+}
+
+@media (max-width: 640px) {
+  .go-paper {
+    background-image: repeating-linear-gradient(180deg, transparent 0 31px, #cfe0ee 31px 32px);
+  }
+}
+
+/* A torn / taped note card */
+.go-card {
+  background: #fffdf6;
+  border: 1px solid #ece3cf;
+  box-shadow: 2px 3px 0 rgba(31, 42, 68, 0.06);
+}
+
+.go-tape {
+  position: relative;
+}
+.go-tape::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 96px;
+  height: 22px;
+  transform: translateX(-50%) rotate(-2deg);
+  background: rgba(214, 199, 122, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Highlighter underline + marker swipe */
+.go-underline {
+  background-image: linear-gradient(transparent 62%, rgba(241, 215, 91, 0.7) 62%);
+}
+.go-marker {
+  background: linear-gradient(120deg, rgba(120, 197, 161, 0.45), rgba(120, 197, 161, 0.2));
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* Hand-drawn pencil diagram strokes */
+.go-pencil {
+  stroke: #3a3a3a;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  filter: url(#goRough);
+}
+.go-pencil-fill-blue { fill: rgba(42, 93, 176, 0.16); }
+.go-pencil-fill-green { fill: rgba(46, 125, 79, 0.16); }
+.go-pencil-fill-amber { fill: rgba(185, 119, 14, 0.18); }
+.go-pencil-fill-red { fill: rgba(192, 57, 43, 0.15); }
+
+.go-ink-label {
+  font-family: var(--font-hand), cursive;
+  fill: #1f2a44;
+}
+
+/* gentle paper wobble for headings */
+.go-tilt-l { transform: rotate(-1.2deg); }
+.go-tilt-r { transform: rotate(1deg); }
