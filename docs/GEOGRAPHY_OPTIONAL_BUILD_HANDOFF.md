@@ -177,3 +177,26 @@ For each topic the student gets:
 
 - **Paper I, Section A (Physical):** Biogeography → Environmental Geography (next build targets)
 - **Paper I, Section B (Human Geography)** and **Paper II (Geography of India)**: to be scoped after Section A is complete.
+
+---
+
+## 10. Access fix — "Complete setup" no longer blocks the optional subjects
+
+**Symptom reported:** clicking *Optional subjects* on the deployed site showed
+*"Set your UPSC self-study profile first → Complete setup"* and appeared to loop.
+
+**Cause:** the whole `/upsc/*` area is wrapped by `UpscProfileGate`, which forces
+the personalised self-study intake before any page renders. The optional-subject
+catalog and the Geography Optional Read pages are **reading/reference content** and
+should not require that intake (a prospective enrollee must be able to browse them).
+
+**Fix (in this branch):** `src/app/(dashboard)/upsc/layout.tsx` now treats
+`/upsc/optional-subjects` and all its sub-paths as profile-open — they render
+directly (still behind login via the dashboard `ProtectedRoute`, just not behind
+the study-profile gate). So *Optional → Geography (Optional) → Read* opens without
+the "Complete setup" wall.
+
+> **Reminder:** this fix — like all the Geography Optional content — is on the
+> `feat/geography-optional-read-geomorphology` branch (PR #3). It is **not on
+> `main`**, so the current live/preview deploy still shows the old gated behaviour.
+> **Merge PR #3 and redeploy** to get both the content and this access fix.

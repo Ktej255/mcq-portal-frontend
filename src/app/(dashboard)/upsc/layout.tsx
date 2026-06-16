@@ -24,6 +24,15 @@ const profileOpenRoutes = new Set([
   "/upsc",
 ]);
 
+// Reading / reference sections that should be browsable without first
+// completing the personalised self-study intake. These are catalog and
+// study-content pages (e.g. the optional-subject Read experience), so a
+// student or a prospective enrollee can open them directly. They remain
+// behind authentication via the dashboard ProtectedRoute.
+const profileOpenPrefixes = [
+  "/upsc/optional-subjects",
+];
+
 const futureSubjectPrefixes = [
   "/upsc/environment",
   "/upsc/disaster-management",
@@ -46,6 +55,10 @@ export default function UpscLayout({ children }: { children: React.ReactNode }) 
   }
 
   if (profileOpenRoutes.has(pathname)) {
+    return <>{children}</>;
+  }
+
+  if (profileOpenPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return <>{children}</>;
   }
 
