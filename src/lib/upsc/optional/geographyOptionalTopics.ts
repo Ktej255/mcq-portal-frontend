@@ -3,6 +3,7 @@ import { geomorphology } from "./geomorphology";
 import { climatology } from "./climatology";
 import { oceanography } from "./oceanography";
 import { biogeography } from "./biogeography";
+import { environmentalGeography } from "./environmentalGeography";
 
 /**
  * Registry of Geography Optional topics.
@@ -23,22 +24,16 @@ type ComingSoonTopic = {
   readMinutes: number;
 };
 
-export const comingSoonTopics: ComingSoonTopic[] = [
-  {
-    slug: "environmental-geography",
-    title: "Environmental Geography",
-    paper: "Paper I",
-    section: "Section A — Physical Geography",
-    order: 5,
-    status: "coming-soon",
-    summary:
-      "Ecosystem principles, environmental degradation & management, hazards and sustainable development.",
-    readMinutes: 26,
-  },
-];
+export const comingSoonTopics: ComingSoonTopic[] = [];
 
 /** Fully-authored topics (Read content ready). */
-export const readyTopics: OptionalTopic[] = [geomorphology, climatology, oceanography, biogeography];
+export const readyTopics: OptionalTopic[] = [
+  geomorphology,
+  climatology,
+  oceanography,
+  biogeography,
+  environmentalGeography,
+];
 
 export type TopicCard = {
   slug: string;

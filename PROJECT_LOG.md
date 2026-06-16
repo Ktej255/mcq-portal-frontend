@@ -165,3 +165,18 @@ Built the first real content module for the **Geography (Optional)** track (prev
 **Validation:** full `next build` passes — **224/224 static pages**, incl. `/read/biogeography`.
 
 **Geography Optional progress:** 4 of 5 physical-geography topics live (Geomorphology, Climatology, Oceanography, Biogeography). Final Section-A target: Environmental Geography.
+
+
+---
+
+## 2026-06-16 (cont.) — Environmental Geography module — Paper I Section A COMPLETE (5/5)
+
+**Environmental Geography (Paper I) shipped** — fifth Read module, completing Section A:
+- `/upsc/optional-subjects/geography-optional/read/environmental-geography` — 6 subtopics: principle of ecology & ecosystem; human ecological adaptations & influence of man; global/regional ecological changes & imbalances; environmental degradation, management & conservation; biodiversity & sustainable development; environmental policy, hazards & legislation.
+- Three-layer syllabus; hidden topics incl. energy flow/10% law/biogeochemical cycles, ecological balance & carrying capacity, ozone/acid-rain/eutrophication mechanisms, international conventions & SDGs, EIA & Indian laws, the risk equation.
+- 3 new pencil-style SVG diagrams: ecosystem structure (energy/nutrient), biogeochemical (carbon) cycle, sustainable-development three pillars.
+- Files: `src/lib/upsc/optional/environmentalGeography.ts`; registered ready in `geographyOptionalTopics.ts` (coming-soon list now empty); diagram IDs added.
+
+**Validation:** full `next build` passes — **225/225 static pages**; all 5 read topics generated.
+
+**Milestone:** Geography Optional **Paper I Section A (Physical Geography) is COMPLETE** — Geomorphology, Climatology, Oceanography, Biogeography, Environmental Geography. Next phase: Paper I Section B (Human Geography), then Paper II (Geography of India).

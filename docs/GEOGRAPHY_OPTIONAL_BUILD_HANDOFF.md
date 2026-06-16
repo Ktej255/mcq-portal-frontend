@@ -34,12 +34,12 @@ For each topic the student gets:
   - **Hidden topics** — themes never printed in the syllabus but repeatedly required to answer questions.
 - A landing page where the **Syllabus button is placed before the Read button** (as specified by the founder).
 
-**Topics live now (4 of 5 in Paper I Physical Geography):**
+**Topics live now (5 of 5 in Paper I Physical Geography — Section A COMPLETE):**
 1. ✅ **Geomorphology**
 2. ✅ **Climatology**
 3. ✅ **Oceanography**
 4. ✅ **Biogeography**
-5. ⏳ Environmental Geography (queued)
+5. ✅ **Environmental Geography**
 
 ---
 
@@ -54,6 +54,7 @@ For each topic the student gets:
 | Read — Climatology | `/upsc/optional-subjects/geography-optional/read/climatology` |
 | Read — Oceanography | `/upsc/optional-subjects/geography-optional/read/oceanography` |
 | Read — Biogeography | `/upsc/optional-subjects/geography-optional/read/biogeography` |
+| Read — Environmental Geography | `/upsc/optional-subjects/geography-optional/read/environmental-geography` |
 
 > These pages sit inside the authenticated dashboard shell. See §5 for how to open them on a deployed (non-localhost) host without a full login.
 
@@ -174,6 +175,16 @@ For each topic the student gets:
 
 **Hidden topics surfaced:** Jenny's CLORPT soil-forming factors; pedogenic processes (laterization/podzolization/calcification/salinization/gleization); ecological succession & climatic climax; biodiversity hotspots (Myers) & Vavilov centres; Wallace's zoogeographic realms; ecosystem energy flow & biogeochemical cycles.
 
+### Environmental Geography (`/read/environmental-geography`) — 6 subtopics
+1. Principle of ecology & the ecosystem (energy flow, 10% law, biogeochemical cycles)
+2. Human ecological adaptations & influence of man (determinism → possibilism → neo-determinism)
+3. Global & regional ecological changes and imbalances (warming, ozone, acid rain, eutrophication)
+4. Environmental degradation, management & conservation (EIA, polluter-pays, precautionary principle)
+5. Biodiversity & sustainable development (three pillars, SDGs, ecosystem services)
+6. Environmental policy, hazards & legislation (Stockholm→SDGs, risk equation, Indian laws)
+
+**Hidden topics surfaced:** ecosystem energy flow / 10% law / biogeochemical cycles; ecological balance, resilience & carrying capacity; ozone/acid-rain/eutrophication mechanisms; international conventions & SDGs; EIA & Indian environmental laws; the Risk = Hazard × Vulnerability × Exposure framing.
+
 ---
 
 ## 8. Notes & known limitations
@@ -186,8 +197,9 @@ For each topic the student gets:
 
 ## 9. Roadmap (remaining Geography Optional content)
 
-- **Paper I, Section A (Physical):** Environmental Geography (final Section-A build target)
-- **Paper I, Section B (Human Geography)** and **Paper II (Geography of India)**: to be scoped after Section A is complete.
+- **Paper I, Section A (Physical Geography): COMPLETE** — all 5 topics live.
+- **Paper I, Section B (Human Geography):** next major build phase (perspectives, economic/population/settlement/regional/political/cultural geography, models & theories).
+- **Paper II (Geography of India):** to be scoped after Section B.
 
 ---
 

@@ -68,7 +68,10 @@ export type DiagramId =
   | "soil-profile"
   | "world-biomes"
   | "ecological-pyramid"
-  | "soil-conservation";
+  | "soil-conservation"
+  | "ecosystem-structure"
+  | "biogeochemical-cycle"
+  | "sustainable-development";
 
 export type Pyq = {
   year?: string;

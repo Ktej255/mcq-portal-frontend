@@ -458,6 +458,60 @@ function SoilConservation() {
   );
 }
 
+function EcosystemStructure() {
+  return (
+    <svg viewBox="0 0 420 230" className="h-auto w-full max-w-lg">
+      <RoughDefs />
+      <path className="go-pencil go-pencil-fill-amber" d="M30 40 a16 16 0 1 0 0.1 0 Z" />
+      <text x="20" y="28" className="go-ink-label" fontSize="11">Sun</text>
+      <path className="go-pencil go-pencil-fill-green" d="M120 70 L240 70 L240 100 L120 100 Z" />
+      <text x="132" y="89" className="go-ink-label" fontSize="11">Producers</text>
+      <path className="go-pencil go-pencil-fill-red" d="M120 130 L240 130 L240 160 L120 160 Z" />
+      <text x="130" y="149" className="go-ink-label" fontSize="11">Consumers</text>
+      <path className="go-pencil go-pencil-fill-blue" d="M120 185 L300 185 L300 212 L120 212 Z" />
+      <text x="130" y="203" className="go-ink-label" fontSize="11">Decomposers → nutrients recycled</text>
+      <path className="go-pencil" d="M46 50 L120 80" />
+      <path className="go-pencil" d="M180 100 L180 130" />
+      <path className="go-pencil" d="M180 160 L180 185" />
+      <path className="go-pencil" d="M300 200 q60 -60 -110 -110" strokeDasharray="3 5" />
+      <text x="300" y="120" className="go-ink-label" fontSize="10">nutrient cycle ↺</text>
+      <text x="40" y="226" className="go-ink-label go-hand" fontSize="14">ecosystem: energy flows, nutrients cycle</text>
+    </svg>
+  );
+}
+
+function BiogeochemicalCycle() {
+  return (
+    <svg viewBox="0 0 380 230" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      <path className="go-pencil" d="M190 120 m-90 0 a90 70 0 1 0 180 0 a90 70 0 1 0 -180 0" />
+      <text x="150" y="40" className="go-ink-label" fontSize="11">atmosphere (CO2)</text>
+      <text x="60" y="125" className="go-ink-label" fontSize="11">plants ↑</text>
+      <text x="250" y="125" className="go-ink-label" fontSize="11">respiration ↓</text>
+      <text x="120" y="205" className="go-ink-label" fontSize="11">soil / ocean / fossil store</text>
+      <path className="go-pencil" d="M150 55 l-8 6 l9 4" />
+      <path className="go-pencil" d="M232 185 l8 -5 l-9 -4" />
+      <text x="60" y="226" className="go-ink-label go-hand" fontSize="14">biogeochemical (carbon) cycle</text>
+    </svg>
+  );
+}
+
+function SustainableDevelopment() {
+  return (
+    <svg viewBox="0 0 380 230" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      <path className="go-pencil go-pencil-fill-green" d="M190 40 L120 150 L260 150 Z" />
+      <text x="155" y="80" className="go-ink-label" fontSize="11">Environment</text>
+      <path className="go-pencil go-pencil-fill-amber" d="M120 150 a30 14 0 1 0 0.1 0 Z" />
+      <text x="92" y="178" className="go-ink-label" fontSize="11">Economy</text>
+      <path className="go-pencil go-pencil-fill-blue" d="M260 150 a30 14 0 1 0 0.1 0 Z" />
+      <text x="238" y="178" className="go-ink-label" fontSize="11">Society</text>
+      <text x="150" y="130" className="go-ink-label" fontSize="10">equity • viability • bearability</text>
+      <text x="40" y="216" className="go-ink-label go-hand" fontSize="14">sustainable development — 3 pillars</text>
+    </svg>
+  );
+}
+
 const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "endo-exo-balance": EndoExoBalance,
   "plate-boundaries": PlateBoundaries,
@@ -479,6 +533,9 @@ const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "world-biomes": WorldBiomes,
   "ecological-pyramid": EcologicalPyramid,
   "soil-conservation": SoilConservation,
+  "ecosystem-structure": EcosystemStructure,
+  "biogeochemical-cycle": BiogeochemicalCycle,
+  "sustainable-development": SustainableDevelopment,
 };
 
 export function GeoDiagram({ id, caption }: { id: DiagramId; caption: string }) {
