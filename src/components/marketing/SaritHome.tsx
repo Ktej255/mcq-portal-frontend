@@ -422,8 +422,11 @@ function Hero({ reduce }: { reduce: boolean | null }) {
             </div>
           </div>
 
-          {/* floating chip */}
-          <div className="sl-float absolute -left-4 bottom-8 hidden rounded-xl border border-[#dcd5c7] bg-[#fffdf8] px-3 py-2 shadow-md sm:flex" style={{ animation: reduce ? undefined : "sl-float 4s ease-in-out infinite" }}>
+          {/* floating chip — sits just below the card, no overlap */}
+          <div
+            className="sl-float absolute -bottom-5 right-6 hidden rounded-xl border border-[#dcd5c7] bg-[#fffdf8] px-3 py-2 shadow-md sm:flex"
+            style={{ animation: reduce ? undefined : "sl-float 4s ease-in-out infinite" }}
+          >
             <span className="flex items-center gap-2 text-xs font-black text-[#33443b]">
               <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" /> Weak area: River systems
             </span>
@@ -450,7 +453,7 @@ function ProblemSection() {
 
         <div className="mt-12 grid items-center gap-8 lg:grid-cols-[1fr_auto_1fr]">
           {/* scattered */}
-          <div className="relative h-64 rounded-2xl border border-[#e6c9c0] bg-[#fbf2ee] p-4">
+          <div className="relative flex h-64 flex-wrap content-center items-center justify-center gap-2.5 rounded-2xl border border-[#e6c9c0] bg-[#fbf2ee] px-5 pb-5 pt-11">
             <p className="absolute left-4 top-3 text-xs font-black uppercase tracking-wide text-[#b4543a]">Before · scattered</p>
             {noisySources.map((s, i) => (
               <motion.span
@@ -459,12 +462,8 @@ function ProblemSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06 }}
-                className="absolute rounded-lg border border-[#e6c9c0] bg-white px-3 py-1.5 text-xs font-bold text-[#7a4a3c] shadow-sm"
-                style={{
-                  left: `${8 + ((i * 37) % 55)}%`,
-                  top: `${26 + ((i * 53) % 50)}%`,
-                  transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (3 + i)}deg)`,
-                }}
+                className="rounded-lg border border-[#e6c9c0] bg-white px-3 py-1.5 text-xs font-bold text-[#7a4a3c] shadow-sm"
+                style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (2 + (i % 3))}deg)` }}
               >
                 {s}
               </motion.span>
