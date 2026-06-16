@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   title: "Sarit Learn — UPSC Command",
   description:
     "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
-  alternates: { canonical: "/" },
+  alternates: { canonical: "/", types: { "text/plain": "/llms.txt" } },
 };
 
 export default function RootLayout({

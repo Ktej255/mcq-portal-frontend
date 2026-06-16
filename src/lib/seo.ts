@@ -26,7 +26,7 @@ export function pageMeta({
   return {
     title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical: path, types: { "text/plain": "/llms.txt" } },
     openGraph: {
       title,
       description,
