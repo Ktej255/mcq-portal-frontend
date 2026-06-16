@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -33,6 +33,7 @@ import {
 } from "@/lib/upsc/optionalGeographyLms";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { GeographyMapRoom } from "@/components/upsc/GeographyMapRoom";
+import { getOptionalAttempts, getOptionalStats, practiceRefId } from "@/lib/upsc/optionalProgress";
 
 type LmsTab = "learn" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
 
@@ -66,6 +67,12 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
   const [practiceTopic, setPracticeTopic] = useState<string | null>(null);
   const [trendYear, setTrendYear] = useState<number>(geographyTrendByYear[0]?.year ?? 0);
   const trendData = geographyTrendByYear.find((t) => t.year === trendYear)?.distribution ?? [];
+  const [stats, setStats] = useState({ total: 0, pyq: 0, practice: 0, avgScore: 0, lastAt: 0 });
+  const [attemptedIds, setAttemptedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setStats(getOptionalStats("geography"));
+    setAttemptedIds(new Set(getOptionalAttempts("geography").map((a) => a.refId)));
+  }, [tab]);
 
   const activePaper = papers[paperIndex];
   const activeModule = activePaper?.modules.find((m) => m.id === active?.mi);
@@ -237,7 +244,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                         <a key={item.id} href={`${ANSWER_BASE}?id=${item.id}`} target="_blank" rel="noreferrer"
                           className="flex items-start justify-between gap-3 rounded-md border border-[#e7e0d2] bg-white p-3 transition hover:border-[#1d9e75]">
                           <span className="flex gap-3"><span className="text-xs font-black text-[#1d9e75]">Q{qi + 1}</span><span className="text-sm font-semibold leading-6 text-[#34453b]">{item.text}</span></span>
-                          <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.1em] text-[#1a3a2a]">Open ↗</span>
+                          <span className={`shrink-0 text-[10px] font-black uppercase tracking-[0.1em] ${attemptedIds.has(item.id) ? "text-[#085041]" : "text-[#1a3a2a]"}`}>{attemptedIds.has(item.id) ? "✓ Done" : "Open ↗"}</span>
                         </a>
                       )) : <p className="text-xs font-semibold text-[#8a8174]">Questions for this paper/year will be added.</p>}
                     </div>
@@ -269,7 +276,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                 {buildTopicPractice(practiceTopic).map((row, ri) => (
                   <div key={ri} className="flex items-start justify-between gap-3 rounded-md border border-[#cfe5dc] bg-white p-3">
                     <span><span className="rounded bg-[#e7f5ee] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">{practiceLevels[ri]?.label}</span><span className="mt-1.5 block text-sm font-semibold leading-6 text-[#34453b]">{row.prompt}</span></span>
-                    <a href={`${ANSWER_BASE}?text=${encodeURIComponent(row.prompt)}&level=${encodeURIComponent(practiceLevels[ri]?.label ?? "")}`} target="_blank" rel="noreferrer" className="shrink-0 self-center rounded-md bg-[#1a3a2a] px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-white">Attempt ↗</a>
+                    <a href={`${ANSWER_BASE}?text=${encodeURIComponent(row.prompt)}&level=${encodeURIComponent(practiceLevels[ri]?.label ?? "")}`} target="_blank" rel="noreferrer" className="shrink-0 self-center rounded-md bg-[#1a3a2a] px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-white">{attemptedIds.has(practiceRefId(row.prompt)) ? "✓ Re-attempt" : "Attempt ↗"}</a>
                   </div>
                 ))}
               </div>
@@ -343,13 +350,16 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
 
         {tab === "reports" && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[["Lessons completed", `0 / ${totalLessons}`], ["Practice answers", "0"], ["PYQs attempted", "0"], ["Last activity", "Not started"]].map(([label, value]) => (
+            {[["Answers evaluated", `${stats.total}`], ["Practice answers", `${stats.practice}`], ["PYQs attempted", `${stats.pyq}`], ["Avg score", stats.total ? `${stats.avgScore}/100` : "—"]].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
                 <p className="mt-1 text-2xl font-black">{value}</p>
               </div>
             ))}
-            <p className="sm:col-span-2 xl:col-span-4 text-xs font-semibold leading-6 text-[#8a8174]">Every answer you write, evaluation you receive, and PYQ you attempt is captured here and on your Gap & analytics pages.</p>
+            <p className="sm:col-span-2 xl:col-span-4 text-xs font-semibold leading-6 text-[#8a8174]">
+              {stats.total ? `Last activity: ${new Date(stats.lastAt).toLocaleString()}. ` : "No attempts yet — evaluate a PYQ or practice answer and Save it; it appears here. "}
+              Tracked on-device now; syncs to your profile &amp; gap page once the backend is connected.
+            </p>
           </div>
         )}
       </div>

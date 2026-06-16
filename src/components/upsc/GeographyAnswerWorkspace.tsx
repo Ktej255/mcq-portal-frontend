@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, Highlighter, MessageCircle, Save, Send, Sparkl
 
 import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
 import { evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
+import { practiceRefId, recordOptionalAttempt } from "@/lib/upsc/optionalProgress";
 
 const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
@@ -52,6 +53,19 @@ export function GeographyAnswerWorkspace() {
       setEvalState("done");
       setDiscussPrompt(true);
     }, 1200);
+  };
+
+  const handleSave = () => {
+    recordOptionalAttempt("geography", {
+      refId: id ?? practiceRefId(textParam ?? questionText),
+      kind: id ? "pyq" : "practice",
+      title: questionText,
+      level: `${selectedEval?.label ?? "Medium"}${level ? ` · ${level}` : ""}`,
+      score: report?.overall ?? 0,
+      status: report?.status ?? (evalSource === "pdf" ? "uploaded" : "saved"),
+      at: Date.now(),
+    });
+    setSaved(true);
   };
 
 
@@ -212,7 +226,7 @@ export function GeographyAnswerWorkspace() {
                   ))}
                 </div>
 
-                <button type="button" onClick={() => setSaved(true)} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-xs font-black uppercase tracking-[0.12em] text-white">
+                <button type="button" onClick={handleSave} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-xs font-black uppercase tracking-[0.12em] text-white">
                   <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save to profile, gap & progress"}
                 </button>
                 {saved && <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#085041]"><CheckCircle2 className="h-3.5 w-3.5" /> Recorded in analytics, gap page and reports.</p>}
