@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { OptionalSubjectDetail } from "@/components/upsc/UpscYearlyPlanner";
 import { OptionalSubjectLMS } from "@/components/upsc/OptionalSubjectLMS";
-import { GEOGRAPHY_OPTIONAL_SLUG } from "@/lib/upsc/optionalGeographyLms";
 import { getOptionalSubject, optionalSubjects } from "@/lib/upsc/yearlyPlanner";
 
 export function generateStaticParams() {
@@ -21,10 +19,8 @@ export default async function OptionalSubjectDetailPage({
     notFound();
   }
 
-  // Geography is the fully-built LMS course player (reference implementation).
-  if (subject.slug === GEOGRAPHY_OPTIONAL_SLUG) {
-    return <OptionalSubjectLMS title={subject.title} group={subject.group} />;
-  }
-
-  return <OptionalSubjectDetail subject={subject} />;
+  // Every optional opens the LMS course player. Geography is the richest
+  // reference (PYQs, interactive map, trends); other subjects inherit the same
+  // shell driven by their own scraped syllabus, with those modules being filled.
+  return <OptionalSubjectLMS slug={subject.slug} title={subject.title} group={subject.group} />;
 }

@@ -27,10 +27,10 @@ import {
   geographyResources,
   geographyTrendByYear,
   geographyTrendWindows,
-  getGeographyPapers,
   practiceLevels,
   trendTypeColors,
 } from "@/lib/upsc/optionalGeographyLms";
+import { getOptionalCoursePapers } from "@/lib/upsc/optionalCourse";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { GeographyMapRoom } from "@/components/upsc/GeographyMapRoom";
 import { getOptionalAttempts, getOptionalStats, practiceRefId } from "@/lib/upsc/optionalProgress";
@@ -51,8 +51,9 @@ const ANSWER_BASE = "/upsc/optional-subjects/answer";
 const READ_BASE = "/upsc/optional-subjects/read";
 
 
-export function OptionalSubjectLMS({ title, group }: { title: string; group: string }) {
-  const papers = useMemo(() => getGeographyPapers(), []);
+export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title: string; group: string }) {
+  const isGeo = slug === "geography";
+  const papers = useMemo(() => getOptionalCoursePapers(slug), [slug]);
   const totalLessons = papers.reduce((sum, p) => sum + p.modules.reduce((s, m) => s + m.lessons.length, 0), 0);
 
   const [tab, setTab] = useState<LmsTab>("learn");
@@ -70,9 +71,9 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
   const [stats, setStats] = useState({ total: 0, pyq: 0, practice: 0, avgScore: 0, lastAt: 0 });
   const [attemptedIds, setAttemptedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    setStats(getOptionalStats("geography"));
-    setAttemptedIds(new Set(getOptionalAttempts("geography").map((a) => a.refId)));
-  }, [tab]);
+    setStats(getOptionalStats(slug));
+    setAttemptedIds(new Set(getOptionalAttempts(slug).map((a) => a.refId)));
+  }, [tab, slug]);
 
   const activePaper = papers[paperIndex];
   const activeModule = activePaper?.modules.find((m) => m.id === active?.mi);
@@ -142,7 +143,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                                 </div>
                                 <div className="mt-1 flex gap-2 pl-5">
                                   <button type="button" onClick={() => { setActive({ mi: mod.id, li }); setVideoOpen(true); }} className={`text-[10px] font-black uppercase tracking-[0.1em] ${isActive ? "text-[#75ddbc]" : "text-[#1d9e75]"}`}>Watch</button>
-                                  <a href={`${READ_BASE}?topic=${encodeURIComponent(les.title)}`} target="_blank" rel="noreferrer" className={`text-[10px] font-black uppercase tracking-[0.1em] ${isActive ? "text-[#75ddbc]" : "text-[#1a3a2a]"}`}>Read</a>
+                                  <a href={`${READ_BASE}?topic=${encodeURIComponent(les.title)}&subject=${slug}`} target="_blank" rel="noreferrer" className={`text-[10px] font-black uppercase tracking-[0.1em] ${isActive ? "text-[#75ddbc]" : "text-[#1a3a2a]"}`}>Read</a>
                                 </div>
                               </div>
                             );
@@ -184,7 +185,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                       )}
                     </div>
                     {activeLesson && (
-                      <a href={`${READ_BASE}?topic=${encodeURIComponent(activeLesson.title)}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]">
+                      <a href={`${READ_BASE}?topic=${encodeURIComponent(activeLesson.title)}&subject=${slug}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]">
                         <BookOpen className="h-3.5 w-3.5" /> Read full content
                       </a>
                     )}
@@ -213,7 +214,13 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
         )}
 
 
-        {tab === "pyqs" && (
+        {tab === "pyqs" && !isGeo && (
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 text-center shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Previous year questions</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Year-wise PYQs for {title} are being added. You can already practise subjective answers under the Practice tab.</p>
+          </div>
+        )}
+        {tab === "pyqs" && isGeo && (
           <div className="space-y-3">
             <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Previous year questions</p>
@@ -241,7 +248,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                   {isOpen && (
                     <div className="space-y-2 border-t border-[#dcd5c7] p-4">
                       {group && group.questions.length > 0 ? group.questions.map((item, qi) => (
-                        <a key={item.id} href={`${ANSWER_BASE}?id=${item.id}`} target="_blank" rel="noreferrer"
+                        <a key={item.id} href={`${ANSWER_BASE}?id=${item.id}&subject=${slug}`} target="_blank" rel="noreferrer"
                           className="flex items-start justify-between gap-3 rounded-md border border-[#e7e0d2] bg-white p-3 transition hover:border-[#1d9e75]">
                           <span className="flex gap-3"><span className="text-xs font-black text-[#1d9e75]">Q{qi + 1}</span><span className="text-sm font-semibold leading-6 text-[#34453b]">{item.text}</span></span>
                           <span className={`shrink-0 text-[10px] font-black uppercase tracking-[0.1em] ${attemptedIds.has(item.id) ? "text-[#085041]" : "text-[#1a3a2a]"}`}>{attemptedIds.has(item.id) ? "✓ Done" : "Open ↗"}</span>
@@ -276,7 +283,7 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
                 {buildTopicPractice(practiceTopic).map((row, ri) => (
                   <div key={ri} className="flex items-start justify-between gap-3 rounded-md border border-[#cfe5dc] bg-white p-3">
                     <span><span className="rounded bg-[#e7f5ee] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">{practiceLevels[ri]?.label}</span><span className="mt-1.5 block text-sm font-semibold leading-6 text-[#34453b]">{row.prompt}</span></span>
-                    <a href={`${ANSWER_BASE}?text=${encodeURIComponent(row.prompt)}&level=${encodeURIComponent(practiceLevels[ri]?.label ?? "")}`} target="_blank" rel="noreferrer" className="shrink-0 self-center rounded-md bg-[#1a3a2a] px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-white">{attemptedIds.has(practiceRefId(row.prompt)) ? "✓ Re-attempt" : "Attempt ↗"}</a>
+                    <a href={`${ANSWER_BASE}?text=${encodeURIComponent(row.prompt)}&level=${encodeURIComponent(practiceLevels[ri]?.label ?? "")}&subject=${slug}`} target="_blank" rel="noreferrer" className="shrink-0 self-center rounded-md bg-[#1a3a2a] px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-white">{attemptedIds.has(practiceRefId(row.prompt)) ? "✓ Re-attempt" : "Attempt ↗"}</a>
                   </div>
                 ))}
               </div>
@@ -285,9 +292,20 @@ export function OptionalSubjectLMS({ title, group }: { title: string; group: str
         )}
 
 
-        {tab === "maps" && <GeographyMapRoom />}
+        {tab === "maps" && (isGeo ? <GeographyMapRoom /> : (
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 text-center shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Maps & Diagrams</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">The interactive map & diagram module is being prepared for {title}. The Geography optional shows the full version.</p>
+          </div>
+        ))}
 
-        {tab === "trends" && (
+        {tab === "trends" && !isGeo && (
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 text-center shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Trend analysis</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">PYQ trend charts for {title} are being prepared. The Geography optional shows the full animated version.</p>
+          </div>
+        )}
+        {tab === "trends" && isGeo && (
           <div className="space-y-3">
             <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Trend analysis</p>

@@ -23,7 +23,7 @@ const PAPER_II_HEADINGS = new Set<string>([
 
 export type LmsLesson = { id: string; title: string; videoUrl?: string; durationLabel: string; free: boolean };
 export type LmsModule = { id: string; title: string; lessons: LmsLesson[] };
-export type LmsPaper = { paper: "Paper I" | "Paper II"; subtitle: string; modules: LmsModule[] };
+export type LmsPaper = { paper: string; subtitle: string; modules: LmsModule[] };
 
 /** Split the real syllabus into Paper I (Physical + Human) and Paper II (India). */
 export function getGeographyPapers(): LmsPaper[] {

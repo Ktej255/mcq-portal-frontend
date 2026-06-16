@@ -17,6 +17,7 @@ const SECTIONS = [
 export function GeographyReadContent() {
   const params = useSearchParams();
   const topic = params.get("topic") ?? "Topic";
+  const subject = params.get("subject") ?? "geography";
   const [step, setStep] = useState(0);
   const section = SECTIONS[step];
   const Icon = section.icon;
@@ -27,7 +28,7 @@ export function GeographyReadContent() {
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto max-w-3xl px-4 py-6 md:px-8">
-        <Link href="/upsc/optional-subjects/geography" className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]">
+        <Link href={`/upsc/optional-subjects/${subject}`} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]">
           <ArrowLeft className="h-4 w-4" /> Back to course
         </Link>
 
@@ -80,7 +81,7 @@ export function GeographyReadContent() {
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           {isLast ? (
-            <Link href="/upsc/optional-subjects/geography" className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1d9e75] px-5 text-sm font-black text-white transition hover:bg-[#168864]">
+            <Link href={`/upsc/optional-subjects/${subject}`} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1d9e75] px-5 text-sm font-black text-white transition hover:bg-[#168864]">
               Finish topic <ArrowRight className="h-4 w-4" />
             </Link>
           ) : (

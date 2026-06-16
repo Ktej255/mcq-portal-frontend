@@ -16,6 +16,7 @@ export function GeographyAnswerWorkspace() {
   const id = params.get("id");
   const textParam = params.get("text");
   const level = params.get("level");
+  const subject = params.get("subject") ?? "geography";
 
   const pyq = id ? getPyqQuestion(id) : null;
   const questionText = pyq?.text ?? textParam ?? "Question not found.";
@@ -56,7 +57,7 @@ export function GeographyAnswerWorkspace() {
   };
 
   const handleSave = () => {
-    recordOptionalAttempt("geography", {
+    recordOptionalAttempt(subject, {
       refId: id ?? practiceRefId(textParam ?? questionText),
       kind: id ? "pyq" : "practice",
       title: questionText,
@@ -72,7 +73,7 @@ export function GeographyAnswerWorkspace() {
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto max-w-4xl px-4 py-6 md:px-8">
-        <Link href="/upsc/optional-subjects/geography" className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]">
+        <Link href={`/upsc/optional-subjects/${subject}`} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a]">
           <ArrowLeft className="h-4 w-4" /> Back to course
         </Link>
 
