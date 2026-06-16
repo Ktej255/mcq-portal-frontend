@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   BarChart3,
   BookOpen,
+  CalendarDays,
   ChevronDown,
   FileText,
   Lock,
@@ -30,15 +31,16 @@ import {
   practiceLevels,
   trendTypeColors,
 } from "@/lib/upsc/optionalGeographyLms";
-import { getOptionalCoursePapers } from "@/lib/upsc/optionalCourse";
+import { buildStudyPlan, getOptionalCoursePapers } from "@/lib/upsc/optionalCourse";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { GeographyMapRoom } from "@/components/upsc/GeographyMapRoom";
 import { getOptionalAttempts, getOptionalStats, practiceRefId } from "@/lib/upsc/optionalProgress";
 
-type LmsTab = "learn" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
+type LmsTab = "learn" | "plan" | "pyqs" | "practice" | "maps" | "trends" | "gap" | "reports";
 
 const TABS: Array<{ id: LmsTab; label: string; icon: typeof BookOpen }> = [
   { id: "learn", label: "Learn", icon: PlayCircle },
+  { id: "plan", label: "Study Plan", icon: CalendarDays },
   { id: "pyqs", label: "PYQs", icon: FileText },
   { id: "practice", label: "Practice", icon: PenLine },
   { id: "maps", label: "Maps & Diagrams", icon: MapIcon },
@@ -360,6 +362,27 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
                   <p className="text-sm font-black tracking-tight text-[#13251d]">{g.area}</p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">Expectation: {g.expectation}</p>
                   <span className="mt-2 inline-flex rounded bg-[#fff4df] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#6f4a12]">{g.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "plan" && (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Study plan</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Generated plan with spaced revision</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">Auto-built from the {title} syllabus. Follow day-by-day; amber days reinforce earlier modules with active recall.</p>
+            </div>
+            <div className="space-y-2">
+              {buildStudyPlan(papers).map((d) => (
+                <div key={d.day} className={`flex items-start gap-3 rounded-lg border p-3 shadow-sm ${d.kind === "revision" ? "border-[#ef9f27]/50 bg-[#fff4df]" : "border-[#dcd5c7] bg-[#fffdf8]"}`}>
+                  <span className={`flex h-8 w-14 shrink-0 items-center justify-center rounded-md text-[11px] font-black uppercase tracking-[0.08em] text-white ${d.kind === "revision" ? "bg-[#9a6a16]" : "bg-[#1a3a2a]"}`}>Day {d.day}</span>
+                  <div>
+                    <p className="text-sm font-black leading-5 text-[#13251d]">{d.title}</p>
+                    <p className="mt-0.5 text-xs font-semibold leading-5 text-[#66736b]">{d.detail}</p>
+                  </div>
                 </div>
               ))}
             </div>

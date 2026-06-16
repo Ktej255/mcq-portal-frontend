@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Highlighter, MessageCircle, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Highlighter, Lightbulb, MessageCircle, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
 
 import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
-import { evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
+import { buildAnswerFramework, evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
 import { practiceRefId, recordOptionalAttempt } from "@/lib/upsc/optionalProgress";
 
 const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
@@ -30,6 +30,8 @@ export function GeographyAnswerWorkspace() {
   const [evalSource, setEvalSource] = useState<"typed" | "pdf" | null>(null);
   const [saved, setSaved] = useState(false);
   const [doubtOpen, setDoubtOpen] = useState(false);
+  const [showFramework, setShowFramework] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const [report, setReport] = useState<EvaluationResult | null>(null);
   const [discussPrompt, setDiscussPrompt] = useState(false);
 
@@ -37,6 +39,7 @@ export function GeographyAnswerWorkspace() {
   const expectedWords = (level ?? "").toLowerCase().includes("easy") ? 150 : 250;
   const typed = `${parts.Introduction} ${parts.Body} ${parts.Conclusion}`.trim();
   const hasTyped = typed.length > 20;
+  const framework = useMemo(() => buildAnswerFramework(questionText), [questionText]);
 
   const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -80,6 +83,32 @@ export function GeographyAnswerWorkspace() {
         <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <span className="rounded bg-[#e7f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">{meta}</span>
           <h1 className="mt-3 text-xl font-black leading-7 tracking-tight md:text-2xl">{questionText}</h1>
+        </section>
+
+        {/* Model-answer framework — how to structure THIS question */}
+        <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] shadow-sm">
+          <button type="button" onClick={() => setShowFramework((v) => !v)} className="flex w-full items-center justify-between gap-3 p-4">
+            <span className="inline-flex items-center gap-2 text-sm font-black"><Lightbulb className="h-4 w-4 text-[#1d9e75]" /> Model-answer framework</span>
+            <ChevronDown className={`h-4 w-4 text-[#1d9e75] transition ${showFramework ? "rotate-180" : ""}`} />
+          </button>
+          {showFramework && (
+            <div className="space-y-2 border-t border-[#dcd5c7] p-4 text-xs font-semibold leading-6 text-[#34453b]">
+              <p><span className="font-black uppercase tracking-[0.1em] text-[#085041]">Directive:</span> {framework.directive}</p>
+              <p><span className="font-black text-[#085041]">Introduction —</span> {framework.intro}</p>
+              <div>
+                <p className="font-black text-[#085041]">Body —</p>
+                <ul className="mt-1 space-y-1">
+                  {framework.body.map((b, i) => (
+                    <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#1d9e75]" />{b}</li>
+                  ))}
+                </ul>
+              </div>
+              <p><span className="font-black text-[#085041]">Conclusion —</span> {framework.conclusion}</p>
+              {framework.keywords.length > 0 && (
+                <p className="flex flex-wrap items-center gap-1.5"><span className="font-black text-[#085041]">Must-hit keywords:</span>{framework.keywords.map((k) => <span key={k} className="rounded bg-[#e7f5ee] px-1.5 py-0.5 text-[10px] font-bold text-[#085041]">{k}</span>)}</p>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Evaluation depth — shared selector (parameters, not credits/model) */}
@@ -233,6 +262,31 @@ export function GeographyAnswerWorkspace() {
                 {saved && <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-black text-[#085041]"><CheckCircle2 className="h-3.5 w-3.5" /> Recorded in analytics, gap page and reports.</p>}
               </>
             ) : null}
+          </section>
+        )}
+
+        {(hasTyped || evalState === "done") && (
+          <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] shadow-sm">
+            <button type="button" onClick={() => setShowCompare((v) => !v)} className="flex w-full items-center justify-between gap-3 p-4">
+              <span className="inline-flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-[#1d9e75]" /> Compare: your answer vs UPSC demand vs topper</span>
+              <ChevronDown className={`h-4 w-4 text-[#1d9e75] transition ${showCompare ? "rotate-180" : ""}`} />
+            </button>
+            {showCompare && (
+              <div className="grid gap-3 border-t border-[#dcd5c7] p-4 md:grid-cols-3">
+                <div className="rounded-md border border-[#e7e0d2] bg-[#fdfaf3] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">Your answer</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#34453b]">{wordCount(typed)} words — Intro {wordCount(parts.Introduction)} / Body {wordCount(parts.Body)} / Concl {wordCount(parts.Conclusion)}.</p>
+                </div>
+                <div className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">UPSC demands</p>
+                  <ul className="mt-1 space-y-1">{framework.body.map((b, i) => <li key={i} className="text-xs font-semibold leading-5 text-[#34453b]">• {b}</li>)}</ul>
+                </div>
+                <div className="rounded-md border border-[#e7e0d2] bg-white p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#6f4a12]">Topper approach</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#34453b]">Definition-led intro, multi-dimensional body with a labelled diagram + scholar, forward-looking conclusion. Verified topper copies will be ingested here for true side-by-side comparison.</p>
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>

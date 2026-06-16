@@ -58,6 +58,13 @@ function q(year: number, paper: "Paper I" | "Paper II", n: number, text: string)
 
 export const geographyPyqYears: PyqYear[] = [
   {
+    year: 2024,
+    papers: [
+      { paper: "Paper I", questions: [q(2024, "Paper I", 1, "Examine the role of remote sensing and GIS in geomorphological mapping."), q(2024, "Paper I", 2, "Discuss environmental determinism and possibilism with examples.")] },
+      { paper: "Paper II", questions: [q(2024, "Paper II", 1, "Analyse the changing cropping patterns in India and their ecological implications.")] },
+    ],
+  },
+  {
     year: 2023,
     papers: [
       {
@@ -100,6 +107,62 @@ export const geographyPyqYears: PyqYear[] = [
     papers: [
       { paper: "Paper I", questions: [q(2021, "Paper I", 1, "Discuss the climatic classification of Koppen with reference to India.")] },
       { paper: "Paper II", questions: [q(2021, "Paper II", 1, "Examine the role of agro-climatic regional planning in Indian agriculture.")] },
+    ],
+  },
+  {
+    year: 2020,
+    papers: [
+      { paper: "Paper I", questions: [q(2020, "Paper I", 1, "Discuss the bearing of plate tectonics on the distribution of earthquakes and volcanoes.")] },
+      { paper: "Paper II", questions: [q(2020, "Paper II", 1, "Examine regional disparities in industrial development in India.")] },
+    ],
+  },
+  {
+    year: 2019,
+    papers: [
+      { paper: "Paper I", questions: [q(2019, "Paper I", 1, "Explain the origin and characteristics of tropical cyclones.")] },
+      { paper: "Paper II", questions: [q(2019, "Paper II", 1, "Discuss the problems of inter-linking of rivers in India.")] },
+    ],
+  },
+  {
+    year: 2018,
+    papers: [
+      { paper: "Paper I", questions: [q(2018, "Paper I", 1, "Bring out the relevance of the concept of carrying capacity in environmental management.")] },
+      { paper: "Paper II", questions: [q(2018, "Paper II", 1, "Examine the spatial pattern of urbanisation in India.")] },
+    ],
+  },
+  {
+    year: 2017,
+    papers: [
+      { paper: "Paper I", questions: [q(2017, "Paper I", 1, "Discuss the salient features of the world's major ocean currents.")] },
+      { paper: "Paper II", questions: [q(2017, "Paper II", 1, "Analyse the drought-prone areas programme and its effectiveness.")] },
+    ],
+  },
+  {
+    year: 2016,
+    papers: [
+      { paper: "Paper I", questions: [q(2016, "Paper I", 1, "Examine the validity of the concept of 'geographical region'.")] },
+      { paper: "Paper II", questions: [q(2016, "Paper II", 1, "Discuss the changing nature of the iron and steel industry in India.")] },
+    ],
+  },
+  {
+    year: 2015,
+    papers: [
+      { paper: "Paper I", questions: [q(2015, "Paper I", 1, "Explain the process of soil formation and the factors affecting it.")] },
+      { paper: "Paper II", questions: [q(2015, "Paper II", 1, "Examine the role of multi-purpose river valley projects in regional development.")] },
+    ],
+  },
+  {
+    year: 2014,
+    papers: [
+      { paper: "Paper I", questions: [q(2014, "Paper I", 1, "Discuss the central place theory of Christaller and its limitations.")] },
+      { paper: "Paper II", questions: [q(2014, "Paper II", 1, "Examine the distribution and problems of tribal population in India.")] },
+    ],
+  },
+  {
+    year: 2013,
+    papers: [
+      { paper: "Paper I", questions: [q(2013, "Paper I", 1, "Explain the concept of isostasy and its significance.")] },
+      { paper: "Paper II", questions: [q(2013, "Paper II", 1, "Discuss the green revolution and its impact on Indian agriculture.")] },
     ],
   },
 ];

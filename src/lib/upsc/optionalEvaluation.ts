@@ -130,3 +130,27 @@ function scoreParameters(parameters: string[], c: ScoreCtx): ParamResult[] {
     return { label, score: clamp((relScore + wordScore) / 2), max: 10, feedback: "Assessed from relevance and depth." };
   });
 }
+
+
+// ─── Model-answer framework (how to structure THIS question) ───
+export type AnswerFramework = { directive: string; intro: string; body: string[]; conclusion: string; keywords: string[] };
+
+export function buildAnswerFramework(question: string): AnswerFramework {
+  const q = question.toLowerCase();
+  const directive =
+    ["critically examine", "critically analyse", "discuss", "examine", "analyse", "explain", "comment", "evaluate", "bring out", "describe"]
+      .find((d) => q.includes(d)) ?? "discuss";
+  const keywords = Array.from(new Set(contentWords(question))).slice(0, 6);
+  return {
+    directive,
+    intro: "Define the core term and set context in 2-3 lines; optionally open with a data point or a map reference.",
+    body: [
+      `Answer the directive ('${directive}') across multiple dimensions — not one-sided.`,
+      "Bring in a relevant model / theory / scholar.",
+      "Add a labelled diagram or map to anchor marks.",
+      "Use an example or case study and link to a recent development.",
+    ],
+    conclusion: "Close with a balanced way-forward / contemporary relevance in 2-3 lines.",
+    keywords,
+  };
+}
