@@ -6,7 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ChevronDown, Highlighter, Lightbulb, MessageCircle, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
 
 import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
-import { buildAnswerFramework, evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
+import { buildAnswerFramework, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
+import { evaluateOptionalAnswer } from "@/services/optionalEvaluationService";
 import { practiceRefId, recordOptionalAttempt } from "@/lib/upsc/optionalProgress";
 
 const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
@@ -45,18 +46,19 @@ export function GeographyAnswerWorkspace() {
     const file = event.target.files?.[0];
     if (file) { setUploadName(file.name); setEvalState("idle"); setSaved(false); }
   };
-  const runEval = (source: "typed" | "pdf") => {
+  const runEval = async (source: "typed" | "pdf") => {
     setEvalSource(source);
     setEvalState("evaluating");
     setSaved(false);
     setReport(null);
-    window.setTimeout(() => {
-      if (source === "typed") {
-        setReport(evaluateAnswer({ question: questionText, parts, parameters: selectedEval?.parameters ?? [], expectedWords }));
-      }
-      setEvalState("done");
-      setDiscussPrompt(true);
-    }, 1200);
+    if (source === "typed") {
+      const result = await evaluateOptionalAnswer({ subject, question: questionText, parts, parameters: selectedEval?.parameters ?? [], expectedWords });
+      setReport(result);
+    } else {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    }
+    setEvalState("done");
+    setDiscussPrompt(true);
   };
 
   const handleSave = () => {
