@@ -65,6 +65,7 @@ import {
   readSyncedStudentProfile,
   type StudentProfile,
 } from "@/lib/upsc/studentProfile";
+import { UpgradeNudge } from "@/components/upsc/UpgradeNudge";
 import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
 import { AchievementBadge } from "@/components/upsc/AchievementBadge";
 import { BADGE_DEFINITIONS } from "@/lib/upsc/gamification";
@@ -308,6 +309,7 @@ export function UpscDailyMissionControl() {
   // Sync tab when URL query changes (e.g. sidebar click from another page)
   useEffect(() => {
     if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional URL->state sync
       setActiveTab(tabFromUrl);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -685,6 +687,16 @@ export function UpscDailyMissionControl() {
               onComplete={completeInduction}
             />
           </div>
+        ) : null}
+
+        {profile ? (
+          <UpgradeNudge
+            signals={{
+              tier: profile.subscriptionPlanId ?? "foundation",
+              billingCycle: profile.billingCycle,
+              targetYear: profile.firstAttemptYear,
+            }}
+          />
         ) : null}
 
         {/* Premium Shortcut Navigation Header */}
