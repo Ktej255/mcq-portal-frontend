@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       ].join("\n");
 
       await resend.emails.send({
-        from: "Sarit Learn <onboarding@resend.dev>",
+        from: process.env.RESEND_FROM_EMAIL || "Sarit Learn <leads@upsccommand.com>",
         to: [notify],
         subject: `New UPSC lead: ${data.name || email}`,
         text: summary,
