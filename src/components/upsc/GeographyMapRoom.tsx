@@ -55,8 +55,16 @@ export function GeographyMapRoom() {
         {/* Map canvas with clickable pins */}
         <div className="relative rounded-lg border border-[#dcd5c7] bg-[#eef6f1] p-2 shadow-sm">
           <div className="relative mx-auto aspect-[6/7] w-full max-w-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/india-map.svg" alt="India map" className="h-full w-full select-none object-contain" draggable={false} />
+            <svg viewBox="0 0 600 700" preserveAspectRatio="xMidYMid meet" className="h-full w-full select-none" aria-label="India schematic map">
+              <rect width="600" height="700" fill="#eef6f1" />
+              <polygon
+                fill="#d7ece1" stroke="#1d9e75" strokeWidth={3} strokeLinejoin="round"
+                points="300,28 332,48 356,36 372,64 408,86 452,104 492,116 532,108 558,132 528,158 548,184 520,210 500,204 506,176 482,166 456,176 470,206 466,240 440,250 432,288 446,330 430,380 416,430 392,470 360,520 330,566 310,520 300,470 286,420 270,372 256,322 236,272 200,290 174,260 206,250 222,222 210,182 246,150 262,112 276,72"
+              />
+              <circle cx={470} cy={560} r={4} fill="#1d9e75" />
+              <circle cx={478} cy={582} r={4} fill="#1d9e75" />
+              <circle cx={150} cy={470} r={3} fill="#1d9e75" />
+            </svg>
             {points.map((p) => {
               const isSel = p.id === selectedId;
               return (
@@ -78,7 +86,7 @@ export function GeographyMapRoom() {
             })}
           </div>
           <p className="mt-1 text-center text-[10px] font-semibold text-[#8a8174]">
-            Schematic outline (incl. J&amp;K, Ladakh/Aksai Chin, Arunachal). Replace <code>/india-map.svg</code> with the official government-approved map.
+            Schematic outline (incl. J&amp;K, Ladakh/Aksai Chin, Arunachal). To be replaced with the official government-approved India map.
           </p>
         </div>
 
