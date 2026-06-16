@@ -1,15 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
-import { gsSubjects, optionalSubjects, type Subject } from "@/components/marketing/site-data";
+import { JsonLd } from "@/components/marketing/JsonLd";
+import { gsSubjects, optionalSubjects, subjects, type Subject } from "@/components/marketing/site-data";
+import { pageMeta, SITE_URL } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Subjects — UPSC GS & Optional | Sarit Learn",
+export const metadata = pageMeta({
+  title: "UPSC Subjects — General Studies & Optional Subjects | Sarit Learn",
   description:
-    "Explore every UPSC subject — General Studies and Optional subjects like PSIR, Sociology, Public Administration and more — each taught through one connected daily loop.",
-};
+    "Explore every UPSC subject — General Studies and Optional subjects like PSIR, Sociology and Public Administration — each taught through one connected daily loop.",
+  path: "/subjects",
+});
 
 const statusStyles: Record<Subject["status"], string> = {
   Live: "bg-[#e7f5ee] text-[#085041]",
@@ -43,8 +45,21 @@ function SubjectCard({ s }: { s: Subject }) {
 }
 
 export default function SubjectsPage() {
+  const itemListSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "UPSC subjects on Sarit Learn",
+    itemListElement: subjects.map((s, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: s.name,
+      url: `${SITE_URL}/subjects/${s.slug}`,
+    })),
+  };
+
   return (
     <PageShell>
+      <JsonLd data={itemListSchema} />
       <PageHero
         eyebrow="Subjects"
         title="Every UPSC subject — GS and Optional."

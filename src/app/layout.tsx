@@ -7,6 +7,8 @@ import { activeAuthProvider, clerkConfigReady, env } from "@/env";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import { JsonLd } from "@/components/marketing/JsonLd";
+import { SITE_URL, organizationSchema, websiteSchema } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,8 +21,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UPSC Command",
-  description: "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
+  metadataBase: new URL(SITE_URL),
+  title: "Sarit Learn — UPSC Command",
+  description:
+    "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
+  alternates: { canonical: "/" },
 };
 
 export default function RootLayout({
@@ -58,6 +63,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <JsonLd data={organizationSchema} />
+        <JsonLd data={websiteSchema} />
         {content}
       </body>
     </html>

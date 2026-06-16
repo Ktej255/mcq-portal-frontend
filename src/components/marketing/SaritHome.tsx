@@ -27,6 +27,7 @@ import {
 
 import { SiteNav } from "./SiteNav";
 import { SiteFooter } from "./SiteFooter";
+import { JsonLd } from "./JsonLd";
 
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
@@ -818,8 +819,18 @@ function FinalCta() {
 
 export function SaritHome() {
   const reduce = useReducedMotion();
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f7f4ee] text-[#13251d]">
+      <JsonLd data={faqSchema} />
       <SiteNav />
       <Hero reduce={reduce} />
       <ProblemSection />

@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
 import { Mail, MessageSquare, MapPin } from "lucide-react";
 
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Contact — Sarit Learn UPSC Command",
+export const metadata = pageMeta({
+  title: "Contact Sarit Learn — Support, Partnerships & Feedback",
   description: "Get in touch with the Sarit Learn team — support, partnerships, and feedback.",
-};
+  path: "/contact",
+});
 
 const channels = [
   { icon: Mail, title: "Email", detail: "support@saritlearn.com", href: "mailto:support@saritlearn.com" },

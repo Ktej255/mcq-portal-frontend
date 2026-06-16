@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
 import { Compass, HeartHandshake, ShieldCheck, Sparkles } from "lucide-react";
 
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "About — Sarit Learn UPSC Command",
+export const metadata = pageMeta({
+  title: "About Sarit Learn — Our Mission for UPSC Aspirants",
   description:
     "Sarit Learn exists to cut the noise and cost of UPSC preparation with one connected, honest, personalized learning system.",
-};
+  path: "/about",
+});
 
 const values = [
   { icon: Compass, title: "Clarity over clutter", detail: "One connected loop instead of a hundred scattered sources. Less noise, more retention." },

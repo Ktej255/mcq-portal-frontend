@@ -13,7 +13,9 @@ import {
 
 import { PageShell } from "@/components/marketing/PageShell";
 import { StartFreeCta } from "@/components/marketing/PageShell";
+import { JsonLd } from "@/components/marketing/JsonLd";
 import { getSubject, subjects, type Subject } from "@/components/marketing/site-data";
+import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
 
 export function generateStaticParams() {
   return subjects.map((s) => ({ slug: s.slug }));
@@ -23,10 +25,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const subject = getSubject(slug);
   if (!subject) return { title: "Subject not found — Sarit Learn" };
-  return {
-    title: `${subject.name} for UPSC — Sarit Learn`,
+  return pageMeta({
+    title: `${subject.name} for UPSC — Syllabus, Strategy & Practice | Sarit Learn`,
     description: subject.tagline,
-  };
+    path: `/subjects/${subject.slug}`,
+  });
 }
 
 const statusStyles: Record<Subject["status"], string> = {
@@ -50,8 +53,31 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
   const Icon = subject.icon;
   const related = subjects.filter((s) => s.category === subject.category && s.slug !== subject.slug).slice(0, 3);
 
+  const courseSchema = {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    name: `${subject.name} for UPSC`,
+    description: subject.tagline,
+    url: `${SITE_URL}/subjects/${subject.slug}`,
+    inLanguage: "en-IN",
+    provider: { "@type": "EducationalOrganization", name: ORG_NAME, sameAs: SITE_URL },
+    about: subject.category === "GS" ? "UPSC General Studies" : "UPSC Optional subject",
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Subjects", item: `${SITE_URL}/subjects` },
+      { "@type": "ListItem", position: 3, name: subject.name, item: `${SITE_URL}/subjects/${subject.slug}` },
+    ],
+  };
+
   return (
     <PageShell>
+      <JsonLd data={courseSchema} />
+      <JsonLd data={breadcrumbSchema} />
       <section className="relative overflow-hidden border-b border-[#dcd5c7]">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_60%_at_85%_0%,rgba(29,158,117,0.12),transparent)]" />
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-20">

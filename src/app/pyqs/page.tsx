@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Gift, Layers, CheckCircle2 } from "lucide-react";
 
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
 import { pyqYears, pyqBySubject } from "@/components/marketing/site-data";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Free UPSC Previous Year Questions (PYQs) — Sarit Learn",
+export const metadata = pageMeta({
+  title: "Free UPSC Previous Year Questions (PYQs) — Prelims & Mains | Sarit Learn",
   description:
     "Browse UPSC Prelims & Mains previous year questions, year-wise and subject-wise, with clean explanations — completely free.",
-};
+  path: "/pyqs",
+});
 
 const whyFree = [
   "Practise real UPSC questions, not look-alikes",

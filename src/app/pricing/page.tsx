@@ -1,14 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
+import { JsonLd } from "@/components/marketing/JsonLd";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Pricing — Sarit Learn UPSC Command",
+export const metadata = pageMeta({
+  title: "Pricing — Free UPSC Plan & Pro Membership | Sarit Learn",
   description:
     "Start free with a personalized plan, one full subject loop and daily practice. Upgrade to Pro for all subjects, unlimited AI doubt-solving, Mains evaluation and full analytics.",
-};
+  path: "/pricing",
+});
 
 const freePerks = [
   "2-min diagnostic + personalized plan",
@@ -37,8 +39,19 @@ const faqs = [
 ];
 
 export default function PricingPage() {
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
   return (
     <PageShell>
+      <JsonLd data={faqSchema} />
       <PageHero
         eyebrow="Pricing"
         title="Start free. Stay because it works."

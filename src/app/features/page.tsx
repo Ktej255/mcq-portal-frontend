@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import {
   BrainCircuit,
   CalendarDays,
@@ -15,12 +14,14 @@ import {
 } from "lucide-react";
 
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Features — Sarit Learn UPSC Command",
+export const metadata = pageMeta({
+  title: "UPSC Preparation Features — Lessons, Doubts, MCQs & Revision | Sarit Learn",
   description:
-    "Everything the big UPSC platforms offer — current affairs, PYQs, tests — plus the gaps they leave: personalization, an AI teacher, weakness tracking and spaced revision in one daily loop.",
-};
+    "Everything top UPSC platforms offer — current affairs, PYQs, tests — plus the gaps they leave: personalization, an AI teacher, weakness tracking and spaced revision in one daily loop.",
+  path: "/features",
+});
 
 const groups = [
   {

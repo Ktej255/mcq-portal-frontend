@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpen } from "lucide-react";
 
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
 import { resourceGroups } from "@/components/marketing/site-data";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Free UPSC Study Resources — Sarit Learn",
+export const metadata = pageMeta({
+  title: "Free UPSC Study Resources — NCERTs, Current Affairs & Mains Toolkit | Sarit Learn",
   description:
     "Free, curated UPSC study resources — NCERT booklist, standard references, daily current affairs, mind maps, PYQs and Mains answer-writing frameworks.",
-};
+  path: "/resources",
+});
 
 export default function ResourcesPage() {
   return (

@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = pageMeta({
   title: "Terms of Service — Sarit Learn",
   description: "The terms that govern your use of Sarit Learn.",
-};
+  path: "/terms",
+});
 
 const sections = [
   {
