@@ -25,20 +25,25 @@ export function GeographyAnswerWorkspace() {
   const [showParams, setShowParams] = useState(false);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [evalState, setEvalState] = useState<"idle" | "evaluating" | "done">("idle");
+  const [evalSource, setEvalSource] = useState<"typed" | "pdf" | null>(null);
   const [saved, setSaved] = useState(false);
   const [doubtOpen, setDoubtOpen] = useState(false);
 
   const selectedEval = useMemo(() => evaluationLevels.find((e) => e.id === evalId), [evalId]);
   const typed = `${parts.Introduction} ${parts.Body} ${parts.Conclusion}`.trim();
   const hasTyped = typed.length > 20;
-  const canEvaluate = hasTyped || Boolean(uploadName);
   const fillers = useMemo(() => FILLERS.filter((f) => typed.toLowerCase().includes(f)), [typed]);
 
   const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) { setUploadName(file.name); setEvalState("idle"); setSaved(false); }
   };
-  const runEval = () => { setEvalState("evaluating"); window.setTimeout(() => setEvalState("done"), 1600); };
+  const runEval = (source: "typed" | "pdf") => {
+    setEvalSource(source);
+    setEvalState("evaluating");
+    setSaved(false);
+    window.setTimeout(() => setEvalState("done"), 1500);
+  };
 
 
   return (
@@ -53,48 +58,11 @@ export function GeographyAnswerWorkspace() {
           <h1 className="mt-3 text-xl font-black leading-7 tracking-tight md:text-2xl">{questionText}</h1>
         </section>
 
-        {/* Write the answer (typing/voice) — evaluation works without image */}
-        <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Write your answer</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Type your Introduction, Body and Conclusion. You can evaluate a typed answer directly — uploading a handwritten copy is optional and adds copy-marking.</p>
-          <div className="mt-4 space-y-3">
-            {answerScaffold.map((part) => {
-              const key = part.part as "Introduction" | "Body" | "Conclusion";
-              return (
-                <div key={part.part} className="rounded-lg border border-[#e7e0d2] bg-white p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-black text-[#13251d]">{part.part}</p>
-                    <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#8a8174]">{wordCount(parts[key])} words</span>
-                  </div>
-                  <p className="mt-0.5 text-xs font-semibold leading-5 text-[#8a8174]">{part.hint}</p>
-                  <textarea
-                    rows={part.part === "Body" ? 5 : 2}
-                    value={parts[key]}
-                    onChange={(e) => { setParts((p) => ({ ...p, [key]: e.target.value })); setEvalState("idle"); }}
-                    placeholder={`Your ${part.part.toLowerCase()}…`}
-                    className="mt-2 w-full resize-y rounded-md border border-[#dcd5c7] bg-[#fffdf8] p-2 text-sm font-semibold leading-6 text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Optional handwritten copy upload */}
-        <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional · handwritten copy</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Upload a photo/PDF of your written answer. It is digitised and your copy is marked (underline / encircle) where the answer falls short.</p>
-          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md bg-[#1a3a2a] px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white">
-            <UploadCloud className="h-4 w-4" /> Upload copy
-            <input type="file" accept="image/*,.pdf" className="hidden" onChange={onUpload} />
-          </label>
-          {uploadName && <p className="mt-2 text-xs font-bold text-[#085041]">Uploaded: {uploadName}</p>}
-        </section>
-
-        {/* Evaluation level — shown by parameter count */}
+        {/* Evaluation depth — shared selector (parameters, not credits/model) */}
         <section className="mt-4 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Evaluation depth</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">Pick how deep the AI checks your answer. This applies to whichever you evaluate below.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {evaluationLevels.map((lvl) => (
               <label key={lvl.id} className={`flex cursor-pointer items-start gap-2 rounded-md border p-3 transition ${evalId === lvl.id ? "border-[#1d9e75] bg-white" : "border-[#cfe5dc] bg-white/70 hover:border-[#1d9e75]"}`}>
                 <input type="radio" name="evalLevel" className="mt-1 accent-[#1d9e75]" checked={evalId === lvl.id} onChange={() => setEvalId(lvl.id)} />
@@ -115,52 +83,105 @@ export function GeographyAnswerWorkspace() {
               ))}
             </ul>
           )}
-          <button type="button" disabled={!canEvaluate || evalState === "evaluating"} onClick={runEval} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-[#1d9e75] px-4 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-50">
-            <Sparkles className="h-4 w-4" /> {evalState === "evaluating" ? "Evaluating…" : `Evaluate on ${selectedEval?.parameterCount} parameters`}
-          </button>
-          {!canEvaluate && <p className="mt-2 text-[11px] font-semibold text-[#6f4a12]">Type your answer or upload a copy to enable evaluation.</p>}
+        </section>
+
+        {/* Write your answer (typed/spoken) + its OWN evaluate button */}
+        <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Write your answer</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Type your Introduction, Body and Conclusion, then evaluate this written answer.</p>
+          <div className="mt-4 space-y-3">
+            {answerScaffold.map((part) => {
+              const key = part.part as "Introduction" | "Body" | "Conclusion";
+              return (
+                <div key={part.part} className="rounded-lg border border-[#e7e0d2] bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-black text-[#13251d]">{part.part}</p>
+                    <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#8a8174]">{wordCount(parts[key])} words</span>
+                  </div>
+                  <p className="mt-0.5 text-xs font-semibold leading-5 text-[#8a8174]">{part.hint}</p>
+                  <textarea
+                    rows={part.part === "Body" ? 5 : 2}
+                    value={parts[key]}
+                    onChange={(e) => { setParts((p) => ({ ...p, [key]: e.target.value })); if (evalSource === "typed") setEvalState("idle"); }}
+                    placeholder={`Your ${part.part.toLowerCase()}…`}
+                    className="mt-2 w-full resize-y rounded-md border border-[#dcd5c7] bg-[#fffdf8] p-2 text-sm font-semibold leading-6 text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex flex-col items-center">
+            <button type="button" disabled={!hasTyped || evalState === "evaluating"} onClick={() => runEval("typed")}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-8 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#168864] disabled:cursor-not-allowed disabled:opacity-50">
+              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "typed" ? "Evaluating…" : "Evaluate"}
+            </button>
+            {!hasTyped && <p className="mt-2 text-[11px] font-semibold text-[#8a8174]">Type your answer above to evaluate.</p>}
+          </div>
         </section>
 
 
-        {/* Detailed evaluation report */}
+        {/* Upload handwritten copy + its OWN evaluate button */}
+        <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Or upload a handwritten copy</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Upload a photo/PDF of your written answer. It is digitised and your copy is marked (underline / encircle) where it falls short — then evaluate just the copy.</p>
+          <div className="mt-3 flex flex-col items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a] transition hover:bg-[#f2eadc]">
+              <UploadCloud className="h-4 w-4" /> {uploadName ? "Change file" : "Upload PDF / image"}
+              <input type="file" accept="image/*,.pdf" className="hidden" onChange={onUpload} />
+            </label>
+            {uploadName && <p className="text-xs font-bold text-[#085041]">Uploaded: {uploadName}</p>}
+            <button type="button" disabled={!uploadName || evalState === "evaluating"} onClick={() => runEval("pdf")}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-8 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#168864] disabled:cursor-not-allowed disabled:opacity-50">
+              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "pdf" ? "Evaluating…" : "Evaluate"}
+            </button>
+            {!uploadName && <p className="text-[11px] font-semibold text-[#8a8174]">Upload a copy to evaluate it.</p>}
+          </div>
+        </section>
+
+
+        {/* Report — reflects whichever source was evaluated */}
         {evalState === "done" && (
           <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Evaluation report · {selectedEval?.label} · {selectedEval?.parameterCount} parameters</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+              Evaluation report · {selectedEval?.label} · {selectedEval?.parameterCount} parameters · {evalSource === "pdf" ? "uploaded copy" : "typed answer"}
+            </p>
 
-            {/* Your answer echoed */}
-            {hasTyped && (
-              <div className="mt-3 rounded-lg border border-[#e7e0d2] bg-[#fdfaf3] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a8174]">Your answer</p>
-                {(["Introduction", "Body", "Conclusion"] as const).map((k) => parts[k].trim() && (
-                  <p key={k} className="mt-1.5 text-xs font-semibold leading-6 text-[#34453b]"><span className="font-black text-[#085041]">{k} ({wordCount(parts[k])}w): </span>{parts[k]}</p>
-                ))}
+            {evalSource === "typed" && (
+              <>
+                <div className="mt-3 rounded-lg border border-[#e7e0d2] bg-[#fdfaf3] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#8a8174]">Your answer</p>
+                  {(["Introduction", "Body", "Conclusion"] as const).map((k) => parts[k].trim() && (
+                    <p key={k} className="mt-1.5 text-xs font-semibold leading-6 text-[#34453b]"><span className="font-black text-[#085041]">{k} ({wordCount(parts[k])}w): </span>{parts[k]}</p>
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {(["Introduction", "Body", "Conclusion"] as const).map((k) => (
+                    <div key={k} className="rounded-md border border-[#dcd5c7] bg-white p-2 text-center">
+                      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">{k}</p>
+                      <p className="text-lg font-black text-[#13251d]">{wordCount(parts[k])}</p>
+                      <p className="text-[9px] font-bold text-[#8a8174]">words</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
+                  <p className="text-xs font-black text-[#13251d]">Redundant words (removable without changing meaning)</p>
+                  {fillers.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">{fillers.map((f) => <span key={f} className="rounded bg-[#fff1ed] px-2 py-1 text-[10px] font-black text-[#7d3827] line-through">{f}</span>)}</div>
+                  ) : <p className="mt-1 text-xs font-semibold text-[#5d675f]">No obvious filler detected.</p>}
+                </div>
+              </>
+            )}
+
+            {evalSource === "pdf" && (
+              <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
+                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Marked copy (digitised)</p>
+                <p className="mt-2 text-xs font-semibold leading-6 text-[#34453b]">
+                  Your introduction is <span className="underline decoration-[#be4444] decoration-2">too generic</span>; the body needs a <span className="rounded-full px-1 ring-2 ring-[#be4444]">diagram</span>; the conclusion is <span className="bg-[#fff4df]">missing a way-forward</span>.
+                </p>
+                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} — auto-marked. Full annotated copy renders here once OCR + marking is wired.</p>
               </div>
             )}
 
-            {/* Word map */}
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {(["Introduction", "Body", "Conclusion"] as const).map((k) => (
-                <div key={k} className="rounded-md border border-[#dcd5c7] bg-white p-2 text-center">
-                  <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">{k}</p>
-                  <p className="text-lg font-black text-[#13251d]">{wordCount(parts[k])}</p>
-                  <p className="text-[9px] font-bold text-[#8a8174]">words</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Redundancy */}
-            <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
-              <p className="text-xs font-black text-[#13251d]">Redundant words (removable without changing meaning)</p>
-              {fillers.length ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {fillers.map((f) => <span key={f} className="rounded bg-[#fff1ed] px-2 py-1 text-[10px] font-black text-[#7d3827] line-through">{f}</span>)}
-                </div>
-              ) : (
-                <p className="mt-1 text-xs font-semibold text-[#5d675f]">No obvious filler detected{hasTyped ? "." : " (type an answer to analyse)."}</p>
-              )}
-            </div>
-
-            {/* Parameter-wise */}
             <div className="mt-3 space-y-1.5">
               <p className="text-xs font-black text-[#13251d]">Parameter-wise assessment (sample)</p>
               {(selectedEval?.parameters.slice(0, 6) ?? []).map((p, i) => {
@@ -174,22 +195,10 @@ export function GeographyAnswerWorkspace() {
               })}
             </div>
 
-            {/* Specific lift + marks band */}
             <div className="mt-3 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3 text-xs font-semibold leading-6 text-[#34453b]">
-              <p><span className="font-black text-[#085041]">Lift suggestion:</span> Replace the generic opening with a one-line definition + a data point; add a labelled diagram in the body for +2 marks.</p>
+              <p><span className="font-black text-[#085041]">Lift suggestion:</span> Add a one-line definition + data point in the intro and a labelled diagram in the body for +2 marks.</p>
               <p className="mt-1"><span className="font-black text-[#085041]">Predicted band:</span> 9-11 / 15 at current quality.</p>
             </div>
-
-            {/* Marked copy (only if uploaded) */}
-            {uploadName && (
-              <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
-                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Marked copy (digitised)</p>
-                <p className="mt-2 text-xs font-semibold leading-6 text-[#34453b]">
-                  Your introduction is <span className="underline decoration-[#be4444] decoration-2">too generic</span>; the body needs a <span className="rounded-full px-1 ring-2 ring-[#be4444]">diagram</span>; the conclusion is <span className="bg-[#fff4df]">missing a way-forward</span>.
-                </p>
-                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} — auto-marked. Full annotated copy renders here once OCR + marking is wired.</p>
-              </div>
-            )}
 
             <button type="button" onClick={() => setSaved(true)} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-xs font-black uppercase tracking-[0.12em] text-white">
               <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save to profile, gap & progress"}
