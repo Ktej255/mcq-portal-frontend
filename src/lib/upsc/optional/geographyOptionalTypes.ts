@@ -54,7 +54,12 @@ export type DiagramId =
   | "isostasy-airy-pratt"
   | "davis-penck-cycle"
   | "channel-patterns"
-  | "slope-elements";
+  | "slope-elements"
+  | "heat-budget"
+  | "tricellular-circulation"
+  | "air-mass-fronts"
+  | "koppen-climate"
+  | "urban-heat-island";
 
 export type Pyq = {
   year?: string;

@@ -159,6 +159,120 @@ function ChannelPatterns() {
   );
 }
 
+function HeatBudget() {
+  return (
+    <svg viewBox="0 0 460 230" className="h-auto w-full max-w-2xl">
+      <RoughDefs />
+      {/* sun */}
+      <path className="go-pencil go-pencil-fill-amber" d="M40 40 a18 18 0 1 0 0.1 0 Z" />
+      <text x="24" y="30" className="go-ink-label go-hand" fontSize="14">Sun</text>
+      {/* incoming 100 */}
+      <path className="go-pencil" d="M58 52 L200 120" />
+      <text x="95" y="78" className="go-ink-label" fontSize="12">incoming 100</text>
+      {/* earth surface */}
+      <path className="go-pencil go-pencil-fill-green" d="M150 150 L430 150 L430 175 L150 175 Z" />
+      <text x="250" y="168" className="go-ink-label" fontSize="12">EARTH SURFACE</text>
+      {/* reflected (albedo) */}
+      <path className="go-pencil" d="M205 120 L300 55" strokeDasharray="4 4" />
+      <text x="250" y="50" className="go-ink-label" fontSize="12">reflected 35 (albedo)</text>
+      {/* absorbed */}
+      <text x="160" y="140" className="go-ink-label" fontSize="11">absorbed 51 (surface)</text>
+      <text x="300" y="140" className="go-ink-label" fontSize="11">+14 atmosphere</text>
+      {/* outgoing terrestrial */}
+      <path className="go-pencil" d="M390 150 L405 70" />
+      <text x="395" y="60" className="go-ink-label" fontSize="11">outgoing 65 ↑</text>
+      <text x="60" y="210" className="go-ink-label go-hand" fontSize="16">balance: in 100 = out (35 + 65)</text>
+    </svg>
+  );
+}
+
+function TricellularCirculation() {
+  return (
+    <svg viewBox="0 0 300 240" className="h-auto w-full max-w-md">
+      <RoughDefs />
+      {/* earth quarter arc */}
+      <path className="go-pencil" d="M40 220 A180 180 0 0 1 220 40" />
+      {/* latitude ticks + cells */}
+      <text x="225" y="210" className="go-ink-label" fontSize="11">0° ITCZ (L)</text>
+      <path className="go-pencil" d="M150 165 q22 -18 0 -36" />
+      <path className="go-pencil" d="M150 129 l-4 6 m4 -6 l5 4" />
+      <text x="120" y="150" className="go-ink-label" fontSize="11">Hadley</text>
+      <text x="180" y="150" className="go-ink-label" fontSize="11">30° (H)</text>
+      <path className="go-pencil" d="M118 120 q22 -18 0 -34" />
+      <text x="80" y="112" className="go-ink-label" fontSize="11">Ferrel</text>
+      <text x="135" y="106" className="go-ink-label" fontSize="11">60° (L)</text>
+      <path className="go-pencil" d="M86 84 q18 -16 0 -30" />
+      <text x="50" y="78" className="go-ink-label" fontSize="11">Polar</text>
+      <text x="92" y="56" className="go-ink-label" fontSize="11">90° (H)</text>
+      <text x="40" y="235" className="go-ink-label go-hand" fontSize="15">tri-cellular circulation</text>
+    </svg>
+  );
+}
+
+function AirMassFronts() {
+  return (
+    <svg viewBox="0 0 460 220" className="h-auto w-full max-w-2xl">
+      <RoughDefs />
+      {/* warm sector */}
+      <path className="go-pencil go-pencil-fill-red" d="M60 150 q120 -40 260 0 Z" />
+      {/* cold front (triangles) */}
+      <path className="go-pencil" d="M60 150 L150 95" />
+      <path className="go-pencil go-pencil-fill-blue" d="M85 132 l8 -5 l2 9 Z" />
+      <path className="go-pencil go-pencil-fill-blue" d="M110 116 l8 -5 l2 9 Z" />
+      <text x="55" y="90" className="go-ink-label" fontSize="11">cold front ▲</text>
+      {/* warm front (semicircles) */}
+      <path className="go-pencil" d="M150 95 q90 -30 170 5" />
+      <path className="go-pencil go-pencil-fill-red" d="M200 80 a5 5 0 0 1 10 0 Z" />
+      <path className="go-pencil go-pencil-fill-red" d="M240 78 a5 5 0 0 1 10 0 Z" />
+      <text x="250" y="70" className="go-ink-label" fontSize="11">warm front ◗</text>
+      <text x="150" y="170" className="go-ink-label" fontSize="12">warm sector</text>
+      <text x="320" y="120" className="go-ink-label" fontSize="11">L (low)</text>
+      <text x="60" y="205" className="go-ink-label go-hand" fontSize="15">mid-latitude (temperate) cyclone</text>
+    </svg>
+  );
+}
+
+function KoppenClimate() {
+  return (
+    <svg viewBox="0 0 360 220" className="h-auto w-full max-w-lg">
+      <RoughDefs />
+      <path className="go-pencil" d="M30 30 L30 190" />
+      {[
+        ["A", "Tropical", 45, "go-pencil-fill-green"],
+        ["B", "Dry", 73, "go-pencil-fill-amber"],
+        ["C", "Warm temperate", 101, "go-pencil-fill-green"],
+        ["D", "Cold (continental)", 129, "go-pencil-fill-blue"],
+        ["E", "Polar", 157, "go-pencil-fill-blue"],
+      ].map(([code, name, y, fill]) => (
+        <g key={code as string}>
+          <path className={`go-pencil ${fill}`} d={`M30 ${(y as number) - 11} L52 ${(y as number) - 11} L52 ${(y as number) + 6} L30 ${(y as number) + 6} Z`} />
+          <text x="36" y={(y as number) + 2} className="go-ink-label" fontSize="13">{code as string}</text>
+          <text x="64" y={(y as number) + 2} className="go-ink-label" fontSize="12">{name as string}</text>
+        </g>
+      ))}
+      <text x="40" y="210" className="go-ink-label go-hand" fontSize="15">Köppen: 5 climate groups (A–E)</text>
+    </svg>
+  );
+}
+
+function UrbanHeatIsland() {
+  return (
+    <svg viewBox="0 0 460 210" className="h-auto w-full max-w-2xl">
+      <RoughDefs />
+      {/* temperature profile curve */}
+      <path className="go-pencil go-pencil-fill-red" d="M30 160 L110 150 Q150 150 160 110 L300 110 Q330 110 340 150 L430 158 L430 175 L30 175 Z" />
+      {/* skyline */}
+      <path className="go-pencil" d="M170 110 L170 80 L185 80 L185 110 M200 110 L200 70 L215 70 L215 110 M235 110 L235 85 L250 85 L250 110" />
+      <text x="40" y="148" className="go-ink-label" fontSize="11">rural</text>
+      <text x="200" y="60" className="go-ink-label" fontSize="11">city core (warm)</text>
+      <text x="380" y="150" className="go-ink-label" fontSize="11">suburb</text>
+      <path className="go-pencil" d="M20 175 L20 60" />
+      <text x="6" y="55" className="go-ink-label" fontSize="10">°C</text>
+      <text x="60" y="200" className="go-ink-label go-hand" fontSize="15">Urban Heat Island profile</text>
+    </svg>
+  );
+}
+
 const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "endo-exo-balance": EndoExoBalance,
   "plate-boundaries": PlateBoundaries,
@@ -166,6 +280,11 @@ const REGISTRY: Record<DiagramId, () => React.ReactElement> = {
   "davis-penck-cycle": DavisPenckCycle,
   "slope-elements": SlopeElements,
   "channel-patterns": ChannelPatterns,
+  "heat-budget": HeatBudget,
+  "tricellular-circulation": TricellularCirculation,
+  "air-mass-fronts": AirMassFronts,
+  "koppen-climate": KoppenClimate,
+  "urban-heat-island": UrbanHeatIsland,
 };
 
 export function GeoDiagram({ id, caption }: { id: DiagramId; caption: string }) {

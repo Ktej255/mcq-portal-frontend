@@ -116,3 +116,22 @@ Built the first real content module for the **Geography (Optional)** track (prev
 **⚠️ Pre-existing build blocker (not introduced here):** `main` has two pages resolving to `/tests` — `src/app/tests/page.tsx` and `src/app/(dashboard)/tests/page.tsx`. `next build` fails on this conflict. Validation above was done by temporarily moving the duplicate aside. **This should be resolved separately** (delete/merge one of the `/tests` pages) before deployment.
 
 **Next:** author Climatology using the same model; then Oceanography, Biogeography, Environmental Geography.
+
+
+---
+
+## 2026-06-16 (cont.) — Climatology module + `/tests` build-blocker fixed
+
+**Climatology (Paper I) shipped** — second Read module, same model/depth as Geomorphology:
+- `/upsc/optional-subjects/geography-optional/read/climatology` — 6 subtopics: heat budget & pressure belts; atmospheric circulation, winds & stability; monsoons & jet streams; air masses, fronts & cyclones; precipitation & climate classification (Köppen/Thornthwaite/Trewartha); climate change & applied/urban climatology.
+- Three-layer syllabus (Official/Trend/Hidden) added; hidden topics incl. lapse rates, ENSO/IOD teleconnections, jet-stream monsoon theory, Bergeron process, radiation laws, Milankovitch cycles.
+- 5 new pencil-style SVG diagrams: heat budget, tri-cellular circulation, mid-latitude cyclone/fronts, Köppen groups, urban heat island.
+- Files: `src/lib/upsc/optional/climatology.ts`; registered in `geographyOptionalTopics.ts` (moved from coming-soon → ready). Diagram IDs added in `geographyOptionalTypes.ts` + `GeoOptionalDiagrams.tsx`.
+
+**Resolved the pre-existing `/tests` build conflict** (was blocking the whole app build):
+- Root cause: two pages resolved to `/tests` — the public marketing page (`src/app/tests/page.tsx`, in the SEO site map + public nav) and a dashboard student-practice page (`src/app/(dashboard)/tests/page.tsx`).
+- Fix: kept the public `/tests`; **moved the dashboard page to `/practice`** (`src/app/(dashboard)/practice/page.tsx`). The dashboard sidebar never linked to `/tests`, so no nav change was needed; updated the lone reference in `scratch/verify-student-signal-pages.cjs` (`/tests` → `/practice`).
+
+**Validation:** full `next build` now succeeds — **222/222 static pages**, including `/tests`, `/practice`, and both `…/read/geomorphology` and `…/read/climatology`. No route conflicts.
+
+**Geography Optional progress:** 2 of 5 physical-geography topics live (Geomorphology, Climatology). Next: Oceanography → Biogeography → Environmental Geography.

@@ -1,5 +1,6 @@
 import type { OptionalTopic, TopicStatus } from "./geographyOptionalTypes";
 import { geomorphology } from "./geomorphology";
+import { climatology } from "./climatology";
 
 /**
  * Registry of Geography Optional topics.
@@ -21,17 +22,6 @@ type ComingSoonTopic = {
 };
 
 export const comingSoonTopics: ComingSoonTopic[] = [
-  {
-    slug: "climatology",
-    title: "Climatology",
-    paper: "Paper I",
-    section: "Section A — Physical Geography",
-    order: 2,
-    status: "coming-soon",
-    summary:
-      "Atmospheric structure, insolation & heat budget, circulation, air masses & fronts, monsoons, and climate classification & change.",
-    readMinutes: 36,
-  },
   {
     slug: "oceanography",
     title: "Oceanography",
@@ -68,7 +58,7 @@ export const comingSoonTopics: ComingSoonTopic[] = [
 ];
 
 /** Fully-authored topics (Read content ready). */
-export const readyTopics: OptionalTopic[] = [geomorphology];
+export const readyTopics: OptionalTopic[] = [geomorphology, climatology];
 
 export type TopicCard = {
   slug: string;
