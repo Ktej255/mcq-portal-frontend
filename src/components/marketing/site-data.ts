@@ -29,6 +29,7 @@ export const navLinks: { href: string; label: string }[] = [
   { href: "/subjects", label: "Subjects" },
   { href: "/current-affairs", label: "Current Affairs" },
   { href: "/pyqs", label: "Free PYQs" },
+  { href: "/tests", label: "Tests" },
   { href: "/resources", label: "Resources" },
   { href: "/pricing", label: "Pricing" },
 ];
@@ -39,6 +40,7 @@ export const footerColumns: { heading: string; links: { label: string; href: str
     links: [
       { label: "Daily loop", href: "/#loop" },
       { label: "Features", href: "/features" },
+      { label: "Tests & practice", href: "/tests" },
       { label: "Pricing", href: "/pricing" },
       { label: "Results", href: "/upsc-prelims-2026-showcase" },
     ],
@@ -428,4 +430,23 @@ export const pyqTips: { title: string; detail: string }[] = [
   { title: "Map every question to a topic", detail: "Tag each question so you can spot high-yield areas." },
   { title: "Revisit your mistakes", detail: "Re-attempt wrong questions after a spaced interval." },
   { title: "Read the pattern, not predictions", detail: "Use trends to prioritise — never to guess the paper." },
+];
+
+
+/* ------------------------------------------------------------------ */
+/* Tests & Daily Practice segment                                      */
+/* ------------------------------------------------------------------ */
+
+export const testFormats: { title: string; detail: string }[] = [
+  { title: "Daily quiz", detail: "A short daily set on static topics + current affairs to build the habit." },
+  { title: "Prelims test series", detail: "Full-length and sectional Prelims mocks on the real UPSC pattern." },
+  { title: "CSAT practice", detail: "Comprehension, reasoning and quantitative aptitude for the qualifying paper." },
+  { title: "Mains answer writing", detail: "GS and essay prompts with structured, criteria-based evaluation." },
+];
+
+export const testFeatures: { title: string; detail: string }[] = [
+  { title: "Instant scoring & solutions", detail: "Detailed explanations the moment you submit — learn while it's fresh." },
+  { title: "Weakness analytics", detail: "Accuracy by subject and micro-topic, not just a single score." },
+  { title: "All-India percentile", detail: "See where you stand against other aspirants on each test." },
+  { title: "Spaced re-tests", detail: "Missed questions resurface at the right interval for retention." },
 ];

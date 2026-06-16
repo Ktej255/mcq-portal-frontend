@@ -20,6 +20,7 @@ export function GET() {
     `- [Pricing](${SITE_URL}/pricing): Free plan vs Pro membership; what each unlocks.`,
     `- [Free PYQs](${SITE_URL}/pyqs): UPSC Prelims & Mains previous year questions, year-wise and subject-wise, free.`,
     `- [Current affairs](${SITE_URL}/current-affairs): Exam-filtered daily current affairs, editorials, schemes and monthly consolidation.`,
+    `- [Tests & practice](${SITE_URL}/tests): Daily quizzes, Prelims mocks, CSAT practice and Mains answer writing with analytics.`,
     `- [Study resources](${SITE_URL}/resources): NCERT booklist, standard references, current affairs, mind maps, Mains frameworks.`,
     `- [Subjects](${SITE_URL}/subjects): All General Studies and Optional subjects.`,
     "",

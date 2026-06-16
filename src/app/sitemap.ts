@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/subjects",
     "/current-affairs",
     "/pyqs",
+    "/tests",
     "/resources",
     "/about",
     "/contact",
