@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle2, RotateCcw, Sparkles, Target } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Lock, RotateCcw, Sparkles, Target } from "lucide-react";
 
 import { gsSubjects } from "./site-data";
 
@@ -14,12 +14,15 @@ type Answers = {
   optional: string;
 };
 
+type Contact = { name: string; email: string; phone: string };
+
 const yearOptions = ["2026", "2027", "2028 or later"];
 const stageOptions = ["Just starting out", "Built my NCERT foundation", "In revision mode", "Heavy test practice"];
 const hoursOptions = ["Under 2 hours", "2–4 hours", "4–6 hours", "6+ hours"];
 const optionalOptions = ["Still undecided", "Sociology", "PSIR", "Public Administration", "Anthropology", "Geography", "Already chosen"];
 
 const STORAGE_KEY = "sarit-diagnostic-plan-v1";
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const dailyMcqByHours: Record<string, number> = {
   "Under 2 hours": 10,
@@ -30,16 +33,14 @@ const dailyMcqByHours: Record<string, number> = {
 
 const totalSteps = 5;
 
+type Phase = "questions" | "capture" | "result";
+
 export function DiagnosticFlow() {
+  const [phase, setPhase] = useState<Phase>("questions");
   const [step, setStep] = useState(0);
-  const [done, setDone] = useState(false);
-  const [answers, setAnswers] = useState<Answers>({
-    year: "",
-    stage: "",
-    subjects: [],
-    hours: "",
-    optional: "",
-  });
+  const [submitting, setSubmitting] = useState(false);
+  const [answers, setAnswers] = useState<Answers>({ year: "", stage: "", subjects: [], hours: "", optional: "" });
+  const [contact, setContact] = useState<Contact>({ name: "", email: "", phone: "" });
 
   const focusSubjects = gsSubjects.map((s) => s.name);
 
@@ -57,22 +58,39 @@ export function DiagnosticFlow() {
     (step === 3 && answers.hours) ||
     (step === 4 && answers.optional);
 
-  function finish() {
+  const contactValid = contact.name.trim().length > 1 && EMAIL_RE.test(contact.email.trim());
+
+  async function reveal() {
+    if (!contactValid || submitting) return;
+    setSubmitting(true);
+    const payload = { ...answers, ...contact, source: "diagnostic" };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...answers, createdAt: new Date().toISOString() }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...payload, createdAt: new Date().toISOString() }));
     } catch {
-      // ignore storage errors (private mode etc.)
+      // ignore storage errors
     }
-    setDone(true);
+    try {
+      await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // never block the user on a delivery error
+    }
+    setSubmitting(false);
+    setPhase("result");
   }
 
   function restart() {
     setAnswers({ year: "", stage: "", subjects: [], hours: "", optional: "" });
+    setContact({ name: "", email: "", phone: "" });
     setStep(0);
-    setDone(false);
+    setPhase("questions");
   }
 
-  if (done) {
+  /* ----------------------------- Result ----------------------------- */
+  if (phase === "result") {
     const focus = answers.subjects[0] ?? "Geography";
     const dailyMcqs = dailyMcqByHours[answers.hours] ?? 10;
     const planItems = [
@@ -92,7 +110,7 @@ export function DiagnosticFlow() {
             <Sparkles className="h-3.5 w-3.5" /> Your personalized starting plan
           </span>
           <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight text-[#13251d] md:text-4xl">
-            Here&apos;s your plan for the {answers.year} attempt.
+            {contact.name ? `${contact.name.split(" ")[0]}, here's` : "Here's"} your plan for the {answers.year} attempt.
           </h1>
           <p className="mt-3 text-sm font-semibold leading-7 text-[#3a4f45]">
             Built from your answers — {answers.stage.toLowerCase()}, {answers.hours.toLowerCase()} a day. This is a
@@ -129,15 +147,86 @@ export function DiagnosticFlow() {
             Preview your daily dashboard
             <ArrowRight className="ml-1.5 h-4 w-4" />
           </Link>
-          <p className="mt-3 text-xs font-semibold text-[#6b7a70]">No card required. Your plan is saved on this device.</p>
+          <p className="mt-3 text-xs font-semibold text-[#6b7a70]">We&apos;ve saved your plan. We&apos;ll email it and helpful next steps to {contact.email}.</p>
         </div>
       </section>
     );
   }
 
+  /* ----------------------------- Capture ---------------------------- */
+  if (phase === "capture") {
+    return (
+      <section className="mx-auto max-w-xl px-4 py-16 md:px-8">
+        <div className="rounded-3xl border border-[#dcd5c7] bg-[#fffdf8] p-7 shadow-sm">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f5ee] px-3 py-1 text-xs font-black uppercase tracking-wide text-[#085041]">
+            <Lock className="h-3.5 w-3.5" /> Last step
+          </span>
+          <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-[#13251d] md:text-3xl">
+            Where should we send your plan?
+          </h1>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#536259]">
+            Get your personalized plan on screen now, plus a copy and helpful next steps by email. No spam.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">Name</label>
+              <input
+                value={contact.name}
+                onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                placeholder="Your name"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">Email</label>
+              <input
+                type="email"
+                value={contact.email}
+                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                placeholder="you@example.com"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">WhatsApp (optional)</label>
+              <input
+                value={contact.phone}
+                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                placeholder="+91…"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setPhase("questions")}
+              className="inline-flex h-11 items-center gap-2 rounded-md px-4 text-sm font-black text-[#536259] transition hover:text-[#13251d]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={reveal}
+              disabled={!contactValid || submitting}
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition enabled:hover:bg-[#10291d] disabled:opacity-40"
+            >
+              {submitting ? "Building your plan…" : "Reveal my plan"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-4 text-xs font-semibold text-[#6b7a70]">By continuing you agree to receive your plan and occasional UPSC tips. Unsubscribe anytime.</p>
+        </div>
+      </section>
+    );
+  }
+
+  /* ---------------------------- Questions --------------------------- */
   return (
     <section className="mx-auto max-w-2xl px-4 py-16 md:px-8">
-      {/* progress */}
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide text-[#536259]">
           <span>Step {step + 1} of {totalSteps}</span>
@@ -146,10 +235,7 @@ export function DiagnosticFlow() {
           </span>
         </div>
         <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#e1d8ca]">
-          <div
-            className="h-full rounded-full bg-[#1d9e75] transition-all duration-300"
-            style={{ width: `${((step + 1) / totalSteps) * 100}%` }}
-          />
+          <div className="h-full rounded-full bg-[#1d9e75] transition-all duration-300" style={{ width: `${((step + 1) / totalSteps) * 100}%` }} />
         </div>
       </div>
 
@@ -158,13 +244,11 @@ export function DiagnosticFlow() {
           <OptionGrid options={yearOptions} value={answers.year} onSelect={(v) => setAnswers((a) => ({ ...a, year: v }))} />
         </Question>
       )}
-
       {step === 1 && (
         <Question title="Where are you right now?" subtitle="Be honest — it helps us start you at the right point.">
           <OptionGrid options={stageOptions} value={answers.stage} onSelect={(v) => setAnswers((a) => ({ ...a, stage: v }))} />
         </Question>
       )}
-
       {step === 2 && (
         <Question title="Which areas feel weakest?" subtitle="Pick one or more — we'll prioritise these.">
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -186,13 +270,11 @@ export function DiagnosticFlow() {
           </div>
         </Question>
       )}
-
       {step === 3 && (
         <Question title="How much can you study daily?" subtitle="We'll size your daily targets to fit.">
           <OptionGrid options={hoursOptions} value={answers.hours} onSelect={(v) => setAnswers((a) => ({ ...a, hours: v }))} />
         </Question>
       )}
-
       {step === 4 && (
         <Question title="Have you picked an optional?" subtitle="We'll factor this into your Mains roadmap.">
           <OptionGrid options={optionalOptions} value={answers.optional} onSelect={(v) => setAnswers((a) => ({ ...a, optional: v }))} columns="grid-cols-2 sm:grid-cols-3" />
@@ -222,7 +304,7 @@ export function DiagnosticFlow() {
         ) : (
           <button
             type="button"
-            onClick={finish}
+            onClick={() => setPhase("capture")}
             disabled={!canAdvance}
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition enabled:hover:bg-[#10291d] disabled:opacity-40"
           >
