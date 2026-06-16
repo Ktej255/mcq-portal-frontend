@@ -211,7 +211,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
               href="/start"
               className="inline-flex h-12 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
-              Start free — no card
+              Take the free diagnostic
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <a

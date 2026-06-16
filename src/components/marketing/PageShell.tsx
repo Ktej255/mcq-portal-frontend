@@ -38,7 +38,7 @@ export function PageHero({
   );
 }
 
-export function StartFreeCta({ label = "Start free — no card" }: { label?: string }) {
+export function StartFreeCta({ label = "Take the free diagnostic" }: { label?: string }) {
   return (
     <Link
       href="/start"
