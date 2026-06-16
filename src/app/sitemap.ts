@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/features",
     "/pricing",
     "/subjects",
+    "/current-affairs",
     "/pyqs",
     "/resources",
     "/about",

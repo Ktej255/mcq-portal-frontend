@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, Gift, Layers, CheckCircle2 } from "lucide-react";
+import { ArrowRight, ClipboardCheck, Gift, Layers, Lightbulb, CheckCircle2 } from "lucide-react";
 
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
-import { pyqYears, pyqBySubject } from "@/components/marketing/site-data";
+import { pyqYears, pyqBySubject, pyqTips } from "@/components/marketing/site-data";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
@@ -85,6 +85,20 @@ export default function PyqsPage() {
               <span className="text-sm font-black text-[#13251d]">{s.subject}</span>
               <span className="text-xs font-bold text-[#8c5d14]">{s.count}</span>
             </Link>
+          ))}
+        </div>
+
+        {/* How to use PYQs */}
+        <div className="mt-14 flex items-center gap-3">
+          <Lightbulb className="h-5 w-5 text-[#1d9e75]" />
+          <h2 className="text-2xl font-black tracking-tight text-[#13251d]">How to use PYQs the right way</h2>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {pyqTips.map((t) => (
+            <div key={t.title} className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <h3 className="text-base font-black text-[#13251d]">{t.title}</h3>
+              <p className="mt-1.5 text-sm font-semibold leading-6 text-[#536259]">{t.detail}</p>
+            </div>
           ))}
         </div>
 

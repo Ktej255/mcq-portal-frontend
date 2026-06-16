@@ -27,6 +27,7 @@ import {
 
 export const navLinks: { href: string; label: string }[] = [
   { href: "/subjects", label: "Subjects" },
+  { href: "/current-affairs", label: "Current Affairs" },
   { href: "/pyqs", label: "Free PYQs" },
   { href: "/resources", label: "Resources" },
   { href: "/pricing", label: "Pricing" },
@@ -56,7 +57,7 @@ export const footerColumns: { heading: string; links: { label: string; href: str
     links: [
       { label: "Previous year questions", href: "/pyqs" },
       { label: "Study resources", href: "/resources" },
-      { label: "Current affairs", href: "/subjects/current-affairs" },
+      { label: "Current affairs", href: "/current-affairs" },
       { label: "Optional subjects", href: "/subjects#optional" },
     ],
   },
@@ -376,4 +377,55 @@ export const resourceGroups: { heading: string; items: { title: string; detail: 
       { title: "Essay frameworks", detail: "Thematic essay structures with fodder material." },
     ],
   },
+];
+
+
+/* ------------------------------------------------------------------ */
+/* Current Affairs segment                                             */
+/* ------------------------------------------------------------------ */
+
+export const currentAffairsDailyFormat: { title: string; detail: string }[] = [
+  { title: "Prelims bytes", detail: "Crisp factual pointers likely to be tested in Prelims." },
+  { title: "Mains articles", detail: "Issue-based analysis structured for GS Mains answers." },
+  { title: "Editorial gist", detail: "The day's key editorials distilled to exam-relevant points." },
+  { title: "PIB & schemes", detail: "Government releases and schemes that matter for the exam." },
+  { title: "Daily CA quiz", detail: "A short quiz to lock in the day's current affairs." },
+];
+
+export const currentAffairsCategories: { name: string; detail: string }[] = [
+  { name: "Polity & Governance", detail: "Bills, judgments, institutions and governance moves." },
+  { name: "Economy", detail: "RBI, Budget, schemes, indicators and key reports." },
+  { name: "Environment", detail: "Climate, biodiversity, conventions and species in news." },
+  { name: "International Relations", detail: "Summits, groupings, treaties and India's diplomacy." },
+  { name: "Science & Technology", detail: "Space, defence, biotech and emerging technology." },
+  { name: "Government Schemes", detail: "Flagship schemes with objectives and outcomes." },
+];
+
+// Evergreen, recurring exam themes shown to illustrate the daily format
+// (not real-time news headlines).
+export const currentAffairsSamples: { tag: string; title: string; summary: string }[] = [
+  { tag: "Economy", title: "RBI Monetary Policy: repo rate & stance", summary: "What a rate decision signals and how to frame it for Prelims and Mains." },
+  { tag: "Environment", title: "Wetlands & Ramsar site designations", summary: "Why wetland conservation and Ramsar recur across GS-I and GS-III." },
+  { tag: "Polity", title: "Landmark Supreme Court judgments", summary: "Linking key judgments to fundamental rights and governance." },
+  { tag: "IR", title: "Multilateral groupings (G20, BRICS, QUAD)", summary: "India's role and recent outcomes relevant to GS-II." },
+];
+
+export const monthlyMagazineMonths: string[] = [
+  "June 2026",
+  "May 2026",
+  "April 2026",
+  "March 2026",
+  "February 2026",
+  "January 2026",
+];
+
+/* ------------------------------------------------------------------ */
+/* PYQ practice guidance                                               */
+/* ------------------------------------------------------------------ */
+
+export const pyqTips: { title: string; detail: string }[] = [
+  { title: "Solve before you study", detail: "Attempt PYQs first to see how a topic is actually tested." },
+  { title: "Map every question to a topic", detail: "Tag each question so you can spot high-yield areas." },
+  { title: "Revisit your mistakes", detail: "Re-attempt wrong questions after a spaced interval." },
+  { title: "Read the pattern, not predictions", detail: "Use trends to prioritise — never to guess the paper." },
 ];

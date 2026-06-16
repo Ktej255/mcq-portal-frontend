@@ -19,6 +19,7 @@ export function GET() {
     `- [Features](${SITE_URL}/features): Personalized plan, ask-the-teacher AI, weakness map, spaced revision, PYQs, Mains answer evaluation.`,
     `- [Pricing](${SITE_URL}/pricing): Free plan vs Pro membership; what each unlocks.`,
     `- [Free PYQs](${SITE_URL}/pyqs): UPSC Prelims & Mains previous year questions, year-wise and subject-wise, free.`,
+    `- [Current affairs](${SITE_URL}/current-affairs): Exam-filtered daily current affairs, editorials, schemes and monthly consolidation.`,
     `- [Study resources](${SITE_URL}/resources): NCERT booklist, standard references, current affairs, mind maps, Mains frameworks.`,
     `- [Subjects](${SITE_URL}/subjects): All General Studies and Optional subjects.`,
     "",
