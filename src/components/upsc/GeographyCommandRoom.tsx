@@ -252,7 +252,7 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Geography</Badge>
+                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Geography · GS</Badge>
                 <span className="text-sm font-black text-[#1d9e75]">Day {activeSession.day} of {geographySessions.length}</span>
                 <span className="text-sm font-semibold text-[#746f66]">{activeSession.duration}</span>
                 {showOperatorViews && (

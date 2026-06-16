@@ -97,6 +97,7 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{group} optional course</p>
                 <h1 className="text-lg font-black tracking-tight md:text-xl">{title}</h1>
+                {isGeo && <p className="mt-0.5 text-[10px] font-semibold text-[#8a8174]">Optional paper (Mains VI/VII) — separate from GS Geography</p>}
               </div>
             </div>
             <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">{totalLessons} lessons</span>
