@@ -274,7 +274,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               {loopSteps.map((step, i) => {
                 const isActive = i === active;
                 const Icon = step.icon;
@@ -283,14 +283,23 @@ function Hero({ reduce }: { reduce: boolean | null }) {
                     key={step.label}
                     animate={isActive && !reduce ? { scale: 1.04 } : { scale: 1 }}
                     transition={{ duration: 0.3 }}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-center transition-colors ${
+                    className={`relative flex flex-col items-center gap-2 rounded-2xl border p-3 text-center transition-colors ${
                       isActive
-                        ? "border-[#1d9e75] bg-[#e7f5ee]"
+                        ? "border-[#1d9e75] bg-[#e7f5ee] shadow-sm"
                         : "border-[#e1d8ca] bg-[#f7f4ee]"
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${isActive ? "text-[#085041]" : "text-[#1a3a2a]"}`} />
-                    <span className="text-[11px] font-black text-[#13251d]">{step.label}</span>
+                    <span className={`absolute right-2 top-1.5 text-[9px] font-black tabular-nums ${isActive ? "text-[#1d9e75]" : "text-[#b8ad97]"}`}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span
+                      className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                        isActive ? "bg-[#1a3a2a] text-white" : "bg-white text-[#1a3a2a]"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-[11px] font-black leading-tight tracking-tight text-[#13251d]">{step.label}</span>
                   </motion.div>
                 );
               })}
