@@ -40,6 +40,7 @@ export const footerColumns: { heading: string; links: { label: string; href: str
     links: [
       { label: "Daily loop", href: "/#loop" },
       { label: "Features", href: "/features" },
+      { label: "Live demo", href: "/demo" },
       { label: "Tests & practice", href: "/tests" },
       { label: "Pricing", href: "/pricing" },
       { label: "Results", href: "/upsc-prelims-2026-showcase" },

@@ -125,7 +125,11 @@ export function DiagnosticFlow() {
               Retake
             </button>
           </div>
-          <p className="mt-4 text-xs font-semibold text-[#6b7a70]">No card required. Your plan is saved on this device.</p>
+          <Link href="/demo" className="mt-4 inline-flex items-center text-sm font-black text-[#085041] underline-offset-4 hover:underline">
+            Preview your daily dashboard
+            <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Link>
+          <p className="mt-3 text-xs font-semibold text-[#6b7a70]">No card required. Your plan is saved on this device.</p>
         </div>
       </section>
     );
