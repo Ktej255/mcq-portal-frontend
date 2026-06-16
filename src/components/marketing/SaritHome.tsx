@@ -28,6 +28,7 @@ import {
 import { SiteNav } from "./SiteNav";
 import { SiteFooter } from "./SiteFooter";
 import { JsonLd } from "./JsonLd";
+import { pricingTiers } from "./site-data";
 
 /* ------------------------------------------------------------------ */
 /* Data                                                                */
@@ -108,26 +109,6 @@ const retentionItems: { title: string; detail: string; icon: LucideIcon }[] = [
   { title: "Peer percentile", detail: "See where you stand against other aspirants — momentum, not isolation.", icon: Users },
 ];
 
-const freePerks = [
-  "2-min diagnostic + personalized plan",
-  "1 active subject (full daily loop)",
-  "10 personalized MCQs every day",
-  "Daily current affairs + quiz",
-  "Basic previous-year-question browser",
-  "Streaks & progress tracking",
-  "Ask-the-teacher AI — up to 5 doubts/day",
-];
-
-const proPerks = [
-  "All subjects unlocked",
-  "Unlimited ask-the-teacher AI",
-  "Mains answer evaluation",
-  "Deep analytics + weakness recovery",
-  "Spaced revision scheduler",
-  "Full PYQ + full-length test series",
-  "All-India rank + mentor check-ins",
-];
-
 const comparison: { label: string; typical: string; sarit: string }[] = [
   { label: "Experience", typical: "Scattered across tabs & apps", sarit: "One connected daily loop" },
   { label: "Personalization", typical: "Same content for everyone", sarit: "Adapts to your weak areas" },
@@ -146,16 +127,16 @@ const roadmap: { window: string; subject: string; status: string }[] = [
 
 const faqs: { q: string; a: string }[] = [
   {
-    q: "Is it really free to start?",
-    a: "Yes. You get a personalized plan, one full subject loop, daily MCQs, current affairs and limited AI doubts — free, with no card required.",
+    q: "Is it free to try?",
+    a: "Previous year questions, study resources, daily current affairs, guides and the 2-minute diagnostic are free for everyone. Full subject plans start at ₹400/mo.",
   },
   {
     q: "How is this different from other UPSC platforms?",
     a: "Most platforms hand you scattered content. Sarit Learn connects watch, discuss, practice, track and revise into a single daily loop that adapts to you.",
   },
   {
-    q: "What do I get when I upgrade?",
-    a: "Pro unlocks every subject, unlimited AI doubt-solving, Mains answer evaluation, deep analytics, spaced revision, full tests and all-India rank.",
+    q: "What do the paid plans include?",
+    a: "Plans run from Foundation (₹400/mo) to Ultimate (₹1,300/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
   },
   {
     q: "Do you cover Hindi medium?",
@@ -605,74 +586,52 @@ function PricingSection() {
     <section id="pricing" className="py-20">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <SectionHeading
-          eyebrow="Two ways in"
-          title="Start free. Stay because it works."
-          sub="Free gives you a real, personalized head start. Pro unlocks the full system when you're ready to go all in."
+          eyebrow="Plans for every stage"
+          title="From ₹400/mo — match your tier to your prep."
+          sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Free resources stay open to everyone."
         />
 
-        <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2">
-          {/* Free */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="flex flex-col rounded-3xl border border-[#dcd5c7] bg-[#fffdf8] p-7 shadow-sm"
-          >
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Free · your first phase</p>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-4xl font-black text-[#13251d]">₹0</span>
-              <span className="text-sm font-bold text-[#536259]">/ forever to start</span>
-            </div>
-            <p className="mt-2 text-sm font-semibold text-[#536259]">Enough to build the habit and feel the difference.</p>
-            <ul className="mt-5 flex-1 space-y-2.5">
-              {freePerks.map((p) => (
-                <li key={p} className="flex items-start gap-2 text-sm font-semibold leading-6 text-[#33443b]">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/start"
-              className="mt-6 inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-5 text-sm font-black text-[#1a3a2a] transition hover:bg-[#1a3a2a] hover:text-white"
+        <div className="mx-auto mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {pricingTiers.map((tier, i) => (
+            <motion.div
+              key={tier.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.06 }}
+              className={`flex flex-col rounded-2xl border p-5 shadow-sm ${
+                tier.featured ? "border-2 border-[#1a3a2a] bg-[#1a3a2a] text-white" : "border-[#dcd5c7] bg-[#fffdf8]"
+              }`}
             >
-              Start free
-            </Link>
-          </motion.div>
+              <p className={`text-xs font-black uppercase tracking-[0.18em] ${tier.featured ? "text-[#7fe0bd]" : "text-[#1d9e75]"}`}>
+                {tier.name}
+              </p>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className={`text-2xl font-black ${tier.featured ? "text-white" : "text-[#13251d]"}`}>{tier.price}</span>
+                <span className={`text-xs font-bold ${tier.featured ? "text-white/70" : "text-[#536259]"}`}>{tier.cadence}</span>
+              </div>
+              <p className={`mt-2 flex-1 text-sm font-semibold leading-6 ${tier.featured ? "text-white/80" : "text-[#536259]"}`}>
+                {tier.tagline}
+              </p>
+              <Link
+                href="/pricing"
+                className={`mt-4 inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-black transition ${
+                  tier.featured
+                    ? "bg-[#ef9f27] text-[#3a2706] hover:bg-[#f4b04b]"
+                    : "border border-[#1a3a2a] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white"
+                }`}
+              >
+                View plan
+              </Link>
+            </motion.div>
+          ))}
+        </div>
 
-          {/* Pro */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="relative flex flex-col rounded-3xl border-2 border-[#1a3a2a] bg-[#1a3a2a] p-7 text-white shadow-[0_20px_50px_rgba(19,37,29,0.18)]"
-          >
-            <span className="absolute right-6 top-6 rounded-full bg-[#ef9f27] px-3 py-1 text-[10px] font-black uppercase tracking-wide text-[#3a2706]">
-              Full system
-            </span>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7fe0bd]">Pro · serious aspirants</p>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-4xl font-black">₹—</span>
-              <span className="text-sm font-bold text-white/70">/ pricing TBD</span>
-            </div>
-            <p className="mt-2 text-sm font-semibold text-white/70">Everything unlocked, all subjects, full support.</p>
-            <ul className="mt-5 flex-1 space-y-2.5">
-              {proPerks.map((p) => (
-                <li key={p} className="flex items-start gap-2 text-sm font-semibold leading-6 text-white/90">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5fd6ab]" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/login?redirect=/upsc"
-              className="mt-6 inline-flex h-11 items-center justify-center rounded-md bg-[#ef9f27] px-5 text-sm font-black text-[#3a2706] transition hover:bg-[#f4b04b]"
-            >
-              Go Pro
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </motion.div>
+        <div className="mt-8 text-center">
+          <Link href="/pricing" className="inline-flex items-center text-sm font-black text-[#085041] underline-offset-4 hover:underline">
+            See full pricing, features and discounts
+            <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Link>
         </div>
       </div>
     </section>

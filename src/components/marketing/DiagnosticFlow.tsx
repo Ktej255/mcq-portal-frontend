@@ -113,7 +113,7 @@ export function DiagnosticFlow() {
               href="/login?redirect=/upsc"
               className="inline-flex h-12 flex-1 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
-              Activate free access
+              Continue to the portal
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <button

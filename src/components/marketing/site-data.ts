@@ -453,3 +453,91 @@ export const testFeatures: { title: string; detail: string }[] = [
   { title: "All-India percentile", detail: "See where you stand against other aspirants on each test." },
   { title: "Spaced re-tests", detail: "Missed questions resurface at the right interval for retention." },
 ];
+
+
+/* ------------------------------------------------------------------ */
+/* Pricing (mirrors the in-app UPSC Pricing Command)                   */
+/* ------------------------------------------------------------------ */
+
+export const pricingStats: { label: string; value: string }[] = [
+  { label: "Base monthly", value: "₹399" },
+  { label: "GS subjects", value: "8" },
+  { label: "Optional pages", value: "48" },
+];
+
+export const billingOptions: { label: string; save?: string }[] = [
+  { label: "Monthly" },
+  { label: "Yearly", save: "-19%" },
+  { label: "2-Year", save: "-29%" },
+  { label: "3-Year", save: "-38%" },
+];
+
+export type PricingTier = {
+  name: string;
+  price: string;
+  cadence: string;
+  tagline: string;
+  usage: string;
+  features: string[];
+  featured?: boolean;
+};
+
+export const pricingTiers: PricingTier[] = [
+  {
+    name: "Foundation",
+    price: "₹400",
+    cadence: "/mo effective",
+    tagline: "Build baseline habits before you commit to higher tiers.",
+    usage: "1 hour daily AI interaction. Generous rate limits apply.",
+    features: [
+      "Core UPSC GS Subject Path",
+      "Daily Planner & Workspace notes",
+      "Standard MCQ Generator (50/day limit)",
+      "1 Spaced Weak-Topic run",
+      "Basic Syllabus check sheet",
+    ],
+  },
+  {
+    name: "Plus",
+    price: "₹700",
+    cadence: "/mo effective",
+    tagline: "Structural prep including optional subject libraries.",
+    usage: "3 hours daily AI interaction. Generous rate limits apply.",
+    features: [
+      "Everything in Foundation",
+      "Full Optional Subject Catalog (Academic/Lit)",
+      "Advanced MCQ Generator (200/day limit)",
+      "5 Spaced Weak-Topics repair runs",
+      "Priority Syllabus & PYQ library",
+    ],
+  },
+  {
+    name: "Pro",
+    price: "₹1,000",
+    cadence: "/mo effective",
+    tagline: "Priority AI queues, unlimited testing, and mains uploading.",
+    usage: "6 hours daily AI interaction. Generous rate limits apply.",
+    features: [
+      "Everything in Plus",
+      "Unlimited MCQ Generator & practice tests",
+      "Unlimited Weak-Topic diagnostic analytics",
+      "Spaced Revision priority queueing",
+      "Auto-Stitched Mobile Mains Uploads",
+    ],
+    featured: true,
+  },
+  {
+    name: "Ultimate",
+    price: "₹1,300",
+    cadence: "/mo effective",
+    tagline: "No limits whatsoever. Complete command and direct support.",
+    usage: "Unlimited everything. Zero limits apply.",
+    features: [
+      "Everything in Pro",
+      "Unlimited AI interaction hours",
+      "No hourly or daily rate limits at all",
+      "Priority AI text and talk model response",
+      "Direct guidance channel with Sarit Classes",
+    ],
+  },
+];
