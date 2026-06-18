@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { getOptionalSubjectContent, optionalSubjectTopicCount } from "@/lib/upsc/optionalSubjectContent";
 import {
   coreSubjectBlueprints,
   officialUpscSourceLinks,
@@ -523,7 +524,13 @@ export function OptionalSubjectsCatalog() {
               </div>
               <h2 className="text-lg font-black tracking-tight">{subject.title}</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{subject.preloadTarget}</p>
-              <p className="mt-3 text-xs font-black uppercase tracking-[0.1em] text-[#31443a]">Paper I / Paper II</p>
+              {optionalSubjectTopicCount(subject.slug) > 0 ? (
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041]">
+                  <CheckCircle2 className="h-3 w-3" /> Syllabus live · {optionalSubjectTopicCount(subject.slug)} topics
+                </p>
+              ) : (
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.1em] text-[#31443a]">Paper I / Paper II</p>
+              )}
             </Link>
           ))}
         </section>
@@ -545,6 +552,7 @@ export function OptionalSubjectDetail({
   };
 }) {
   const sourcePack = getOptionalSourcePack(subject.slug);
+  const content = getOptionalSubjectContent(subject.slug);
   const yearRows = sourcePack?.yearRows ?? [];
   const paperSummaries = sourcePack?.paperSummary ?? [];
   const syllabusThemes = sourcePack?.syllabusThemes ?? [];
@@ -579,19 +587,65 @@ export function OptionalSubjectDetail({
               ))}
             </div>
           ) : null}
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {subject.papers.map((paper) => (
-              <article key={paper} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
-                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                  <Layers3 className="h-4 w-4" />
-                </div>
-                <h2 className="text-xl font-black">{paper}</h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                  Build syllabus tree, attach year-wise questions, mark repeated themes, and connect answer-writing prompts.
-                </p>
-              </article>
-            ))}
-          </div>
+          {content ? (
+            <div data-testid="upsc-optional-syllabus" className="mt-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Full UPSC syllabus</p>
+                <a
+                  href={content.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1a3a2a] underline-offset-2 hover:underline"
+                >
+                  Source: Sarit Classes
+                </a>
+              </div>
+              {content.papers.map((paper, paperIndex) => (
+                <details
+                  key={paper.paper}
+                  open={paperIndex === 0}
+                  data-testid="upsc-optional-paper"
+                  className="overflow-hidden rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] shadow-sm"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+                    <span className="text-lg font-black tracking-tight text-[#13251d]">{paper.paper}</span>
+                    <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">
+                      {paper.sections.reduce((sum, section) => sum + section.topics.length, 0)} topics
+                    </span>
+                  </summary>
+                  <div className="space-y-3 border-t border-[#dcd5c7] p-4">
+                    {paper.sections.map((section) => (
+                      <div key={section.heading} className="rounded-lg border border-[#e7e0d2] bg-white p-3">
+                        <p className="text-sm font-black tracking-tight text-[#13251d]">{section.heading}</p>
+                        <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                          {section.topics.map((topic, topicIndex) => (
+                            <li key={topicIndex} className="flex gap-2 text-xs font-semibold leading-5 text-[#49675e]">
+                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#1d9e75]" />
+                              {topic}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {subject.papers.map((paper) => (
+                <article key={paper} className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
+                    <Layers3 className="h-4 w-4" />
+                  </div>
+                  <h2 className="text-xl font-black">{paper}</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
+                    Build syllabus tree, attach year-wise questions, mark repeated themes, and connect answer-writing prompts.
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
           <div className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4">
             <div className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#085041]">
               <BrainCircuit className="h-4 w-4" /> First build action

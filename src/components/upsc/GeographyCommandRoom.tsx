@@ -48,6 +48,8 @@ import { readStudentProfile, type StudentLevel } from "@/lib/upsc/studentProfile
 import { getSubjectSourcePack } from "@/lib/upsc/syllabusPyqRegistry";
 import { useGeographyProgress, type GeographyDayProgress } from "@/lib/upsc/useGeographyProgress";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 
 type FunnelStatus = "done" | "current" | "locked";
 
@@ -137,6 +139,8 @@ function buildFunnelSteps(
 
 export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const { getDayProgress, isLoaded, progress } = useGeographyProgress();
+  const { user } = useAuth();
+  const showOperatorViews = isMasterEmail(user?.email) || isLocalMockMasterSession();
   const [activeDay, setActiveDay] = useState(resolveSession(initialDay).day);
   const [learnerLevel, setLearnerLevel] = useState<"Beginner" | "Intermediate" | "Advanced">("Beginner");
   const [studyWindow, setStudyWindow] = useState("90 min");
@@ -248,12 +252,14 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Geography</Badge>
+                <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Geography · GS</Badge>
                 <span className="text-sm font-black text-[#1d9e75]">Day {activeSession.day} of {geographySessions.length}</span>
                 <span className="text-sm font-semibold text-[#746f66]">{activeSession.duration}</span>
-                <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-xs font-black text-[#085041]">
-                  {activeTopicGroups.length || 0} PDF topic groups
-                </span>
+                {showOperatorViews && (
+                  <span className="rounded-md bg-[#e7f5ee] px-2.5 py-1 text-xs font-black text-[#085041]">
+                    {activeTopicGroups.length || 0} PDF topic groups
+                  </span>
+                )}
                 <Link
                   href="/upsc/geography/continue"
                   className="inline-flex min-h-8 items-center rounded-md border border-[#cfe5dc] bg-white px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:border-[#1d9e75]"
@@ -286,6 +292,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                       </span>
                     ))}
                   </div>
+                  {showOperatorViews && (
+                  <>
                   <div
                     data-testid="geography-command-topic-coverage-audit"
                     data-total-pdf-topic-groups={topicCoverageSummary.total}
@@ -500,6 +508,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                       </div>
                     </div>
                   ) : null}
+                  </>
+                  )}
                 </div>
               </details>
             </div>
@@ -728,6 +738,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               </div>
             </section>
 
+            {showOperatorViews && (
+            <>
             <section
               data-testid="geography-completion-audit"
               data-audit-score={completionAuditSummary.score}
@@ -922,6 +934,8 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                 </div>
               </div>
             </section>
+            </>
+            )}
 
             <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
@@ -1009,6 +1023,7 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
               </div>
             </section>
 
+            {showOperatorViews && (
             <section
               data-testid="geography-topic-finder"
               data-topic-count={geographyTopicGroups.length}
@@ -1067,6 +1082,7 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                 </div>
               </div>
             </section>
+            )}
 
             <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

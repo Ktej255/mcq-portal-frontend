@@ -448,7 +448,7 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
                 Discussion cleared: {Math.max(visibleTalkScore, GEOGRAPHY_RECALL_TARGET)}% recall
               </p>
 
-              <section
+              <details
                 data-testid="mcq-four-signal-grid"
                 data-signal-count="4"
                 data-fresh-set-state={freshSetState}
@@ -457,8 +457,12 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
                 data-score-percent={resolvedScorePercent}
                 data-next-action-route={hasPracticeResult ? nextActionHref : isReady ? "#practice" : ""}
                 data-next-action-label={nextRouteSignalText}
-                className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-2"
               >
+                <summary className="cursor-pointer list-none rounded-md bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] text-[#5d675f]">
+                  At a glance: recall, fresh set, score, next route
+                </summary>
+                <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div
                   data-testid="mcq-signal-recall-cleared"
                   data-signal="recall-cleared"
@@ -535,7 +539,8 @@ export function GeographyMcqReadinessRoom({ initialDay }: { initialDay?: number 
                     <p className="mt-2 text-sm font-black leading-6 text-[#13251d]">{nextRouteSignalText}</p>
                   </div>
                 )}
-              </section>
+                </div>
+              </details>
             </div>
 
             {!practiceStarted || hasPracticeResult ? (

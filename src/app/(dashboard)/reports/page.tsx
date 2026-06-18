@@ -30,6 +30,8 @@ import {
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
 import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
 import { useGeographyProgress } from "@/lib/upsc/useGeographyProgress";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 
 type DailyReportState = {
   subjectSlug: string;
@@ -224,6 +226,9 @@ export default function ReportsPage() {
     };
   }, [completedStrategyTasks, strategyPracticeHandoffs, strategyQuestionAttempts]);
 
+  const { user } = useAuth();
+  const showOperatorViews = isMasterEmail(user?.email) || isLocalMockMasterSession();
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
@@ -360,6 +365,7 @@ export default function ReportsPage() {
           </div>
         </section>
 
+        {showOperatorViews && (
         <section
           data-testid="upsc-2027-audit-readiness-report"
           data-proof-rule="strategy-build-generated-practice-solved-attempt-readiness"
@@ -459,6 +465,7 @@ export default function ReportsPage() {
             </div>
           </div>
         </section>
+        )}
 
         <section
           data-testid="upsc-auto-session-report-bridge"
