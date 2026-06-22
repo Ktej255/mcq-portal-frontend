@@ -4,50 +4,27 @@ import { usePathname } from "next/navigation";
 
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { UpscProfileGate } from "@/components/upsc/UpscProfileGate";
-
-const operatorRoutes = new Set([
-  "/upsc/prelims-2026-audit",
-  "/upsc/prelims-2026-audit-v2",
-  "/upsc/prelims-2026-showcase",
-  "/upsc/prelims-review-command",
-  "/upsc/prelims-2027-strategy",
-  "/upsc/readiness-audit",
-  "/upsc/current-affairs",
-  "/upsc/mcq-command",
-  "/upsc/content-command",
-  "/upsc/revision-command",
-  "/upsc/yearly-planner",
-  "/upsc/geography/testing",
-]);
+import { operatorRoutes } from "@/lib/navigation/studentNav";
 
 const profileOpenRoutes = new Set([
   "/upsc",
 ]);
 
-const futureSubjectPrefixes = [
-  "/upsc/environment",
-  "/upsc/disaster-management",
-  "/upsc/economy",
-  "/upsc/science-tech",
-  "/upsc/polity-governance",
-  "/upsc/internal-security-society",
-  "/upsc/history",
-];
-
 export default function UpscLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // Operator-only routes require ADMIN role (e.g. audit, command, strategy pages)
   if (operatorRoutes.has(pathname)) {
     return <ProtectedRoute requiredRole="ADMIN">{children}</ProtectedRoute>;
   }
 
-  if (futureSubjectPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    return <ProtectedRoute requiredRole="ADMIN">{children}</ProtectedRoute>;
-  }
-
+  // The UPSC root is open without a profile gate (landing/onboarding)
   if (profileOpenRoutes.has(pathname)) {
     return <>{children}</>;
   }
 
+  // All other routes (including GS subject routes like /upsc/polity-governance,
+  // /upsc/economy, etc.) are student-accessible behind the profile gate.
+  // Those pages render "Coming Soon" states at the page-component level.
   return <UpscProfileGate>{children}</UpscProfileGate>;
 }

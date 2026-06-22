@@ -472,7 +472,7 @@ async function run() {
     readinessReport.status !== "Repair lock" ||
     readinessReport.score !== "60" ||
     readinessHref !== "/upsc/geography/talk?day=1" ||
-    !/current session readiness/i.test(readinessReport.text) ||
+    !/today's readiness/i.test(readinessReport.text) ||
     !/because-chain/i.test(readinessReport.text) ||
     !/Exact PYQ 1 solved \/ 0 clear/i.test(readinessReport.text)
   ) {
@@ -538,8 +538,8 @@ async function run() {
     autoHandoffBridge.revisionDue !== "AI gap" ||
     autoHandoffBridge.reportHref !== "/reports" ||
     autoHandoffBridge.questionBankHref !== "/upsc/question-bank?subject=geography" ||
-    !/Auto session report bridge/i.test(autoHandoffBridge.text) ||
-    !/Next session held: Repair first/i.test(autoHandoffBridge.text) ||
+    !/Next-day handoff/i.test(autoHandoffBridge.text) ||
+    !/Next day held: Repair first/i.test(autoHandoffBridge.text) ||
     !/Clear 2 blockers/i.test(autoHandoffBridge.text)
   ) {
     throw new Error(

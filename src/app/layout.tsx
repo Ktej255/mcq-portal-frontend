@@ -52,8 +52,8 @@ export default function RootLayout({
         publishableKey={env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         signInUrl={env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/login"}
         signUpUrl={env.NEXT_PUBLIC_CLERK_SIGN_UP_URL || "/sign-up"}
-        signInFallbackRedirectUrl={env.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || "/dashboard"}
-        signUpFallbackRedirectUrl={env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || "/dashboard"}
+        signInFallbackRedirectUrl={env.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || "/upsc"}
+        signUpFallbackRedirectUrl={env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || "/upsc"}
       >
         {appShell}
       </ClerkProvider>

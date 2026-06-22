@@ -225,8 +225,8 @@ export default function ReportsPage() {
   }, [completedStrategyTasks, strategyPracticeHandoffs, strategyQuestionAttempts]);
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <main className="text-[#13251d]">
+      <div>
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -259,7 +259,7 @@ export default function ReportsPage() {
               <div className="mb-3 flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-[#085041]" />
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                  Current session readiness
+                  Today&apos;s readiness
                 </p>
               </div>
               <h2 className="text-2xl font-black tracking-tight">
@@ -493,15 +493,15 @@ export default function ReportsPage() {
               <div className="mb-3 flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-[#085041]" />
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">
-                  Auto session report bridge
+                  Next-day handoff
                 </p>
               </div>
               <h2 className="text-2xl font-black tracking-tight">
                 {autoSessionHandoff
                   ? autoSessionHandoff.canAdvance
-                    ? `Next session ready: Day ${autoSessionHandoff.targetDay}`
-                    : `Next session held: ${autoSessionHandoff.statusLabel}`
-                  : "Daily Command has not generated a handoff yet"}
+                    ? `Next day ready: Day ${autoSessionHandoff.targetDay}`
+                    : `Next day held: ${autoSessionHandoff.statusLabel}`
+                  : "Today's plan has not generated a handoff yet"}
               </h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
                 {autoSessionHandoff

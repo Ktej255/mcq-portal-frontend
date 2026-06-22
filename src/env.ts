@@ -18,6 +18,11 @@ export const env = {
   NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_MEDIA_URL: process.env.NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_MEDIA_URL,
   NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_MEDIA_LABEL: process.env.NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_MEDIA_LABEL,
   NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_TRANSCRIPT_URL: process.env.NEXT_PUBLIC_UPSC_GEOGRAPHY_DAY1_TRANSCRIPT_URL,
+  // Orientation/walkthrough video shown in onboarding. A `video_ref` the A1
+  // video seam understands: `youtube:<id-or-url>`, a YouTube URL, `direct:<url>`,
+  // any http(s) URL, or a bare media key. When unset, onboarding falls back to
+  // the methodology slideshow (no fabricated video).
+  NEXT_PUBLIC_UPSC_ORIENTATION_VIDEO_REF: process.env.NEXT_PUBLIC_UPSC_ORIENTATION_VIDEO_REF,
   NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,

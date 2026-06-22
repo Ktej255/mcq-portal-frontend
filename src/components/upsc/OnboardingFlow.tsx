@@ -24,6 +24,9 @@ import {
 } from "lucide-react";
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
 import { cn } from "@/lib/utils";
+import { VideoPlayer } from "@/components/upsc/video/VideoPlayer";
+import { resolveVideoSource } from "@/components/upsc/video/videoSource";
+import { env } from "@/env";
 
 // ─────────────────────────────────────────────────────────────────────
 // WelcomeVideoOverlay Component
@@ -32,7 +35,12 @@ import { cn } from "@/lib/utils";
 export function WelcomeVideoOverlay({ onComplete }: { onComplete: () => void }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [videoEnded, setVideoEnded] = useState(false);
   const duration = 20;
+
+  // Real orientation video when configured; otherwise the methodology slideshow.
+  const orientationSource = resolveVideoSource(env.NEXT_PUBLIC_UPSC_ORIENTATION_VIDEO_REF);
+  const hasRealVideo = orientationSource.kind !== "none";
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -94,6 +102,13 @@ export function WelcomeVideoOverlay({ onComplete }: { onComplete: () => void }) 
           </button>
         </div>
 
+        {hasRealVideo ? (
+          <VideoPlayer
+            source={orientationSource}
+            title="Welcome to UPSC Command"
+            onEnded={() => setVideoEnded(true)}
+          />
+        ) : (
         <div className="relative overflow-hidden rounded-lg border border-[#dcd5c7] bg-[#1a3a2a] text-white aspect-video flex flex-col justify-between p-6">
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#dcd5c7_1px,transparent_1px)] [background-size:16px_16px]" />
 
@@ -144,13 +159,14 @@ export function WelcomeVideoOverlay({ onComplete }: { onComplete: () => void }) 
             </div>
           </div>
         </div>
+        )}
 
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-xs text-[#657066] font-semibold leading-5 max-w-md">
             Watch the 20-second walkthrough to learn how our pedagogical engine works, or skip to begin your setup.
           </p>
 
-          {currentTime >= duration ? (
+          {(hasRealVideo ? videoEnded : currentTime >= duration) ? (
             <button
               onClick={onComplete}
               className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"

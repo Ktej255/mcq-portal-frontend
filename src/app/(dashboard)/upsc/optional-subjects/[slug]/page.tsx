@@ -1,15 +1,14 @@
-import { notFound } from "next/navigation";
-
-import { OptionalSubjectDetail } from "@/components/upsc/UpscYearlyPlanner";
-import { getOptionalSubject, optionalSubjects } from "@/lib/upsc/yearlyPlanner";
+import { SubjectShell } from "@/components/upsc/SubjectShell";
+import { OPTIONAL_SUBJECTS } from "@/lib/upsc/optionalSubjectsCatalog";
 
 export function generateStaticParams() {
-  // geography-optional has its own dedicated static route segment
-  // (./geography-optional) with a full Read + Syllabus experience, so it is
-  // excluded here to avoid two routes resolving to the same path.
-  return optionalSubjects
-    .filter((subject) => subject.slug !== "geography-optional")
-    .map((subject) => ({ slug: subject.slug }));
+  // Pre-render the 25 standard optional subjects from the canonical catalog.
+  // The legacy bespoke "geography-optional" route segment was removed in task
+  // 6.4; the canonical Geography optional is the catalog slug "geography",
+  // served (like every subject) by SubjectShell below. Unknown/non-catalog
+  // slugs still resolve at request time and render SubjectShell's graceful
+  // "subject not found / coming soon" state.
+  return OPTIONAL_SUBJECTS.map((subject) => ({ slug: subject.slug }));
 }
 
 export default async function OptionalSubjectDetailPage({
@@ -18,11 +17,5 @@ export default async function OptionalSubjectDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const subject = getOptionalSubject(slug);
-
-  if (!subject) {
-    notFound();
-  }
-
-  return <OptionalSubjectDetail subject={subject} />;
+  return <SubjectShell slug={slug} />;
 }

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BrainDumpModal } from "@/components/upsc/BrainDumpModal";
+import { UpscLoader } from "@/components/upsc/UpscLoader";
+import { OptionalHomeEntry } from "@/components/upsc/OptionalHomeEntry";
 import { UpscYearlyPlanner } from "@/components/upsc/UpscYearlyPlanner";
 import { UpscSyllabusPyqLibrary } from "@/components/upsc/UpscSyllabusPyqLibrary";
 import {
@@ -32,7 +34,6 @@ import {
   FolderTree,
   LibraryBig,
   CalendarCheck,
-  BarChart3,
   Settings,
 } from "lucide-react";
 
@@ -659,13 +660,7 @@ export function UpscDailyMissionControl() {
   };
 
   if (!isLoaded) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee] text-[#1b2f27]">
-        <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 text-sm font-black">
-          Loading UPSC daily mission...
-        </div>
-      </div>
-    );
+    return <UpscLoader message="Loading UPSC daily mission..." />;
   }
 
   if (!isWelcomeVideoCompleted) {
@@ -675,8 +670,8 @@ export function UpscDailyMissionControl() {
   }
 
   return (
-    <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f4ee] text-[#1b2f27]">
-      <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="max-w-full overflow-x-hidden text-[#1b2f27]">
+      <div className="mx-auto flex w-full min-w-0 flex-col gap-6">
         {profile && !profile.inductionCompleted ? (
           <div className="mb-2">
             <InductionChecklist
@@ -701,9 +696,6 @@ export function UpscDailyMissionControl() {
             {[
               { id: "today", name: "Today's Study", icon: CalendarCheck },
               { id: "yearly", name: "Yearly Planner", icon: FolderTree },
-              { id: "gaps", name: "Study Gaps", icon: Target },
-              { id: "revision", name: "Revision Board", icon: RefreshCcw },
-              { id: "history", name: "Progress History", icon: BarChart3 },
               { id: "syllabus", name: "Syllabus & PYQs", icon: LibraryBig },
             ].map((item) => {
               const isActive = activeTab === item.id;
@@ -711,7 +703,7 @@ export function UpscDailyMissionControl() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id as any)}
+                  onClick={() => setActiveTab(item.id as TabId)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all active:scale-95",
                     isActive
@@ -725,20 +717,8 @@ export function UpscDailyMissionControl() {
               );
             })}
           </div>
-
-          {profile && typeof profile.points === "number" && (
-            <div className="ml-auto flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-[#fff4df] border border-[#ef9f27]/30 rounded-lg px-2.5 py-1 text-xs font-black text-[#6f4a12]">
-                <span>🪙</span>
-                <span>{profile.coins ?? 0} Coins</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-[#e7f5ee] border border-[#1d9e75]/30 rounded-lg px-2.5 py-1 text-xs font-black text-[#085041]">
-                <span>⚡</span>
-                <span>{profile.points ?? 0} XP</span>
-              </div>
-            </div>
-          )}
         </div>
+        <OptionalHomeEntry />
         {activeTab === "today" && (
           <>
             <section
@@ -763,7 +743,7 @@ export function UpscDailyMissionControl() {
               <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Daily command</Badge>
+                    <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Today</Badge>
                     <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
                       {activeSubject.title} / Day {activeSession.day}
                     </span>
@@ -967,7 +947,7 @@ export function UpscDailyMissionControl() {
                     </div>
                     <div>
                       <p className="text-sm font-black text-[#13251d]">Daily note</p>
-                      <p className="text-xs font-semibold text-[#746f66]">Saved locally for the selected mission</p>
+                      <p className="text-xs font-semibold text-[#746f66]">Saved locally for the selected day</p>
                     </div>
                   </div>
 
@@ -1243,7 +1223,7 @@ export function UpscDailyMissionControl() {
                       </span>
                     </div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-75">
-                      Before session readiness
+                      Before today&apos;s class
                     </p>
                     <h2 className="mt-1 text-2xl font-black tracking-tight text-[#13251d]">
                       {dailyPlanner.sessionReadiness.title}
@@ -1634,7 +1614,7 @@ export function UpscDailyMissionControl() {
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                    New-day operating contract
+                    Today&apos;s plan
                   </p>
                   <h2 className="mt-1 text-xl font-black tracking-tight text-[#13251d]">
                     The portal chooses the next action from evidence.
@@ -1648,7 +1628,7 @@ export function UpscDailyMissionControl() {
                 </Badge>
               </div>
 
-              {/* Operating Contract summary row */}
+              {/* Today's plan summary row */}
               <div className="mt-4 border-t border-current/10 pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
@@ -1832,7 +1812,7 @@ export function UpscDailyMissionControl() {
               <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Mission selector</p>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Day selector</p>
                     <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Choose subject and day</h2>
                   </div>
                   <CalendarDays className="h-6 w-6 text-[#085041]" />

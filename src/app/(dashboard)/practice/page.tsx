@@ -10,8 +10,8 @@ export default function TestsPage() {
   const practiceReady = overview.loopState.room === "mcq";
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <main className="text-[#13251d]">
+      <div>
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

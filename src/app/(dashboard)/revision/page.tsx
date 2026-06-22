@@ -254,8 +254,8 @@ export default function RevisionPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+    <main className="text-[#13251d]">
+      <div>
         <section
           data-testid="student-revision-command"
           data-proof-rule="all-subject-revision-from-recall-mcq-ai-gaps-me-time-question-bank"
@@ -343,7 +343,7 @@ export default function RevisionPage() {
           >
             <div className="flex items-center gap-3">
               <BrainCircuit className="h-5 w-5 text-[#085041]" />
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Report bridge</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Reports</p>
             </div>
             <h2 className="mt-3 text-2xl font-black tracking-tight">Weekly and monthly reports stay automatic</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{report.autoReport.evidenceRule}</p>

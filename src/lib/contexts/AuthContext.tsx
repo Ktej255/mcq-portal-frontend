@@ -8,6 +8,9 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
   User,
 } from "../firebase/config";
 import { setPersistence, browserLocalPersistence } from "firebase/auth";
@@ -47,6 +50,7 @@ type AuthUser = User | {
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const mockAuthEnabled = env.NEXT_PUBLIC_USE_MOCK_AUTH === "true";
+const EMAIL_FOR_SIGN_IN_KEY = "sarit-email-for-sign-in-v1";
 
 async function assertSupabaseAuthReachable() {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return;
@@ -273,9 +277,29 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [devLogin, replaceRoute]);
 
+  // Complete a Firebase passwordless email-link sign-in when the user returns
+  // from their inbox (the emailed link lands back on /login?...).
+  useEffect(() => {
+    if (!auth || typeof window === "undefined") return;
+    if (!isSignInWithEmailLink(auth, window.location.href)) return;
+
+    const storedEmail = window.localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY);
+    const email = storedEmail || window.prompt("Please confirm your email to finish signing in") || "";
+    if (!email) return;
+
+    signInWithEmailLink(auth, email, window.location.href)
+      .then(() => {
+        window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
+        const params = new URLSearchParams(window.location.search);
+        replaceRoute(params.get("redirect") || "/dashboard");
+      })
+      .catch((error) => {
+        console.error("AUTH | signInWithEmailLink completion ERROR:", error);
+      });
+  }, [replaceRoute]);
+
   const signInWithGoogle = async (redirectPath = "/dashboard") => {
     if (authDebug) console.info("AUTH | signInWithGoogle triggered");
-    // Supabase auth checks removed (Supabase auth disabled)
 
     if (!auth) {
       console.error(`AUTH | Firebase auth is not initialized in signInWithGoogle. Missing: ${missingFirebaseEnvVars.join(", ")}`);
@@ -293,11 +317,46 @@ const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const sendEmailOtp = async (email: string, redirectPath = "/dashboard") => {
-    throw new Error("Email OTP login via Supabase is disabled.");
+    if (authDebug) console.info("AUTH | sendEmailOtp (Firebase email link) triggered");
+    if (!auth) {
+      throw new Error(
+        "Email login is not available right now because the auth service is not configured. Please use Google login or Student Preview.",
+      );
+    }
+
+    const targetRedirect = normalizeInternalRedirectPath(redirectPath);
+    const continueUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(targetRedirect)}`;
+
+    try {
+      await sendSignInLinkToEmail(auth, email, {
+        url: continueUrl,
+        handleCodeInApp: true,
+      });
+      // Persist the email so the link can be completed on this device without re-prompting.
+      window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, email);
+    } catch (error: unknown) {
+      const authError = error as { code?: string; message?: string };
+      console.error("AUTH | sendSignInLinkToEmail ERROR | Code:", authError.code, "Message:", authError.message);
+      throw new Error(
+        authError.code === "auth/unauthorized-continue-uri" || authError.code === "auth/operation-not-allowed"
+          ? "Email link login is not enabled for this domain yet. Please use Google login or Student Preview."
+          : "Email login could not start right now. Please try Google login or Student Preview.",
+      );
+    }
   };
 
-  const verifyEmailOtp = async (email: string, token: string, redirectPath = "/dashboard") => {
-    throw new Error("Email OTP verification via Supabase is disabled.");
+  const verifyEmailOtp = async (email: string, _token: string, redirectPath = "/dashboard") => {
+    // Firebase passwordless auth is link-based, not code-based: completion happens
+    // automatically when the user opens the emailed link (see the effect below).
+    if (!auth) {
+      throw new Error("Email login is not available right now. Please use Google login or Student Preview.");
+    }
+    if (!isSignInWithEmailLink(auth, window.location.href)) {
+      throw new Error("Open the secure login link from your email on this device to finish signing in.");
+    }
+    await signInWithEmailLink(auth, email, window.location.href);
+    window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
+    replaceRoute(redirectPath);
   };
 
   const logout = async () => {

@@ -7,6 +7,9 @@ import {
   signInWithRedirect,
   signOut,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
   User,
 } from "firebase/auth";
 
@@ -35,5 +38,8 @@ export {
   signInWithRedirect,
   signOut,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
   type User,
 };

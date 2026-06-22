@@ -6,20 +6,8 @@ import { useApiConfig } from "@/lib/hooks/useApi";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
-
-const adminShellRoutes = new Set([
-  "/upsc/content-command",
-  "/upsc/current-affairs",
-  "/upsc/mcq-command",
-  "/upsc/prelims-2026-audit",
-  "/upsc/prelims-2026-audit-v2",
-  "/upsc/prelims-2026-showcase",
-  "/upsc/prelims-review-command",
-  "/upsc/prelims-2027-strategy",
-  "/upsc/readiness-audit",
-  "/upsc/revision-command",
-  "/upsc/yearly-planner",
-]);
+import { UpscLoader } from "@/components/upsc/UpscLoader";
+import { isOperatorRoute } from "@/lib/navigation/studentNav";
 
 export default function DashboardLayout({
   children,
@@ -29,20 +17,17 @@ export default function DashboardLayout({
   const { isLoaded } = useApiConfig();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isAdminShell = adminShellRoutes.has(pathname);
+  const isAdminShell = isOperatorRoute(pathname);
 
   if (!isLoaded) return (
-    <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-      <div className="flex flex-col items-center gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground animate-pulse">Initializing UPSC Command...</p>
-      </div>
+    <div className="flex h-screen items-center justify-center bg-[#f7f4ee]">
+      <UpscLoader message="Initializing UPSC Command..." />
     </div>
   );
 
   return (
     <ProtectedRoute>
-      <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-[#f7f4ee]">
         {/* Sidebar for Desktop & Mobile */}
         <DashboardSidebar 
           isAdmin={isAdminShell}
@@ -50,13 +35,13 @@ export default function DashboardLayout({
           onClose={() => setIsSidebarOpen(false)} 
         />
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           {/* Header */}
           <DashboardHeader onMenuClick={() => setIsSidebarOpen(true)} />
 
           {/* Main Content */}
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
+            <div className="mx-auto max-w-7xl">
               {children}
             </div>
           </main>

@@ -1,8 +1,8 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { ZenDashboard } from "@/components/dashboard/ZenDashboard";
-
+// Canonical student home is /upsc (UPSC Daily Mission Control).
+// The legacy /dashboard surface now redirects there to remove the
+// duplicate "home" experience.
 export default function DashboardHome() {
-  return <ZenDashboard />;
+  redirect("/upsc");
 }
-

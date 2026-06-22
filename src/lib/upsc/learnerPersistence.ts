@@ -1,6 +1,5 @@
-import { readLocalMockToken } from "@/lib/auth/local-testing";
 import { activeAuthProvider } from "@/env";
-import { supabase } from "@/lib/supabase/client";
+import { apiClient } from "@/services/api/client";
 
 type ProgressItem = {
   updatedAt?: string;
@@ -26,15 +25,24 @@ function timestamp(value?: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-async function currentRemoteUserId() {
-  if (activeAuthProvider === "clerk") return null;
-  if (!supabase || readLocalMockToken()) return null;
-
+async function backendGet<T>(url: string): Promise<T | null> {
+  // Canonical student datastore = the FastAPI/Postgres backend (Master Plan
+  // A3 / GATE-4). Fails soft: any error (no token / offline / 401) returns null
+  // so callers fall back to the localStorage cache and the app keeps working.
   try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.user.id ?? null;
+    const res = await apiClient.get(url);
+    return (res.data?.data ?? null) as T | null;
   } catch {
     return null;
+  }
+}
+
+async function backendPut(url: string, body: Record<string, unknown>): Promise<boolean> {
+  try {
+    await apiClient.put(url, body);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -123,21 +131,8 @@ export async function loadRemoteStudentProfile<T extends object>() {
     }
   }
 
-  const userId = await currentRemoteUserId();
-  if (!userId || !supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from("upsc_student_profiles")
-      .select("profile")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error || !data?.profile || typeof data.profile !== "object") return null;
-    return data.profile as T;
-  } catch {
-    return null;
-  }
+  const data = await backendGet<{ profile: T | null }>("student/profile");
+  return (data?.profile ?? null) as T | null;
 }
 
 export async function saveRemoteStudentProfile<T extends object>(profile: T) {
@@ -148,28 +143,9 @@ export async function saveRemoteStudentProfile<T extends object>(profile: T) {
     return true;
   }
 
-  const userId = await currentRemoteUserId();
-  const remoteClient = supabase;
-  if (!userId || !remoteClient) return false;
-
-  return queueLatestRemoteWrite(`profile:${userId}`, async () => {
-    try {
-      const { error } = await remoteClient
-        .from("upsc_student_profiles")
-        .upsert(
-          {
-            user_id: userId,
-            profile,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-
-      return !error;
-    } catch {
-      return false;
-    }
-  });
+  return queueLatestRemoteWrite("profile", () =>
+    backendPut("student/profile", { profile }),
+  );
 }
 
 export async function loadRemoteSubjectProgress<T extends ProgressItem>(subjectSlug: string) {
@@ -183,22 +159,10 @@ export async function loadRemoteSubjectProgress<T extends ProgressItem>(subjectS
     }
   }
 
-  const userId = await currentRemoteUserId();
-  if (!userId || !supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from("upsc_subject_progress")
-      .select("progress")
-      .eq("user_id", userId)
-      .eq("subject_slug", subjectSlug)
-      .maybeSingle();
-
-    if (error || !data?.progress || typeof data.progress !== "object") return null;
-    return data.progress as ProgressMap<T>;
-  } catch {
-    return null;
-  }
+  const data = await backendGet<{ progress: ProgressMap<T> | null }>(
+    `student/progress/${encodeURIComponent(subjectSlug)}`,
+  );
+  return (data?.progress ?? null) as ProgressMap<T> | null;
 }
 
 export async function saveRemoteSubjectProgress<T extends ProgressItem>(
@@ -216,27 +180,7 @@ export async function saveRemoteSubjectProgress<T extends ProgressItem>(
     return true;
   }
 
-  const userId = await currentRemoteUserId();
-  const remoteClient = supabase;
-  if (!userId || !remoteClient) return false;
-
-  return queueLatestRemoteWrite(`subject:${userId}:${subjectSlug}`, async () => {
-    try {
-      const { error } = await remoteClient
-        .from("upsc_subject_progress")
-        .upsert(
-          {
-            user_id: userId,
-            subject_slug: subjectSlug,
-            progress,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,subject_slug" }
-        );
-
-      return !error;
-    } catch {
-      return false;
-    }
-  });
+  return queueLatestRemoteWrite(`subject:${subjectSlug}`, () =>
+    backendPut(`student/progress/${encodeURIComponent(subjectSlug)}`, { progress }),
+  );
 }

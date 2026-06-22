@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { SignIn } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2, KeyRound, Mail } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ function safeRedirectPath(path: string) {
 }
 
 export default function LoginPage() {
-  const { signInWithGoogle, sendEmailOtp, verifyEmailOtp, devLogin, user, loading: authLoading } = useAuth();
+  const { signInWithGoogle, sendEmailOtp, devLogin, user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const redirectPath = safeRedirectPath(searchParams.get("redirect") || "/dashboard");
   const masterPreviewRequested = searchParams.get("master") === "1";
@@ -32,9 +32,7 @@ export default function LoginPage() {
   const [localTestingHost, setLocalTestingHost] = useState(false);
   const [googleChecking, setGoogleChecking] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
   const [email, setEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [emailNotice, setEmailNotice] = useState("");
   const [authIssue, setAuthIssue] = useState("");
   const [fallbackAvailable, setFallbackAvailable] = useState(false);
@@ -99,27 +97,12 @@ export default function LoginPage() {
 
     try {
       await sendEmailOtp(email.trim(), redirectPath);
-      setEmailNotice("Check your email for the login link. If you received a code, enter it below.");
+      setEmailNotice("Check your email and click the secure login link to finish signing in. You can close this tab once it opens your dashboard.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Email login could not start right now.";
       setAuthIssue(message);
     } finally {
       setEmailSending(false);
-    }
-  };
-
-  const handleOtpVerify = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAuthIssue("");
-    setOtpVerifying(true);
-
-    try {
-      await verifyEmailOtp(email.trim(), otpCode.trim(), redirectPath);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "This code could not be verified.";
-      setAuthIssue(message);
-    } finally {
-      setOtpVerifying(false);
     }
   };
 
@@ -305,34 +288,6 @@ export default function LoginPage() {
               <div className="rounded-lg border border-[#1d9e75]/30 bg-[#eefaf4] p-4 text-sm font-bold leading-6 text-[#164633]">
                 {emailNotice}
               </div>
-            ) : null}
-
-            {emailNotice ? (
-              <form onSubmit={handleOtpVerify} className="space-y-3 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                <label className="block text-xs font-black uppercase tracking-[0.16em] text-[#5d675f]" htmlFor="login-code">
-                  Optional OTP code
-                </label>
-                <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5d675f]" />
-                  <Input
-                    id="login-code"
-                    value={otpCode}
-                    onChange={(event) => setOtpCode(event.target.value)}
-                    placeholder="6-digit code"
-                    className="h-12 rounded-md border-[#cfc6b6] bg-white pl-10 text-sm font-bold text-[#13251d]"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  variant="outline"
-                  disabled={authLoading || otpVerifying || !email.trim() || !otpCode.trim()}
-                  className="h-11 w-full rounded-md border-[#cfc6b6] bg-white text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc]"
-                >
-                  {otpVerifying ? "Verifying code..." : "Verify code"}
-                </Button>
-              </form>
             ) : null}
 
             {authIssue ? (
