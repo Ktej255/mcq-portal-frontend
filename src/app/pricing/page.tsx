@@ -24,7 +24,7 @@ export default function PricingPage() {
       <PageHero
         eyebrow="UPSC pricing command"
         title="Flexible plans. Transparent value."
-        sub="Select a tier to match your preparation level. Get deeper discounts with yearly, 2-year or 3-year commitments. Start for ₹399/mo, upgrade anytime."
+        sub="Select a tier to match your preparation level. Get deeper discounts with yearly, 2-year or 3-year commitments. Launch pricing continued till 11/4. Start for ₹399/mo, upgrade anytime."
       />
 
       <section className="mx-auto max-w-7xl px-4 py-16 md:px-8">

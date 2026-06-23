@@ -587,8 +587,8 @@ function PricingSection() {
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <SectionHeading
           eyebrow="Plans for every stage"
-          title="From ₹400/mo — match your tier to your prep."
-          sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Free resources stay open to everyone."
+          title="From ₹399/mo — match your tier to your prep."
+          sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Launch pricing continued till 11/4. Free resources stay open to everyone."
         />
 
         <div className="mx-auto mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
