@@ -485,7 +485,7 @@ export type PricingTier = {
 export const pricingTiers: PricingTier[] = [
   {
     name: "Foundation",
-    price: "₹400",
+    price: "₹399",
     cadence: "/mo effective",
     tagline: "Build baseline habits before you commit to higher tiers.",
     usage: "1 hour daily AI interaction. Generous rate limits apply.",
@@ -499,7 +499,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Plus",
-    price: "₹700",
+    price: "₹699",
     cadence: "/mo effective",
     tagline: "Structural prep including optional subject libraries.",
     usage: "3 hours daily AI interaction. Generous rate limits apply.",
