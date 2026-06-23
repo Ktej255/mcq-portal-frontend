@@ -366,6 +366,15 @@ export const gsLmsService = {
   },
 
   /**
+   * Fetch an active practice session by ID (for session recovery).
+   * @fulfills Requirement 5.1, 5.2
+   */
+  getPracticeSession: async (sessionId: number): Promise<PracticeSessionOut> => {
+    const response = await apiClient.get(`${BASE}/practice/${sessionId}`);
+    return unwrap<PracticeSessionOut>(response.data);
+  },
+
+  /**
    * Submit the practice session for scoring.
    * @fulfills Requirement 1.1, 5.4, 5.5
    */

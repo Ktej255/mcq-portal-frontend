@@ -87,7 +87,7 @@ export function PlannerUI() {
       </div>
 
       {/* Bandwidth selector */}
-      <div className="flex items-center gap-3 p-4 rounded-lg border border-[#dcd5c7] bg-white">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-3 p-4 rounded-lg border border-[#dcd5c7] bg-white">
         <label className="text-sm text-[#13251d]/70">Daily bandwidth:</label>
         <input
           type="number"
@@ -125,7 +125,7 @@ export function PlannerUI() {
                     : `/upsc/geography/lms/topic/${item.node_id}`
                 )
               }
-              className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-[#dcd5c7] bg-white hover:border-[#1d9e75]/40 transition-colors"
+              className="w-full text-left flex items-center gap-3 p-2.5 md:p-3 rounded-lg border border-[#dcd5c7] bg-white hover:border-[#1d9e75]/40 transition-colors"
             >
               <span
                 className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center ${

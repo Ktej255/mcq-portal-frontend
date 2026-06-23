@@ -47,7 +47,7 @@ export function GapDashboard() {
   return (
     <div className="space-y-8">
       {/* Header summary */}
-      <div className="flex items-center gap-6 p-5 rounded-xl border border-[#dcd5c7] bg-[#fffdf8]">
+      <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 p-4 md:p-5 rounded-xl border border-[#dcd5c7] bg-[#fffdf8]">
         <div className="text-center">
           <p className="text-3xl font-bold text-[#1d9e75]">
             {Math.round(progress.overall_percent)}%
@@ -82,7 +82,7 @@ export function GapDashboard() {
                     onClick={() =>
                       router.push(`/upsc/geography/lms/topic/${topic.node_id}`)
                     }
-                    className="w-full text-left flex items-center justify-between p-3 rounded-lg border border-[#dcd5c7] bg-white hover:border-red-200 transition-colors"
+                    className="w-full text-left flex items-center justify-between p-3 md:p-4 rounded-lg border border-[#dcd5c7] bg-white hover:border-red-200 transition-colors"
                   >
                     <div>
                       <p className="text-sm font-medium text-[#1a3a2a]">
@@ -114,7 +114,7 @@ export function GapDashboard() {
               return (
                 <div
                   key={qt.question_type}
-                  className="p-3 rounded-lg border border-[#dcd5c7] bg-white"
+                  className="p-3 md:p-4 rounded-lg border border-[#dcd5c7] bg-white"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm text-[#13251d]/70">

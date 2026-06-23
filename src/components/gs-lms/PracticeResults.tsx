@@ -15,9 +15,9 @@ export function PracticeResults({ result }: PracticeResultsProps) {
     <div className="p-6 space-y-8">
       {/* Score header */}
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-[#1a3a2a]">Practice Complete</h2>
+        <h2 className="text-2xl md:text-4xl font-bold text-[#1a3a2a]">Practice Complete</h2>
         <div className="inline-flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-[#1d9e75]">
+          <span className="text-2xl md:text-4xl font-bold text-[#1d9e75]">
             {result.correct_count}
           </span>
           <span className="text-lg text-[#13251d]/60">
@@ -35,7 +35,7 @@ export function PracticeResults({ result }: PracticeResultsProps) {
         {result.attempts.map((attempt, idx) => (
           <div
             key={attempt.question_id}
-            className={`rounded-lg border p-4 ${
+            className={`rounded-lg border p-3 md:p-4 ${
               attempt.is_correct
                 ? "border-[#1d9e75]/30 bg-[#1d9e75]/5"
                 : attempt.chosen_answer === null

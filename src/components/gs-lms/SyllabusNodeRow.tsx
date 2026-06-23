@@ -36,8 +36,8 @@ export function SyllabusNodeRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f7f4ee] cursor-pointer transition-colors"
-      style={{ paddingLeft: `${depth * 24 + 12}px` }}
+      className="flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 rounded-lg hover:bg-[#f7f4ee] cursor-pointer transition-colors"
+      style={{ paddingLeft: `${depth * 16 + 8}px` }}
       onClick={handleClick}
       role="treeitem"
       aria-expanded={!isLeaf ? expanded : undefined}
@@ -49,11 +49,11 @@ export function SyllabusNodeRow({
             e.stopPropagation();
             onToggle();
           }}
-          className="w-5 h-5 flex items-center justify-center text-[#13251d] shrink-0"
+          className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[#13251d] shrink-0"
           aria-label={expanded ? "Collapse" : "Expand"}
         >
           <svg
-            className={`w-4 h-4 transition-transform ${expanded ? "rotate-90" : ""}`}
+            className={`w-3.5 h-3.5 md:w-4 md:h-4 transition-transform ${expanded ? "rotate-90" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -62,17 +62,17 @@ export function SyllabusNodeRow({
           </svg>
         </button>
       ) : (
-        <span className="w-5 shrink-0" />
+        <span className="w-4 md:w-5 shrink-0" />
       )}
 
       {/* Title */}
-      <span className="flex-1 text-sm font-medium text-[#13251d] truncate">
+      <span className="flex-1 text-xs md:text-sm font-medium text-[#13251d] truncate">
         {node.title}
       </span>
 
       {/* Node type badge */}
       <span
-        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase shrink-0 ${badgeColors[node.node_type]}`}
+        className={`text-[9px] md:text-[10px] font-semibold px-1.5 md:px-2 py-0.5 rounded-full uppercase shrink-0 ${badgeColors[node.node_type]}`}
       >
         {node.node_type.replace("_", " ")}
       </span>
@@ -80,7 +80,7 @@ export function SyllabusNodeRow({
       {/* Progress or completion indicator */}
       {isLeaf ? (
         node.completed ? (
-          <svg className="w-5 h-5 text-[#1d9e75] shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-4 h-4 md:w-5 md:h-5 text-[#1d9e75] shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -88,10 +88,10 @@ export function SyllabusNodeRow({
             />
           </svg>
         ) : (
-          <span className="w-5 h-5 rounded-full border-2 border-[#dcd5c7] shrink-0" />
+          <span className="w-4 h-4 md:w-5 md:h-5 rounded-full border-2 border-[#dcd5c7] shrink-0" />
         )
       ) : (
-        <div className="w-20 h-2 bg-[#dcd5c7] rounded-full overflow-hidden shrink-0">
+        <div className="w-14 md:w-20 h-1.5 md:h-2 bg-[#dcd5c7] rounded-full overflow-hidden shrink-0">
           <div
             className="h-full bg-[#1d9e75] rounded-full transition-all"
             style={{ width: `${node.completion_percent ?? 0}%` }}

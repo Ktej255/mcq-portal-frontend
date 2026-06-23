@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 
+const ONBOARDING_CACHE_KEY = "lms-onboarding-completed";
+
 const BREADCRUMB_MAP: Record<string, string> = {
   syllabus: "Syllabus",
   topic: "Topic",
@@ -33,12 +35,28 @@ export default function LmsLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Check sessionStorage cache first
+    try {
+      const cached = sessionStorage.getItem(ONBOARDING_CACHE_KEY);
+      if (cached === "true") {
+        setGateChecked(true);
+        return;
+      }
+    } catch {
+      // sessionStorage unavailable (private browsing) — continue to API
+    }
+
     gsLmsService
       .getOnboardingStatus()
       .then((status) => {
         if (!status.completed) {
           router.replace("/upsc/geography/lms/onboarding");
         } else {
+          try {
+            sessionStorage.setItem(ONBOARDING_CACHE_KEY, "true");
+          } catch {
+            // Ignore storage errors
+          }
           setGateChecked(true);
         }
       })

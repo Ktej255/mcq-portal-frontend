@@ -23,7 +23,7 @@ export function PracticeUI({ session, onAnswer, onSkip }: PracticeUIProps) {
     <div className="p-6 space-y-6">
       {/* Progress indicator */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-[#13251d]/70">
+        <span className="text-xs md:text-sm font-medium text-[#13251d]/70">
           Question {current_index + 1} of {total_questions}
         </span>
         <span className="text-xs text-[#13251d]/50 bg-[#f7f4ee] px-2 py-1 rounded">
@@ -50,7 +50,7 @@ export function PracticeUI({ session, onAnswer, onSkip }: PracticeUIProps) {
           <button
             key={option.label}
             onClick={() => onAnswer(option.label)}
-            className="w-full text-left px-4 py-3 rounded-lg border border-[#dcd5c7] bg-white hover:border-[#1d9e75] hover:bg-[#1d9e75]/5 transition-colors group"
+            className="w-full text-left px-3 py-2.5 md:px-4 md:py-3 min-h-[44px] rounded-lg border border-[#dcd5c7] bg-white hover:border-[#1d9e75] hover:bg-[#1d9e75]/5 transition-colors group"
           >
             <span className="inline-flex items-center gap-3">
               <span className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full border border-[#dcd5c7] text-xs font-semibold text-[#13251d]/70 group-hover:border-[#1d9e75] group-hover:text-[#1d9e75]">

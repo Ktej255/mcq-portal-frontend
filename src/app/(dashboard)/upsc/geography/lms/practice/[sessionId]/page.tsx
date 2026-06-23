@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { PracticeSessionOut, PracticeResultOut } from "@/services/api/gsLmsService";
@@ -17,18 +17,58 @@ export default function PracticeSessionPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  const fetchSessionFromApi = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setNotFound(false);
+    try {
+      const data = await gsLmsService.getPracticeSession(sessionId);
+      setSession(data);
+      // Persist to sessionStorage for future reloads
+      try {
+        sessionStorage.setItem(
+          `practice-session-${sessionId}`,
+          JSON.stringify(data)
+        );
+      } catch {
+        // sessionStorage unavailable (private browsing) — continue without caching
+      }
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 404) {
+        setNotFound(true);
+      } else {
+        setError("Could not load session. Please check your connection and try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
+    let restored = false;
     const stored = sessionStorage.getItem(`practice-session-${sessionId}`);
     if (stored) {
       try {
         setSession(JSON.parse(stored));
+        restored = true;
       } catch {
-        setError("Could not restore session. Please start a new practice.");
+        // JSON parse failed — fall through to API fetch
       }
     }
-    setLoading(false);
-  }, [sessionId]);
+
+    if (restored) {
+      setLoading(false);
+    } else {
+      // Fallback: fetch from backend API
+      fetchSessionFromApi();
+    }
+  }, [sessionId, fetchSessionFromApi]);
 
   // Persist session to sessionStorage on updates
   useEffect(() => {
@@ -94,8 +134,30 @@ export default function PracticeSessionPage() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-red-600">{error}</p>
+      <div className="p-6 text-center">
+        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <button
+          onClick={fetchSessionFromApi}
+          className="text-sm text-[#1d9e75] hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-sm text-[#13251d]/60 mb-4">
+          Session not found. It may have expired or already been submitted.
+        </p>
+        <a
+          href="/upsc/geography/lms/practice"
+          className="text-sm text-[#1d9e75] hover:underline"
+        >
+          ← Back to topic selector
+        </a>
       </div>
     );
   }
@@ -121,13 +183,19 @@ export default function PracticeSessionPage() {
     );
   }
 
-  // No session loaded yet (e.g. page refresh without stored data)
+  // No session loaded (unexpected — API fallback should have handled this)
   if (!session) {
     return (
       <div className="p-6 text-center">
         <p className="text-sm text-[#13251d]/60 mb-4">
           Session data not found. This may happen on page refresh.
         </p>
+        <button
+          onClick={fetchSessionFromApi}
+          className="text-sm text-[#1d9e75] hover:underline mr-4"
+        >
+          Retry
+        </button>
         <a
           href="/upsc/geography/lms/practice"
           className="text-sm text-[#1d9e75] hover:underline"
