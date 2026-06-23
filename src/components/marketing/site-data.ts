@@ -513,7 +513,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Pro",
-    price: "₹1,000",
+    price: "₹999",
     cadence: "/mo effective",
     tagline: "Priority AI queues, unlimited testing, and mains uploading.",
     usage: "6 hours daily AI interaction. Generous rate limits apply.",
@@ -528,7 +528,7 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Ultimate",
-    price: "₹1,300",
+    price: "₹1,299",
     cadence: "/mo effective",
     tagline: "No limits whatsoever. Complete command and direct support.",
     usage: "Unlimited everything. Zero limits apply.",

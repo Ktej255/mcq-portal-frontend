@@ -136,7 +136,7 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "What do the paid plans include?",
-    a: "Plans run from Foundation (₹399/mo) to Ultimate (₹1,300/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
+    a: "Plans run from Foundation (₹399/mo) to Ultimate (₹1,299/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
   },
   {
     q: "Do you cover Hindi medium?",
