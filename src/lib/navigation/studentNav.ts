@@ -68,6 +68,14 @@ export const operatorRoutes = new Set<string>([
   "/upsc/revision-command",
   "/upsc/yearly-planner",
   "/upsc/geography/testing",
+  "/upsc/geography/animation-studio",
+  "/upsc/geography/continue",
+  "/upsc/geography/intro",
+  "/upsc/geography/pilot",
+  "/upsc/geography/production-check",
+  "/upsc/content-preview",
+  "/upsc/question-bank",
+  "/upsc/source-library",
 ]);
 
 /**
@@ -83,6 +91,10 @@ export const futureSubjectPrefixes: string[] = [];
 
 export function isOperatorRoute(pathname: string) {
   if (operatorRoutes.has(pathname)) return true;
+  // Also match sub-paths of operator routes (e.g. /upsc/content-preview/galaxies)
+  for (const route of operatorRoutes) {
+    if (pathname.startsWith(`${route}/`)) return true;
+  }
   return futureSubjectPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
@@ -215,6 +227,12 @@ export const studentNavSections: StudentNavSection[] = [
         href: "/upsc?tab=syllabus",
         icon: LibraryBig,
         match: (pathname, tab) => onHome(pathname) && tab === "syllabus",
+      },
+      {
+        name: "Billing",
+        href: "/upsc/billing",
+        icon: BadgeIndianRupee,
+        match: (pathname) => pathname.startsWith("/upsc/billing") || pathname.startsWith("/upsc/pricing"),
       },
     ],
   },

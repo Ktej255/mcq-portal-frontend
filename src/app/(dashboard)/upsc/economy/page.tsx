@@ -1,8 +1,5 @@
-"use client";
-
-import { SubjectCommandRoom } from "@/components/upsc/SubjectCommandRoom";
-import { economyPlan } from "@/lib/upsc/subjectPlans";
+import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
 
 export default function EconomyPage() {
-  return <SubjectCommandRoom plan={economyPlan} />;
+  return <GsSubjectComingSoon subjectName="Economy" />;
 }

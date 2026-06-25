@@ -1,8 +1,5 @@
-"use client";
-
-import { SubjectCommandRoom } from "@/components/upsc/SubjectCommandRoom";
-import { disasterManagementPlan } from "@/lib/upsc/subjectPlans";
+import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
 
 export default function DisasterManagementPage() {
-  return <SubjectCommandRoom plan={disasterManagementPlan} />;
+  return <GsSubjectComingSoon subjectName="Disaster Management" />;
 }

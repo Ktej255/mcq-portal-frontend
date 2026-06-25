@@ -1,8 +1,5 @@
-"use client";
-
-import { SubjectCommandRoom } from "@/components/upsc/SubjectCommandRoom";
-import { historyPlan } from "@/lib/upsc/subjectPlans";
+import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
 
 export default function HistoryPage() {
-  return <SubjectCommandRoom plan={historyPlan} />;
+  return <GsSubjectComingSoon subjectName="History" />;
 }

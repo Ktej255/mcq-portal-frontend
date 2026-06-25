@@ -1,8 +1,5 @@
-"use client";
-
-import { SubjectCommandRoom } from "@/components/upsc/SubjectCommandRoom";
-import { internalSecuritySocietyPlan } from "@/lib/upsc/subjectPlans";
+import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
 
 export default function InternalSecuritySocietyPage() {
-  return <SubjectCommandRoom plan={internalSecuritySocietyPlan} />;
+  return <GsSubjectComingSoon subjectName="Internal Security & Society" />;
 }

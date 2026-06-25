@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { UpscProfileGate } from "@/components/upsc/UpscProfileGate";
-import { operatorRoutes } from "@/lib/navigation/studentNav";
+import { isOperatorRoute } from "@/lib/navigation/studentNav";
 
 const profileOpenRoutes = new Set([
   "/upsc",
@@ -14,7 +14,7 @@ export default function UpscLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
 
   // Operator-only routes require ADMIN role (e.g. audit, command, strategy pages)
-  if (operatorRoutes.has(pathname)) {
+  if (isOperatorRoute(pathname)) {
     return <ProtectedRoute requiredRole="ADMIN">{children}</ProtectedRoute>;
   }
 
