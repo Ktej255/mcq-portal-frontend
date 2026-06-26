@@ -19,6 +19,8 @@ import {
   BookMarked,
   Briefcase,
   Languages,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -194,6 +196,22 @@ export const subjects: Subject[] = [
     category: "GS",
     icon: Globe2,
     tagline: "India and the world, groupings, treaties and foreign policy.",
+    status: "Planned",
+  },
+  {
+    slug: "disaster-management",
+    name: "Disaster Management",
+    category: "GS",
+    icon: AlertTriangle,
+    tagline: "Disaster preparedness, mitigation and institutional frameworks for GS-III.",
+    status: "Planned",
+  },
+  {
+    slug: "internal-security",
+    name: "Internal Security",
+    category: "GS",
+    icon: ShieldAlert,
+    tagline: "Terrorism, insurgency, cyber security, border management and security forces.",
     status: "Planned",
   },
   {

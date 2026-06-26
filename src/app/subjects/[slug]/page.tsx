@@ -3,34 +3,57 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
+  BookOpen,
   BookOpenCheck,
   CheckCircle2,
   ClipboardCheck,
+  GraduationCap,
+  Lightbulb,
   MessageSquareText,
   PlayCircle,
   Route,
+  ScrollText,
+  TrendingUp,
 } from "lucide-react";
 
-import { PageShell } from "@/components/marketing/PageShell";
-import { StartFreeCta } from "@/components/marketing/PageShell";
+import { PageShell, StartFreeCta } from "@/components/marketing/PageShell";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { getSubject, subjects, type Subject } from "@/components/marketing/site-data";
+import { getGsSubjectDetail, gsSubjectSlugs } from "@/lib/subjects/gs-subject-data";
 import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
+
+/* ------------------------------------------------------------------ */
+/* Static params & metadata                                            */
+/* ------------------------------------------------------------------ */
 
 export function generateStaticParams() {
   return subjects.map((s) => ({ slug: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const subject = getSubject(slug);
   if (!subject) return { title: "Subject not found — Sarit Classes" };
+
+  const detail = getGsSubjectDetail(slug);
+  const description = detail
+    ? detail.overview.slice(0, 155) + "…"
+    : subject.tagline;
+
   return pageMeta({
-    title: `${subject.name} for UPSC — Syllabus, Strategy & Practice | Sarit Classes`,
-    description: subject.tagline,
+    title: `${detail?.name ?? subject.name} for UPSC — Syllabus, Strategy & Books | Sarit Classes`,
+    description,
     path: `/subjects/${subject.slug}`,
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Styling helpers                                                     */
+/* ------------------------------------------------------------------ */
 
 const statusStyles: Record<Subject["status"], string> = {
   Live: "bg-[#e7f5ee] text-[#085041]",
@@ -45,23 +68,47 @@ const loopApplied = [
   { icon: BookOpenCheck, label: "Revise", detail: "Spaced revision resurfaces it before you forget." },
 ];
 
-export default async function SubjectPage({ params }: { params: Promise<{ slug: string }> }) {
+/* ------------------------------------------------------------------ */
+/* Page component                                                      */
+/* ------------------------------------------------------------------ */
+
+export default async function SubjectPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const subject = getSubject(slug);
   if (!subject) notFound();
 
+  const detail = getGsSubjectDetail(slug);
   const Icon = subject.icon;
-  const related = subjects.filter((s) => s.category === subject.category && s.slug !== subject.slug).slice(0, 3);
+  const related = subjects
+    .filter((s) => s.category === subject.category && s.slug !== subject.slug)
+    .slice(0, 3);
 
+  /* ---- JSON-LD structured data ---- */
   const courseSchema = {
     "@context": "https://schema.org",
     "@type": "Course",
-    name: `${subject.name} for UPSC`,
-    description: subject.tagline,
+    name: `${detail?.name ?? subject.name} for UPSC`,
+    description: detail?.overview ?? subject.tagline,
     url: `${SITE_URL}/subjects/${subject.slug}`,
     inLanguage: "en-IN",
-    provider: { "@type": "EducationalOrganization", name: ORG_NAME, sameAs: SITE_URL },
-    about: subject.category === "GS" ? "UPSC General Studies" : "UPSC Optional subject",
+    provider: {
+      "@type": "EducationalOrganization",
+      name: ORG_NAME,
+      sameAs: SITE_URL,
+    },
+    about:
+      subject.category === "GS"
+        ? "UPSC General Studies"
+        : "UPSC Optional subject",
+    hasCourseInstance: {
+      "@type": "CourseInstance",
+      courseMode: "online",
+      courseWorkload: "PT6H/week",
+    },
   };
 
   const breadcrumbSchema = {
@@ -69,8 +116,18 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: "Subjects", item: `${SITE_URL}/subjects` },
-      { "@type": "ListItem", position: 3, name: subject.name, item: `${SITE_URL}/subjects/${subject.slug}` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Subjects",
+        item: `${SITE_URL}/subjects`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: detail?.name ?? subject.name,
+        item: `${SITE_URL}/subjects/${subject.slug}`,
+      },
     ],
   };
 
@@ -78,10 +135,15 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
     <PageShell>
       <JsonLd data={courseSchema} />
       <JsonLd data={breadcrumbSchema} />
+
+      {/* ─── HERO SECTION ─── */}
       <section className="relative overflow-hidden border-b border-[#dcd5c7]">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_60%_at_85%_0%,rgba(29,158,117,0.12),transparent)]" />
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-20">
-          <Link href="/subjects" className="text-sm font-bold text-[#536259] hover:text-[#13251d]">
+          <Link
+            href="/subjects"
+            className="text-sm font-bold text-[#536259] hover:text-[#13251d]"
+          >
             ← All subjects
           </Link>
           <div className="mt-5 flex items-center gap-4">
@@ -91,28 +153,68 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
             <div>
               <div className="flex items-center gap-3">
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-[#8c5d14]">
-                  {subject.category === "GS" ? "General Studies" : "Optional subject"}
+                  {subject.category === "GS"
+                    ? "General Studies"
+                    : "Optional subject"}
                 </p>
-                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${statusStyles[subject.status]}`}>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${statusStyles[subject.status]}`}
+                >
                   {subject.status}
                 </span>
               </div>
-              <h1 className="mt-1 text-3xl font-black tracking-tight text-[#13251d] md:text-4xl">{subject.name}</h1>
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-[#13251d] md:text-4xl">
+                {detail?.name ?? subject.name}
+              </h1>
             </div>
           </div>
-          <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-[#536259]">{subject.tagline}</p>
+          <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-[#536259]">
+            {detail?.overview ?? subject.tagline}
+          </p>
           <div className="mt-7">
-            <StartFreeCta label={subject.status === "Live" ? "Start this subject free" : "Get notified at launch"} />
+            <StartFreeCta
+              label={`Start studying ${subject.name}`}
+            />
           </div>
         </div>
       </section>
 
-      {subject.topics && subject.topics.length > 0 ? (
+      {/* ─── OFFICIAL UPSC SYLLABUS ─── */}
+      {detail ? (
         <section className="mx-auto max-w-7xl px-4 py-14 md:px-8">
-          <h2 className="text-2xl font-black tracking-tight text-[#13251d]">What this subject covers</h2>
+          <div className="flex items-center gap-3">
+            <ScrollText className="h-5 w-5 text-[#1d9e75]" />
+            <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+              Official UPSC Syllabus
+            </h2>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-[#536259]">
+            Directly from the UPSC CSE notification — these are the topics you
+            must cover.
+          </p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {detail.syllabus.map((point) => (
+              <div
+                key={point}
+                className="flex items-start gap-2 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-sm font-bold leading-6 text-[#33443b]"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                {point}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : subject.topics && subject.topics.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-4 py-14 md:px-8">
+          <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+            What this subject covers
+          </h2>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {subject.topics.map((t) => (
-              <div key={t} className="flex items-start gap-2 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-sm font-bold leading-6 text-[#33443b]">
+              <div
+                key={t}
+                className="flex items-start gap-2 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-sm font-bold leading-6 text-[#33443b]"
+              >
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
                 {t}
               </div>
@@ -121,22 +223,187 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
         </section>
       ) : null}
 
+      {/* ─── PREPARATION STRATEGY ─── */}
+      {detail ? (
+        <section className="border-y border-[#dcd5c7] bg-[#fffdf8] py-14">
+          <div className="mx-auto max-w-7xl px-4 md:px-8">
+            <div className="flex items-center gap-3">
+              <Lightbulb className="h-5 w-5 text-[#8c5d14]" />
+              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+                Preparation Strategy
+              </h2>
+            </div>
+            <div className="mt-6 space-y-5 max-w-3xl">
+              {detail.strategy.map((para, i) => (
+                <p
+                  key={i}
+                  className="text-[15px] font-medium leading-7 text-[#33443b]"
+                >
+                  {para}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ─── RECOMMENDED BOOKS ─── */}
+      {detail ? (
+        <section className="mx-auto max-w-7xl px-4 py-14 md:px-8">
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-5 w-5 text-[#1d9e75]" />
+            <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+              Recommended Books
+            </h2>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-[#536259]">
+            Time-tested resources used by toppers and serious aspirants.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {detail.books.map((book) => (
+              <div
+                key={book.title}
+                className="rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-5"
+              >
+                <h3 className="text-base font-black text-[#13251d]">
+                  {book.title}
+                </h3>
+                <p className="mt-1 text-xs font-bold text-[#8c5d14]">
+                  {book.author}
+                </p>
+                <p className="mt-3 text-sm font-medium leading-6 text-[#536259]">
+                  {book.why}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ─── PYQ TREND ANALYSIS ─── */}
+      {detail ? (
+        <section className="border-y border-[#dcd5c7] bg-[#fffdf8] py-14">
+          <div className="mx-auto max-w-7xl px-4 md:px-8">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="h-5 w-5 text-[#1d9e75]" />
+              <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+                Previous Year Question Trends
+              </h2>
+            </div>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+              <div className="rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-6">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-[#8c5d14]">
+                  Frequency
+                </p>
+                <p className="mt-2 text-lg font-black text-[#13251d]">
+                  {detail.pyqTrend.frequency}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-6">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-[#8c5d14]">
+                  Pattern Insight
+                </p>
+                <p className="mt-2 text-[15px] font-medium leading-7 text-[#33443b]">
+                  {detail.pyqTrend.insight}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ─── FREE RESOURCES ON PLATFORM ─── */}
+      {detail ? (
+        <section className="mx-auto max-w-7xl px-4 py-14 md:px-8">
+          <div className="flex items-center gap-3">
+            <GraduationCap className="h-5 w-5 text-[#1d9e75]" />
+            <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+              Free Resources Available
+            </h2>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-[#536259]">
+            Start preparing right now — no subscription needed.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "Previous Year Questions",
+                desc: `Topic-wise PYQs for ${subject.name} with detailed explanations.`,
+                href: "/pyqs",
+              },
+              {
+                title: "Daily Practice MCQs",
+                desc: `Fresh ${subject.name} questions daily, tuned to your level.`,
+                href: "/start",
+              },
+              {
+                title: "Concept Videos",
+                desc: "Short, syllabus-mapped lessons covering core topics.",
+                href: "/start",
+              },
+              {
+                title: "NCERT Notes",
+                desc: `Key takeaways from NCERTs relevant to ${subject.name}.`,
+                href: "/resources",
+              },
+              {
+                title: "Revision Mind Maps",
+                desc: "One-page visual summaries for quick revision before exams.",
+                href: "/resources",
+              },
+              {
+                title: "Current Affairs Connect",
+                desc: `Weekly updates linking ${subject.name} to current events.`,
+                href: "/current-affairs",
+              },
+            ].map((resource) => (
+              <Link
+                key={resource.title}
+                href={resource.href}
+                className="group rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-5 transition hover:-translate-y-1 hover:shadow-md"
+              >
+                <h3 className="text-base font-black text-[#13251d] group-hover:text-[#085041]">
+                  {resource.title}
+                </h3>
+                <p className="mt-2 text-sm font-medium leading-6 text-[#536259]">
+                  {resource.desc}
+                </p>
+                <span className="mt-3 inline-flex items-center text-xs font-black text-[#085041]">
+                  Explore free
+                  <ArrowRight className="ml-1 h-3 w-3 transition group-hover:translate-x-1" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ─── HOW YOU'LL STUDY IT ─── */}
       <section className="border-y border-[#dcd5c7] bg-[#fffdf8] py-14">
         <div className="mx-auto max-w-7xl px-4 md:px-8">
           <div className="flex items-center gap-3">
             <Route className="h-5 w-5 text-[#1d9e75]" />
-            <h2 className="text-2xl font-black tracking-tight text-[#13251d]">How you&apos;ll study it</h2>
+            <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+              How you&apos;ll study it
+            </h2>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {loopApplied.map((step) => {
               const StepIcon = step.icon;
               return (
-                <div key={step.label} className="rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-5">
+                <div
+                  key={step.label}
+                  className="rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-5"
+                >
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1a3a2a] text-white">
                     <StepIcon className="h-5 w-5" />
                   </span>
-                  <h3 className="mt-4 text-base font-black text-[#13251d]">{step.label}</h3>
-                  <p className="mt-1.5 text-sm font-semibold leading-6 text-[#536259]">{step.detail}</p>
+                  <h3 className="mt-4 text-base font-black text-[#13251d]">
+                    {step.label}
+                  </h3>
+                  <p className="mt-1.5 text-sm font-semibold leading-6 text-[#536259]">
+                    {step.detail}
+                  </p>
                 </div>
               );
             })}
@@ -144,9 +411,25 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
+      {/* ─── CTA SECTION ─── */}
+      <section className="mx-auto max-w-7xl px-4 py-14 md:px-8 text-center">
+        <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+          Ready to start {subject.name}?
+        </h2>
+        <p className="mt-3 text-base font-semibold text-[#536259]">
+          Jump in with a free diagnostic and get a personalised study plan.
+        </p>
+        <div className="mt-6">
+          <StartFreeCta label={`Start studying ${subject.name}`} />
+        </div>
+      </section>
+
+      {/* ─── RELATED SUBJECTS ─── */}
       {related.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-4 py-14 md:px-8">
-          <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Related subjects</h2>
+        <section className="mx-auto max-w-7xl px-4 py-14 md:px-8 border-t border-[#dcd5c7]">
+          <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+            Related subjects
+          </h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             {related.map((r) => {
               const RIcon = r.icon;
@@ -159,7 +442,9 @@ export default async function SubjectPage({ params }: { params: Promise<{ slug: 
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#e7f5ee] text-[#085041]">
                     <RIcon className="h-5 w-5" />
                   </span>
-                  <span className="flex-1 text-sm font-black text-[#13251d]">{r.name}</span>
+                  <span className="flex-1 text-sm font-black text-[#13251d]">
+                    {r.name}
+                  </span>
                   <ArrowRight className="h-4 w-4 text-[#085041] transition group-hover:translate-x-1" />
                 </Link>
               );
