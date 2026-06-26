@@ -6,7 +6,7 @@ import { pricingStats, billingOptions, pricingTiers } from "@/components/marketi
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Pricing — UPSC Plans from ₹399/mo | Sarit Learn",
+  title: "Pricing — UPSC Plans from ₹399/mo | Sarit Classes",
   description:
     "Flexible UPSC plans — Foundation, Plus, Pro and Ultimate — starting at ₹399/mo. Deeper discounts on yearly, 2-year and 3-year commitments. Free resources for everyone.",
   path: "/pricing",

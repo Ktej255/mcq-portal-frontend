@@ -6,9 +6,9 @@ import { JsonLd } from "@/components/marketing/JsonLd";
 import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "How We Measure Coverage — Our Transparency Method | Sarit Learn",
+  title: "How We Measure Coverage — Our Transparency Method | Sarit Classes",
   description:
-    "Exactly how Sarit Learn measures and reports exam coverage: how we classify direct vs partial matches, our verification process, and what the numbers do and don't mean.",
+    "Exactly how Sarit Classes measures and reports exam coverage: how we classify direct vs partial matches, our verification process, and what the numbers do and don't mean.",
   path: "/methodology",
 });
 
@@ -56,7 +56,7 @@ export default function MethodologyPage() {
     "@type": "Article",
     headline: "How we measure exam coverage",
     description:
-      "Sarit Learn's transparent method for measuring and reporting UPSC exam coverage, including classification rules and verification.",
+      "Sarit Classes' transparent method for measuring and reporting UPSC exam coverage, including classification rules and verification.",
     url: `${SITE_URL}/methodology`,
     author: { "@type": "Organization", name: ORG_NAME, url: SITE_URL },
     publisher: { "@type": "EducationalOrganization", name: ORG_NAME, url: SITE_URL },

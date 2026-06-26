@@ -2,15 +2,15 @@ import { PageShell, PageHero } from "@/components/marketing/PageShell";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Terms of Service — Sarit Learn",
-  description: "The terms that govern your use of Sarit Learn.",
+  title: "Terms of Service — Sarit Classes",
+  description: "The terms that govern your use of Sarit Classes.",
   path: "/terms",
 });
 
 const sections = [
   {
     h: "Using the platform",
-    p: "Sarit Learn provides UPSC preparation content and tools for your personal, non-commercial study. You agree to use the platform lawfully and not to misuse, copy or redistribute our content.",
+    p: "Sarit Classes provides UPSC preparation content and tools for your personal, non-commercial study. You agree to use the platform lawfully and not to misuse, copy or redistribute our content.",
   },
   {
     h: "Your account",
@@ -36,7 +36,7 @@ export default function TermsPage() {
       <PageHero eyebrow="Legal" title="Terms of Service" sub="Last updated: June 2026" />
       <section className="mx-auto max-w-3xl px-4 py-16 md:px-8">
         <p className="text-sm font-semibold leading-8 text-[#536259]">
-          This is a plain-language summary of the terms for using Sarit Learn. A full legal version will be published
+          This is a plain-language summary of the terms for using Sarit Classes. A full legal version will be published
           before public launch.
         </p>
         <div className="mt-8 space-y-8">

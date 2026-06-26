@@ -10,7 +10,7 @@ import { BookOpen, Clock } from "lucide-react";
  * marks everything else `authored: false` with `content: null`. The frontend
  * must never dress that absence up as complete content. This component is the
  * shared, reusable way both {@link ReadView} and {@link SubjectShell} express
- * that state, so the wording and Sarit Learn palette stay consistent:
+ * that state, so the wording and Sarit Classes palette stay consistent:
  *
  * - {@link NotYetAuthored} — a full dedicated panel for an empty topic page.
  * - {@link NotYetAuthoredBadge} — a compact inline badge for topic rows.

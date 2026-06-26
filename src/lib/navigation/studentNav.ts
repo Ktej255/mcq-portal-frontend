@@ -25,7 +25,7 @@ import {
 /**
  * Single source of truth for the student section navigation + route gating.
  *
- * The student portal standardises on the warm "Sarit Learn" palette
+ * The student portal standardises on the warm "Sarit Classes" palette
  * (see globals.css --sl-* tokens):
  *   paper   #f7f4ee   surface #fffdf8   ink     #13251d
  *   primary #1a3a2a   emerald #1d9e75   border  #dcd5c7

@@ -1,4 +1,4 @@
-# Sarit Learn — UPSC Command · Project Log
+# Sarit Classes — UPSC Command · Project Log
 
 A chronological, single-source-of-truth record of work on this project so any
 agent or teammate can quickly understand **what exists, what changed, and what's

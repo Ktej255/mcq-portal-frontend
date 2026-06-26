@@ -4,8 +4,8 @@ import { PageShell, PageHero } from "@/components/marketing/PageShell";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Contact Sarit Learn — Support, Partnerships & Feedback",
-  description: "Get in touch with the Sarit Learn team — support, partnerships, and feedback.",
+  title: "Contact Sarit Classes — Support, Partnerships & Feedback",
+  description: "Get in touch with the Sarit Classes team — support, partnerships, and feedback.",
   path: "/contact",
 });
 

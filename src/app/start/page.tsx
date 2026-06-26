@@ -3,7 +3,7 @@ import { DiagnosticFlow } from "@/components/marketing/DiagnosticFlow";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Get Started Free — 2-Minute UPSC Diagnostic | Sarit Learn",
+  title: "Get Started Free — 2-Minute UPSC Diagnostic | Sarit Classes",
   description:
     "Answer five quick questions and get a personalized UPSC starting plan — your first subject, daily targets, current-affairs routine and revision rhythm. Free, no card.",
   path: "/start",

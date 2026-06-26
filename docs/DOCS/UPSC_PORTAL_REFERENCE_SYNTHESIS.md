@@ -19,7 +19,7 @@ The first paid UPSC landing experience should guide the student into a subject c
 Local references already identified:
 
 - `D:\Development\Student Portal`
-  - Sarit Learn design direction.
+  - Sarit Classes design direction.
   - Warm study-room theme.
   - Watch -> Talk -> Test -> Track -> Revisit flow.
   - Geography palette: teal, forest green, amber, warm off-white.

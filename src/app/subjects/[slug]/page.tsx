@@ -24,9 +24,9 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const subject = getSubject(slug);
-  if (!subject) return { title: "Subject not found — Sarit Learn" };
+  if (!subject) return { title: "Subject not found — Sarit Classes" };
   return pageMeta({
-    title: `${subject.name} for UPSC — Syllabus, Strategy & Practice | Sarit Learn`,
+    title: `${subject.name} for UPSC — Syllabus, Strategy & Practice | Sarit Classes`,
     description: subject.tagline,
     path: `/subjects/${subject.slug}`,
   });

@@ -2,9 +2,9 @@ import { SaritHome } from "@/components/marketing/SaritHome";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Sarit Learn — One Connected UPSC Preparation System",
+  title: "Sarit Classes — AI-Driven UPSC Preparation Platform",
   description:
-    "Stop juggling tabs, PDFs and apps. Sarit Learn keeps your UPSC lessons, doubts, maps, MCQs, tracking and revision in one personalized daily loop — honestly.",
+    "Stop juggling tabs, PDFs and apps. Sarit Classes keeps your UPSC lessons, doubts, maps, MCQs, tracking and revision in one personalized daily loop — honestly.",
   path: "/",
 });
 

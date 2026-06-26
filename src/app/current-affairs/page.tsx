@@ -12,7 +12,7 @@ import {
 import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "UPSC Current Affairs — Daily News, Editorials & Monthly Magazine | Sarit Learn",
+  title: "UPSC Current Affairs — Daily News, Editorials & Monthly Magazine | Sarit Classes",
   description:
     "Exam-filtered UPSC current affairs every day — Prelims bytes, Mains articles, editorial gist, schemes and a daily quiz — plus monthly consolidation. Less noise, more signal.",
   path: "/current-affairs",

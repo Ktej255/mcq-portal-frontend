@@ -112,7 +112,7 @@ function MarketingTestsView() {
     "@type": "CollectionPage",
     name: "UPSC Tests & Daily Practice",
     description:
-      "UPSC practice on Sarit Learn: daily quizzes, Prelims test series, CSAT practice and Mains answer writing with instant solutions and analytics.",
+      "UPSC practice on Sarit Classes: daily quizzes, Prelims test series, CSAT practice and Mains answer writing with instant solutions and analytics.",
     url: `${SITE_URL}/tests`,
     isPartOf: { "@type": "WebSite", name: ORG_NAME, url: SITE_URL },
   };

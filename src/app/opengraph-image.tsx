@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Sarit Learn — UPSC Command: one connected system to learn, practise and revise for UPSC.";
+export const alt = "Sarit Classes — UPSC Command: one connected system to learn, practise and revise for UPSC.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -37,7 +37,7 @@ export default function OpengraphImage() {
             S
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "30px", fontWeight: 800, color: "#13251d" }}>Sarit Learn</span>
+            <span style={{ fontSize: "30px", fontWeight: 800, color: "#13251d" }}>Sarit Classes</span>
             <span style={{ fontSize: "18px", fontWeight: 700, color: "#1d9e75", letterSpacing: "4px" }}>UPSC COMMAND</span>
           </div>
         </div>

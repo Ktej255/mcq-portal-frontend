@@ -17,7 +17,7 @@ import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageSh
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "UPSC Preparation Features — Lessons, Doubts, MCQs & Revision | Sarit Learn",
+  title: "UPSC Preparation Features — Lessons, Doubts, MCQs & Revision | Sarit Classes",
   description:
     "Everything top UPSC platforms offer — current affairs, PYQs, tests — plus the gaps they leave: personalization, an AI teacher, weakness tracking and spaced revision in one daily loop.",
   path: "/features",

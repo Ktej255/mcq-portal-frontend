@@ -21,7 +21,7 @@ export const guides: Guide[] = [
   {
     slug: "how-to-start-upsc-preparation",
     title: "How to start UPSC preparation: a beginner's roadmap",
-    metaTitle: "How to Start UPSC Preparation in 2026 — Beginner's Roadmap | Sarit Learn",
+    metaTitle: "How to Start UPSC Preparation in 2026 — Beginner's Roadmap | Sarit Classes",
     excerpt:
       "A clear, step-by-step roadmap for beginners: understand the exam, read the syllabus, build NCERT foundations, add current affairs, and start practising early.",
     cluster: "Getting started",
@@ -67,7 +67,7 @@ export const guides: Guide[] = [
   {
     slug: "upsc-syllabus-explained",
     title: "The UPSC syllabus explained (Prelims and Mains)",
-    metaTitle: "UPSC Syllabus Explained — Prelims & Mains Breakdown | Sarit Learn",
+    metaTitle: "UPSC Syllabus Explained — Prelims & Mains Breakdown | Sarit Classes",
     excerpt:
       "A plain-language breakdown of the UPSC Prelims and Mains syllabus, paper by paper, so you know exactly what to study and what to skip.",
     cluster: "Getting started",
@@ -106,7 +106,7 @@ export const guides: Guide[] = [
   {
     slug: "best-books-for-upsc-preparation",
     title: "Best books for UPSC preparation (without the overload)",
-    metaTitle: "Best Books for UPSC Preparation 2026 — Curated Booklist | Sarit Learn",
+    metaTitle: "Best Books for UPSC Preparation 2026 — Curated Booklist | Sarit Classes",
     excerpt:
       "A curated, minimal UPSC booklist — NCERTs plus one standard reference per subject — so you read deeply instead of collecting books you never finish.",
     cluster: "Resources",
@@ -142,7 +142,7 @@ export const guides: Guide[] = [
   {
     slug: "how-to-prepare-current-affairs-for-upsc",
     title: "How to prepare current affairs for UPSC",
-    metaTitle: "How to Prepare Current Affairs for UPSC — A Simple System | Sarit Learn",
+    metaTitle: "How to Prepare Current Affairs for UPSC — A Simple System | Sarit Classes",
     excerpt:
       "A simple, sustainable current-affairs system for UPSC: filter daily, link news to the syllabus, consolidate monthly, and revise with quizzes.",
     cluster: "Strategy",
@@ -178,7 +178,7 @@ export const guides: Guide[] = [
   {
     slug: "upsc-prelims-preparation-strategy",
     title: "UPSC Prelims preparation strategy that works",
-    metaTitle: "UPSC Prelims Strategy 2026 — Study Plan & Revision | Sarit Learn",
+    metaTitle: "UPSC Prelims Strategy 2026 — Study Plan & Revision | Sarit Classes",
     excerpt:
       "A practical UPSC Prelims strategy: master static through NCERTs and PYQs, integrate current affairs, take regular mocks, and revise in tightening loops.",
     cluster: "Strategy",

@@ -7,7 +7,7 @@ import { gsSubjects, optionalSubjects, subjects, type Subject } from "@/componen
 import { pageMeta, SITE_URL } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "UPSC Subjects — General Studies & Optional Subjects | Sarit Learn",
+  title: "UPSC Subjects — General Studies & Optional Subjects | Sarit Classes",
   description:
     "Explore every UPSC subject — General Studies and Optional subjects like PSIR, Sociology and Public Administration — each taught through one connected daily loop.",
   path: "/subjects",
@@ -48,7 +48,7 @@ export default function SubjectsPage() {
   const itemListSchema = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "UPSC subjects on Sarit Learn",
+    name: "UPSC subjects on Sarit Classes",
     itemListElement: subjects.map((s, i) => ({
       "@type": "ListItem",
       position: i + 1,

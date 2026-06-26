@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Sarit Learn — UPSC Command",
-    short_name: "Sarit Learn",
+    name: "Sarit Classes — UPSC Command",
+    short_name: "Sarit Classes",
     description:
       "One connected system to learn, practise and revise for UPSC — lessons, doubts, MCQs, tracking and revision in one daily loop.",
     start_url: "/",

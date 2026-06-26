@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Sarit Learn — UPSC Command",
+  title: "Sarit Classes — UPSC Command",
   description:
     "Integrated UPSC learning command center for classes, discussion, labs, practice, tracking, and revision.",
   alternates: { canonical: "/", types: { "text/plain": "/llms.txt" } },

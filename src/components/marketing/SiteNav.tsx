@@ -32,7 +32,7 @@ export function SiteNav() {
             <GraduationCap className="h-5 w-5" />
           </span>
           <span className="flex flex-col leading-none">
-            <span className="text-base font-black tracking-tight text-[#13251d]">Sarit Learn</span>
+            <span className="text-base font-black tracking-tight text-[#13251d]">Sarit Classes</span>
             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">UPSC Command</span>
           </span>
         </Link>

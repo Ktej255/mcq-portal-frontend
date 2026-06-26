@@ -6,7 +6,7 @@ import { resourceGroups } from "@/components/marketing/site-data";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Free UPSC Study Resources — NCERTs, Current Affairs & Mains Toolkit | Sarit Learn",
+  title: "Free UPSC Study Resources — NCERTs, Current Affairs & Mains Toolkit | Sarit Classes",
   description:
     "Free, curated UPSC study resources — NCERT booklist, standard references, daily current affairs, mind maps, PYQs and Mains answer-writing frameworks.",
   path: "/resources",

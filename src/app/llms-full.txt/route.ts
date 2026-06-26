@@ -15,10 +15,10 @@ export const dynamic = "force-static";
  */
 export function GET() {
   const lines: string[] = [
-    "# Sarit Learn — UPSC Command (full content)",
+    "# Sarit Classes — UPSC Command (full content)",
     "",
     "## What it is",
-    "Sarit Learn is an integrated UPSC Civil Services Examination (CSE) preparation platform for India. Instead of scattering preparation across many tabs, PDFs and apps, it connects the whole study journey into one personalized daily loop: Watch a lesson, Talk to an AI teacher to clear doubts, use the Visual Lab (maps and concept boards), practise fresh MCQs, Track weak areas, and Revisit through spaced revision.",
+    "Sarit Classes is an integrated UPSC Civil Services Examination (CSE) preparation platform for India. Instead of scattering preparation across many tabs, PDFs and apps, it connects the whole study journey into one personalized daily loop: Watch a lesson, Talk to an AI teacher to clear doubts, use the Visual Lab (maps and concept boards), practise fresh MCQs, Track weak areas, and Revisit through spaced revision.",
     "",
     "## Who it is for",
     "Aspirants preparing for UPSC Prelims and Mains (General Studies and Optional subjects), in both English and Hindi over time.",
@@ -54,7 +54,7 @@ export function GET() {
     "",
     "## Frequently asked questions",
     "Q: Is it really free to start? A: Yes. You get a personalized plan, one full subject loop, daily MCQs, current affairs and limited AI doubts, with no card required.",
-    "Q: How is this different from other UPSC platforms? A: Most platforms hand you scattered content; Sarit Learn connects watch, discuss, practise, track and revise into a single daily loop that adapts to you.",
+    "Q: How is this different from other UPSC platforms? A: Most platforms hand you scattered content; Sarit Classes connects watch, discuss, practise, track and revise into a single daily loop that adapts to you.",
     "Q: What does Pro unlock? A: Every subject, unlimited AI doubt-solving, Mains answer evaluation, deep analytics, spaced revision, full tests and all-India rank.",
     "Q: Do you cover Hindi medium? A: Yes — content is being rolled out bilingually (Hindi and English), subject by subject.",
     "",

@@ -4,7 +4,7 @@ Copy everything below into your deployment agent.
 
 ---
 
-You are taking over the **Sarit Learn — UPSC Command** project to deploy it to
+You are taking over the **Sarit Classes — UPSC Command** project to deploy it to
 production. The application code is complete and reviewed; your job is to merge
 the open PRs and deploy. Do not rebuild features — deploy what exists.
 

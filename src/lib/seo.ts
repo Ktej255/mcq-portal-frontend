@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
 /**
- * Canonical site constants for Sarit Learn — UPSC Command.
+ * Canonical site constants for Sarit Classes — UPSC Command.
  * Canonical domain is taken from beyond-seo/KIRO_INSTRUCTIONS.md (upsccommand.com).
  */
 export const SITE_URL = "https://upsccommand.com";
-export const SITE_NAME = "Sarit Learn — UPSC Command";
-export const ORG_NAME = "Sarit Learn";
+export const SITE_NAME = "Sarit Classes — UPSC Command";
+export const ORG_NAME = "Sarit Classes";
 
 /**
  * Build page metadata with canonical alternates + Open Graph + Twitter,
@@ -48,10 +48,10 @@ export const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "EducationalOrganization",
   name: ORG_NAME,
-  alternateName: "Sarit Learn UPSC Command",
+  alternateName: "Sarit Classes UPSC Command",
   url: SITE_URL,
   description:
-    "Sarit Learn is an integrated UPSC Civil Services preparation platform that connects lessons, doubt-solving, practice, tracking and revision in one personalized daily loop.",
+    "Sarit Classes is an integrated UPSC Civil Services preparation platform that connects lessons, doubt-solving, practice, tracking and revision in one personalized daily loop.",
   areaServed: "IN",
   knowsAbout: [
     "UPSC Civil Services Examination",

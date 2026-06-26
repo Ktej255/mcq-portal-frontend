@@ -118,11 +118,11 @@ const comparison: { label: string; typical: string; sarit: string }[] = [
 ];
 
 const roadmap: { window: string; subject: string; status: string }[] = [
-  { window: "June", subject: "Geography", status: "Live pilot" },
-  { window: "July", subject: "Environment & Disaster Mgmt", status: "Next" },
-  { window: "August", subject: "Economy", status: "Planned" },
-  { window: "September", subject: "Science & Tech", status: "Planned" },
-  { window: "Later", subject: "Polity & Governance", status: "Mega chapter" },
+  { window: "Now", subject: "Geography", status: "Live" },
+  { window: "Next", subject: "Environment & Disaster Mgmt", status: "Building" },
+  { window: "Coming", subject: "Economy", status: "Planned" },
+  { window: "Coming", subject: "Science & Tech", status: "Planned" },
+  { window: "Coming", subject: "Polity & Governance", status: "Planned" },
 ];
 
 const faqs: { q: string; a: string }[] = [
@@ -132,7 +132,7 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How is this different from other UPSC platforms?",
-    a: "Most platforms hand you scattered content. Sarit Learn connects watch, discuss, practice, track and revise into a single daily loop that adapts to you.",
+    a: "Most platforms hand you scattered content. Sarit Classes connects watch, discuss, practice, track and revise into a single daily loop that adapts to you.",
   },
   {
     q: "What do the paid plans include?",
@@ -194,7 +194,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
             variants={fadeUp}
             className="inline-flex items-center gap-2 rounded-full border border-[#1d9e75]/30 bg-[#e7f5ee] px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-[#085041]"
           >
-            <Sparkles className="h-3.5 w-3.5" /> Built for UPSC CSE 2026 / 2027
+            <Sparkles className="h-3.5 w-3.5" /> Built for UPSC CSE 2027 / 2028
           </motion.span>
 
           <motion.h1 variants={fadeUp} className="mt-5 text-4xl font-black leading-[1.05] tracking-tight text-[#13251d] md:text-6xl">
@@ -202,7 +202,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
           </motion.h1>
 
           <motion.p variants={fadeUp} className="mt-5 max-w-xl text-lg font-semibold leading-8 text-[#536259]">
-            Stop juggling tabs, PDFs and apps. Sarit Learn keeps your lessons, doubts, maps, MCQs, tracking and revision in
+            Stop juggling tabs, PDFs and apps. Sarit Classes keeps your lessons, doubts, maps, MCQs, tracking and revision in
             one daily loop that adapts to you.
           </motion.p>
 
@@ -225,7 +225,7 @@ function Hero({ reduce }: { reduce: boolean | null }) {
           {/* trust stat strip */}
           <motion.div variants={fadeUp} className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-[#dcd5c7] pt-6">
             {[
-              { end: 76, suffix: "%", label: "Honest prelims coverage" },
+              { end: 9, suffix: " GS", label: "Subjects covered end-to-end" },
               { end: 6, suffix: "-step", label: "Daily learning loop" },
               { end: 1, suffix: " plan", label: "Personalized to you" },
             ].map((s) => (
@@ -646,7 +646,7 @@ function ComparisonSection() {
   return (
     <section className="border-y border-[#dcd5c7] bg-[#fffdf8] py-20">
       <div className="mx-auto max-w-5xl px-4 md:px-8">
-        <SectionHeading eyebrow="The difference" title="Sarit Learn vs a typical UPSC site" />
+        <SectionHeading eyebrow="The difference" title="Sarit Classes vs a typical UPSC site" />
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -657,7 +657,7 @@ function ComparisonSection() {
           <div className="grid grid-cols-3 bg-[#13251d] text-white">
             <div className="p-4 text-xs font-black uppercase tracking-wide text-white/70" />
             <div className="p-4 text-center text-xs font-black uppercase tracking-wide text-white/70">Typical site</div>
-            <div className="p-4 text-center text-xs font-black uppercase tracking-wide text-[#7fe0bd]">Sarit Learn</div>
+            <div className="p-4 text-center text-xs font-black uppercase tracking-wide text-[#7fe0bd]">Sarit Classes</div>
           </div>
           {comparison.map((row, i) => (
             <div key={row.label} className={`grid grid-cols-3 ${i % 2 ? "bg-[#f7f4ee]" : "bg-[#fffdf8]"}`}>

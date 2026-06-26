@@ -11,7 +11,7 @@ export const dynamic = "force-static";
  */
 export function GET() {
   const lines: string[] = [
-    "# Sarit Learn — UPSC Command",
+    "# Sarit Classes — UPSC Command",
     "",
     "> One connected system to learn, practise and revise for the UPSC Civil Services Examination (CSE). Lessons, AI doubt-solving, interactive maps, fresh MCQs, weakness tracking and spaced revision live in one personalized daily loop. Free to start; a Pro membership unlocks all subjects, unlimited AI doubt-solving and Mains answer evaluation.",
     "",

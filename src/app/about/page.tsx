@@ -4,9 +4,9 @@ import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageSh
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "About Sarit Learn — Our Mission for UPSC Aspirants",
+  title: "About Sarit Classes — Our Mission for UPSC Aspirants",
   description:
-    "Sarit Learn exists to cut the noise and cost of UPSC preparation with one connected, honest, personalized learning system.",
+    "Sarit Classes exists to cut the noise and cost of UPSC preparation with one connected, honest, personalized learning system.",
   path: "/about",
 });
 
@@ -34,7 +34,7 @@ export default function AboutPage() {
             study, when to revise, and whether it&apos;s actually working.
           </p>
           <p>
-            Sarit Learn brings the whole journey into one place: watch a concept, discuss your doubt, practise it, see your
+            Sarit Classes brings the whole journey into one place: watch a concept, discuss your doubt, practise it, see your
             weak areas, and revise them before you forget. MCQs are one action in that loop — not the entire product.
           </p>
           <p>

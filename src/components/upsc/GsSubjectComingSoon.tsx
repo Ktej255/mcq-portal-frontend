@@ -4,7 +4,7 @@ import { Clock, Compass } from "lucide-react";
 
 /**
  * Placeholder page rendered for GS subjects that are not yet live.
- * Shows a warm "Coming Soon" state consistent with the Sarit Learn design tokens.
+ * Shows a warm "Coming Soon" state consistent with the Sarit Classes design tokens.
  *
  * Used by: polity-governance, economy, environment, history, science-tech,
  *          disaster-management, internal-security-society.

@@ -6,7 +6,7 @@ import { pyqYears, pyqBySubject, pyqTips } from "@/components/marketing/site-dat
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Free UPSC Previous Year Questions (PYQs) — Prelims & Mains | Sarit Learn",
+  title: "Free UPSC Previous Year Questions (PYQs) — Prelims & Mains | Sarit Classes",
   description:
     "Browse UPSC Prelims & Mains previous year questions, year-wise and subject-wise, with clean explanations — completely free.",
   path: "/pyqs",

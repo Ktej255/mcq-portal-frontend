@@ -2,8 +2,8 @@ import { PageShell, PageHero } from "@/components/marketing/PageShell";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Privacy Policy — Sarit Learn",
-  description: "How Sarit Learn collects, uses and protects your data.",
+  title: "Privacy Policy — Sarit Classes",
+  description: "How Sarit Classes collects, uses and protects your data.",
   path: "/privacy",
 });
 
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
       <section className="mx-auto max-w-3xl px-4 py-16 md:px-8">
         <p className="text-sm font-semibold leading-8 text-[#536259]">
           This is a plain-language summary of how we handle your data. A full legal version will be published before
-          public launch. By using Sarit Learn you agree to the practices described here.
+          public launch. By using Sarit Classes you agree to the practices described here.
         </p>
         <div className="mt-8 space-y-8">
           {sections.map((s) => (

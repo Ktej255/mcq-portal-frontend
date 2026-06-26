@@ -12,7 +12,7 @@ The MCQ Portal is now the stable exam/report engine. The next product step is to
 4. Track mastery, retention, and gaps.
 5. Revisit through spaced repetition.
 
-The reference product identity is **Sarit Learn** with the tagline:
+The reference product identity is **Sarit Classes** with the tagline:
 
 > One subject. One month. Command it.
 
@@ -30,7 +30,7 @@ Useful files:
 - `screen-watch-talk.jsx`
 - `screen-test-track.jsx`
 - `screen-revisit-mobile.jsx`
-- `Sarit Learn.html`
+- `Sarit Classes.html`
 
 Key takeaways:
 
@@ -124,7 +124,7 @@ Do not rebuild from scratch.
 Use MCQ Portal as the stable engine and gradually add LMS layers:
 
 1. **Phase 1: Geography launch shell**
-   - Add Sarit Learn design tokens.
+   - Add Sarit Classes design tokens.
    - Add UPSC subject plan model/data.
    - Add Geography LMS route/dashboard.
    - Link existing MCQ engine as the Test step.

@@ -26,11 +26,12 @@ import {
 /* ------------------------------------------------------------------ */
 
 export const navLinks: { href: string; label: string }[] = [
-  { href: "/subjects", label: "Subjects" },
+  { href: "/prelims", label: "Prelims" },
+  { href: "/mains", label: "Mains" },
   { href: "/current-affairs", label: "Current Affairs" },
-  { href: "/pyqs", label: "Free PYQs" },
-  { href: "/tests", label: "Tests" },
-  { href: "/resources", label: "Resources" },
+  { href: "/test-series", label: "Test Series" },
+  { href: "/resources", label: "Free Resources" },
+  { href: "/subjects", label: "Subjects" },
   { href: "/pricing", label: "Pricing" },
 ];
 
@@ -40,10 +41,9 @@ export const footerColumns: { heading: string; links: { label: string; href: str
     links: [
       { label: "Daily loop", href: "/#loop" },
       { label: "Features", href: "/features" },
-      { label: "Live demo", href: "/demo" },
-      { label: "Tests & practice", href: "/tests" },
+      { label: "Test Series", href: "/test-series" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Results", href: "/upsc-prelims-2026-showcase" },
+      { label: "Results", href: "/results" },
     ],
   },
   {
@@ -75,6 +75,18 @@ export const footerColumns: { heading: string; links: { label: string; href: str
       { label: "Terms", href: "/terms" },
     ],
   },
+];
+
+/* ------------------------------------------------------------------ */
+/* Social Media Links                                                   */
+/* ------------------------------------------------------------------ */
+
+export const socialLinks: { label: string; href: string; icon: string }[] = [
+  { label: "YouTube", href: "https://youtube.com/@saritclasses", icon: "youtube" },
+  { label: "Telegram", href: "https://t.me/saritclasses", icon: "telegram" },
+  { label: "Twitter", href: "https://twitter.com/saritclasses", icon: "twitter" },
+  { label: "Instagram", href: "https://instagram.com/saritclasses", icon: "instagram" },
+  { label: "LinkedIn", href: "https://linkedin.com/company/saritclasses", icon: "linkedin" },
 ];
 
 /* ------------------------------------------------------------------ */

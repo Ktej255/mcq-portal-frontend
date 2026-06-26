@@ -7,7 +7,7 @@ import { guides, guideClusters } from "@/components/marketing/guides-data";
 import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "UPSC Guides — Strategy, Syllabus & Resources | Sarit Learn",
+  title: "UPSC Guides — Strategy, Syllabus & Resources | Sarit Classes",
   description:
     "Practical, no-fluff UPSC guides: how to start preparation, the syllabus explained, the best books, current-affairs strategy and a Prelims study plan.",
   path: "/guides",
@@ -17,7 +17,7 @@ export default function GuidesPage() {
   const blogSchema = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    name: "UPSC Guides — Sarit Learn",
+    name: "UPSC Guides — Sarit Classes",
     url: `${SITE_URL}/guides`,
     publisher: { "@type": "EducationalOrganization", name: ORG_NAME, url: SITE_URL },
     blogPost: guides.map((g) => ({
