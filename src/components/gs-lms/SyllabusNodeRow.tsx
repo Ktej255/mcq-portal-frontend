@@ -34,9 +34,18 @@ export function SyllabusNodeRow({
     }
   };
 
+  // Color-coded row background based on completion status
+  const rowBg = isLeaf
+    ? node.completed
+      ? "hover:bg-[#e7f5ee] bg-[#e7f5ee]/30"
+      : "hover:bg-[#f7f4ee]"
+    : (node.completion_percent ?? 0) > 0
+      ? "hover:bg-[#e7f5ee]/50"
+      : "hover:bg-[#f7f4ee]";
+
   return (
     <div
-      className="flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 rounded-lg hover:bg-[#f7f4ee] cursor-pointer transition-colors"
+      className={`flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 rounded-lg cursor-pointer transition-colors ${rowBg}`}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
       onClick={handleClick}
       role="treeitem"
