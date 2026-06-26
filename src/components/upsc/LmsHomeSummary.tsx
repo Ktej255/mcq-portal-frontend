@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Flame, RefreshCw, BookOpen, Target, Bell } from "lucide-react";
+import { ArrowRight, Flame, RefreshCw, BookOpen, Target, Bell, BadgeIndianRupee } from "lucide-react";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { paymentService, type SubscriptionResponse } from "@/services/api/paymentService";
 import type { DailyPlanOut, PlanItemOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
 
@@ -27,6 +28,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const { isLoaded, isSignedIn } = useApiConfig();
   const [plan, setPlan] = useState<DailyPlanOut | null>(null);
   const [recallGate, setRecallGate] = useState<RecallGateState | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,10 +40,12 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
     Promise.all([
       gsLmsService.getTodayPlan("geography").catch(() => null),
       gsLmsService.checkRecallGate("geography").catch(() => null),
+      paymentService.getSubscription().catch(() => null),
     ])
-      .then(([planData, gateData]) => {
+      .then(([planData, gateData, subData]) => {
         setPlan(planData);
         setRecallGate(gateData);
+        setSubscription(subData);
       })
       .finally(() => setLoading(false));
   }, [isLoaded, isSignedIn]);
@@ -63,10 +67,26 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   return (
     <section className="rounded-2xl border border-[#b9d9cd] bg-gradient-to-br from-[#e7f5ee] to-[#fffdf8] p-5 shadow-sm md:p-6">
       {/* Personalized Greeting */}
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-black text-[#1a3a2a] md:text-2xl">
           {timeGreeting}{firstName ? `, ${firstName}` : ""}! 👋
         </h1>
+        {/* Subscription Status Badge */}
+        {subscription && (
+          <Link
+            href="/upsc/billing"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition hover:opacity-80 ${
+              subscription.status === "active"
+                ? "bg-[#e7f5ee] text-[#085041] border border-[#b9d9cd]"
+                : "bg-[#f7f4ee] text-[#8c5d14] border border-[#dcd5c7]"
+            }`}
+          >
+            <BadgeIndianRupee className="h-3 w-3" />
+            {subscription.status === "active"
+              ? `${subscription.plan_tier} · ${subscription.remaining_days}d left`
+              : "Free plan · Upgrade"}
+          </Link>
+        )}
       </div>
 
       {/* Header: Streak + Progress */}
