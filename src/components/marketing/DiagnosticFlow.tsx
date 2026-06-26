@@ -16,19 +16,27 @@ type Answers = {
 
 type Contact = { name: string; email: string; phone: string };
 
-const yearOptions = ["2026", "2027", "2028 or later"];
-const stageOptions = ["Just starting out", "Built my NCERT foundation", "In revision mode", "Heavy test practice"];
-const hoursOptions = ["Under 2 hours", "2–4 hours", "4–6 hours", "6+ hours"];
-const optionalOptions = ["Still undecided", "Sociology", "PSIR", "Public Administration", "Anthropology", "Geography", "Already chosen"];
+const yearOptions = ["2027", "2028", "2029", "2030"];
+const stageOptions = ["Fresh start — beginning from scratch", "Self-study (6+ months in)", "Coaching student (online/offline)", "Repeat attempt (appeared before)"];
+const hoursOptions = ["2–3 hours", "4–5 hours", "6–8 hours", "8+ hours"];
+const optionalOptions = [
+  "Geography", "Sociology", "PSIR", "Public Administration", "Anthropology",
+  "History", "Philosophy", "Economics", "Law", "Mathematics",
+  "Commerce & Accountancy", "Medical Science", "Management", "Psychology",
+  "Hindi Literature", "English Literature", "Sanskrit Literature",
+  "Electrical Engineering", "Mechanical Engineering", "Civil Engineering",
+  "Agriculture", "Animal Husbandry", "Botany", "Chemistry", "Physics",
+  "Zoology", "Statistics", "Geology", "Not decided yet",
+];
 
 const STORAGE_KEY = "sarit-diagnostic-plan-v1";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const dailyMcqByHours: Record<string, number> = {
-  "Under 2 hours": 10,
-  "2–4 hours": 20,
-  "4–6 hours": 30,
-  "6+ hours": 40,
+  "2–3 hours": 15,
+  "4–5 hours": 25,
+  "6–8 hours": 35,
+  "8+ hours": 50,
 };
 
 const totalSteps = 5;
@@ -93,14 +101,26 @@ export function DiagnosticFlow() {
   if (phase === "result") {
     const focus = answers.subjects[0] ?? "Geography";
     const dailyMcqs = dailyMcqByHours[answers.hours] ?? 10;
+
+    // Compute months remaining until target Prelims (June of target year)
+    const targetYear = parseInt(answers.year) || 2027;
+    const targetPrelimsDate = new Date(targetYear, 5, 1); // June 1st
+    const now = new Date();
+    const monthsRemaining = Math.max(1, Math.round((targetPrelimsDate.getTime() - now.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
+
+    // Compute daily study plan based on hours
+    const hoursNum = answers.hours.startsWith("8") ? 8 : parseInt(answers.hours) || 4;
+    const topicsPerDay = Math.max(1, Math.min(4, Math.floor(hoursNum / 2)));
+
     const planItems = [
-      `Start with ${focus} — your first connected daily loop (Watch → Talk → Visual Lab → MCQ → Track → Revisit).`,
-      `Daily target: ${dailyMcqs} personalized MCQs + a short current-affairs quiz to build the habit.`,
-      "Keep a light daily current-affairs routine instead of hoarding magazines.",
-      "Take a weekly mock and turn every mistake into a spaced re-test.",
-      answers.optional === "Still undecided"
-        ? "Explore optional subjects before committing — we'll help you compare."
-        : `Optional: ${answers.optional} — we'll factor this into your Mains roadmap.`,
+      `You have ${monthsRemaining} months until UPSC Prelims ${targetYear}. That's enough time for systematic preparation.`,
+      `Start with ${focus} — your first connected daily loop (Discussion → Content → PYQ → Practice → Gap Analysis).`,
+      `Daily target: ${topicsPerDay} topic${topicsPerDay > 1 ? "s" : ""}/day (${answers.hours}) + ${dailyMcqs} MCQs + current affairs quiz.`,
+      "Week 1–2: Geography (foundation). Week 3–4: Add Polity. Progressive subject loading every 2 weeks.",
+      answers.optional === "Not decided yet"
+        ? "Explore optional subjects early — we'll help you compare based on your strengths."
+        : `Optional: ${answers.optional} — integrated into your Mains roadmap from week 3.`,
+      "Spaced revisits auto-scheduled at Day+3, Day+7, Day+21 for every topic you complete.",
     ];
 
     return (
@@ -276,8 +296,26 @@ export function DiagnosticFlow() {
         </Question>
       )}
       {step === 4 && (
-        <Question title="Have you picked an optional?" subtitle="We'll factor this into your Mains roadmap.">
-          <OptionGrid options={optionalOptions} value={answers.optional} onSelect={(v) => setAnswers((a) => ({ ...a, optional: v }))} columns="grid-cols-2 sm:grid-cols-3" />
+        <Question title="Have you picked an optional?" subtitle="Pick your Mains optional subject. You can change this later.">
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-[#dcd5c7] p-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {optionalOptions.map((o) => {
+                const active = answers.optional === o;
+                return (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setAnswers((a) => ({ ...a, optional: o }))}
+                    className={`rounded-lg border p-2.5 text-left text-xs font-bold transition ${
+                      active ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : "border-[#dcd5c7] bg-[#fffdf8] text-[#33443b] hover:border-[#1d9e75]/50"
+                    }`}
+                  >
+                    {o}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </Question>
       )}
 
