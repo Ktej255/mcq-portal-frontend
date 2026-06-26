@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, ClipboardCheck, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
 
 import { buildGeographyReportSnapshot, type GeographyReportWindow } from "@/lib/upsc/geographyReportEngine";
+import { LmsProgressCard } from "@/components/upsc/LmsProgressCard";
 import {
   buildDailyPlannerDecision,
   readLocalAutoSessionHandoff,
@@ -227,6 +228,9 @@ export default function ReportsPage() {
   return (
     <main className="text-[#13251d]">
       <div>
+        {/* LMS Backend Progress — real data from the Geography LMS */}
+        <LmsProgressCard />
+
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
