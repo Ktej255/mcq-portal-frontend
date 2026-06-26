@@ -3,13 +3,16 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export default function LmsEntryPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useApiConfig();
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
     gsLmsService
-      .getOnboardingStatus()
+      .getOnboardingStatus("geography")
       .then((status) => {
         if (status.completed) {
           router.replace("/upsc/geography/lms/syllabus");
@@ -21,7 +24,7 @@ export default function LmsEntryPage() {
         // Fallback to syllabus on error
         router.replace("/upsc/geography/lms/syllabus");
       });
-  }, [router]);
+  }, [router, isLoaded, isSignedIn]);
 
   return (
     <div className="min-h-[40vh] flex items-center justify-center">

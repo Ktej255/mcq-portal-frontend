@@ -20,7 +20,7 @@ export function PdfDownloadButton({ nodeId, topicCompleted, topicTitle }: PdfDow
     setError(null);
 
     try {
-      const blob = await gsLmsService.getTopicPdf(nodeId);
+      const blob = await gsLmsService.getTopicPdf("geography", nodeId);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

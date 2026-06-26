@@ -18,14 +18,14 @@ export function PYQPanel({ nodeId }: PYQPanelProps) {
   useEffect(() => {
     setLoading(true);
     gsLmsService
-      .getTopicPyqs(nodeId, activeTab)
+      .getTopicPyqs("geography", nodeId, activeTab)
       .then((res) => setPyqs(res.pyqs))
       .catch(() => setPyqs([]))
       .finally(() => setLoading(false));
   }, [nodeId, activeTab]);
 
   const handleReveal = async (pyqId: number) => {
-    const updated = await gsLmsService.revealPyqAnswer(pyqId);
+    const updated = await gsLmsService.revealPyqAnswer("geography", pyqId);
     setPyqs((prev) =>
       prev.map((p) => (p.id === pyqId ? { ...p, ...updated, revealed: true } : p))
     );

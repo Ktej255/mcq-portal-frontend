@@ -1,24 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { SyllabusNodeOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
 import { LmsEmptyState } from "@/components/gs-lms/LmsEmptyState";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export default function PracticeTopicSelectorPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useApiConfig();
   const [leafTopics, setLeafTopics] = useState<SyllabusNodeOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchTopics = useCallback(() => {
+    setLoading(true);
+    setError(null);
     gsLmsService
-      .getSyllabusTree()
+      .getSyllabusTree("geography")
       .then((data) => {
-        // Extract all leaf topics from the tree
         const leaves: SyllabusNodeOut[] = [];
         const collectLeaves = (nodes: SyllabusNodeOut[]) => {
           for (const node of nodes) {
@@ -39,10 +42,15 @@ export default function PracticeTopicSelectorPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    fetchTopics();
+  }, [isLoaded, isSignedIn, fetchTopics]);
+
   const handleStartPractice = async (nodeId: number) => {
     setStarting(nodeId);
     try {
-      const session = await gsLmsService.startPractice(nodeId);
+      const session = await gsLmsService.startPractice("geography", nodeId);
       // Store session so the session page can restore on mount
       sessionStorage.setItem(
         `practice-session-${session.session_id}`,
@@ -67,6 +75,13 @@ export default function PracticeTopicSelectorPage() {
     return (
       <div className="p-6">
         <p className="text-sm text-red-600">{error}</p>
+        <button
+          type="button"
+          onClick={fetchTopics}
+          className="mt-3 rounded-md border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+        >
+          Retry
+        </button>
       </div>
     );
   }

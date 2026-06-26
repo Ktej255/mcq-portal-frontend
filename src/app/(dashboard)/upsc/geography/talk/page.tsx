@@ -1,20 +1,8 @@
-import { GeographyTalkRoom } from "@/components/upsc/GeographyTalkRoom";
-
-export default async function GeographyTalkPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ day?: string; module?: string; section?: string; startDay?: string }>;
-}) {
-  const params = await searchParams;
-  const day = Number(params?.day ?? "1");
-  const startDay = params?.startDay ? Number(params.startDay) : NaN;
-
-  return (
-    <GeographyTalkRoom
-      initialDay={Number.isFinite(day) ? day : 1}
-      initialModuleId={params?.module}
-      initialSectionId={params?.section}
-      dayStartReturnDay={Number.isFinite(startDay) ? startDay : undefined}
-    />
-  );
+/**
+ * @deprecated Redirects to the Geography LMS syllabus page.
+ * The Talk/Discussion room is now the AI Discussion gate inside each LMS topic.
+ */
+import { redirect } from "next/navigation";
+export default function GeographyTalkPage() {
+  redirect("/upsc/geography/lms/syllabus");
 }

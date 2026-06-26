@@ -23,25 +23,17 @@ export const env = {
   // any http(s) URL, or a bare media key. When unset, onboarding falls back to
   // the methodology slideshow (no fabricated video).
   NEXT_PUBLIC_UPSC_ORIENTATION_VIDEO_REF: process.env.NEXT_PUBLIC_UPSC_ORIENTATION_VIDEO_REF,
-  NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 const isMockAuth = env.NEXT_PUBLIC_USE_MOCK_AUTH === 'true';
 
-export type AuthProviderName = 'mock' | 'firebase' | 'supabase' | 'clerk';
+export type AuthProviderName = 'mock' | 'supabase' | 'clerk';
 
 export const activeAuthProvider: AuthProviderName = isMockAuth
   ? 'mock'
-  : env.NEXT_PUBLIC_AUTH_PROVIDER === 'clerk'
-    ? 'clerk'
-    : env.NEXT_PUBLIC_AUTH_PROVIDER === 'supabase'
-      ? 'supabase'
-      : 'firebase';
+  : env.NEXT_PUBLIC_AUTH_PROVIDER === 'supabase'
+    ? 'supabase'
+    : 'clerk';
 
 const hasValidClerkPublishableKey =
   typeof env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === 'string' &&
@@ -68,18 +60,5 @@ export const missingSupabaseEnvVars = [
   .map(([key]) => key);
 
 export const supabaseConfigReady = activeAuthProvider !== 'supabase' || missingSupabaseEnvVars.length === 0;
-
-export const missingFirebaseEnvVars = [
-  ['NEXT_PUBLIC_FIREBASE_API_KEY', env.NEXT_PUBLIC_FIREBASE_API_KEY],
-  ['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN],
-  ['NEXT_PUBLIC_FIREBASE_PROJECT_ID', env.NEXT_PUBLIC_FIREBASE_PROJECT_ID],
-  ['NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET],
-  ['NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID', env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID],
-  ['NEXT_PUBLIC_FIREBASE_APP_ID', env.NEXT_PUBLIC_FIREBASE_APP_ID],
-]
-  .filter(([, value]) => !value)
-  .map(([key]) => key);
-
-export const firebaseConfigReady = isMockAuth || missingFirebaseEnvVars.length === 0;
 
 export const legacyApiEnabled = env.NEXT_PUBLIC_ENABLE_LEGACY_API === 'true';

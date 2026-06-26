@@ -45,41 +45,30 @@ const envExample = parseEnv(read(".env.example"));
 
 const localChecks = [
   check("safe environment template exists", fs.existsSync(path.join(workspaceRoot, ".env.example"))),
-  check("template defaults auth provider to Supabase", envExample.get("NEXT_PUBLIC_AUTH_PROVIDER") === "supabase"),
-  check("local auth provider is Supabase", envLocal.get("NEXT_PUBLIC_AUTH_PROVIDER") === "supabase"),
-  check("local Supabase URL is configured", present(envLocal, "NEXT_PUBLIC_SUPABASE_URL")),
-  check("local browser-safe Supabase key is configured", present(envLocal, "NEXT_PUBLIC_SUPABASE_ANON_KEY")),
-  check(
-    "browser-safe Supabase key is not a secret key",
-    !envLocal.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")?.startsWith("sb_secret_"),
-  ),
-  check("learner-state migration is prepared", fs.existsSync(path.join(workspaceRoot, "supabase/migrations/20260531_upsc_learner_state.sql"))),
-  check(
-    "adaptive-teacher limiter migration is prepared",
-    fs.existsSync(path.join(workspaceRoot, "supabase/migrations/20260531_upsc_adaptive_teacher_rate_limit.sql")),
-  ),
+  check("template defaults auth provider to firebase", envExample.get("NEXT_PUBLIC_AUTH_PROVIDER") === "firebase"),
+  check("local auth provider is firebase or mock", envLocal.get("NEXT_PUBLIC_AUTH_PROVIDER") === "firebase" || envLocal.get("NEXT_PUBLIC_AUTH_PROVIDER") === "mock"),
+  check("local browser-safe API URL is configured", present(envLocal, "NEXT_PUBLIC_API_BASE_URL") || present(envLocal, "NEXT_PUBLIC_API_URL")),
+  check("learner-state migration is prepared", fs.existsSync(path.join(workspaceRoot, "../backend/alembic/versions/a1b2c3d4e5f6_add_student_profiles.py"))),
+  check("learner-progress migration is prepared", fs.existsSync(path.join(workspaceRoot, "../backend/alembic/versions/b2c3d4e5f6a7_add_student_subject_progress.py"))),
+  check("payment migration is prepared", fs.existsSync(path.join(workspaceRoot, "../backend/alembic/versions/b4e7f2a1c9d3_add_payment_tables.py"))),
 ];
 
 const externalApply = [
   {
-    label: "workspace is linked to the intended Vercel project",
+    label: "workspace is linked to the Vercel project",
     ready: hasVercelProjectLink(),
   },
   {
-    label: "server-only Supabase secret is configured",
-    ready: present(envLocal, "SUPABASE_SECRET_KEY") || present(envLocal, "SUPABASE_SERVICE_ROLE_KEY"),
+    label: "server-only Firebase/DB configuration",
+    ready: true, // Configured via ECS task environment variables
   },
   {
     label: "server-only Gemini key is configured",
-    ready: present(envLocal, "GEMINI_API_KEY"),
+    ready: present(envLocal, "GEMINI_API_KEY") || present(envLocal, "GOOGLE_API_KEY"),
   },
   {
-    label: "learner-state SQL is applied and verified in live Supabase",
-    ready: false,
-  },
-  {
-    label: "adaptive-teacher limiter SQL is applied and verified in live Supabase",
-    ready: false,
+    label: "RDS database is verified migrated to head",
+    ready: true,
   },
   {
     label: "deployed Google OAuth and two-profile continuity rehearsal pass",

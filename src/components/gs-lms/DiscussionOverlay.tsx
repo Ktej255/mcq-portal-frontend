@@ -5,9 +5,65 @@ import type { DiscussionTurnOut } from "@/services/api/gsLmsService";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { DiscussionThread } from "./DiscussionThread";
 
+interface ConceptProgress {
+  conceptsMatched: string[];
+  conceptsMissed: string[];
+  matchPercentage: number;
+}
+
 interface DiscussionOverlayProps {
   nodeId: number;
   onComplete: () => void;
+}
+
+function ConceptProgressIndicator({ progress }: { progress: ConceptProgress }) {
+  const { conceptsMatched, conceptsMissed, matchPercentage } = progress;
+  const total = conceptsMatched.length + conceptsMissed.length;
+  const covered = conceptsMatched.length;
+
+  const barColor =
+    matchPercentage >= 80
+      ? "bg-[#1d9e75]"
+      : matchPercentage >= 50
+        ? "bg-[#ef9f27]"
+        : "bg-[#dcd5c7]";
+
+  return (
+    <div className="mx-4 mt-3 p-3 rounded-xl border border-[#dcd5c7] bg-[#f7f4ee]">
+      {/* Progress bar header */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-[#13251d]/60">
+          {covered}/{total} concepts covered
+        </span>
+        <span className="text-xs font-medium text-[#13251d]/60">
+          {Math.round(matchPercentage)}%
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 rounded-full bg-[#dcd5c7] overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${matchPercentage}%` }}
+        />
+      </div>
+
+      {/* Matched concepts list */}
+      {conceptsMatched.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          {conceptsMatched.map((concept) => (
+            <span
+              key={concept}
+              className="text-xs text-[#13251d]/60 flex items-center gap-1"
+            >
+              <span className="text-[#1d9e75]">✓</span>
+              {concept}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps) {
@@ -16,11 +72,12 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [conceptProgress, setConceptProgress] = useState<ConceptProgress | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     gsLmsService
-      .startDiscussion(nodeId)
+      .startDiscussion("geography", nodeId)
       .then((session) => {
         setSessionId(session.session_id);
         setTurns(session.turns);
@@ -43,8 +100,21 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
     setSending(true);
 
     try {
-      const response = await gsLmsService.submitDiscussionTurn(sessionId, content);
+      const response = await gsLmsService.submitDiscussionTurn("geography", sessionId, content);
       setTurns((prev) => [...prev, response.student_turn, response.ai_turn]);
+
+      // Update concept progress if data is available
+      if (
+        response.concepts_matched !== null &&
+        response.concepts_missed !== null &&
+        response.match_percentage !== null
+      ) {
+        setConceptProgress({
+          conceptsMatched: response.concepts_matched,
+          conceptsMissed: response.concepts_missed,
+          matchPercentage: response.match_percentage,
+        });
+      }
 
       if (response.gate_passed) {
         onComplete();
@@ -65,6 +135,9 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
           </p>
         </div>
       </div>
+
+      {/* Concept progress indicator — only shown when concept data exists */}
+      {conceptProgress && <ConceptProgressIndicator progress={conceptProgress} />}
 
       {/* Chat area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">

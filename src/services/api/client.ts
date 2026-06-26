@@ -20,7 +20,6 @@ export const apiClient = axios.create({
   },
 });
 
-import { auth } from '@/lib/firebase/config';
 const apiDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
 // Initialize debug object
@@ -56,14 +55,10 @@ apiClient.interceptors.request.use(
       // HARD GATE: Wait for token before any request
       const token = await waitForToken();
 
-      if (!token && !auth) {
-        console.error("[MCQ_DEBUG] FATAL: Auth instance missing and no MOCK_TOKEN available");
-        return config;
-      }
-      
       if (debug) {
-        debug.user = auth?.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null;
-        debug.authState = auth?.currentUser ? 'SIGNED_IN' : 'SIGNED_OUT';
+        const clerkUser = typeof window !== 'undefined' ? (window as any).Clerk?.user : null;
+        debug.user = clerkUser ? { uid: clerkUser.id, email: clerkUser.primaryEmailAddress?.emailAddress } : null;
+        debug.authState = clerkUser ? 'SIGNED_IN' : 'SIGNED_OUT';
         debug.tokenPresent = !!token;
       }
 

@@ -67,6 +67,26 @@ export function ContentSectionCard({ section, isActive, onComplete }: ContentSec
     );
   }
 
+  // Skippable state (unlocked but not required for completion)
+  if (section.skippable && !isActive) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#dcd5c7] bg-[#f7f4ee] cursor-pointer hover:border-[#1d9e75]/30 transition-colors">
+        <svg className="w-5 h-5 text-[#1d9e75]/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+        </svg>
+        <span className="text-sm font-medium text-[#13251d]/60">{section.title}</span>
+        <span className="ml-auto flex items-center gap-1.5">
+          <span className="text-[10px] bg-[#1d9e75]/10 text-[#1d9e75] px-2 py-0.5 rounded-full font-semibold">
+            Optional
+          </span>
+          <span className="text-xs text-[#13251d]/30 uppercase font-semibold">
+            {section.section_label.replace("_", " ")}
+          </span>
+        </span>
+      </div>
+    );
+  }
+
   // Active state (expanded with content)
   return (
     <div className="rounded-xl border-2 border-[#1d9e75] bg-[#fffdf8] p-5">

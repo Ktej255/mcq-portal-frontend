@@ -159,6 +159,10 @@ export const studentNavSections: StudentNavSection[] = [
   },
   {
     label: "Geography LMS",
+    // Geography LMS uses /upsc/geography/lms/* (static route).
+    // When other subjects launch their LMS, add new sections here with
+    // /upsc/{subject}/lms/* paths (e.g., /upsc/economy/lms/syllabus).
+    // The dynamic [subject]/lms route handles subjects without a static directory.
     items: [
       {
         name: "Syllabus",
@@ -183,6 +187,12 @@ export const studentNavSections: StudentNavSection[] = [
         href: "/upsc/geography/lms/planner",
         icon: FolderTree,
         match: (pathname) => pathname.startsWith("/upsc/geography/lms/planner"),
+      },
+      {
+        name: "Retro",
+        href: "/upsc/geography/lms/retro",
+        icon: RefreshCcw,
+        match: (pathname) => pathname.startsWith("/upsc/geography/lms/retro"),
       },
     ],
   },

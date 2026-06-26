@@ -1,4 +1,3 @@
-import { auth } from '@/lib/firebase/config';
 import { activeAuthProvider, env } from '@/env';
 import { supabase } from '@/lib/supabase/client';
 import { readLocalMockToken } from '@/lib/auth/local-testing';
@@ -29,18 +28,6 @@ export async function resolveToken(forceRefresh = false): Promise<string | null>
       }
     } catch (err) {
       console.error("FORENSIC | TOKEN_STRATEGY | Clerk token retrieval failed:", err);
-    }
-  }
-
-  // 2. Check Firebase Authentication
-  if (auth && auth.currentUser) {
-    try {
-      const token = await auth.currentUser.getIdToken(forceRefresh);
-      if (token) {
-        return token;
-      }
-    } catch (err) {
-      console.error("FORENSIC | TOKEN_STRATEGY | Firebase token retrieval failed:", err);
     }
   }
 

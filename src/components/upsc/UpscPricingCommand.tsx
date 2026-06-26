@@ -17,7 +17,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   productMonthlyBasePrice,
   pricingCheckoutPath,
@@ -25,11 +24,9 @@ import {
   recommendedProductPlanId,
   yearlyPlannerBlocks,
   billingCycles,
-  planBases,
   coreSubjectBlueprints,
   optionalSubjects,
   type BillingCycle,
-  type PlanTier,
 } from "@/lib/upsc/yearlyPlanner";
 import { pricingPlanIntentLabel, publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
@@ -42,7 +39,7 @@ function money(value: number) {
 export function UpscPricingCommand() {
   const { profile, saveProfile, isLoaded } = useDashboardData();
   const [selectedCycle, setSelectedCycle] = useState<BillingCycle>(
-    profile?.billingCycle ?? "monthly"
+    profile?.billingCycle ?? "three-year"
   );
   
   // Accordion toggle states to keep the page minimalist
@@ -120,28 +117,38 @@ export function UpscPricingCommand() {
                 2-year, or 3-year commitments. Start for ₹399/mo, upgrade anytime.
               </p>
               
-              {/* Billing Cycle Selector Buttons */}
-              <div className="mt-5 flex flex-wrap gap-2 rounded-xl border border-[#e8e2d5] bg-[#fdfaf3] p-1.5 w-fit">
+              {/* Billing Duration Toggle — ChatGPT-style pill strip */}
+              <div className="mt-5 inline-flex rounded-full bg-[#1a3a2a]/5 p-1">
                 {billingCycles.map((cycleItem) => (
                   <button
                     key={cycleItem.cycle}
                     type="button"
                     onClick={() => setSelectedCycle(cycleItem.cycle)}
-                    className={`rounded-lg px-4 py-2 text-xs font-black transition-all ${
+                    className={`relative rounded-full px-5 py-2.5 text-sm font-black transition-all duration-200 ${
                       selectedCycle === cycleItem.cycle
-                        ? "bg-[#1a3a2a] text-white"
-                        : "text-[#495c52] hover:bg-[#e7f5ee] hover:text-[#13251d]"
+                        ? "bg-[#1a3a2a] text-white shadow-md"
+                        : "text-[#495c52] hover:text-[#13251d]"
                     }`}
                   >
                     {cycleItem.label}
-                    {cycleItem.discountPercent > 0 && (
-                      <span className="ml-1.5 rounded bg-[#1d9e75] px-1 py-0.5 text-[9px] text-white">
+                    {cycleItem.discountPercent > 0 && selectedCycle !== cycleItem.cycle && (
+                      <span className="ml-1.5 rounded-full bg-[#1d9e75]/15 px-1.5 py-0.5 text-[9px] font-black text-[#085041]">
+                        -{cycleItem.discountPercent}%
+                      </span>
+                    )}
+                    {cycleItem.discountPercent > 0 && selectedCycle === cycleItem.cycle && (
+                      <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-black text-white">
                         -{cycleItem.discountPercent}%
                       </span>
                     )}
                   </button>
                 ))}
               </div>
+              {selectedCycle !== "monthly" && (
+                <p className="mt-2 text-xs font-bold text-[#1d9e75]">
+                  🎉 You save {billingCycles.find(c => c.cycle === selectedCycle)?.discountPercent}% with {billingCycles.find(c => c.cycle === selectedCycle)?.label} billing
+                </p>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
@@ -177,74 +184,73 @@ export function UpscPricingCommand() {
                 data-savings={savings}
                 data-discount-percent={plan.discountPercent}
                 data-effective-monthly={plan.effectiveMonthly}
-                className={`flex flex-col justify-between rounded-xl border p-5 shadow-sm transition hover:border-[#1d9e75]/50 ${
+                className={`group relative flex flex-col justify-between rounded-2xl border-2 p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                   isActivePlan 
-                    ? "border-[#1d9e75] bg-[#e7f5ee]" 
+                    ? "border-[#1d9e75] bg-[#e7f5ee] shadow-md" 
                     : isRecommended
-                    ? "border-[#1a3a2a] bg-[#fffdf8] ring-1 ring-[#1a3a2a]"
-                    : "border-[#dcd5c7] bg-[#fffdf8]"
+                    ? "border-[#1a3a2a] bg-[#fffdf8] shadow-md"
+                    : "border-[#e8e2d5] bg-[#fffdf8] hover:border-[#1d9e75]/40"
                 }`}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#1a3a2a] text-white">
-                      <BadgeIndianRupee className="h-4 w-4" />
-                    </div>
+                {/* Badge */}
+                {(isActivePlan || isRecommended || plan.discountPercent > 0) && (
+                  <div className="absolute -top-3 left-5">
                     {isActivePlan ? (
-                      <Badge className="rounded-md bg-[#085041] px-2 py-1 text-white">
+                      <span className="rounded-full bg-[#085041] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
                         Active Plan
-                      </Badge>
+                      </span>
                     ) : isRecommended ? (
-                      <Badge className="rounded-md bg-[#1a3a2a] px-2 py-1 text-white">
-                        Recommended
-                      </Badge>
+                      <span className="rounded-full bg-[#1a3a2a] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                        ⭐ Recommended
+                      </span>
                     ) : plan.discountPercent > 0 ? (
-                      <Badge className="rounded-md bg-[#1d9e75] px-2 py-1 text-white">
-                        {plan.discountPercent}% off
-                      </Badge>
+                      <span className="rounded-full bg-[#1d9e75] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                        Save {plan.discountPercent}%
+                      </span>
                     ) : null}
                   </div>
+                )}
+
+                <div>
+                  {/* Tier name */}
+                  <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                    {plan.tier}
+                  </p>
                   
-                  <div className="mt-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
-                      {plan.tier}
+                  {/* Price — large and prominent */}
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="text-4xl font-black text-[#13251d]">{money(plan.effectiveMonthly)}</span>
+                    <span className="text-sm font-semibold text-[#5d675f]">/mo</span>
+                  </div>
+                  
+                  {/* Billing info */}
+                  <p className="mt-1.5 text-xs font-bold text-[#746f66]">
+                    {plan.months === 1 
+                      ? "Billed monthly" 
+                      : `${money(plan.launchPrice)} billed once for ${plan.months} months`}
+                  </p>
+                  {savings > 0 && (
+                    <p className="mt-1 text-xs font-black text-[#1d9e75]">
+                      You save {money(savings)}
                     </p>
-                    <h3 className="mt-1 text-xl font-black tracking-tight">{plan.title}</h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="text-3xl font-black">{money(plan.effectiveMonthly)}</span>
-                      <span className="text-xs font-semibold text-[#5d675f]">/ mo effective</span>
-                    </div>
-                    <p className="mt-1 text-xs font-bold text-[#746f66]">
-                      {plan.months === 1 
-                        ? "Billed monthly" 
-                        : `Billed ${money(plan.launchPrice)} every ${plan.months} months`}
-                    </p>
+                  )}
+
+                  {/* Promise / tagline */}
+                  <p className="mt-4 text-sm font-semibold leading-6 text-[#31443a]">
+                    {plan.promise}
+                  </p>
+
+                  {/* Usage limits */}
+                  <div className="mt-4 flex items-center gap-1.5 rounded-lg bg-[#f7f4ee] px-3 py-2">
+                    <Clock className="h-3.5 w-3.5 text-[#1d9e75]" />
+                    <p className="text-xs font-bold text-[#31443a]">{plan.limits}</p>
                   </div>
 
-                  <div className="mt-3 rounded-md bg-[#f7f4ee]/70 p-2.5 text-xs font-semibold text-[#31443a]">
-                    <p className="font-bold text-[#13251d]">{plan.promise}</p>
-                    {savings > 0 && (
-                      <p className="mt-1 text-[#085041] font-bold">
-                        Save {money(savings)} vs monthly billing
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Limits and Rate Limits Display */}
-                  <div className="mt-4 border-t border-[#e8e2d5] pt-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75] flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> Usage & Rate Limits
-                    </p>
-                    <p className="mt-1 text-xs font-bold leading-5 text-[#31443a]">
-                      {plan.limits}
-                    </p>
-                  </div>
-
-                  {/* Plan Features */}
-                  <ul className="mt-4 space-y-2 border-t border-[#e8e2d5] pt-3">
+                  {/* Features */}
+                  <ul className="mt-5 space-y-2.5">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex gap-2 text-xs font-medium leading-5 text-[#31443a]">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1d9e75]" />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -254,15 +260,15 @@ export function UpscPricingCommand() {
                 <Link
                   href={pricingCheckoutPath(plan.id)}
                   data-testid="upsc-pricing-plan-select"
-                  className={`mt-6 inline-flex min-h-10 w-full items-center justify-center rounded-lg px-3 text-sm font-black transition ${
+                  className={`mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl px-3 text-sm font-black transition-all duration-200 ${
                     isActivePlan
-                      ? "bg-[#1d9e75]/25 text-[#085041] pointer-events-none border border-[#1d9e75]/35"
+                      ? "bg-[#1d9e75]/20 text-[#085041] pointer-events-none border border-[#1d9e75]/30"
                       : isRecommended
-                      ? "bg-[#1a3a2a] text-white hover:bg-[#10291d]"
-                      : "bg-[#1a3a2a]/90 text-white hover:bg-[#1a3a2a]"
+                      ? "bg-[#1a3a2a] text-white hover:bg-[#10291d] shadow-sm"
+                      : "border-2 border-[#1a3a2a] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white"
                   }`}
                 >
-                  {isActivePlan ? "Current Plan" : pricingPlanIntentLabel(plan.title)}{" "}
+                  {isActivePlan ? "✓ Current Plan" : pricingPlanIntentLabel(plan.title)}{" "}
                   {!isActivePlan && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Link>
               </article>

@@ -1,12 +1,8 @@
-import { GeographyMcqReadinessRoom } from "@/components/upsc/GeographyMcqReadinessRoom";
-
-export default async function GeographyMcqReadinessPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ day?: string }>;
-}) {
-  const params = await searchParams;
-  const day = Number(params?.day ?? "1");
-
-  return <GeographyMcqReadinessRoom initialDay={Number.isFinite(day) ? day : 1} />;
+/**
+ * @deprecated Redirects to the Geography LMS practice page.
+ * MCQ practice is now handled inside the LMS with per-topic sequential sessions.
+ */
+import { redirect } from "next/navigation";
+export default function GeographyMcqReadinessPage() {
+  redirect("/upsc/geography/lms/practice");
 }

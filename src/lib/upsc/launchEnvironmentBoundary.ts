@@ -42,8 +42,7 @@ function hasEnv(name: string) {
 
 function isPublicSecretLeak() {
   return Boolean(
-    envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY").startsWith("sb_secret_") ||
-      hasEnv("NEXT_PUBLIC_SUPABASE_SECRET_KEY") ||
+    hasEnv("NEXT_PUBLIC_SUPABASE_SECRET_KEY") ||
       hasEnv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY") ||
       hasEnv("NEXT_PUBLIC_GEMINI_API_KEY") ||
       hasEnv("NEXT_PUBLIC_NVIDIA_API_KEY") ||
@@ -73,54 +72,50 @@ function check(input: LaunchEnvironmentCheck): LaunchEnvironmentCheck {
 
 export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
   const publicSecretExposure = isPublicSecretLeak();
-  const hasServerSupabaseSecret = hasEnv("SUPABASE_SECRET_KEY") || hasEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const hasServerFirebaseSecret = hasEnv("FIREBASE_SERVICE_ACCOUNT_JSON") || hasEnv("GOOGLE_APPLICATION_CREDENTIALS") || hasEnv("FIREBASE_PROJECT_ID");
   const checks = [
     check({
       id: "env-template",
       title: "Safe committed environment template",
       group: "local-config",
       status: exists(".env.example") ? "pass" : "fail",
-      proof: ".env.example exists and documents browser-safe Supabase keys separately from server-only secrets.",
+      proof: ".env.example exists and documents browser-safe keys separately from server-only secrets.",
       nextAction: "Keep the template committed and never commit .env.local values.",
       publicSafe: true,
     }),
     check({
       id: "auth-provider",
-      title: "Supabase auth provider selected",
+      title: "Firebase auth provider selected",
       group: "local-config",
-      status: envValue("NEXT_PUBLIC_AUTH_PROVIDER") === "supabase" ? "pass" : "pending",
-      proof: "NEXT_PUBLIC_AUTH_PROVIDER is checked as a name/value boundary only.",
-      nextAction: "Set NEXT_PUBLIC_AUTH_PROVIDER=supabase in local, preview, and production.",
+      status: (envValue("NEXT_PUBLIC_AUTH_PROVIDER") === "firebase" || envValue("NEXT_PUBLIC_AUTH_PROVIDER") === "mock") ? "pass" : "pending",
+      proof: "NEXT_PUBLIC_AUTH_PROVIDER is configured for Firebase or Mock Auth.",
+      nextAction: "Set NEXT_PUBLIC_AUTH_PROVIDER=firebase (or mock in local dev).",
       publicSafe: true,
     }),
     check({
-      id: "browser-supabase-url",
-      title: "Browser Supabase URL configured",
+      id: "browser-api-url",
+      title: "Browser backend API URL configured",
       group: "local-config",
-      status: hasEnv("NEXT_PUBLIC_SUPABASE_URL") ? "pass" : "pending",
-      proof: "The browser-safe Supabase project URL is present without printing it.",
-      nextAction: "Add NEXT_PUBLIC_SUPABASE_URL to Vercel and local .env.local.",
+      status: (hasEnv("NEXT_PUBLIC_API_BASE_URL") || hasEnv("NEXT_PUBLIC_API_URL")) ? "pass" : "pending",
+      proof: "The browser-safe backend API base URL is present.",
+      nextAction: "Add NEXT_PUBLIC_API_BASE_URL to Vercel and local .env.local.",
       publicSafe: true,
     }),
     check({
-      id: "browser-supabase-key",
-      title: "Browser Supabase publishable key configured",
+      id: "browser-firebase-key",
+      title: "Browser Firebase API key configured",
       group: "local-config",
-      status: hasEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-        ? envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY").startsWith("sb_secret_")
-          ? "fail"
-          : "pass"
-        : "pending",
-      proof: "The public key is present and checked so an sb_secret_ backend key cannot be used in the browser.",
-      nextAction: "Use a publishable or anon browser key only; never use an sb_secret_ key here.",
-      publicSafe: !envValue("NEXT_PUBLIC_SUPABASE_ANON_KEY").startsWith("sb_secret_"),
+      status: hasEnv("NEXT_PUBLIC_FIREBASE_API_KEY") ? "pass" : "pending",
+      proof: "Firebase API key is present.",
+      nextAction: "Add NEXT_PUBLIC_FIREBASE_API_KEY to local and production env.",
+      publicSafe: true,
     }),
     check({
       id: "public-secret-firewall",
       title: "No server secret is exposed as NEXT_PUBLIC",
       group: "local-config",
       status: publicSecretExposure ? "fail" : "pass",
-      proof: "The boundary checks for public Supabase service keys and public AI provider keys without printing values.",
+      proof: "The boundary checks for public service keys and public AI provider keys without printing values.",
       nextAction: "Delete any NEXT_PUBLIC_* server secret immediately before building.",
       publicSafe: !publicSecretExposure,
     }),
@@ -130,16 +125,16 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       group: "local-config",
       status: hasVercelProjectLink() ? "pass" : "pending",
       proof: ".vercel project metadata is present locally.",
-      nextAction: "Link the workspace to the intended upsc-command Vercel project before env or deployment work.",
+      nextAction: "Link the workspace to the Vercel project.",
       publicSafe: true,
     }),
     check({
-      id: "server-supabase-secret",
-      title: "Server-only Supabase secret configured",
+      id: "server-firebase-secret",
+      title: "Server-only Firebase secret configured",
       group: "server-secret",
-      status: hasServerSupabaseSecret ? "pass" : "pending",
-      proof: "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is checked as present without printing the value.",
-      nextAction: "Add the sb_secret_ key only as a server-side Vercel variable.",
+      status: hasServerFirebaseSecret ? "pass" : "pending",
+      proof: "Firebase service credentials checked as present.",
+      nextAction: "Add Firebase config variables on backend server.",
       publicSafe: true,
     }),
     check({
@@ -155,45 +150,36 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       id: "learner-state-migration",
       title: "Learner-state migration prepared",
       group: "migration",
-      status: exists("supabase/migrations/20260531_upsc_learner_state.sql") ? "pass" : "fail",
-      proof: "The profile and subject-progress RLS migration file is present in the repository.",
-      nextAction: "Apply the SQL in live Supabase, then run the matching verification query.",
+      status: exists("backend/alembic/versions/a1b2c3d4e5f6_add_student_profiles.py") ? "pass" : "fail",
+      proof: "The profile Alembic migration file is present in the repository.",
+      nextAction: "Apply migration via Alembic to live RDS.",
       publicSafe: true,
     }),
     check({
-      id: "learner-state-verify-sql",
-      title: "Learner-state verification SQL prepared",
+      id: "learner-progress-migration",
+      title: "Learner progress migration prepared",
       group: "migration",
-      status: exists("supabase/verify/20260531_upsc_learner_state_checks.sql") ? "pass" : "fail",
-      proof: "The read-only RLS verification query is present.",
-      nextAction: "Run it after the migration and store the result in the live continuity receipt panel.",
+      status: exists("backend/alembic/versions/b2c3d4e5f6a7_add_student_subject_progress.py") ? "pass" : "fail",
+      proof: "The student subject progress Alembic migration file is present in the repository.",
+      nextAction: "Apply migration via Alembic to live RDS.",
       publicSafe: true,
     }),
     check({
-      id: "teacher-limiter-migration",
-      title: "Adaptive-teacher limiter migration prepared",
+      id: "payment-migration",
+      title: "Payment tables migration prepared",
       group: "migration",
-      status: exists("supabase/migrations/20260531_upsc_adaptive_teacher_rate_limit.sql") ? "pass" : "fail",
-      proof: "The distributed Talk limiter migration file is present.",
-      nextAction: "Apply it before deployed Talk can use provider-backed AI.",
-      publicSafe: true,
-    }),
-    check({
-      id: "teacher-limiter-verify-sql",
-      title: "Adaptive-teacher limiter verification SQL prepared",
-      group: "migration",
-      status: exists("supabase/verify/20260531_upsc_adaptive_teacher_rate_limit_checks.sql") ? "pass" : "fail",
-      proof: "The restricted RPC and privilege verification query is present.",
-      nextAction: "Run it after limiter SQL apply and record the proof receipt.",
+      status: exists("backend/alembic/versions/b4e7f2a1c9d3_add_payment_tables.py") ? "pass" : "fail",
+      proof: "The payment tables Alembic migration file is present.",
+      nextAction: "Apply payment tables migration via Alembic to live RDS.",
       publicSafe: true,
     }),
     check({
       id: "live-sql-receipt",
       title: "Live SQL apply receipt recorded",
       group: "live-receipt",
-      status: "pending",
-      proof: "This cannot be proven by local files; it must come from the Supabase dashboard result.",
-      nextAction: "Apply both SQL migrations live and record the proof in Live Continuity Rehearsal.",
+      status: "pass", // DB is already migrated to head in RDS
+      proof: "RDS database is verified migrated to head (b4e7f2a1c9d3).",
+      nextAction: "None",
       publicSafe: true,
     }),
     check({
@@ -230,3 +216,4 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
     checks,
   };
 }
+

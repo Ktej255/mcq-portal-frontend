@@ -135,6 +135,16 @@ function buildFunnelSteps(
   });
 }
 
+/**
+ * @deprecated The GeographyCommandRoom (Watch→Talk→MCQ day-based system) has been
+ * superseded by the unified Geography LMS (`/upsc/geography/lms`). This component
+ * is kept for backward compatibility during the transition period and will be
+ * removed in a future cleanup phase.
+ *
+ * Students visiting `/upsc/geography` are now redirected to `/upsc/geography/lms`.
+ *
+ * Requirements: 10.4, 10.5
+ */
 export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
   const { getDayProgress, isLoaded, progress } = useGeographyProgress();
   const [activeDay, setActiveDay] = useState(resolveSession(initialDay).day);
@@ -255,10 +265,10 @@ export function GeographyCommandRoom({ initialDay }: { initialDay?: number }) {
                   {activeTopicGroups.length || 0} PDF topic groups
                 </span>
                 <Link
-                  href="/upsc/geography/continue"
-                  className="inline-flex min-h-8 items-center rounded-md border border-[#cfe5dc] bg-white px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:border-[#1d9e75]"
+                  href="/upsc/geography/lms/syllabus"
+                  className="inline-flex min-h-8 items-center rounded-md border border-[#1d9e75] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#1d9e75] hover:text-white"
                 >
-                  Continue Geography
+                  Deep LMS →
                 </Link>
               </div>
               <h1 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">{activeSession.title}</h1>

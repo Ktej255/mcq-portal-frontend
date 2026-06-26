@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 const ONBOARDING_CACHE_KEY = "lms-onboarding-completed";
 
@@ -26,9 +27,12 @@ function getBreadcrumbLabel(pathname: string): string {
 export default function LmsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useApiConfig();
   const [gateChecked, setGateChecked] = useState(false);
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
     // Skip onboarding check if already on the onboarding page
     if (pathname.includes("/onboarding")) {
       setGateChecked(true);
@@ -47,7 +51,7 @@ export default function LmsLayout({ children }: { children: React.ReactNode }) {
     }
 
     gsLmsService
-      .getOnboardingStatus()
+      .getOnboardingStatus("geography")
       .then((status) => {
         if (!status.completed) {
           router.replace("/upsc/geography/lms/onboarding");

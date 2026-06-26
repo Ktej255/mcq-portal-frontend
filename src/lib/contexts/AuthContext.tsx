@@ -2,20 +2,20 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser as useClerkUser } from "@clerk/nextjs";
-import {
-  auth,
-  googleProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  User,
-} from "../firebase/config";
-import { setPersistence, browserLocalPersistence } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { resolveToken } from "../auth/token-strategy";
+import { activeAuthProvider } from "@/env";
+
+// Safe wrappers that return no-op values when ClerkProvider is not mounted
+function useClerkAuthSafe() {
+  try { return useClerkAuth(); } catch { return { isLoaded: true, isSignedIn: false, getToken: async () => null } as ReturnType<typeof useClerkAuth>; }
+}
+function useClerkUserSafe() {
+  try { return useClerkUser(); } catch { return { user: null, isLoaded: true, isSignedIn: false } as ReturnType<typeof useClerkUser>; }
+}
+function useClerkSafe() {
+  try { return useClerk(); } catch { return { signOut: async () => {} } as unknown as ReturnType<typeof useClerk>; }
+}
 import {
   canUsePreviewAuth,
   clearLocalMockToken,
@@ -25,22 +25,13 @@ import {
   saveLocalMockIdentity,
   saveLocalMockToken,
 } from "../auth/local-testing";
-import {
-  activeAuthProvider,
-  clerkConfigReady,
-  env,
-  missingClerkEnvVars,
-  missingFirebaseEnvVars,
-  missingSupabaseEnvVars,
-} from "@/env";
-import { supabase } from "@/lib/supabase/client";
+import { env } from "@/env";
 import {
   clearLocalUpscLearnerState,
   reconcileLocalUpscLearnerIdentity,
 } from "@/lib/upsc/learnerPersistence";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-type AuthUser = User | {
+type AuthUser = {
   email: string | null;
   uid: string;
   displayName: string | null;
@@ -50,32 +41,6 @@ type AuthUser = User | {
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
 const mockAuthEnabled = env.NEXT_PUBLIC_USE_MOCK_AUTH === "true";
-const EMAIL_FOR_SIGN_IN_KEY = "sarit-email-for-sign-in-v1";
-
-async function assertSupabaseAuthReachable() {
-  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return;
-
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 3500);
-
-  try {
-    const settingsUrl = new URL("/auth/v1/settings", env.NEXT_PUBLIC_SUPABASE_URL).toString();
-    const response = await fetch(settingsUrl, {
-      cache: "no-store",
-      headers: {
-        apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error("Supabase auth key was rejected.");
-    }
-  } catch {
-    throw new Error("Supabase auth is unreachable or the public API key is invalid right now. Please use Student Preview while auth is being restored.");
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -97,26 +62,6 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
   getToken: async () => null,
   devLogin: () => {},
-});
-
-const mapSupabaseUser = (supabaseUser: SupabaseUser, accessToken?: string): AuthUser => ({
-  email: supabaseUser.email ?? null,
-  uid: supabaseUser.id,
-  displayName:
-    typeof supabaseUser.user_metadata?.full_name === "string"
-      ? supabaseUser.user_metadata.full_name
-      : supabaseUser.email?.split("@")[0] ?? null,
-  photoURL:
-    typeof supabaseUser.user_metadata?.avatar_url === "string"
-      ? supabaseUser.user_metadata.avatar_url
-      : null,
-  getIdToken: async (forceRefresh?: boolean) => {
-    if (!supabase) return accessToken ?? "";
-    const sessionResult = forceRefresh
-      ? await supabase.auth.refreshSession()
-      : await supabase.auth.getSession();
-    return sessionResult.data.session?.access_token ?? accessToken ?? "";
-  },
 });
 
 function normalizeInternalRedirectPath(redirectPath = "/dashboard") {
@@ -153,265 +98,16 @@ function buildLocalMockUser(savedToken: string | null): AuthUser | null {
   };
 }
 
-const LegacyAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  const replaceRoute = useCallback((redirectPath = "/dashboard") => {
-    window.setTimeout(() => {
-      router.replace(normalizeInternalRedirectPath(redirectPath));
-    }, 0);
-  }, [router]);
-
-  const pushRoute = useCallback((redirectPath = "/dashboard") => {
-    window.setTimeout(() => {
-      router.push(normalizeInternalRedirectPath(redirectPath));
-    }, 0);
-  }, [router]);
-
-  const devLogin = useCallback((email: string, uid: string, redirectPath?: string) => {
-    if (!canUsePreviewAuth()) return;
-    if (authDebug) console.info("AUTH | DEV LOGIN TRIGGERED | Email:", email);
-    const token = `MOCK_TOKEN_local_${uid}`;
-    const mockUser = {
-      email,
-      uid,
-      displayName: email.split("@")[0],
-      photoURL: null,
-      getIdToken: async () => token,
-    };
-    if (typeof window !== 'undefined') {
-      saveLocalMockToken(token);
-      saveLocalMockIdentity(email, uid);
-    }
-    setUser(mockUser);
-    setLoading(false);
-    if (redirectPath) {
-      replaceRoute(redirectPath);
-    }
-  }, [replaceRoute]);
-
-  useEffect(() => {
-    if (authDebug) console.info("AUTH | AuthProvider Mount | Auth Initialized:", !!auth);
-
-    if (typeof window !== "undefined") {
-      const existingMockToken = readLocalMockToken();
-      if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
-        const params = new URLSearchParams(window.location.search);
-        const redirectPath = params.get("redirect") || "/dashboard";
-        devLogin("student@upsc.local", "local-dev-student", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
-        return;
-      }
-    }
-    
-    // DEV BYPASS RESTORATION
-    if (typeof window !== 'undefined') {
-      const savedToken = readLocalMockToken();
-      if (savedToken) {
-        if (authDebug) console.info("AUTH | Restoring MOCK_TOKEN session");
-        saveLocalMockToken(savedToken);
-        
-        const mockUser = buildLocalMockUser(savedToken);
-
-        window.setTimeout(() => {
-          setUser(mockUser);
-          setLoading(false);
-        }, 0);
-        return;
-      }
-    }
-
-    // Supabase auth block removed (Supabase auth disabled)
-
-    if (!auth) {
-      if (!mockAuthEnabled) {
-        console.error(`AUTH | Firebase auth is not initialized. Missing: ${missingFirebaseEnvVars.join(", ")}`);
-      }
-      window.setTimeout(() => setLoading(false), 0);
-      return;
-    }
-    
-    // Explicitly set persistence
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => {
-        if (authDebug) console.info("AUTH | Persistence set to local");
-      })
-      .catch((err) => console.error("AUTH | Error setting persistence:", err));
-
-    let settled = false;
-
-    if (authDebug) console.info("AUTH | Registering onAuthStateChanged listener");
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (authDebug) console.info("AUTH | onAuthStateChanged Fired | User exists:", !!currentUser);
-      if (currentUser) {
-        if (authDebug) console.info("AUTH | Current User Details | UID:", currentUser.uid, "Email:", currentUser.email);
-        try {
-          const token = await currentUser.getIdToken();
-          if (authDebug) console.info("AUTH | Token retrieved on state change | Length:", token?.length);
-        } catch (tokenErr) {
-          console.error("AUTH | Token retrieval error on state change:", tokenErr);
-        }
-      }
-      reconcileLocalUpscLearnerIdentity(currentUser?.uid);
-      settled = true;
-      setUser(currentUser);
-      setLoading(false);
-      if (currentUser && window.location.pathname.startsWith("/login")) {
-        const params = new URLSearchParams(window.location.search);
-        replaceRoute(params.get("redirect") || "/dashboard");
-      }
-    });
-
-    const fallback = window.setTimeout(() => {
-      if (!settled) {
-        if (authDebug) console.warn("AUTH | Firebase auth state did not settle in 5s; force-finishing loading.");
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      if (authDebug) console.info("AUTH | AuthProvider Unmount");
-      window.clearTimeout(fallback);
-      unsubscribe();
-    };
-  }, [devLogin, replaceRoute]);
-
-  // Complete a Firebase passwordless email-link sign-in when the user returns
-  // from their inbox (the emailed link lands back on /login?...).
-  useEffect(() => {
-    if (!auth || typeof window === "undefined") return;
-    if (!isSignInWithEmailLink(auth, window.location.href)) return;
-
-    const storedEmail = window.localStorage.getItem(EMAIL_FOR_SIGN_IN_KEY);
-    const email = storedEmail || window.prompt("Please confirm your email to finish signing in") || "";
-    if (!email) return;
-
-    signInWithEmailLink(auth, email, window.location.href)
-      .then(() => {
-        window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
-        const params = new URLSearchParams(window.location.search);
-        replaceRoute(params.get("redirect") || "/dashboard");
-      })
-      .catch((error) => {
-        console.error("AUTH | signInWithEmailLink completion ERROR:", error);
-      });
-  }, [replaceRoute]);
-
-  const signInWithGoogle = async (redirectPath = "/dashboard") => {
-    if (authDebug) console.info("AUTH | signInWithGoogle triggered");
-
-    if (!auth) {
-      console.error(`AUTH | Firebase auth is not initialized in signInWithGoogle. Missing: ${missingFirebaseEnvVars.join(", ")}`);
-      return;
-    }
-    try {
-      if (authDebug) console.info("AUTH | Starting signInWithPopup");
-      const result = await signInWithPopup(auth, googleProvider);
-      if (authDebug) console.info("AUTH | signInWithPopup SUCCESS | User:", result.user.email);
-    } catch (error: unknown) {
-      const authError = error as { code?: string; message?: string };
-      console.error("AUTH | signInWithPopup ERROR | Code:", authError.code, "Message:", authError.message);
-      throw error;
-    }
-  };
-
-  const sendEmailOtp = async (email: string, redirectPath = "/dashboard") => {
-    if (authDebug) console.info("AUTH | sendEmailOtp (Firebase email link) triggered");
-    if (!auth) {
-      throw new Error(
-        "Email login is not available right now because the auth service is not configured. Please use Google login or Student Preview.",
-      );
-    }
-
-    const targetRedirect = normalizeInternalRedirectPath(redirectPath);
-    const continueUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(targetRedirect)}`;
-
-    try {
-      await sendSignInLinkToEmail(auth, email, {
-        url: continueUrl,
-        handleCodeInApp: true,
-      });
-      // Persist the email so the link can be completed on this device without re-prompting.
-      window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, email);
-    } catch (error: unknown) {
-      const authError = error as { code?: string; message?: string };
-      console.error("AUTH | sendSignInLinkToEmail ERROR | Code:", authError.code, "Message:", authError.message);
-      throw new Error(
-        authError.code === "auth/unauthorized-continue-uri" || authError.code === "auth/operation-not-allowed"
-          ? "Email link login is not enabled for this domain yet. Please use Google login or Student Preview."
-          : "Email login could not start right now. Please try Google login or Student Preview.",
-      );
-    }
-  };
-
-  const verifyEmailOtp = async (email: string, _token: string, redirectPath = "/dashboard") => {
-    // Firebase passwordless auth is link-based, not code-based: completion happens
-    // automatically when the user opens the emailed link (see the effect below).
-    if (!auth) {
-      throw new Error("Email login is not available right now. Please use Google login or Student Preview.");
-    }
-    if (!isSignInWithEmailLink(auth, window.location.href)) {
-      throw new Error("Open the secure login link from your email on this device to finish signing in.");
-    }
-    await signInWithEmailLink(auth, email, window.location.href);
-    window.localStorage.removeItem(EMAIL_FOR_SIGN_IN_KEY);
-    replaceRoute(redirectPath);
-  };
-
-  const logout = async () => {
-    if (authDebug) console.info("AUTH | logout triggered");
-    if (readLocalMockToken()) {
-      reconcileLocalUpscLearnerIdentity(null);
-      clearLocalMockToken();
-      localStorage.removeItem('mcq-timer-storage');
-      localStorage.removeItem('mcq-exam-storage');
-      setUser(null);
-      setLoading(false);
-      pushRoute("/login");
-      return;
-    }
-
-    // Supabase logout check removed (Supabase auth disabled)
-
-    if (!auth) return;
-    try {
-      await signOut(auth);
-      reconcileLocalUpscLearnerIdentity(null);
-      clearLocalMockToken();
-      if (authDebug) console.info("AUTH | signOut SUCCESS");
-      // Clear persisted stores
-      localStorage.removeItem('mcq-timer-storage');
-      localStorage.removeItem('mcq-exam-storage');
-      pushRoute("/login");
-    } catch (error) {
-      console.error("AUTH | logout ERROR", error);
-    }
-  };
-
-  const getToken = async () => {
-    return await resolveToken(true);
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{ user, loading, signInWithGoogle, sendEmailOtp, verifyEmailOtp, logout, getToken, devLogin }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
 function clearExamStores() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("mcq-timer-storage");
   localStorage.removeItem("mcq-exam-storage");
 }
 
-const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { isLoaded, isSignedIn, getToken: getClerkToken } = useClerkAuth();
-  const { user: clerkUser } = useClerkUser();
-  const { signOut: clerkSignOut } = useClerk();
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const { isLoaded, isSignedIn, getToken: getClerkToken } = useClerkAuthSafe();
+  const { user: clerkUser } = useClerkUserSafe();
+  const { signOut: clerkSignOut } = useClerkSafe();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -448,6 +144,32 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [replaceRoute]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const existingMockToken = readLocalMockToken();
+      if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
+        const params = new URLSearchParams(window.location.search);
+        const redirectPath = params.get("redirect") || "/dashboard";
+        devLogin("student@upsc.local", "local-dev-student", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
+        return;
+      }
+    }
+
+    // When mock auth is enabled, don't wait for Clerk — resolve immediately
+    if (mockAuthEnabled) {
+      if (typeof window !== "undefined") {
+        const existingMockToken = readLocalMockToken();
+        if (existingMockToken) {
+          (window as Window & { MOCK_TOKEN?: string }).MOCK_TOKEN = existingMockToken;
+          setUser(buildLocalMockUser(existingMockToken));
+          setLoading(false);
+          return;
+        }
+      }
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     if (!isLoaded) {
       setLoading(true);
       return;
@@ -505,7 +227,7 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
     reconcileLocalUpscLearnerIdentity(null);
     setUser(null);
     setLoading(false);
-  }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute]);
+  }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute, devLogin]);
 
   // Sync profile & progress back to Clerk unsafeMetadata when updated locally
   useEffect(() => {
@@ -588,18 +310,6 @@ const ClerkAuthProvider = ({ children }: { children: React.ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  if (activeAuthProvider === "clerk" && clerkConfigReady) {
-    return <ClerkAuthProvider>{children}</ClerkAuthProvider>;
-  }
-
-  if (activeAuthProvider === "clerk" && !clerkConfigReady && authDebug) {
-    console.error(`AUTH | Clerk auth is not initialized. Missing: ${missingClerkEnvVars.join(", ")}`);
-  }
-
-  return <LegacyAuthProvider>{children}</LegacyAuthProvider>;
 };
 
 export const useAuth = () => useContext(AuthContext);

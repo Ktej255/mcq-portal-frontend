@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { DailyPlanOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "./LmsLoadingSkeleton";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export function PlannerUI() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useApiConfig();
   const [plan, setPlan] = useState<DailyPlanOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,9 +17,11 @@ export function PlannerUI() {
   const [updating, setUpdating] = useState(false);
   const [replanning, setReplanning] = useState(false);
 
-  useEffect(() => {
+  const fetchPlan = useCallback(() => {
+    setLoading(true);
+    setError(null);
     gsLmsService
-      .getTodayPlan()
+      .getTodayPlan("geography")
       .then((data) => {
         setPlan(data);
         setBandwidthVal(data.bandwidth);
@@ -28,10 +32,15 @@ export function PlannerUI() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    fetchPlan();
+  }, [isLoaded, isSignedIn, fetchPlan]);
+
   const handleUpdateBandwidth = async () => {
     setUpdating(true);
     try {
-      const updated = await gsLmsService.setBandwidth(bandwidth);
+      const updated = await gsLmsService.setBandwidth("geography", bandwidth);
       setPlan(updated);
     } catch {
       // revert
@@ -43,8 +52,8 @@ export function PlannerUI() {
   const handleReplan = async () => {
     setReplanning(true);
     try {
-      await gsLmsService.replan();
-      const refreshed = await gsLmsService.getTodayPlan();
+      await gsLmsService.replan("geography");
+      const refreshed = await gsLmsService.getTodayPlan("geography");
       setPlan(refreshed);
     } catch {
       // silent
@@ -115,39 +124,62 @@ export function PlannerUI() {
         {plan.planned_items.length === 0 ? (
           <p className="text-sm text-[#13251d]/50 py-4">No items planned for today.</p>
         ) : (
-          plan.planned_items.map((item) => (
-            <button
-              key={`${item.node_id}-${item.item_type}`}
-              onClick={() =>
-                router.push(
-                  item.item_type === "practice"
-                    ? "/upsc/geography/lms/practice"
-                    : `/upsc/geography/lms/topic/${item.node_id}`
-                )
-              }
-              className="w-full text-left flex items-center gap-3 p-2.5 md:p-3 rounded-lg border border-[#dcd5c7] bg-white hover:border-[#1d9e75]/40 transition-colors"
-            >
-              <span
-                className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center ${
-                  item.completed
-                    ? "bg-[#1d9e75] border-[#1d9e75] text-white"
-                    : "border-[#dcd5c7]"
+          plan.planned_items.map((item, idx) => {
+            const isRevisit = item.item_type === 'revisit';
+            const dest = isRevisit
+              ? `/upsc/geography/lms/topic/${item.node_id}?mode=revisit`
+              : item.item_type === "retro"
+                ? "/upsc/geography/lms/retro"
+                : item.item_type === "practice"
+                  ? "/upsc/geography/lms/practice"
+                  : `/upsc/geography/lms/topic/${item.node_id}`;
+            return (
+              <button
+                key={`${item.node_id}-${item.item_type}-${idx}`}
+                onClick={() => router.push(dest)}
+                className={`w-full text-left flex items-center gap-3 p-2.5 md:p-3 rounded-lg border transition-colors ${
+                  isRevisit
+                    ? "border-[#ef9f27]/40 bg-[#fff4df] hover:border-[#ef9f27]"
+                    : item.item_type === "retro"
+                      ? "border-[#1d9e75]/30 bg-[#e7f5ee] hover:border-[#1d9e75]"
+                      : "border-[#dcd5c7] bg-white hover:border-[#1d9e75]/40"
                 }`}
               >
-                {item.completed && (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </span>
-              <div>
-                <p className={`text-sm ${item.completed ? "text-[#13251d]/50 line-through" : "text-[#1a3a2a]"}`}>
-                  {item.title}
-                </p>
-                <p className="text-xs text-[#13251d]/40 capitalize">{item.item_type}</p>
-              </div>
-            </button>
-          ))
+                <span
+                  className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center ${
+                    item.completed
+                      ? "bg-[#1d9e75] border-[#1d9e75] text-white"
+                      : isRevisit
+                        ? "border-[#ef9f27] text-[#ef9f27]"
+                        : item.item_type === "retro"
+                          ? "border-[#1d9e75] text-[#1d9e75]"
+                          : "border-[#dcd5c7]"
+                  }`}
+                >
+                  {item.completed ? (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : isRevisit ? (
+                    <span className="text-[10px]">🔄</span>
+                  ) : item.item_type === "retro" ? (
+                    <span className="text-[10px]">📝</span>
+                  ) : null}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm truncate ${item.completed ? "text-[#13251d]/50 line-through" : "text-[#1a3a2a]"}`}>
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-[#13251d]/40 capitalize flex items-center gap-1">
+                    {item.item_type}
+                    {isRevisit && item.overdue && (
+                      <span className="text-[#ef9f27] font-semibold">· Overdue</span>
+                    )}
+                  </p>
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
 

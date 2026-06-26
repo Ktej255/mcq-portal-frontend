@@ -13,7 +13,7 @@ export const metadata = pageMeta({
 });
 
 const faqs = [
-  { q: "How do the multi-year discounts work?", a: "Longer commitments cost less per month: Yearly saves 19%, 2-Year saves 29%, and 3-Year saves 38% versus monthly billing." },
+  { q: "How do the multi-year discounts work?", a: "Longer commitments cost less per month: Yearly saves 15%, 2-Year saves 25%, and 3-Year saves 35% versus monthly billing." },
   { q: "Can I upgrade later?", a: "Yes — start on any tier and upgrade anytime as your preparation deepens." },
   { q: "What's free without a plan?", a: "Previous year questions, study resources, daily current affairs and our guides are open to everyone, along with the 2-minute diagnostic plan." },
 ];
@@ -51,7 +51,7 @@ export default function PricingPage() {
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-xs font-semibold text-[#536259]">Save up to 38% with a 3-year commitment.</p>
+            <p className="mt-3 text-xs font-semibold text-[#536259]">Save up to 35% with a 3-year commitment.</p>
           </div>
         </div>
 

@@ -7,11 +7,12 @@ import type { PracticeSessionOut, PracticeResultOut } from "@/services/api/gsLms
 import { PracticeUI } from "@/components/gs-lms/PracticeUI";
 import { PracticeResults } from "@/components/gs-lms/PracticeResults";
 import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export default function PracticeSessionPage() {
   const params = useParams();
   const sessionId = Number(params.sessionId);
-
+  const { isLoaded, isSignedIn } = useApiConfig();
   const [session, setSession] = useState<PracticeSessionOut | null>(null);
   const [result, setResult] = useState<PracticeResultOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function PracticeSessionPage() {
     setError(null);
     setNotFound(false);
     try {
-      const data = await gsLmsService.getPracticeSession(sessionId);
+      const data = await gsLmsService.getPracticeSession("geography", sessionId);
       setSession(data);
       // Persist to sessionStorage for future reloads
       try {
@@ -51,15 +52,18 @@ export default function PracticeSessionPage() {
   }, [sessionId]);
 
   useEffect(() => {
+    // Wait for auth before making API calls
+    if (!isLoaded || !isSignedIn) return;
+
     let restored = false;
-    const stored = sessionStorage.getItem(`practice-session-${sessionId}`);
-    if (stored) {
-      try {
+    try {
+      const stored = sessionStorage.getItem(`practice-session-${sessionId}`);
+      if (stored) {
         setSession(JSON.parse(stored));
         restored = true;
-      } catch {
-        // JSON parse failed — fall through to API fetch
       }
+    } catch {
+      // JSON parse failed or sessionStorage unavailable — fall through to API
     }
 
     if (restored) {
@@ -68,7 +72,7 @@ export default function PracticeSessionPage() {
       // Fallback: fetch from backend API
       fetchSessionFromApi();
     }
-  }, [sessionId, fetchSessionFromApi]);
+  }, [sessionId, fetchSessionFromApi, isLoaded, isSignedIn]);
 
   // Persist session to sessionStorage on updates
   useEffect(() => {
@@ -82,7 +86,7 @@ export default function PracticeSessionPage() {
 
   const handleAnswer = async (answer: string) => {
     try {
-      const updated = await gsLmsService.answerQuestion(sessionId, answer);
+      const updated = await gsLmsService.answerQuestion("geography", sessionId, answer);
       if (updated.status === "COMPLETED" || updated.current_question === null) {
         // All questions answered — submit for results
         handleSubmit();
@@ -96,7 +100,7 @@ export default function PracticeSessionPage() {
 
   const handleSkip = async () => {
     try {
-      const updated = await gsLmsService.skipQuestion(sessionId);
+      const updated = await gsLmsService.skipQuestion("geography", sessionId);
       if (updated.status === "COMPLETED" || updated.current_question === null) {
         handleSubmit();
       } else {
@@ -110,7 +114,7 @@ export default function PracticeSessionPage() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const res = await gsLmsService.submitPractice(sessionId);
+      const res = await gsLmsService.submitPractice("geography", sessionId);
       setResult(res);
       sessionStorage.removeItem(`practice-session-${sessionId}`);
     } catch (err: unknown) {

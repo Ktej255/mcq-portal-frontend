@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { GapOut, ProgressOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "./LmsLoadingSkeleton";
 import { LmsEmptyState } from "./LmsEmptyState";
+import { useApiConfig } from "@/lib/hooks/useApi";
 
 export function GapDashboard() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useApiConfig();
   const [gaps, setGaps] = useState<GapOut | null>(null);
   const [progress, setProgress] = useState<ProgressOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([gsLmsService.getGaps(), gsLmsService.getProgress()])
+  const fetchData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([gsLmsService.getGaps("geography"), gsLmsService.getProgress("geography")])
       .then(([gapData, progressData]) => {
         setGaps(gapData);
         setProgress(progressData);
@@ -25,6 +29,11 @@ export function GapDashboard() {
       )
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    fetchData();
+  }, [isLoaded, isSignedIn, fetchData]);
 
   if (loading) return <LmsLoadingSkeleton variant="list" />;
 

@@ -14,15 +14,99 @@ import {
 } from "@/lib/upsc/yearlyPlanner";
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
+import { CashfreeCheckout } from "@/components/upsc/CashfreeCheckout";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
+// ---------------------------------------------------------------------------
+// Payment Success Receipt (Task 6.3)
+// ---------------------------------------------------------------------------
+
+function PaymentSuccessReceipt({
+  orderId,
+  amount,
+  planTitle,
+  billingCycle,
+  months,
+}: {
+  orderId: string;
+  amount: number;
+  planTitle: string;
+  billingCycle: string;
+  months: number;
+}) {
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setMonth(endDate.getMonth() + months);
+
+  return (
+    <div
+      data-testid="payment-success-receipt"
+      className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-7"
+    >
+      <div className="mb-4 flex items-center gap-2">
+        <CheckCircle2 className="h-5 w-5 text-[#1d9e75]" />
+        <h2 className="text-xl font-black text-[#085041]">Payment Successful</h2>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#49675e]">
+            Order Reference
+          </p>
+          <p className="mt-1 text-sm font-black text-[#13251d]">{orderId}</p>
+        </div>
+        <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#49675e]">
+            Amount Paid
+          </p>
+          <p className="mt-1 text-sm font-black text-[#13251d]">{money(amount)}</p>
+        </div>
+        <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#49675e]">
+            Plan Activated
+          </p>
+          <p className="mt-1 text-sm font-black text-[#13251d]">
+            {planTitle} ({billingCycle})
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#b9d9cd] bg-white/70 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#49675e]">
+            Subscription Period
+          </p>
+          <p className="mt-1 text-sm font-black text-[#13251d]">
+            {startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            {" → "}
+            {endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          href="/upsc/daily-command?tab=today"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-5 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
+        >
+          Open Study Workspace <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
 export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }) {
   const { profile, saveProfile, isLoaded } = useDashboardData();
   const [activationSuccess, setActivationSuccess] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const selectedPlan = getProductPricingPlan(planId);
   const savings = selectedPlan.listPrice - selectedPlan.launchPrice;
@@ -48,6 +132,25 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
       });
       setActivationSuccess(true);
     }
+  };
+
+  const handlePaymentSuccess = (orderId: string) => {
+    setPaymentOrderId(orderId);
+    setPaymentSuccess(true);
+    setPaymentError(null);
+    // Also update local profile state to reflect the new subscription
+    if (profile) {
+      saveProfile({
+        ...profile,
+        subscriptionPlanId: selectedPlan.tier,
+        billingCycle: selectedPlan.cycle,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handlePaymentFailure = (error: string) => {
+    setPaymentError(error);
   };
 
   const isCurrentlyActive = profile?.subscriptionPlanId === selectedPlan.tier && profile?.billingCycle === selectedPlan.cycle;
@@ -135,36 +238,66 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           </p>
         </section>
 
-        {/* Activation Controller */}
-        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-          <h2 className="text-xl font-black text-[#13251d]">Confirm & Activate</h2>
-          <p className="mt-1 text-sm font-semibold text-[#5d675f]">
-            Since you are part of the pilot validation, you can activate this plan directly to your workspace.
-          </p>
-          
-          <div className="mt-4 flex flex-wrap gap-3 items-center">
-            {isCurrentlyActive ? (
-              <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] px-4 py-2 text-xs font-black text-[#085041]">
-                ✓ Plan is currently active on your account
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleConfirmActivation}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-5 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
-              >
-                Confirm Pilot Activation <ArrowRight className="ml-2 h-4 w-4" />
-              </button>
-            )}
-          </div>
+        {/* Payment / Activation Controller */}
+        {paymentSuccess && paymentOrderId ? (
+          <PaymentSuccessReceipt
+            orderId={paymentOrderId}
+            amount={selectedPlan.launchPrice}
+            planTitle={selectedPlan.title}
+            billingCycle={selectedPlan.cycle}
+            months={selectedPlan.months}
+          />
+        ) : publicCommerceLaunchBoundary.readyForPayment ? (
+          /* Live commerce mode — render Cashfree checkout */
+          <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+            <h2 className="text-xl font-black text-[#13251d]">Complete Payment</h2>
+            <p className="mt-1 text-sm font-semibold text-[#5d675f]">
+              Secure payment via Cashfree. Your subscription activates immediately after successful payment.
+            </p>
 
-          {(activationSuccess || isCurrentlyActive) && (
-            <div className="mt-4 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-sm font-bold text-[#085041]">
-              Active subscription updated to **{selectedPlan.title} ({selectedPlan.cycle})**! 
-              Usage limits have been reallocated according to the tier configuration.
+            <div className="mt-4">
+              <CashfreeCheckout
+                planTier={selectedPlan.tier}
+                billingCycle={selectedPlan.cycle}
+                amount={selectedPlan.launchPrice}
+                planTitle={selectedPlan.title}
+                onSuccess={handlePaymentSuccess}
+                onFailure={handlePaymentFailure}
+              />
             </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          /* Pilot mode — existing pilot activation flow */
+          <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+            <h2 className="text-xl font-black text-[#13251d]">Confirm & Activate</h2>
+            <p className="mt-1 text-sm font-semibold text-[#5d675f]">
+              Since you are part of the pilot validation, you can activate this plan directly to your workspace.
+            </p>
+            
+            <div className="mt-4 flex flex-wrap gap-3 items-center">
+              {isCurrentlyActive ? (
+                <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] px-4 py-2 text-xs font-black text-[#085041]">
+                  ✓ Plan is currently active on your account
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirmActivation}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-5 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
+                >
+                  Confirm Pilot Activation <ArrowRight className="ml-2 h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {(activationSuccess || isCurrentlyActive) && (
+              <div className="mt-4 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-sm font-bold text-[#085041]">
+                Active subscription updated to **{selectedPlan.title} ({selectedPlan.cycle})**! 
+                Usage limits have been reallocated according to the tier configuration.
+              </div>
+            )}
+          </section>
+        )}
 
         <UpscPricingIntentRecorder
           plan={selectedPlan}

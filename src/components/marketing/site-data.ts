@@ -467,9 +467,9 @@ export const pricingStats: { label: string; value: string }[] = [
 
 export const billingOptions: { label: string; save?: string }[] = [
   { label: "Monthly" },
-  { label: "Yearly", save: "-19%" },
-  { label: "2-Year", save: "-29%" },
-  { label: "3-Year", save: "-38%" },
+  { label: "Yearly", save: "-15%" },
+  { label: "2-Year", save: "-25%" },
+  { label: "3-Year", save: "-35%" },
 ];
 
 export type PricingTier = {

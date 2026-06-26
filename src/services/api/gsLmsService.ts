@@ -1,11 +1,15 @@
 import { apiClient } from './client';
 
 /**
- * API client for the GS LMS Platform (Geography).
+ * API client for the GS LMS Platform (multi-subject).
  *
- * Wraps all `/api/v1/gs-lms/geography/*` backend endpoints with typed
+ * Wraps all `/api/v1/gs-lms/{subject}/*` backend endpoints with typed
  * request/response interfaces, mirroring the established `optionalService.ts`
  * pattern: single exported object, shared `apiClient`, `unwrap` helper.
+ *
+ * Every method accepts a `subject` slug as the first parameter (default:
+ * "geography") so existing callers continue to work without modification
+ * while new subjects can be added seamlessly.
  *
  * Auth is handled centrally by the shared `apiClient` request interceptor
  * (Bearer token), matching every other service in this codebase.
@@ -47,6 +51,7 @@ export interface ContentSectionOut {
   display_order: number;
   locked: boolean;
   completed: boolean;
+  skippable: boolean;
   blocks: ContentBlock[] | null;
 }
 
@@ -55,6 +60,9 @@ export interface TopicSectionsOut {
   title: string;
   discussion_gate_passed: boolean;
   topic_completed: boolean;
+  video_url: string | null;
+  video_watched: boolean;
+  learner_level: string | null;
   sections: ContentSectionOut[];
 }
 
@@ -159,6 +167,9 @@ export interface DiscussionTurnResponseOut {
   student_turn: DiscussionTurnOut;
   ai_turn: DiscussionTurnOut;
   gate_passed: boolean;
+  concepts_matched: string[] | null;
+  concepts_missed: string[] | null;
+  match_percentage: number | null;
 }
 
 // -- Progress / Gaps --------------------------------------------------------
@@ -210,9 +221,12 @@ export interface ProgressOut {
 export interface PlanItemOut {
   node_id: number;
   title: string;
-  item_type: 'section' | 'practice';
+  item_type: 'section' | 'practice' | 'revisit' | 'retro';
   completed: boolean;
   completed_at: string | null;
+  revisit_id: number | null;
+  revisit_type: string | null;
+  overdue: boolean;
 }
 
 export interface DailyPlanOut {
@@ -242,13 +256,13 @@ export interface OnboardingStatusOut {
   bandwidth_selected: number | null;
   first_topic_id: number | null;
   first_topic_title: string | null;
+  learner_level: string | null;
+  study_window_minutes: number | null;
 }
 
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
-
-const BASE = 'gs-lms/geography';
 
 const unwrap = <T>(data: unknown): T => {
   const record = (data && typeof data === 'object' ? (data as Record<string, unknown>) : {});
@@ -261,11 +275,11 @@ export const gsLmsService = {
   // -------------------------------------------------------------------------
 
   /**
-   * Fetch the full Geography syllabus tree (mega-topics → sub-topics → leaves).
+   * Fetch the full syllabus tree (mega-topics → sub-topics → leaves).
    * @fulfills Requirement 1.1, 2.1
    */
-  getSyllabusTree: async (): Promise<SyllabusTreeOut> => {
-    const response = await apiClient.get(`${BASE}/syllabus`);
+  getSyllabusTree: async (subject = "geography"): Promise<SyllabusTreeOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/syllabus`);
     return unwrap<SyllabusTreeOut>(response.data);
   },
 
@@ -273,8 +287,8 @@ export const gsLmsService = {
    * Fetch a single syllabus node by ID with its children.
    * @fulfills Requirement 1.1
    */
-  getSyllabusNode: async (nodeId: number): Promise<SyllabusNodeOut> => {
-    const response = await apiClient.get(`${BASE}/syllabus/${nodeId}`);
+  getSyllabusNode: async (subject = "geography", nodeId: number): Promise<SyllabusNodeOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/syllabus/${nodeId}`);
     return unwrap<SyllabusNodeOut>(response.data);
   },
 
@@ -286,8 +300,8 @@ export const gsLmsService = {
    * Fetch the four progressive-disclosure sections for a topic.
    * @fulfills Requirement 1.1, 3.1
    */
-  getTopicSections: async (nodeId: number): Promise<TopicSectionsOut> => {
-    const response = await apiClient.get(`${BASE}/topics/${nodeId}/sections`);
+  getTopicSections: async (subject = "geography", nodeId: number): Promise<TopicSectionsOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/topics/${nodeId}/sections`);
     return unwrap<TopicSectionsOut>(response.data);
   },
 
@@ -295,8 +309,18 @@ export const gsLmsService = {
    * Mark a content section as completed, unlocking the next section.
    * @fulfills Requirement 1.1, 3.3
    */
-  completeSection: async (nodeId: number, sectionId: number): Promise<void> => {
-    await apiClient.post(`${BASE}/topics/${nodeId}/sections/${sectionId}/complete`);
+  completeSection: async (subject = "geography", nodeId: number, sectionId: number): Promise<void> => {
+    await apiClient.post(`gs-lms/${subject}/topics/${nodeId}/sections/${sectionId}/complete`);
+  },
+
+  /**
+   * Mark a topic's video as watched (persist optional watch duration).
+   * @fulfills Requirement 1.2, 1.3
+   */
+  markVideoWatched: async (subject = "geography", nodeId: number, durationSeconds?: number): Promise<void> => {
+    const payload: Record<string, unknown> = {};
+    if (durationSeconds != null) payload.duration_seconds = durationSeconds;
+    await apiClient.post(`gs-lms/${subject}/topics/${nodeId}/video/watched`, payload);
   },
 
   // -------------------------------------------------------------------------
@@ -307,10 +331,10 @@ export const gsLmsService = {
    * Fetch PYQs for a topic, optionally filtered by exam type.
    * @fulfills Requirement 1.1, 4.1
    */
-  getTopicPyqs: async (nodeId: number, examType?: string): Promise<PyqListOut> => {
+  getTopicPyqs: async (subject = "geography", nodeId: number, examType?: string): Promise<PyqListOut> => {
     const params: Record<string, string> = {};
     if (examType) params.exam_type = examType;
-    const response = await apiClient.get(`${BASE}/topics/${nodeId}/pyqs`, { params });
+    const response = await apiClient.get(`gs-lms/${subject}/topics/${nodeId}/pyqs`, { params });
     return unwrap<PyqListOut>(response.data);
   },
 
@@ -318,8 +342,8 @@ export const gsLmsService = {
    * Reveal the answer/explanation for a PYQ (persists server-side).
    * @fulfills Requirement 1.1, 4.2, 4.4
    */
-  revealPyqAnswer: async (pyqId: number): Promise<PyqOut> => {
-    const response = await apiClient.post(`${BASE}/pyqs/${pyqId}/reveal`);
+  revealPyqAnswer: async (subject = "geography", pyqId: number): Promise<PyqOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/pyqs/${pyqId}/reveal`);
     return unwrap<PyqOut>(response.data);
   },
 
@@ -331,8 +355,8 @@ export const gsLmsService = {
    * Start a new practice session for a topic.
    * @fulfills Requirement 1.1, 5.1
    */
-  startPractice: async (nodeId: number): Promise<PracticeSessionOut> => {
-    const response = await apiClient.post(`${BASE}/practice/start`, {
+  startPractice: async (subject = "geography", nodeId: number): Promise<PracticeSessionOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/practice/start`, {
       syllabus_node_id: nodeId,
     });
     return unwrap<PracticeSessionOut>(response.data);
@@ -343,6 +367,7 @@ export const gsLmsService = {
    * @fulfills Requirement 1.1, 5.2
    */
   answerQuestion: async (
+    subject = "geography",
     sessionId: number,
     answer: string,
     timeTakenSeconds?: number,
@@ -350,7 +375,7 @@ export const gsLmsService = {
     const payload: Record<string, unknown> = { chosen_answer: answer };
     if (timeTakenSeconds != null) payload.time_taken_seconds = timeTakenSeconds;
     const response = await apiClient.post(
-      `${BASE}/practice/${sessionId}/answer`,
+      `gs-lms/${subject}/practice/${sessionId}/answer`,
       payload,
     );
     return unwrap<PracticeSessionOut>(response.data);
@@ -360,8 +385,8 @@ export const gsLmsService = {
    * Skip the current practice question and advance.
    * @fulfills Requirement 1.1, 5.3
    */
-  skipQuestion: async (sessionId: number): Promise<PracticeSessionOut> => {
-    const response = await apiClient.post(`${BASE}/practice/${sessionId}/skip`);
+  skipQuestion: async (subject = "geography", sessionId: number): Promise<PracticeSessionOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/practice/${sessionId}/skip`);
     return unwrap<PracticeSessionOut>(response.data);
   },
 
@@ -369,8 +394,8 @@ export const gsLmsService = {
    * Fetch an active practice session by ID (for session recovery).
    * @fulfills Requirement 5.1, 5.2
    */
-  getPracticeSession: async (sessionId: number): Promise<PracticeSessionOut> => {
-    const response = await apiClient.get(`${BASE}/practice/${sessionId}`);
+  getPracticeSession: async (subject = "geography", sessionId: number): Promise<PracticeSessionOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/practice/${sessionId}`);
     return unwrap<PracticeSessionOut>(response.data);
   },
 
@@ -378,8 +403,8 @@ export const gsLmsService = {
    * Submit the practice session for scoring.
    * @fulfills Requirement 1.1, 5.4, 5.5
    */
-  submitPractice: async (sessionId: number): Promise<PracticeResultOut> => {
-    const response = await apiClient.post(`${BASE}/practice/${sessionId}/submit`);
+  submitPractice: async (subject = "geography", sessionId: number): Promise<PracticeResultOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/practice/${sessionId}/submit`);
     return unwrap<PracticeResultOut>(response.data);
   },
 
@@ -391,8 +416,8 @@ export const gsLmsService = {
    * Start an AI discussion session for a topic (gates content access).
    * @fulfills Requirement 1.1, 6.1
    */
-  startDiscussion: async (nodeId: number): Promise<DiscussionSessionOut> => {
-    const response = await apiClient.post(`${BASE}/discussion/start`, {
+  startDiscussion: async (subject = "geography", nodeId: number): Promise<DiscussionSessionOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/discussion/start`, {
       syllabus_node_id: nodeId,
     });
     return unwrap<DiscussionSessionOut>(response.data);
@@ -403,11 +428,12 @@ export const gsLmsService = {
    * @fulfills Requirement 1.1, 6.3
    */
   submitDiscussionTurn: async (
+    subject = "geography",
     sessionId: number,
     content: string,
   ): Promise<DiscussionTurnResponseOut> => {
     const response = await apiClient.post(
-      `${BASE}/discussion/${sessionId}/turn`,
+      `gs-lms/${subject}/discussion/${sessionId}/turn`,
       { content },
     );
     return unwrap<DiscussionTurnResponseOut>(response.data);
@@ -417,8 +443,8 @@ export const gsLmsService = {
    * Get the current status of a discussion session.
    * @fulfills Requirement 1.1, 6.4
    */
-  getDiscussionStatus: async (sessionId: number): Promise<DiscussionSessionOut> => {
-    const response = await apiClient.get(`${BASE}/discussion/${sessionId}/status`);
+  getDiscussionStatus: async (subject = "geography", sessionId: number): Promise<DiscussionSessionOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/discussion/${sessionId}/status`);
     return unwrap<DiscussionSessionOut>(response.data);
   },
 
@@ -427,11 +453,11 @@ export const gsLmsService = {
   // -------------------------------------------------------------------------
 
   /**
-   * Fetch overall student progress across the Geography syllabus.
+   * Fetch overall student progress across the syllabus.
    * @fulfills Requirement 1.1, 7.6
    */
-  getProgress: async (): Promise<ProgressOut> => {
-    const response = await apiClient.get(`${BASE}/progress`);
+  getProgress: async (subject = "geography"): Promise<ProgressOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/progress`);
     return unwrap<ProgressOut>(response.data);
   },
 
@@ -439,8 +465,8 @@ export const gsLmsService = {
    * Fetch the student's gap profile (weak topics, types, recommended actions).
    * @fulfills Requirement 1.1, 7.1
    */
-  getGaps: async (): Promise<GapOut> => {
-    const response = await apiClient.get(`${BASE}/gaps`);
+  getGaps: async (subject = "geography"): Promise<GapOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/gaps`);
     return unwrap<GapOut>(response.data);
   },
 
@@ -452,8 +478,8 @@ export const gsLmsService = {
    * Fetch today's daily plan with planned items and streak.
    * @fulfills Requirement 1.1, 8.1
    */
-  getTodayPlan: async (): Promise<DailyPlanOut> => {
-    const response = await apiClient.get(`${BASE}/plan/today`);
+  getTodayPlan: async (subject = "geography"): Promise<DailyPlanOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/plan/today`);
     return unwrap<DailyPlanOut>(response.data);
   },
 
@@ -461,8 +487,8 @@ export const gsLmsService = {
    * Set or update the student's daily bandwidth target.
    * @fulfills Requirement 1.1, 8.2
    */
-  setBandwidth: async (bandwidth: number): Promise<DailyPlanOut> => {
-    const response = await apiClient.put(`${BASE}/plan/bandwidth`, { bandwidth });
+  setBandwidth: async (subject = "geography", bandwidth: number): Promise<DailyPlanOut> => {
+    const response = await apiClient.put(`gs-lms/${subject}/plan/bandwidth`, { bandwidth });
     return unwrap<DailyPlanOut>(response.data);
   },
 
@@ -470,9 +496,82 @@ export const gsLmsService = {
    * Trigger a replan event (consecutive misses, manual, or bandwidth change).
    * @fulfills Requirement 1.1, 8.6
    */
-  replan: async (): Promise<ReplanOut> => {
-    const response = await apiClient.post(`${BASE}/plan/replan`);
+  replan: async (subject = "geography"): Promise<ReplanOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/plan/replan`);
     return unwrap<ReplanOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Revisit & Recall Gate
+  // -------------------------------------------------------------------------
+
+  /** Fetch today's due revisits (spaced repetition items). */
+  getDueRevisits: async (subject = "geography"): Promise<{
+    total: number;
+    revisits: Array<{
+      id: number;
+      syllabus_node_id: number;
+      title: string;
+      due_date: string;
+      revisit_type: string;
+      overdue: boolean;
+    }>;
+  }> => {
+    const response = await apiClient.get(`gs-lms/${subject}/revisits/due`);
+    return unwrap(response.data);
+  },
+
+  /** Mark a revisit as completed. */
+  completeRevisit: async (subject = "geography", revisitId: number): Promise<void> => {
+    await apiClient.post(`gs-lms/${subject}/revisits/${revisitId}/complete`);
+  },
+
+  /**
+   * Check if a day-start recall is needed before today's content.
+   * @fulfills Requirement 5.1, 5.2
+   */
+  checkRecallGate: async (subject = "geography"): Promise<{
+    recall_needed: boolean;
+    topic_id: number | null;
+    topic_title: string | null;
+    concepts: string[] | null;
+  }> => {
+    const response = await apiClient.get(`gs-lms/${subject}/recall-gate`);
+    return unwrap(response.data);
+  },
+
+  /**
+   * Clear today's recall gate after the student completes a quick recall.
+   * @fulfills Requirement 5.4
+   */
+  clearRecallGate: async (subject = "geography", topicId: number): Promise<void> => {
+    await apiClient.post(`gs-lms/${subject}/recall-gate/clear`, { topic_id: topicId });
+  },
+
+  // -------------------------------------------------------------------------
+  // Weekly Retro
+  // -------------------------------------------------------------------------
+
+  /** Get the current week's retrospective (creates one if not exists). */
+  getCurrentRetro: async (subject = "geography"): Promise<{
+    id: number;
+    week_number: number;
+    plan_date: string;
+    topics_completed: Array<{ node_id: number; title: string }> | null;
+    gap_summary: Array<{ type: string; accuracy: number }> | null;
+    reflection_text: string | null;
+    completed: boolean;
+    completed_at: string | null;
+  }> => {
+    const response = await apiClient.get(`gs-lms/${subject}/retro/current`);
+    return unwrap(response.data);
+  },
+
+  /** Submit reflection and mark the current retro as done. */
+  completeRetro: async (subject = "geography", reflectionText: string): Promise<void> => {
+    await apiClient.post(`gs-lms/${subject}/retro/complete`, {
+      reflection_text: reflectionText,
+    });
   },
 
   // -------------------------------------------------------------------------
@@ -484,8 +583,8 @@ export const gsLmsService = {
    * Uses responseType: 'blob' — does NOT go through the unwrap helper.
    * @fulfills Requirement 1.1, 9.1, 9.2
    */
-  getTopicPdf: async (nodeId: number): Promise<Blob> => {
-    const response = await apiClient.get(`${BASE}/topics/${nodeId}/pdf`, {
+  getTopicPdf: async (subject = "geography", nodeId: number): Promise<Blob> => {
+    const response = await apiClient.get(`gs-lms/${subject}/topics/${nodeId}/pdf`, {
       responseType: 'blob',
     });
     return response.data as Blob;
@@ -499,21 +598,40 @@ export const gsLmsService = {
    * Check the student's onboarding status (completed, bandwidth, first topic).
    * @fulfills Requirement 1.1, 10.1, 10.5
    */
-  getOnboardingStatus: async (): Promise<OnboardingStatusOut> => {
-    const response = await apiClient.get(`${BASE}/onboarding/status`);
+  getOnboardingStatus: async (subject = "geography"): Promise<OnboardingStatusOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/onboarding/status`);
     return unwrap<OnboardingStatusOut>(response.data);
   },
 
   /**
    * Mark onboarding as complete with bandwidth selection and optional first topic.
-   * @fulfills Requirement 1.1, 10.4
+   * @fulfills Requirement 1.1, 10.4, 3.1, 6.1
    */
   completeOnboarding: async (
+    subject = "geography",
     bandwidth: number,
     firstTopicId?: number,
+    learnerLevel?: string,
+    studyWindowMinutes?: number,
   ): Promise<void> => {
     const payload: Record<string, unknown> = { bandwidth };
     if (firstTopicId != null) payload.first_topic_id = firstTopicId;
-    await apiClient.post(`${BASE}/onboarding/complete`, payload);
+    if (learnerLevel != null) payload.learner_level = learnerLevel;
+    if (studyWindowMinutes != null) payload.study_window_minutes = studyWindowMinutes;
+    await apiClient.post(`gs-lms/${subject}/onboarding/complete`, payload);
+  },
+
+  /**
+   * Update the student's learner level post-onboarding.
+   * @fulfills Requirement 3.1, 3.2, 6.4
+   */
+  updateLearnerLevel: async (
+    subject = "geography",
+    learnerLevel: string,
+  ): Promise<OnboardingStatusOut> => {
+    const response = await apiClient.put(`gs-lms/${subject}/onboarding/level`, {
+      learner_level: learnerLevel,
+    });
+    return unwrap<OnboardingStatusOut>(response.data);
   },
 };

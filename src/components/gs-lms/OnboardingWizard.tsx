@@ -6,28 +6,80 @@ import { gsLmsService } from "@/services/api/gsLmsService";
 
 const STEPS = [
   { label: "Welcome" },
-  { label: "Bandwidth" },
+  { label: "Your Profile" },
   { label: "Get Started" },
+];
+
+type LearnerLevel = "beginner" | "intermediate" | "advanced";
+
+interface StudyWindowOption {
+  minutes: number;
+  topicsPerDay: number;
+  label: string;
+}
+
+const STUDY_WINDOW_OPTIONS: StudyWindowOption[] = [
+  { minutes: 60, topicsPerDay: 1, label: "1 topic/day" },
+  { minutes: 90, topicsPerDay: 2, label: "2 topics/day" },
+  { minutes: 120, topicsPerDay: 3, label: "3 topics/day" },
+  { minutes: 180, topicsPerDay: 4, label: "4 topics/day" },
+];
+
+const LEARNER_LEVELS: {
+  value: LearnerLevel;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "beginner",
+    title: "Beginner",
+    description:
+      "I'm starting fresh. Walk me through everything step by step.",
+  },
+  {
+    value: "intermediate",
+    title: "Intermediate",
+    description:
+      "I've studied with coaching. I know basics but need UPSC depth.",
+  },
+  {
+    value: "advanced",
+    title: "Advanced",
+    description:
+      "I can explain most topics. I need gap-filling and exam patterns.",
+  },
 ];
 
 export function OnboardingWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [bandwidth, setBandwidth] = useState(3);
+  const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>("beginner");
+  const [studyWindowMinutes, setStudyWindowMinutes] = useState(90);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Derive bandwidth from study window
+  const bandwidth =
+    STUDY_WINDOW_OPTIONS.find((o) => o.minutes === studyWindowMinutes)
+      ?.topicsPerDay ?? 2;
 
   const handleGetStarted = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      await gsLmsService.completeOnboarding(bandwidth);
+      await gsLmsService.completeOnboarding(
+        "geography",
+        bandwidth,
+        undefined,
+        learnerLevel,
+        studyWindowMinutes,
+      );
       router.push("/upsc/geography/lms/syllabus");
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "response" in err
-          ? ((err as { response?: { data?: { message?: string } } }).response?.data
-              ?.message ?? "Failed to complete onboarding")
+          ? ((err as { response?: { data?: { message?: string } } }).response
+              ?.data?.message ?? "Failed to complete onboarding")
           : "Failed to complete onboarding";
       setError(msg);
     } finally {
@@ -61,9 +113,20 @@ export function OnboardingWizard() {
         {/* Step content */}
         {step === 0 && <StepWelcome />}
         {step === 1 && (
-          <StepBandwidth bandwidth={bandwidth} setBandwidth={setBandwidth} />
+          <StepProfile
+            learnerLevel={learnerLevel}
+            setLearnerLevel={setLearnerLevel}
+            studyWindowMinutes={studyWindowMinutes}
+            setStudyWindowMinutes={setStudyWindowMinutes}
+          />
         )}
-        {step === 2 && <StepConfirmation bandwidth={bandwidth} />}
+        {step === 2 && (
+          <StepConfirmation
+            bandwidth={bandwidth}
+            learnerLevel={learnerLevel}
+            studyWindowMinutes={studyWindowMinutes}
+          />
+        )}
 
         {/* Error */}
         {error && (
@@ -157,8 +220,8 @@ function StepWelcome() {
             5
           </span>
           <span>
-            <strong>Track</strong> — Daily planner, streak tracking, and weak-area
-            identification
+            <strong>Track</strong> — Daily planner, streak tracking, and
+            weak-area identification
           </span>
         </li>
       </ol>
@@ -166,44 +229,115 @@ function StepWelcome() {
   );
 }
 
-function StepBandwidth({
-  bandwidth,
-  setBandwidth,
+function StepProfile({
+  learnerLevel,
+  setLearnerLevel,
+  studyWindowMinutes,
+  setStudyWindowMinutes,
 }: {
-  bandwidth: number;
-  setBandwidth: (v: number) => void;
+  learnerLevel: LearnerLevel;
+  setLearnerLevel: (v: LearnerLevel) => void;
+  studyWindowMinutes: number;
+  setStudyWindowMinutes: (v: number) => void;
 }) {
   return (
-    <div className="text-center space-y-5">
-      <h2 className="text-xl font-semibold text-[#1a3a2a]">
-        Set Your Daily Pace
-      </h2>
-      <p className="text-sm text-[#13251d]/70 leading-relaxed">
-        How many topics per day would you like to cover? You can always change
-        this later from the Planner page.
-      </p>
-      <div className="flex items-center justify-center gap-3 pt-2">
-        <input
-          type="number"
-          min={1}
-          max={10}
-          value={bandwidth}
-          onChange={(e) => {
-            const val = Math.min(10, Math.max(1, Number(e.target.value) || 1));
-            setBandwidth(val);
-          }}
-          className="w-20 px-3 py-2 text-lg text-center border border-[#dcd5c7] rounded-lg focus:border-[#1d9e75] outline-none"
-        />
-        <span className="text-sm text-[#13251d]/60">topics / day</span>
+    <div className="space-y-6">
+      {/* Learner Level Selection */}
+      <div className="space-y-3">
+        <h2 className="text-xl font-semibold text-[#1a3a2a] text-center">
+          What&apos;s Your Level?
+        </h2>
+        <p className="text-sm text-[#13251d]/70 text-center leading-relaxed">
+          This helps us tailor the content flow to your experience.
+        </p>
+        <div className="space-y-2 pt-1">
+          {LEARNER_LEVELS.map((level) => {
+            const isSelected = learnerLevel === level.value;
+            return (
+              <button
+                key={level.value}
+                type="button"
+                onClick={() => setLearnerLevel(level.value)}
+                className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                  isSelected
+                    ? "border-[#1d9e75] bg-[#e7f5ee]"
+                    : "border-[#dcd5c7] bg-white hover:border-[#1d9e75]/50"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                      isSelected
+                        ? "border-[#1d9e75]"
+                        : "border-[#dcd5c7]"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="w-2 h-2 rounded-full bg-[#1d9e75]" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1a3a2a]">
+                      {level.title}
+                    </p>
+                    <p className="text-xs text-[#13251d]/60 mt-0.5">
+                      {level.description}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <p className="text-xs text-[#13251d]/50">
-        Recommended: 2–4 topics/day for steady UPSC preparation
-      </p>
+
+      {/* Study Window Picker */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-[#1a3a2a] text-center">
+          Daily Study Window
+        </h3>
+        <p className="text-xs text-[#13251d]/60 text-center">
+          How much time can you dedicate per day?
+        </p>
+        <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+          {STUDY_WINDOW_OPTIONS.map((option) => {
+            const isSelected = studyWindowMinutes === option.minutes;
+            return (
+              <button
+                key={option.minutes}
+                type="button"
+                onClick={() => setStudyWindowMinutes(option.minutes)}
+                className={`px-3 py-2 rounded-full text-xs font-medium border transition-colors ${
+                  isSelected
+                    ? "bg-[#1d9e75] text-white border-[#1d9e75]"
+                    : "bg-white text-[#1a3a2a] border-[#dcd5c7] hover:border-[#1d9e75]/50"
+                }`}
+              >
+                {option.minutes} min
+                <span className="block text-[10px] opacity-75 mt-0.5">
+                  {option.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-function StepConfirmation({ bandwidth }: { bandwidth: number }) {
+function StepConfirmation({
+  bandwidth,
+  learnerLevel,
+  studyWindowMinutes,
+}: {
+  bandwidth: number;
+  learnerLevel: LearnerLevel;
+  studyWindowMinutes: number;
+}) {
+  const levelLabel =
+    LEARNER_LEVELS.find((l) => l.value === learnerLevel)?.title ?? "Beginner";
+
   return (
     <div className="text-center space-y-4">
       <h2 className="text-xl font-semibold text-[#1a3a2a]">
@@ -212,10 +346,14 @@ function StepConfirmation({ bandwidth }: { bandwidth: number }) {
       <p className="text-sm text-[#13251d]/70 leading-relaxed">
         Your daily target is set to{" "}
         <span className="font-semibold text-[#1d9e75]">{bandwidth}</span>{" "}
-        {bandwidth === 1 ? "topic" : "topics"} per day. The syllabus will guide
-        you through Geography starting from Physical Geography fundamentals.
+        {bandwidth === 1 ? "topic" : "topics"} per day ({studyWindowMinutes}{" "}
+        min). The syllabus will guide you through Geography starting from
+        Physical Geography fundamentals.
       </p>
-      <div className="mt-4 p-4 rounded-xl border border-[#1d9e75]/20 bg-[#1d9e75]/5">
+      <div className="mt-4 p-4 rounded-xl border border-[#1d9e75]/20 bg-[#1d9e75]/5 space-y-2">
+        <p className="text-sm font-medium text-[#1a3a2a]">
+          Level: {levelLabel}
+        </p>
         <p className="text-sm font-medium text-[#1a3a2a]">
           First topic: Physical Geography — Geomorphology
         </p>

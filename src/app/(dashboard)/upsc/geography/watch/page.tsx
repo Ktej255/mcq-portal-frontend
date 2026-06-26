@@ -1,18 +1,8 @@
-import { GeographyWatchRoom } from "@/components/upsc/GeographyWatchRoom";
-
-export default async function GeographyWatchPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ day?: string; module?: string; section?: string }>;
-}) {
-  const params = await searchParams;
-  const day = Number(params?.day ?? "1");
-
-  return (
-    <GeographyWatchRoom
-      initialDay={Number.isFinite(day) ? day : 1}
-      initialModuleId={params?.module}
-      initialSectionId={params?.section}
-    />
-  );
+/**
+ * @deprecated Redirects to the Geography LMS syllabus page.
+ * The Watch room has been unified into the LMS topic content pages.
+ */
+import { redirect } from "next/navigation";
+export default function GeographyWatchPage() {
+  redirect("/upsc/geography/lms/syllabus");
 }
