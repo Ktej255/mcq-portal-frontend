@@ -148,10 +148,10 @@ export function DiagnosticFlow() {
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/login?redirect=/upsc"
+              href="/login?redirect=/upsc/geography/lms"
               className="inline-flex h-12 flex-1 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
-              Continue to the portal
+              Start your first topic
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             <button

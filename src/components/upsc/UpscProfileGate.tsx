@@ -11,7 +11,54 @@ import { activateUpscMasterPass, upscMasterPassActivatedEvent } from "@/lib/upsc
 import {
   readStudentProfile,
   readSyncedStudentProfile,
+  saveStudentProfile,
 } from "@/lib/upsc/studentProfile";
+
+const DIAGNOSTIC_STORAGE_KEY = "sarit-diagnostic-plan-v1";
+
+/**
+ * Attempt to auto-create a student profile from diagnostic questionnaire data.
+ * If the student completed /start before signing up, their answers are in localStorage.
+ * This removes the "Set up your account" friction entirely.
+ */
+function tryAutoCreateProfileFromDiagnostic(): boolean {
+  try {
+    const raw = localStorage.getItem(DIAGNOSTIC_STORAGE_KEY);
+    if (!raw) return false;
+    const diagnostic = JSON.parse(raw);
+    if (!diagnostic.name) return false;
+
+    // Map diagnostic answers to a minimal student profile
+    const levelMap: Record<string, string> = {
+      "Fresh start — beginning from scratch": "Beginner",
+      "Self-study (6+ months in)": "Intermediate",
+      "Coaching student (online/offline)": "Intermediate",
+      "Repeat attempt (appeared before)": "Advanced",
+    };
+    const hoursMap: Record<string, number> = {
+      "2–3 hours": 150,
+      "4–5 hours": 270,
+      "6–8 hours": 420,
+      "8+ hours": 540,
+    };
+
+    const profile = {
+      name: diagnostic.name,
+      targetYear: diagnostic.year || "2027",
+      level: levelMap[diagnostic.stage] || "Beginner",
+      studyWindow: hoursMap[diagnostic.hours] || 270,
+      optional: diagnostic.optional === "Not decided yet" ? null : diagnostic.optional,
+      weakSubjects: diagnostic.subjects || [],
+      createdAt: new Date().toISOString(),
+      autoCreated: true,
+    };
+
+    saveStudentProfile(profile);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function UpscProfileGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -41,7 +88,13 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
       setState("checking");
       const profile = await readSyncedStudentProfile();
       if (!cancelled && checkId === profileCheckId.current) {
-        setState(profile ? "ready" : "missing");
+        if (profile) {
+          setState("ready");
+        } else {
+          // Try to auto-create from diagnostic data (removes friction)
+          const autoCreated = tryAutoCreateProfileFromDiagnostic();
+          setState(autoCreated ? "ready" : "missing");
+        }
       }
     };
 
