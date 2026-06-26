@@ -23,7 +23,7 @@ interface RecallGateState {
  * the existing localStorage-based sections. Falls back gracefully if the
  * backend is unreachable (shows nothing, doesn't break the page).
  */
-export function LmsHomeSummary() {
+export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const { isLoaded, isSignedIn } = useApiConfig();
   const [plan, setPlan] = useState<DailyPlanOut | null>(null);
   const [recallGate, setRecallGate] = useState<RecallGateState | null>(null);
@@ -55,8 +55,20 @@ export function LmsHomeSummary() {
   const pendingItems = (plan?.planned_items ?? []).filter((item) => !item.completed);
   const hasRecallDue = recallGate?.recall_needed === true;
 
+  // Time-of-day greeting
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const firstName = greeting?.split(" ")[0];
+
   return (
     <section className="rounded-2xl border border-[#b9d9cd] bg-gradient-to-br from-[#e7f5ee] to-[#fffdf8] p-5 shadow-sm md:p-6">
+      {/* Personalized Greeting */}
+      <div className="mb-4">
+        <h1 className="text-xl font-black text-[#1a3a2a] md:text-2xl">
+          {timeGreeting}{firstName ? `, ${firstName}` : ""}! 👋
+        </h1>
+      </div>
+
       {/* Header: Streak + Progress */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
@@ -143,13 +155,25 @@ export function LmsHomeSummary() {
           href="/upsc/current-affairs"
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
         >
-          Current Affairs
+          📰 Current Affairs
         </Link>
         <Link
           href="/upsc/geography/lms/gaps"
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
         >
           View Gaps
+        </Link>
+      </div>
+
+      {/* Current Affairs Highlight */}
+      <div className="mt-4 rounded-xl border border-[#dcd5c7] bg-white p-3 flex items-center gap-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ef9f27]/10 text-[#8c5d14] text-sm">📰</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-[#8c5d14]">Today&apos;s Current Affairs</p>
+          <p className="text-[11px] text-[#536259] truncate">Daily UPSC-relevant news, filtered and explained</p>
+        </div>
+        <Link href="/upsc/current-affairs" className="text-xs font-bold text-[#1d9e75] hover:underline shrink-0">
+          Read →
         </Link>
       </div>
     </section>

@@ -299,7 +299,7 @@ export function UpscDailyMissionControl() {
   const [isSimplePathOpen, setIsSimplePathOpen] = useState(false);
   const [isOperatingContractOpen, setIsOperatingContractOpen] = useState(false);
   const searchParams = useSearchParams();
-  const validTabs = ["today", "yearly", "gaps", "revision", "history", "syllabus"] as const;
+  const validTabs = ["today", "yearly"] as const;
   type TabId = (typeof validTabs)[number];
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const [activeTab, setActiveTab] = useState<TabId>(() => {
@@ -684,7 +684,7 @@ export function UpscDailyMissionControl() {
         ) : null}
 
         {/* LMS Backend Summary — today's plan, streak, recall gate */}
-        <LmsHomeSummary />
+        <LmsHomeSummary greeting={profile?.name} />
 
         {/* Premium Shortcut Navigation Header */}
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
@@ -700,7 +700,6 @@ export function UpscDailyMissionControl() {
             {[
               { id: "today", name: "Today's Study", icon: CalendarCheck },
               { id: "yearly", name: "Yearly Planner", icon: FolderTree },
-              { id: "syllabus", name: "Syllabus & PYQs", icon: LibraryBig },
             ].map((item) => {
               const isActive = activeTab === item.id;
               return (
@@ -862,21 +861,21 @@ export function UpscDailyMissionControl() {
                       {
                         label: "Watch",
                         detail: activeProgress?.watched ? "Watched" : contentReady ? "Ready to watch" : "Content pending",
-                        href: `${basePath}/watch?day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/syllabus`,
                         icon: PlayCircle,
                         active: true,
                       },
                       {
                         label: "Talk",
                         detail: activeProgress?.reflection ? "Reflection saved" : "Explain after watch",
-                        href: `${basePath}/talk?day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/syllabus`,
                         icon: BrainCircuit,
                         active: Boolean(activeProgress?.watched),
                       },
                       {
                         label: "Lab",
                         detail: activeSession.lab,
-                        href: `${basePath}/lab?mode=${activeLabSlug}&day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/syllabus`,
                         icon: Layers3,
                         active: Boolean(activeLabSlug),
                       },
@@ -889,14 +888,14 @@ export function UpscDailyMissionControl() {
                             : activeMcqBatch.ready
                               ? "Practice pending"
                               : `${activeMcqBatch.drafted}/${activeMcqBatch.planned} drafted`,
-                        href: `${basePath}/mcq-readiness?day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/practice`,
                         icon: ClipboardCheck,
                         active: true,
                       },
                       {
                         label: "Retro",
                         detail: activeProgress?.retroCompleted ? "Retrospective completed" : "Review Saturday test",
-                        href: `${basePath}/retro?day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/retro`,
                         icon: Sparkles,
                         active: profile ? Boolean(profile.inductionCompleted) : true,
                       },
@@ -910,14 +909,14 @@ export function UpscDailyMissionControl() {
                       {
                         label: "Track",
                         detail: "Subject progress",
-                        href: `${basePath}/track`,
+                        href: `/upsc/geography/lms/gaps`,
                         icon: LineChart,
                         active: true,
                       },
                       {
                         label: "Revisit",
                         detail: activeProgress?.revisitQueued ? "Repair now" : "Recovery room",
-                        href: `${basePath}/revisit?day=${activeSession.day}`,
+                        href: `/upsc/geography/lms/planner`,
                         icon: RefreshCcw,
                         active: true,
                       },
