@@ -100,9 +100,6 @@ export function isOperatorRoute(pathname: string) {
   );
 }
 
-const onHome = (pathname: string) =>
-  pathname === "/upsc" || pathname === "/upsc/daily-command" || pathname === "/dashboard";
-
 /** Locked subjects rendered as disabled "Soon" entries in the sidebar.
  *  These 7 GS subjects are visible to students with "Coming Soon" badges
  *  but not navigable. They have been removed from `futureSubjectPrefixes`
@@ -127,7 +124,8 @@ export const studentNavSections: StudentNavSection[] = [
         name: "Today",
         href: "/upsc",
         icon: CalendarCheck,
-        match: (pathname, tab) => onHome(pathname) && (!tab || tab === "today"),
+        match: (pathname) =>
+          pathname === "/upsc" || pathname === "/upsc/daily-command" || pathname === "/dashboard",
       },
       {
         name: "Current Affairs",
@@ -136,12 +134,10 @@ export const studentNavSections: StudentNavSection[] = [
         match: (pathname) => pathname.startsWith("/upsc/current-affairs"),
       },
       {
-        name: "Geography",
-        href: "/upsc/geography",
+        name: "GS",
+        href: "/upsc/geography/lms",
         icon: Compass,
-        match: (pathname) =>
-          pathname.startsWith("/upsc/geography") &&
-          !pathname.startsWith("/upsc/geography/lms"),
+        match: (pathname) => pathname.startsWith("/upsc/geography"),
       },
       {
         name: "Optional",
@@ -158,91 +154,26 @@ export const studentNavSections: StudentNavSection[] = [
     ],
   },
   {
-    label: "Geography LMS",
-    // Geography LMS uses /upsc/geography/lms/* (static route).
-    // When other subjects launch their LMS, add new sections here with
-    // /upsc/{subject}/lms/* paths (e.g., /upsc/economy/lms/syllabus).
-    // The dynamic [subject]/lms route handles subjects without a static directory.
+    label: "Account",
     items: [
-      {
-        name: "Syllabus",
-        href: "/upsc/geography/lms/syllabus",
-        icon: LibraryBig,
-        match: (pathname) => pathname.startsWith("/upsc/geography/lms/syllabus") || pathname.startsWith("/upsc/geography/lms/topic"),
-      },
-      {
-        name: "Practice",
-        href: "/upsc/geography/lms/practice",
-        icon: ClipboardCheck,
-        match: (pathname) => pathname.startsWith("/upsc/geography/lms/practice"),
-      },
-      {
-        name: "Gaps",
-        href: "/upsc/geography/lms/gaps",
-        icon: BarChart3,
-        match: (pathname) => pathname.startsWith("/upsc/geography/lms/gaps"),
-      },
-      {
-        name: "Planner",
-        href: "/upsc/geography/lms/planner",
-        icon: FolderTree,
-        match: (pathname) => pathname.startsWith("/upsc/geography/lms/planner"),
-      },
-      {
-        name: "Retro",
-        href: "/upsc/geography/lms/retro",
-        icon: RefreshCcw,
-        match: (pathname) => pathname.startsWith("/upsc/geography/lms/retro"),
-      },
-    ],
-  },
-  {
-    label: "GS Subjects",
-    items: [
-      ...lockedSubjectNavItems,
-    ],
-  },
-  {
-    label: "Review",
-    items: [
-      {
-        name: "Revision",
-        href: "/revision",
-        icon: RefreshCcw,
-        match: (pathname, tab) =>
-          pathname.startsWith("/revision") || (onHome(pathname) && tab === "revision"),
-      },
       {
         name: "Reports",
         href: "/reports",
         icon: BarChart3,
-        match: (pathname, tab) =>
-          pathname.startsWith("/reports") || (onHome(pathname) && tab === "gaps"),
+        match: (pathname) => pathname.startsWith("/reports"),
       },
       {
-        name: "Progress",
-        href: "/history",
-        icon: Activity,
-        match: (pathname, tab) =>
-          pathname.startsWith("/history") || (onHome(pathname) && tab === "history"),
-      },
-      {
-        name: "Planner",
-        href: "/upsc?tab=yearly",
-        icon: FolderTree,
-        match: (pathname, tab) => onHome(pathname) && tab === "yearly",
-      },
-      {
-        name: "Syllabus & PYQs",
-        href: "/upsc?tab=syllabus",
-        icon: LibraryBig,
-        match: (pathname, tab) => onHome(pathname) && tab === "syllabus",
+        name: "Revision",
+        href: "/revision",
+        icon: RefreshCcw,
+        match: (pathname) => pathname.startsWith("/revision"),
       },
       {
         name: "Billing",
         href: "/upsc/billing",
         icon: BadgeIndianRupee,
-        match: (pathname) => pathname.startsWith("/upsc/billing") || pathname.startsWith("/upsc/pricing"),
+        match: (pathname) =>
+          pathname.startsWith("/upsc/billing") || pathname.startsWith("/upsc/pricing"),
       },
     ],
   },
