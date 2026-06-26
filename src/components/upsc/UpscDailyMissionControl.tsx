@@ -68,6 +68,7 @@ import {
 } from "@/lib/upsc/studentProfile";
 import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
 import { AchievementBadge } from "@/components/upsc/AchievementBadge";
+import { LmsHomeSummary } from "@/components/upsc/LmsHomeSummary";
 import { BADGE_DEFINITIONS } from "@/lib/upsc/gamification";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
@@ -681,6 +682,9 @@ export function UpscDailyMissionControl() {
             />
           </div>
         ) : null}
+
+        {/* LMS Backend Summary — today's plan, streak, recall gate */}
+        <LmsHomeSummary />
 
         {/* Premium Shortcut Navigation Header */}
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
