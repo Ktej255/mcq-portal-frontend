@@ -123,6 +123,9 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
   }
 
   if (state === "missing") {
+    // Instead of showing a blocker, redirect to the LMS onboarding
+    // which handles new student setup properly. This prevents the
+    // "complete your setup" dead-end loop.
     return (
       <main className="min-h-[70vh] bg-[#f7f4ee] p-4 text-[#13251d]">
         <section
@@ -132,19 +135,39 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
           <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
             <UserRoundCheck className="h-5 w-5" />
           </div>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Profile required</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight">Set your UPSC self-study profile first</h1>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Quick setup</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight">Let&apos;s set up your study plan</h1>
           <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-[#5d675f]">
-            Tell us whether you are starting fresh, shifting from coaching to self-study, or recovering after repeated
-            attempts. Then the portal opens one correct next action without extra clutter.
+            Takes 30 seconds — pick your level and daily study time, then you&apos;re straight into your first topic.
           </p>
-          <Link
-            href="/upsc#upsc-intake"
-            data-testid="upsc-profile-required-action"
-            className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
-          >
-            Complete setup <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/upsc/geography/lms/onboarding"
+              data-testid="upsc-profile-required-action"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
+            >
+              Start setup <ArrowRight className="h-4 w-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                // Quick skip: create a default profile and proceed
+                const defaultProfile = {
+                  name: "Student",
+                  targetYear: "2027",
+                  level: "Beginner",
+                  studyWindow: 90,
+                  createdAt: new Date().toISOString(),
+                  autoCreated: true,
+                };
+                saveStudentProfile(defaultProfile);
+                setState("ready");
+              }}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#dcd5c7] px-5 text-sm font-black text-[#536259] transition hover:border-[#1d9e75] hover:text-[#1a3a2a]"
+            >
+              Skip for now
+            </button>
+          </div>
         </section>
       </main>
     );

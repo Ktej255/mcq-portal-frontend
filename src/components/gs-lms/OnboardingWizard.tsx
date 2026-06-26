@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { triggerWelcomeEngagement } from "@/lib/engagement/triggerWelcome";
+
+const DIAGNOSTIC_STORAGE_KEY = "sarit-diagnostic-plan-v1";
 
 const STEPS = [
   { label: "Welcome" },
@@ -57,6 +60,48 @@ export function OnboardingWizard() {
   const [studyWindowMinutes, setStudyWindowMinutes] = useState(90);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnosticName, setDiagnosticName] = useState<string | null>(null);
+  const [diagnosticEmail, setDiagnosticEmail] = useState<string | null>(null);
+
+  // Pre-fill from diagnostic data if available
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DIAGNOSTIC_STORAGE_KEY);
+      if (!raw) return;
+      const diagnostic = JSON.parse(raw);
+
+      // Map diagnostic stage to learner level
+      const stageMap: Record<string, LearnerLevel> = {
+        "Fresh start — beginning from scratch": "beginner",
+        "Self-study (6+ months in)": "intermediate",
+        "Coaching student (online/offline)": "intermediate",
+        "Repeat attempt (appeared before)": "advanced",
+      };
+      if (diagnostic.stage && stageMap[diagnostic.stage]) {
+        setLearnerLevel(stageMap[diagnostic.stage]);
+      }
+
+      // Map hours to study window
+      const hoursMap: Record<string, number> = {
+        "2–3 hours": 60,
+        "4–5 hours": 90,
+        "6–8 hours": 120,
+        "8+ hours": 180,
+      };
+      if (diagnostic.hours && hoursMap[diagnostic.hours]) {
+        setStudyWindowMinutes(hoursMap[diagnostic.hours]);
+      }
+
+      // Store name/email for engagement trigger
+      if (diagnostic.name) setDiagnosticName(diagnostic.name);
+      if (diagnostic.email) setDiagnosticEmail(diagnostic.email);
+
+      // Skip Step 1 (Welcome) if diagnostic was completed — they already know the method
+      setStep(1);
+    } catch {
+      // No diagnostic data — start from Step 0
+    }
+  }, []);
 
   // Derive bandwidth from study window
   const bandwidth =
@@ -74,6 +119,18 @@ export function OnboardingWizard() {
         learnerLevel,
         studyWindowMinutes,
       );
+
+      // Fire welcome engagement (email + WhatsApp) — fire and forget
+      if (diagnosticName || diagnosticEmail) {
+        void triggerWelcomeEngagement({
+          name: diagnosticName || "Student",
+          email: diagnosticEmail || "",
+          targetYear: "2027",
+          firstTopicUrl: "/upsc/geography/lms/syllabus",
+        });
+      }
+
+      // Go directly to syllabus (the first topic is there)
       router.push("/upsc/geography/lms/syllabus");
     } catch (err: unknown) {
       const msg =
