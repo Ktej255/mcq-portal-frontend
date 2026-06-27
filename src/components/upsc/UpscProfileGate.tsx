@@ -53,7 +53,7 @@ function tryAutoCreateProfileFromDiagnostic(): boolean {
       autoCreated: true,
     };
 
-    saveStudentProfile(profile);
+    saveStudentProfile(profile as any);
     return true;
   } catch {
     return false;
@@ -160,7 +160,7 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
                   createdAt: new Date().toISOString(),
                   autoCreated: true,
                 };
-                saveStudentProfile(defaultProfile);
+                saveStudentProfile(defaultProfile as any);
                 setState("ready");
               }}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#dcd5c7] px-5 text-sm font-black text-[#536259] transition hover:border-[#1d9e75] hover:text-[#1a3a2a]"

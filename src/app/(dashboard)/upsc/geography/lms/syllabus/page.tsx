@@ -74,10 +74,6 @@ export default function SyllabusPage() {
 
   const filteredTree = filterTree(tree, search);
 
-  const handleLeafClick = (nodeId: number) => {
-    router.push(`/upsc/geography/lms/topic/${nodeId}`);
-  };
-
   if (loading) {
     return (
       <div className="p-6">

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import {
   AUTO_SESSION_HANDOFF_STORAGE_KEY,
   buildDailyPlannerDecision,
@@ -275,6 +276,7 @@ function labelForDailyDoubt(href: string) {
 }
 
 export function UpscDailyMissionControl() {
+  const { user } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [localWelcomeVideoCompleted, setLocalWelcomeVideoCompleted] = useState<boolean>(() => {
@@ -299,7 +301,7 @@ export function UpscDailyMissionControl() {
   const [isSimplePathOpen, setIsSimplePathOpen] = useState(false);
   const [isOperatingContractOpen, setIsOperatingContractOpen] = useState(false);
   const searchParams = useSearchParams();
-  const validTabs = ["today", "yearly"] as const;
+  const validTabs = ["today", "yearly", "gaps", "revision", "history", "syllabus", "settings", "doubts", "performance"] as const;
   type TabId = (typeof validTabs)[number];
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const [activeTab, setActiveTab] = useState<TabId>(() => {
@@ -684,7 +686,7 @@ export function UpscDailyMissionControl() {
         ) : null}
 
         {/* LMS Backend Summary — today's plan, streak, recall gate */}
-        <LmsHomeSummary greeting={profile?.name} />
+        <LmsHomeSummary greeting={user?.displayName || undefined} />
 
         {/* Premium Shortcut Navigation Header */}
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
