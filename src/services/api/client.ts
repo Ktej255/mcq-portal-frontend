@@ -4,12 +4,19 @@ import { env } from '@/env';
 const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
 // Ensure baseURL ends with /api/v1/ if it's pointing to the root domain
 let normalizedBaseUrl = rawBaseUrl;
-if (normalizedBaseUrl && !normalizedBaseUrl.includes('/api/v1')) {
-  normalizedBaseUrl = normalizedBaseUrl.endsWith('/') ? `${normalizedBaseUrl}api/v1/` : `${normalizedBaseUrl}/api/v1/`;
-} else if (!normalizedBaseUrl) {
+
+const isBrowser = typeof window !== 'undefined';
+if (isBrowser && rawBaseUrl.startsWith('http://mcq-portal-alb')) {
+  // Use relative path in browser to trigger next.config.ts rewrites proxy and avoid Mixed Content block
   normalizedBaseUrl = '/api/v1/';
-} else if (!normalizedBaseUrl.endsWith('/')) {
-  normalizedBaseUrl = `${normalizedBaseUrl}/`;
+} else {
+  if (normalizedBaseUrl && !normalizedBaseUrl.includes('/api/v1')) {
+    normalizedBaseUrl = normalizedBaseUrl.endsWith('/') ? `${normalizedBaseUrl}api/v1/` : `${normalizedBaseUrl}/api/v1/`;
+  } else if (!normalizedBaseUrl) {
+    normalizedBaseUrl = '/api/v1/';
+  } else if (!normalizedBaseUrl.endsWith('/')) {
+    normalizedBaseUrl = `${normalizedBaseUrl}/`;
+  }
 }
 
 // Base Axios instance
