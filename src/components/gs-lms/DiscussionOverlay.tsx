@@ -243,6 +243,7 @@ function ActiveDiscussionScreen({
   input,
   setInput,
   onSubmit,
+  onForceComplete,
   sending,
   listening,
   micSupported,
@@ -252,6 +253,7 @@ function ActiveDiscussionScreen({
   input: string;
   setInput: (v: string) => void;
   onSubmit: (text: string) => void;
+  onForceComplete: () => void;
   sending: boolean;
   listening: boolean;
   micSupported: boolean;
@@ -265,6 +267,19 @@ function ActiveDiscussionScreen({
   // Get last AI question and last student answer (if any)
   const lastAiTurn = [...turns].reverse().find((t) => t.role === "ai");
   const lastStudentTurn = [...turns].reverse().find((t) => t.role === "student");
+
+  // Detect if the AI's last message is a gate-pass message
+  const lastAiText = (lastAiTurn?.content ?? "").toLowerCase();
+  const isGatePassMessage =
+    lastAiText.includes("proceed to the content") ||
+    lastAiText.includes("let's proceed") ||
+    lastAiText.includes("lets proceed") ||
+    lastAiText.includes("demonstrated a solid") ||
+    lastAiText.includes("you've unlocked") ||
+    lastAiText.includes("you have unlocked");
+
+  // Show escape-hatch link after 2+ rounds
+  const canEscape = turns.length >= 4; // 2 student + 2 AI turns
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -284,9 +299,15 @@ function ActiveDiscussionScreen({
 
         {/* Current AI question — prominent */}
         {lastAiTurn && (
-          <div className="bg-emerald-600 rounded-3xl px-5 py-5 shadow-md shadow-emerald-100">
+          <div
+            className={`rounded-3xl px-5 py-5 shadow-md ${
+              isGatePassMessage
+                ? "bg-emerald-600 shadow-emerald-100"
+                : "bg-emerald-600 shadow-emerald-100"
+            }`}
+          >
             <p className="text-[11px] font-bold text-emerald-200 uppercase tracking-widest mb-2">
-              AI Tutor asks
+              {isGatePassMessage ? "✓ Gate Passed" : "AI Tutor asks"}
             </p>
             <p className="text-white text-base leading-relaxed font-medium">
               {lastAiTurn.content}
@@ -295,50 +316,71 @@ function ActiveDiscussionScreen({
         )}
       </div>
 
-      {/* Fixed input area */}
-      <div className="border-t border-slate-100 bg-white px-4 py-4">
-        <form onSubmit={handleSubmit} className="space-y-2.5">
-          <div className="relative">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your response or tap the mic…"
-              rows={3}
-              disabled={sending}
-              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (input.trim() && !sending) onSubmit(input.trim());
-                }
-              }}
-            />
-            {listening && (
-              <div className="absolute top-3 right-3 flex items-center gap-1.5 text-red-500 text-xs font-semibold animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                Listening…
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <MicButton listening={listening} supported={micSupported} onToggle={onToggleMic} />
-            <button
-              type="submit"
-              disabled={!input.trim() || sending}
-              className="flex-1 py-2.5 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all active:scale-[0.98]"
-            >
-              {sending ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Analysing…
-                </span>
-              ) : (
-                "Submit Answer →"
+      {/* Bottom area — Proceed button if gate text detected, else input form */}
+      {isGatePassMessage ? (
+        <div className="border-t border-emerald-100 bg-emerald-50 px-4 py-5 flex flex-col items-center gap-3">
+          <p className="text-sm font-semibold text-emerald-800">🎉 You&apos;ve unlocked this topic!</p>
+          <button
+            onClick={onForceComplete}
+            className="w-full max-w-sm py-3.5 px-6 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-2xl transition-all shadow-lg shadow-emerald-200"
+          >
+            Proceed to Content →
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-slate-100 bg-white px-4 py-4">
+          <form onSubmit={handleSubmit} className="space-y-2.5">
+            <div className="relative">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your response or tap the mic…"
+                rows={3}
+                disabled={sending}
+                className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (input.trim() && !sending) onSubmit(input.trim());
+                  }
+                }}
+              />
+              {listening && (
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 text-red-500 text-xs font-semibold animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                  Listening…
+                </div>
               )}
+            </div>
+            <div className="flex items-center gap-3">
+              <MicButton listening={listening} supported={micSupported} onToggle={onToggleMic} />
+              <button
+                type="submit"
+                disabled={!input.trim() || sending}
+                className="flex-1 py-2.5 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all active:scale-[0.98]"
+              >
+                {sending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Analysing…
+                  </span>
+                ) : (
+                  "Submit Answer →"
+                )}
+              </button>
+            </div>
+          </form>
+          {/* Escape hatch after sufficient discussion */}
+          {canEscape && (
+            <button
+              onClick={onForceComplete}
+              className="w-full mt-2 text-xs text-slate-400 hover:text-emerald-600 transition-colors py-1"
+            >
+              I&apos;ve understood the topic — skip ahead →
             </button>
-          </div>
-        </form>
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -566,7 +608,21 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           });
         }
 
-        if (response.gate_passed) {
+        // Multi-signal gate detection:
+        // 1. Explicit gate_passed flag
+        // 2. Session status set to COMPLETED by backend
+        // 3. AI message text contains the proceed phrase (backend sometimes sends
+        //    the congratulatory message before flipping the flag)
+        const aiText = response.ai_turn.content.toLowerCase();
+        const textSignal =
+          aiText.includes("proceed to the content") ||
+          aiText.includes("let's proceed") ||
+          aiText.includes("lets proceed") ||
+          aiText.includes("you've unlocked") ||
+          aiText.includes("you have unlocked") ||
+          aiText.includes("demonstrated a solid");
+
+        if (response.gate_passed || response.status === "COMPLETED" || textSignal) {
           setPhase(2);
         }
       } finally {
@@ -649,6 +705,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           input={input}
           setInput={setInput}
           onSubmit={handleSubmit}
+          onForceComplete={onComplete}
           sending={sending}
           listening={listening}
           micSupported={micSupported}

@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 import type { PyqOut } from "@/services/api/gsLmsService";
+import { AnswerWorkspace } from "./AnswerWorkspace";
 
 interface PYQCardProps {
   pyq: PyqOut;
   onReveal: (pyqId: number) => Promise<void>;
+  /** Subject slug for answer submission (defaults to geography). */
+  subject?: string;
 }
 
-export function PYQCard({ pyq, onReveal }: PYQCardProps) {
+export function PYQCard({ pyq, onReveal, subject = "geography" }: PYQCardProps) {
   const [revealed, setRevealed] = useState(pyq.revealed);
   const [revealing, setRevealing] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const isMains = pyq.exam_type === "MAINS";
 
   const handleReveal = async () => {
     setRevealing(true);
@@ -64,6 +69,29 @@ export function PYQCard({ pyq, onReveal }: PYQCardProps) {
               <p className="text-sm text-[#13251d]/80 mt-1 leading-relaxed">
                 {pyq.explanation}
               </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mains answer-writing + evaluation (R9, R10) */}
+      {isMains && (
+        <div className="mt-3 pt-3 border-t border-[#dcd5c7]">
+          <button
+            onClick={() => setWriting((w) => !w)}
+            className="text-sm font-medium text-[#1d9e75] hover:text-[#178a65] transition-colors"
+          >
+            {writing ? "Hide answer workspace" : "Write & evaluate your answer"}
+          </button>
+          {writing && (
+            <div className="mt-3">
+              <AnswerWorkspace
+                subject={subject}
+                pyqId={pyq.id}
+                questionText={pyq.question_text}
+                year={pyq.year}
+                maxMarks={pyq.marks ?? undefined}
+              />
             </div>
           )}
         </div>
