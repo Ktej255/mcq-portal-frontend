@@ -35,6 +35,7 @@ interface DSpeechRecognitionResultList {
 
 interface DSpeechRecognitionResult {
   readonly length: number;
+  readonly isFinal: boolean;
   [index: number]: DSpeechRecognitionAlternative;
 }
 
@@ -508,6 +509,8 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   const listeningRef = useRef(false);
   // Cache the constructor so startRecognition can create new instances on restart.
   const recognitionCtorRef = useRef<(new () => DSpeechRecognition) | null>(null);
+  // Accumulator for final verified speech text during this microphone session
+  const finalTranscriptRef = useRef("");
 
   // Detect browser speech API support
   useEffect(() => {
@@ -547,14 +550,17 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
     recognition.lang = "en-IN";
 
     recognition.onresult = (event: DSpeechRecognitionEvent) => {
-      let transcript = "";
+      let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscriptRef.current += result[0].transcript + " ";
+        } else {
+          interim = result[0].transcript;
+        }
       }
-      setInput((prev) => {
-        const base = prev.replace(/\s*\[…\]\s*$/, "").trimEnd();
-        return base ? `${base} ${transcript}` : transcript;
-      });
+      // Update text area with accumulated final text + active interim text
+      setInput(finalTranscriptRef.current + interim);
     };
 
     // onend fires after silence timeout even with continuous=true.
@@ -599,6 +605,8 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       recognitionRef.current?.stop();
       recognitionRef.current = null;
       setListening(false);
+      // Clean up final trailing spaces
+      setInput((prev) => prev.trim());
       return;
     }
 
@@ -609,11 +617,14 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       | undefined;
     if (!Ctor) return;
 
+    // Start fresh with whatever is currently written in the input
+    finalTranscriptRef.current = input ? input.trim() + " " : "";
+
     recognitionCtorRef.current = Ctor;
     listeningRef.current = true;
     setListening(true);
     startRecognition();
-  }, [startRecognition]);
+  }, [input, startRecognition]);
 
   // Stop mic on unmount
   useEffect(() => {
