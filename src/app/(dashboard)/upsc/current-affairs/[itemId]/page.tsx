@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Star } from 'lucide-react';
+import { ArrowLeft, Star, GitBranch } from 'lucide-react';
 import { caService, CAItemDetailOut } from '@/services/api/caService';
 import { CAItemFunnel } from '@/components/current-affairs/CAItemFunnel';
+import { CADoubtChat } from '@/components/current-affairs/CADoubtChat';
 
 /**
  * CA Item Funnel Page — individual item learning experience.
@@ -104,6 +105,9 @@ export default function CAItemPage() {
 
         {/* Funnel */}
         <CAItemFunnel itemId={itemId} item={item} />
+
+        {/* AI Doubt Chat (floating) */}
+        <CADoubtChat itemId={itemId} itemTitle={item.title} />
       </div>
     </main>
   );
