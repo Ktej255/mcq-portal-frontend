@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { TopicSectionsOut } from "@/services/api/gsLmsService";
-import { ContentSections } from "@/components/gs-lms/ContentSections";
-import { PYQPanel } from "@/components/gs-lms/PYQPanel";
-import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
 import { DiscussionOverlay } from "@/components/gs-lms/DiscussionOverlay";
 import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
 import { VideoPlayer } from "@/components/gs-lms/VideoPlayer";
@@ -18,20 +15,17 @@ import { McqLabStep } from "@/components/gs-lms/McqLabStep";
 import { MainsPracticeStep } from "@/components/gs-lms/MainsPracticeStep";
 import { GrowthReportStep } from "@/components/gs-lms/GrowthReportStep";
 import { ExternalResourceCards } from "@/components/gs-lms/ExternalResourceCards";
+import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
 import { useFunnelState } from "@/hooks/useFunnelState";
-import { useReadingTimer } from "@/hooks/useReadingTimer";
 
 export default function TopicContentPage() {
   const params = useParams();
-  const router = useRouter();
   const nodeId = Number(params.nodeId);
   const { isLoaded, isSignedIn } = useApiConfig();
 
   const [data, setData] = useState<TopicSectionsOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [startingPractice, setStartingPractice] = useState(false);
-  const [practiceError, setPracticeError] = useState<string | null>(null);
 
   // Interactive Learning Funnel state
   const funnel = useFunnelState(nodeId, "geography");
@@ -61,34 +55,6 @@ export default function TopicContentPage() {
     funnel.completeStep(1).catch(() => {});
     fetchSections();
   }, [fetchSections, funnel]);
-
-  const handleSectionComplete = async (sectionId: number) => {
-    try {
-      await gsLmsService.completeSection("geography", nodeId, sectionId);
-      fetchSections();
-    } catch {
-      // Silently handle — user can retry
-    }
-  };
-
-  const handleStartPractice = async () => {
-    setStartingPractice(true);
-    setPracticeError(null);
-    try {
-      const session = await gsLmsService.startPractice("geography", nodeId);
-      sessionStorage.setItem(
-        `practice-session-${session.session_id}`,
-        JSON.stringify(session),
-      );
-      router.push(`/upsc/geography/lms/practice/${session.session_id}`);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        "No practice questions are available for this topic yet.";
-      setPracticeError(msg);
-      setStartingPractice(false);
-    }
-  };
 
   if (loading || funnel.loading) {
     return (
@@ -142,18 +108,14 @@ export default function TopicContentPage() {
               />
             )}
 
-            {/* Progressive-disclosure sections with reading time tracking */}
-            <ContentSections
-              sections={data.sections.map((section, index) => {
-                const isFirst = index === 0;
-                const prevCompleted = index > 0 && data.sections[index - 1].completed;
-                if (isFirst || prevCompleted) {
-                  return { ...section, locked: false };
-                }
-                return section;
-              })}
-              onComplete={handleSectionComplete}
-            />
+            {/* Content rendered as rich text (no old progressive-disclosure UI) */}
+            {data.sections && data.sections.length > 0 && (
+              <div className="rounded-xl border border-[#dcd5c7] bg-white p-5">
+                <p className="text-sm text-[#5d675f]">
+                  Read through the content below, then proceed to the recall check.
+                </p>
+              </div>
+            )}
 
             {/* External resources (shown after content, before recall) */}
             <ExternalResourceCards nodeId={nodeId} />
@@ -173,8 +135,15 @@ export default function TopicContentPage() {
               />
             )}
 
-            {/* PYQ Panel */}
-            <PYQPanel nodeId={nodeId} />
+            {/* Advance to next content step */}
+            {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (
+              <button
+                onClick={() => advanceStep(currentStep)}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+              >
+                I&apos;ve Read This Section → Continue
+              </button>
+            )}
           </div>
         )}
 
@@ -221,34 +190,6 @@ export default function TopicContentPage() {
           </div>
         )}
       </FunnelOrchestrator>
-
-      {/* Practice MCQs — legacy sequential practice (still accessible) */}
-      <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5">
-        <h2 className="text-base font-semibold text-[#13251d]">Practice Questions</h2>
-        <p className="mt-1 text-sm text-[#13251d]/60">
-          Test yourself with UPSC-style MCQs for this topic.
-        </p>
-        <button
-          type="button"
-          onClick={handleStartPractice}
-          disabled={startingPractice}
-          className="mt-3 rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#178a65] disabled:opacity-50"
-        >
-          {startingPractice ? "Starting…" : "Start Practice →"}
-        </button>
-        {practiceError ? (
-          <p className="mt-2 text-sm font-medium text-[#a23b46]">{practiceError}</p>
-        ) : null}
-      </section>
-
-      {/* PDF download — visible only when topic is fully completed */}
-      {data.topic_completed && (
-        <PdfDownloadButton
-          nodeId={nodeId}
-          topicCompleted={data.topic_completed}
-          topicTitle={data.title}
-        />
-      )}
     </div>
   );
 }
