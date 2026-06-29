@@ -21,44 +21,39 @@ interface DiscussionOverlayProps {
 }
 
 // ---------------------------------------------------------------------------
-// Web Speech API type shim (not in lib.dom by default in all configs)
+// Web Speech API — file-scoped types (DS prefix avoids global namespace clash)
 // ---------------------------------------------------------------------------
-interface SpeechRecognitionEvent extends Event {
+interface DSpeechRecognitionEvent extends Event {
   resultIndex: number;
-  results: SpeechRecognitionResultList;
+  results: DSpeechRecognitionResultList;
 }
 
-interface SpeechRecognitionResultList {
+interface DSpeechRecognitionResultList {
   readonly length: number;
-  [index: number]: SpeechRecognitionResult;
+  [index: number]: DSpeechRecognitionResult;
 }
 
-interface SpeechRecognitionResult {
+interface DSpeechRecognitionResult {
   readonly length: number;
-  [index: number]: SpeechRecognitionAlternative;
+  [index: number]: DSpeechRecognitionAlternative;
 }
 
-interface SpeechRecognitionAlternative {
+interface DSpeechRecognitionAlternative {
   readonly transcript: string;
   readonly confidence: number;
 }
 
-interface SpeechRecognition extends EventTarget {
+interface DSpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   start(): void;
   stop(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  abort(): void;
+  onresult: ((event: DSpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
+  onerror: ((event: Event) => void) | null;
+  onstart: (() => void) | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -465,15 +460,12 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   // Voice input state
   const [listening, setListening] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<DSpeechRecognition | null>(null);
 
   // Detect browser speech API support
   useEffect(() => {
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined"
-        ? window.SpeechRecognition || window.webkitSpeechRecognition
-        : null;
-    setMicSupported(!!SpeechRecognitionCtor);
+    const w = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : null;
+    setMicSupported(!!(w?.SpeechRecognition || w?.webkitSpeechRecognition));
   }, []);
 
   // Load / resume existing session
@@ -498,11 +490,11 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
 
   // Toggle microphone
   const toggleMic = useCallback(() => {
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined"
-        ? window.SpeechRecognition || window.webkitSpeechRecognition
-        : null;
-    if (!SpeechRecognitionCtor) return;
+    const w = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : null;
+    const Ctor = (w?.SpeechRecognition || w?.webkitSpeechRecognition) as
+      | (new () => DSpeechRecognition)
+      | undefined;
+    if (!Ctor) return;
 
     if (listening) {
       recognitionRef.current?.stop();
@@ -510,18 +502,17 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       return;
     }
 
-    const recognition = new SpeechRecognitionCtor();
+    const recognition = new Ctor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-IN";
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: DSpeechRecognitionEvent) => {
       let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
       setInput((prev) => {
-        // Append new transcript words to existing text (interim results overwrite)
         const base = prev.replace(/\s*\[…\]\s*$/, "").trimEnd();
         return base ? `${base} ${transcript}` : transcript;
       });
