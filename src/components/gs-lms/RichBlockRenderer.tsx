@@ -461,6 +461,78 @@ function Diagram({ block }: { block: ContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
+// NCERT Reference — direct-jump link to exact book/chapter/page
+// ---------------------------------------------------------------------------
+function NcertReference({ block }: { block: ContentBlock }) {
+  const book = block.book as string | undefined;
+  const classNum = block.class as string | undefined;
+  const chapter = block.chapter as string | undefined;
+  const pageStart = block.page_start as number | undefined;
+  const pageEnd = block.page_end as number | undefined;
+  const externalUrl = block.external_url as string | undefined;
+  const content = (block.text || block.content) as string | undefined;
+  const keyFacts = block.key_facts as string[] | undefined;
+
+  const pageRange = pageStart && pageEnd
+    ? `pp. ${pageStart}–${pageEnd}`
+    : pageStart
+      ? `p. ${pageStart}`
+      : '';
+
+  return (
+    <div className="my-4 rounded-xl border border-[#e8d5a8] bg-gradient-to-br from-[#fef9ec] to-[#fffbeb] p-4">
+      {/* Header with book info */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          {book && (
+            <p className="text-xs font-black text-[#8c5d14]">{book}</p>
+          )}
+          <p className="text-[10px] text-[#8c5d14]/70">
+            {[classNum && `Class ${classNum}`, chapter && `Ch. ${chapter}`, pageRange]
+              .filter(Boolean)
+              .join(' • ')}
+          </p>
+        </div>
+        {externalUrl && (
+          <a
+            href={externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 rounded-lg border border-[#e8d5a8] bg-white px-2.5 py-1 text-[9px] font-black text-[#8c5d14] hover:bg-[#fef9ec] hover:shadow-sm transition-all"
+          >
+            Open NCERT →
+          </a>
+        )}
+      </div>
+
+      {/* Extracted content */}
+      {content && (
+        <p className="text-sm leading-relaxed text-[#5d4e37]">{renderInline(content)}</p>
+      )}
+
+      {/* Key facts list */}
+      {keyFacts && keyFacts.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {keyFacts.map((fact, i) => (
+            <li key={i} className="flex items-start gap-1.5 text-xs text-[#5d4e37]">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#8c5d14]/40 flex-shrink-0" />
+              {renderInline(fact)}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Non-clickable reference when no URL */}
+      {!externalUrl && book && (
+        <p className="mt-2 text-[10px] text-[#8c5d14]/60 italic">
+          Reference: {book}{classNum ? `, Class ${classNum}` : ''}{chapter ? `, Chapter ${chapter}` : ''}{pageRange ? `, ${pageRange}` : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Master block dispatcher.
 // ---------------------------------------------------------------------------
 export function RichBlock({ block }: { block: ContentBlock }) {
@@ -506,6 +578,10 @@ export function RichBlock({ block }: { block: ContentBlock }) {
       return <Points block={block} />;
     case "diagram":
       return <Diagram block={block} />;
+    case "ncert_reference":
+    case "ncert_ref":
+    case "ncert":
+      return <NcertReference block={block} />;
     case "para":
     default:
       return (
