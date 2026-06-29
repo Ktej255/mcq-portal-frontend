@@ -494,6 +494,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [turns, setTurns] = useState<DiscussionTurnOut[]>([]);
   const [input, setInput] = useState("");
+  const [interimInput, setInterimInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conceptProgress, setConceptProgress] = useState<ConceptProgress | null>(null);
@@ -550,22 +551,43 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
     recognition.lang = "en-IN";
 
     recognition.onresult = (event: DSpeechRecognitionEvent) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscriptRef.current += result[0].transcript + " ";
+      const startIndex =
+        typeof event.resultIndex === "number"
+          ? Math.max(0, Math.min(event.resultIndex, event.results.length))
+          : 0;
+      const finalSegments: string[] = [];
+      const interimSegments: string[] = [];
+
+      for (let index = startIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const transcript = result?.[0]?.transcript;
+        if (!transcript) continue;
+
+        if (result.isFinal === false) {
+          interimSegments.push(transcript);
         } else {
-          interim = result[0].transcript;
+          finalSegments.push(transcript);
         }
       }
-      // Update text area with accumulated final text + active interim text
-      setInput(finalTranscriptRef.current + interim);
+
+      const finalText = finalSegments.join(" ").trim();
+      const interimText = interimSegments.join(" ").trim();
+
+      setInterimInput(interimText);
+
+      if (finalText) {
+        setInput((current) => {
+          const cleaned = finalText.replace(/\s+/g, " ").trim();
+          if (!cleaned) return current;
+          return `${current}${current.trim() ? " " : ""}${cleaned}`.trim();
+        });
+      }
     };
 
     // onend fires after silence timeout even with continuous=true.
     // If the user hasn't stopped intentionally, restart immediately.
     recognition.onend = () => {
+      setInterimInput("");
       if (listeningRef.current) {
         // Small delay prevents rapid-fire restart errors in some browsers
         setTimeout(() => startRecognition(), 100);
@@ -575,6 +597,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
     };
 
     recognition.onerror = (e: Event) => {
+      setInterimInput("");
       const err = (e as unknown as { error?: string }).error;
       // "no-speech" is normal — just restart. Abort on fatal errors.
       if (err === "not-allowed" || err === "service-not-allowed") {
@@ -605,6 +628,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       recognitionRef.current?.stop();
       recognitionRef.current = null;
       setListening(false);
+      setInterimInput("");
       // Clean up final trailing spaces
       setInput((prev) => prev.trim());
       return;
@@ -745,7 +769,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       {phase === 0 && (
         <WelcomeScreen
           topicTitle={topicTitle}
-          input={input}
+          input={input + (interimInput ? (input.trim() ? " " : "") + interimInput : "")}
           setInput={setInput}
           onSubmit={handleSubmit}
           sending={sending}
@@ -758,7 +782,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       {phase === 1 && (
         <ActiveDiscussionScreen
           turns={turns}
-          input={input}
+          input={input + (interimInput ? (input.trim() ? " " : "") + interimInput : "")}
           setInput={setInput}
           onSubmit={handleSubmit}
           onForceComplete={onComplete}
