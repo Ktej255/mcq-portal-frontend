@@ -42,7 +42,7 @@ function layoutGraph(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge
   g.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 100 });
 
   nodes.forEach(node => {
-    const size = node.data?.size || 50;
+    const size = (node.data?.size as number) || 50;
     g.setNode(node.id, { width: size + 40, height: size + 20 });
   });
   edges.forEach(edge => {
@@ -70,8 +70,8 @@ export function KnowledgeGraph({ onNodeClick }: KnowledgeGraphProps) {
   const [filters, setFilters] = useState<Partial<CAFilters>>({});
   const [selectedNode, setSelectedNode] = useState<GraphNodeOut | null>(null);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   const fetchGraph = useCallback(async () => {
     setLoading(true);
@@ -175,7 +175,7 @@ export function KnowledgeGraph({ onNodeClick }: KnowledgeGraphProps) {
         >
           <Background color="#dcd5c7" gap={20} />
           <Controls className="!bg-white !border-[#dcd5c7] !rounded-lg" />
-          <MiniMap nodeColor={(n) => n.data?.color || '#94a3b8'} className="!bg-[#f7f4ee] !border-[#dcd5c7] !rounded-lg" />
+          <MiniMap nodeColor={(n) => (n.data?.color as string) || '#94a3b8'} className="!bg-[#f7f4ee] !border-[#dcd5c7] !rounded-lg" />
 
           {/* Legend */}
           <Panel position="top-left" className="bg-white/90 rounded-lg border border-[#dcd5c7] p-2 space-y-1">

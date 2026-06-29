@@ -139,7 +139,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
               `}
             >
               {state === 'locked' ? <Lock className="h-3 w-3" /> : null}
-              {state === 'visited' && state !== 'active' ? <CheckCircle2 className="h-3 w-3" /> : null}
+              {state === 'visited' ? <CheckCircle2 className="h-3 w-3" /> : null}
               {state === 'active' || state === 'locked' ? tab.icon : null}
               <span>{tab.label}</span>
             </button>
