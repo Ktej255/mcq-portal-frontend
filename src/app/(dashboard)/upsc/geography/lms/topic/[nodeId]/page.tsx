@@ -81,6 +81,16 @@ export default function TopicContentPage() {
     return <DiscussionOverlay nodeId={nodeId} topicTitle={data.title} onComplete={handleGateComplete} />;
   }
 
+  // Enforce sequential unlocking on the client-side as a fallback to prevent backend lock bugs
+  const displaySections = data.sections.map((section, index) => {
+    const isFirst = index === 0;
+    const prevCompleted = index > 0 && data.sections[index - 1].completed;
+    if (isFirst || prevCompleted) {
+      return { ...section, locked: false };
+    }
+    return section;
+  });
+
   return (
     <div className="p-6 space-y-8">
       {/* Page title */}
@@ -97,7 +107,7 @@ export default function TopicContentPage() {
       )}
 
       {/* Progressive-disclosure sections */}
-      <ContentSections sections={data.sections} onComplete={handleSectionComplete} />
+      <ContentSections sections={displaySections} onComplete={handleSectionComplete} />
 
       {/* PYQ Panel */}
       <PYQPanel nodeId={nodeId} />
