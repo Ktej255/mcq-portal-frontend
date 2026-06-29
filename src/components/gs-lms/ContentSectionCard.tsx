@@ -1,30 +1,12 @@
 "use client";
 
-import type { ContentSectionOut, ContentBlock } from "@/services/api/gsLmsService";
+import type { ContentSectionOut } from "@/services/api/gsLmsService";
+import { RichBlocks } from "./RichBlockRenderer";
 
 interface ContentSectionCardProps {
   section: ContentSectionOut;
   isActive: boolean;
   onComplete: (sectionId: number) => void;
-}
-
-function renderBlock(block: ContentBlock, index: number) {
-  const type = block.type as string | undefined;
-  const text = block.text as string | undefined;
-
-  if (type === "heading" || type === "h2" || type === "h3") {
-    return (
-      <h3 key={index} className="text-base font-semibold text-[#13251d] mt-4 mb-2">
-        {text}
-      </h3>
-    );
-  }
-
-  return (
-    <p key={index} className="text-sm text-[#13251d]/80 leading-relaxed mb-3">
-      {text ?? JSON.stringify(block)}
-    </p>
-  );
 }
 
 export function ContentSectionCard({ section, isActive, onComplete }: ContentSectionCardProps) {
@@ -99,7 +81,7 @@ export function ContentSectionCard({ section, isActive, onComplete }: ContentSec
 
       {/* Content blocks */}
       <div className="mb-5">
-        {section.blocks?.map((block, i) => renderBlock(block, i))}
+        <RichBlocks blocks={section.blocks} />
       </div>
 
       {/* Mark Complete button */}

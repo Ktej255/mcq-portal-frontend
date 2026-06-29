@@ -73,6 +73,7 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conceptProgress, setConceptProgress] = useState<ConceptProgress | null>(null);
+  const [gatePassed, setGatePassed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,7 +118,7 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
       }
 
       if (response.gate_passed) {
-        onComplete();
+        setGatePassed(true);
       }
     } finally {
       setSending(false);
@@ -156,27 +157,42 @@ export function DiscussionOverlay({ nodeId, onComplete }: DiscussionOverlayProps
         )}
       </div>
 
-      {/* Input area */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-3 px-4 py-3 border-t border-[#dcd5c7] bg-[#f7f4ee]"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your explanation…"
-          disabled={sending || loading}
-          className="flex-1 px-4 py-2.5 text-sm bg-white border border-[#dcd5c7] rounded-lg outline-none focus:border-[#1d9e75] focus:ring-1 focus:ring-[#1d9e75] disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || sending || loading}
-          className="px-4 py-2.5 text-sm font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Gate passed — show prominent proceed button instead of the input */}
+      {gatePassed ? (
+        <div className="flex flex-col items-center gap-3 px-4 py-5 border-t border-[#1d9e75]/30 bg-[#edf8f3]">
+          <p className="text-sm font-medium text-[#1a3a2a]">
+            🎉 Great work! You&apos;ve unlocked this topic.
+          </p>
+          <button
+            onClick={onComplete}
+            className="w-full max-w-sm px-6 py-3 text-sm font-semibold text-white bg-[#1d9e75] hover:bg-[#178a65] active:scale-[0.98] rounded-xl transition-all shadow-md"
+          >
+            Proceed to Content →
+          </button>
+        </div>
+      ) : (
+        /* Input area */
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-3 px-4 py-3 border-t border-[#dcd5c7] bg-[#f7f4ee]"
         >
-          {sending ? "Sending…" : "Send"}
-        </button>
-      </form>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your explanation…"
+            disabled={sending || loading}
+            className="flex-1 px-4 py-2.5 text-sm bg-white border border-[#dcd5c7] rounded-lg outline-none focus:border-[#1d9e75] focus:ring-1 focus:ring-[#1d9e75] disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || sending || loading}
+            className="px-4 py-2.5 text-sm font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
