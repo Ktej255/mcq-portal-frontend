@@ -37,6 +37,16 @@ export default function TopicContentPage() {
     fetchSections();
   }, [isLoaded, isSignedIn, fetchSections]);
 
+  const [forceGatePassed, setForceGatePassed] = useState(false);
+
+  // Called when student clicks "Proceed to Content" in the discussion overlay.
+  // Set forceGatePassed FIRST so that even if the backend still returns
+  // discussion_gate_passed=false, we skip the overlay and show content.
+  const handleGateComplete = useCallback(() => {
+    setForceGatePassed(true);
+    fetchSections();
+  }, [fetchSections]);
+
   const handleSectionComplete = async (sectionId: number) => {
     try {
       await gsLmsService.completeSection("geography", nodeId, sectionId);
@@ -65,9 +75,10 @@ export default function TopicContentPage() {
 
   if (!data) return null;
 
-  // Discussion gate — must pass before seeing content
-  if (!data.discussion_gate_passed) {
-    return <DiscussionOverlay nodeId={nodeId} topicTitle={data.title} onComplete={fetchSections} />;
+  // Discussion gate — must pass before seeing content.
+  // forceGatePassed lets the UI bypass a stale backend flag after the student clicks Proceed.
+  if (!data.discussion_gate_passed && !forceGatePassed) {
+    return <DiscussionOverlay nodeId={nodeId} topicTitle={data.title} onComplete={handleGateComplete} />;
   }
 
   return (
