@@ -67,7 +67,7 @@ export default function TopicContentPage() {
 
   // Discussion gate — must pass before seeing content
   if (!data.discussion_gate_passed) {
-    return <DiscussionOverlay nodeId={nodeId} onComplete={fetchSections} />;
+    return <DiscussionOverlay nodeId={nodeId} topicTitle={data.title} onComplete={fetchSections} />;
   }
 
   return (
