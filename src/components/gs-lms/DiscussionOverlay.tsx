@@ -503,6 +503,11 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   const [listening, setListening] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
   const recognitionRef = useRef<DSpeechRecognition | null>(null);
+  // listeningRef tracks USER INTENT — stays true until they tap mic again.
+  // This lets onend auto-restart without checking stale React state.
+  const listeningRef = useRef(false);
+  // Cache the constructor so startRecognition can create new instances on restart.
+  const recognitionCtorRef = useRef<(new () => DSpeechRecognition) | null>(null);
 
   // Detect browser speech API support
   useEffect(() => {
@@ -530,19 +535,11 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       .finally(() => setLoading(false));
   }, [nodeId]);
 
-  // Toggle microphone
-  const toggleMic = useCallback(() => {
-    const w = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : null;
-    const Ctor = (w?.SpeechRecognition || w?.webkitSpeechRecognition) as
-      | (new () => DSpeechRecognition)
-      | undefined;
-    if (!Ctor) return;
-
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
+  // Start a fresh recognition instance and attach handlers.
+  // Called on first start AND on every auto-restart after onend.
+  const startRecognition = useCallback(() => {
+    const Ctor = recognitionCtorRef.current;
+    if (!Ctor || !listeningRef.current) return;
 
     const recognition = new Ctor();
     recognition.continuous = true;
@@ -560,22 +557,68 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       });
     };
 
+    // onend fires after silence timeout even with continuous=true.
+    // If the user hasn't stopped intentionally, restart immediately.
     recognition.onend = () => {
-      setListening(false);
+      if (listeningRef.current) {
+        // Small delay prevents rapid-fire restart errors in some browsers
+        setTimeout(() => startRecognition(), 100);
+      } else {
+        setListening(false);
+      }
     };
 
-    recognition.onerror = () => {
-      setListening(false);
+    recognition.onerror = (e: Event) => {
+      const err = (e as unknown as { error?: string }).error;
+      // "no-speech" is normal — just restart. Abort on fatal errors.
+      if (err === "not-allowed" || err === "service-not-allowed") {
+        listeningRef.current = false;
+        setListening(false);
+        return;
+      }
+      if (listeningRef.current) {
+        setTimeout(() => startRecognition(), 200);
+      } else {
+        setListening(false);
+      }
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      // Already started — ignore
+    }
+  }, []);
+
+  // Toggle microphone on/off
+  const toggleMic = useCallback(() => {
+    // Stop
+    if (listeningRef.current) {
+      listeningRef.current = false;
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setListening(false);
+      return;
+    }
+
+    // Start — look up constructor first
+    const w = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : null;
+    const Ctor = (w?.SpeechRecognition || w?.webkitSpeechRecognition) as
+      | (new () => DSpeechRecognition)
+      | undefined;
+    if (!Ctor) return;
+
+    recognitionCtorRef.current = Ctor;
+    listeningRef.current = true;
     setListening(true);
-  }, [listening]);
+    startRecognition();
+  }, [startRecognition]);
 
   // Stop mic on unmount
   useEffect(() => {
     return () => {
+      listeningRef.current = false;
       recognitionRef.current?.stop();
     };
   }, []);
@@ -585,7 +628,9 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       if (!text.trim() || !sessionId || sending) return;
 
       // Stop mic if active
+      listeningRef.current = false;
       recognitionRef.current?.stop();
+      recognitionRef.current = null;
       setListening(false);
 
       setInput("");
