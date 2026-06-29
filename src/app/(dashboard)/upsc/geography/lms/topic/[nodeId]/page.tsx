@@ -15,6 +15,7 @@ import { McqLabStep } from "@/components/gs-lms/McqLabStep";
 import { MainsPracticeStep } from "@/components/gs-lms/MainsPracticeStep";
 import { GrowthReportStep } from "@/components/gs-lms/GrowthReportStep";
 import { ExternalResourceCards } from "@/components/gs-lms/ExternalResourceCards";
+import { RichBlocks } from "@/components/gs-lms/RichBlockRenderer";
 import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
 import { useFunnelState } from "@/hooks/useFunnelState";
 
@@ -108,14 +109,23 @@ export default function TopicContentPage() {
               />
             )}
 
-            {/* Content rendered as rich text (no old progressive-disclosure UI) */}
-            {data.sections && data.sections.length > 0 && (
-              <div className="rounded-xl border border-[#dcd5c7] bg-white p-5">
-                <p className="text-sm text-[#5d675f]">
-                  Read through the content below, then proceed to the recall check.
-                </p>
-              </div>
-            )}
+            {/* Render actual content blocks from the current section */}
+            {data.sections && data.sections.length > 0 && (() => {
+              // Determine which section to show based on current funnel step
+              const sectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
+              const activeSection = data.sections[sectionIndex];
+              if (!activeSection) return null;
+              return (
+                <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
+                  <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
+                  {activeSection.blocks && activeSection.blocks.length > 0 ? (
+                    <RichBlocks blocks={activeSection.blocks} />
+                  ) : (
+                    <p className="text-sm text-[#5d675f]">Content for this section is being authored.</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* External resources (shown after content, before recall) */}
             <ExternalResourceCards nodeId={nodeId} />
