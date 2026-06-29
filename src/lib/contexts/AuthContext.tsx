@@ -227,7 +227,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     reconcileLocalUpscLearnerIdentity(null);
     setUser(null);
     setLoading(false);
-  }, [clerkUser, getClerkToken, isLoaded, isSignedIn, replaceRoute, devLogin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clerkUser, isLoaded, isSignedIn, replaceRoute, devLogin]);
 
   // Sync profile & progress back to Clerk unsafeMetadata when updated locally
   useEffect(() => {
