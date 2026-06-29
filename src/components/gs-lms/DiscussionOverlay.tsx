@@ -504,6 +504,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   // Voice input state
   const [listening, setListening] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const recognitionRef = useRef<DSpeechRecognition | null>(null);
   // listeningRef tracks USER INTENT — stays true until they tap mic again.
   // This lets onend auto-restart without checking stale React state.
@@ -570,6 +571,9 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
         }
       }
 
+      // A result arrived — the mic is genuinely working; clear any prior error.
+      setMicError(null);
+
       const finalText = finalSegments.join(" ").trim();
       const interimText = interimSegments.join(" ").trim();
 
@@ -599,11 +603,27 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
     recognition.onerror = (e: Event) => {
       setInterimInput("");
       const err = (e as unknown as { error?: string }).error;
-      // "no-speech" is normal — just restart. Abort on fatal errors.
+      // "no-speech" / "aborted" are normal — just restart. Surface fatal errors
+      // to the user instead of silently failing (the gate must never look
+      // "stuck recording" with no feedback).
       if (err === "not-allowed" || err === "service-not-allowed") {
         listeningRef.current = false;
         setListening(false);
+        setMicError(
+          "Microphone permission is blocked. Allow mic access in your browser, or just type your answer below."
+        );
         return;
+      }
+      if (err === "network") {
+        listeningRef.current = false;
+        setListening(false);
+        setMicError(
+          "Voice recognition service is unreachable. Please type your answer below."
+        );
+        return;
+      }
+      if (err === "no-speech") {
+        setMicError("No speech detected yet — speak clearly, or type your answer.");
       }
       if (listeningRef.current) {
         setTimeout(() => startRecognition(), 200);
@@ -641,6 +661,17 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       | undefined;
     if (!Ctor) return;
 
+    // The Web Speech API requires a secure context (https or localhost). If we
+    // are not secure, recognition silently never returns results — surface this
+    // instead of leaving the user "stuck recording".
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      setMicError(
+        "Voice input requires a secure (https) connection. Please type your answer below."
+      );
+      return;
+    }
+
+    setMicError(null);
     // Start fresh with whatever is currently written in the input
     finalTranscriptRef.current = input ? input.trim() + " " : "";
 
@@ -764,6 +795,14 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
 
       {/* ── Progress bar (phases 1 & 2 only) ── */}
       {conceptProgress && phase !== 2 && <ProgressBar progress={conceptProgress} />}
+
+      {/* ── Mic error / guidance banner ── */}
+      {micError && (
+        <div className="px-5 py-2 bg-amber-50 border-b border-amber-100 text-amber-700 text-xs font-medium flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{micError}</span>
+        </div>
+      )}
 
       {/* ── Phase content ── */}
       {phase === 0 && (
