@@ -185,9 +185,59 @@ function KeyTerms({ block }: { block: ContentBlock }) {
 }
 
 // ---------------------------------------------------------------------------
-// Comparison table — two columns (e.g. Steady State vs Big Bang).
+// Comparison table — supports BOTH formats:
+//   Format A (topics 1-6): { columns, rows: [{label, a, b}] }
+//   Format B (topics 7+):  { left: {label, items}, right: {label, items} }
 // ---------------------------------------------------------------------------
 function Compare({ block }: { block: ContentBlock }) {
+  const left = block.left as { label?: string; items?: string[] } | undefined;
+  const right = block.right as { label?: string; items?: string[] } | undefined;
+
+  // Format B: left/right with items arrays
+  if (left && right) {
+    const title = block.title as string | undefined;
+    const leftItems = left.items || [];
+    const rightItems = right.items || [];
+    return (
+      <div className="overflow-hidden rounded-xl border border-[#dcd5c7]">
+        {title && (
+          <div className="bg-[#1d9e75]/10 px-3 py-2">
+            <p className="text-[12px] font-bold uppercase tracking-wide text-[#1a3a2a]">{title}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 divide-x divide-[#dcd5c7]">
+          <div className="p-3">
+            {left.label && (
+              <p className="mb-2 text-[12px] font-bold text-[#1d9e75]">{left.label}</p>
+            )}
+            <ul className="flex flex-col gap-1.5">
+              {leftItems.map((item, i) => (
+                <li key={i} className="flex gap-2 text-sm leading-6 text-[#31443a]">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d9e75]" />
+                  <span>{renderInline(item)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="p-3">
+            {right.label && (
+              <p className="mb-2 text-[12px] font-bold text-[#ef9f27]">{right.label}</p>
+            )}
+            <ul className="flex flex-col gap-1.5">
+              {rightItems.map((item, i) => (
+                <li key={i} className="flex gap-2 text-sm leading-6 text-[#31443a]">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ef9f27]" />
+                  <span>{renderInline(item)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Format A: columns/rows table
   const columns = (block.columns as string[]) || ["A", "B"];
   const rows =
     (block.rows as Array<{ label?: string; a: string; b: string }>) || [];
@@ -228,37 +278,66 @@ function Compare({ block }: { block: ContentBlock }) {
 
 // ---------------------------------------------------------------------------
 // Timeline — chronology (who proposed → who proved, etc.).
+// Supports BOTH formats:
+//   Format A (topics 1-6): { events: [{year, title, detail}] }
+//   Format B (topics 7+):  { items: [{year, event}] }
 // ---------------------------------------------------------------------------
 function Timeline({ block }: { block: ContentBlock }) {
-  const events =
-    (block.events as Array<{ year: string; title: string; detail?: string }>) || [];
+  const rawEvents =
+    (block.events as Array<{ year: string; title?: string; detail?: string; event?: string }>) || [];
+  const rawItems =
+    (block.items as Array<{ year: string; title?: string; detail?: string; event?: string }>) || [];
+  
+  // Merge both formats into a unified shape
+  const events = (rawEvents.length > 0 ? rawEvents : rawItems).map((e) => ({
+    year: e.year,
+    title: e.title || e.event || "",
+    detail: e.detail,
+  }));
+
   if (!events.length) return null;
+
+  const title = block.title as string | undefined;
+
   return (
-    <ol className="relative ml-3 flex flex-col gap-4 border-l-2 border-[#1d9e75]/30 pl-5">
-      {events.map((e, i) => (
-        <li key={i} className="relative">
-          <span className="absolute -left-[27px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9e75] ring-4 ring-[#1d9e75]/15" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-black text-[#1d9e75]">{e.year}</span>
-            <span className="text-sm font-bold text-[#13251d]">{e.title}</span>
-          </div>
-          {e.detail ? (
-            <p className="mt-0.5 text-[13px] leading-6 text-[#5d675f]">
-              {renderInline(e.detail)}
-            </p>
-          ) : null}
-        </li>
-      ))}
-    </ol>
+    <div>
+      {title && (
+        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-[#1d9e75]">
+          {title}
+        </p>
+      )}
+      <ol className="relative ml-3 flex flex-col gap-4 border-l-2 border-[#1d9e75]/30 pl-5">
+        {events.map((e, i) => (
+          <li key={i} className="relative">
+            <span className="absolute -left-[27px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9e75] ring-4 ring-[#1d9e75]/15" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-black text-[#1d9e75]">{e.year}</span>
+              <span className="text-sm font-bold text-[#13251d]">{e.title}</span>
+            </div>
+            {e.detail ? (
+              <p className="mt-0.5 text-[13px] leading-6 text-[#5d675f]">
+                {renderInline(e.detail)}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
 // Examiner trap — distinctive red warning card.
+// Supports BOTH formats:
+//   Format A (topics 1-6): { title, text }
+//   Format B (topics 7+):  { wrong, correct }
 // ---------------------------------------------------------------------------
 function Trap({ block }: { block: ContentBlock }) {
   const title = (block.title as string) || "Examiner Trap";
   const text = block.text as string | undefined;
+  const wrong = block.wrong as string | undefined;
+  const correct = block.correct as string | undefined;
+
   return (
     <div className="rounded-xl border border-[#e6c2c2] bg-[#fbf0ee] p-4">
       <div className="flex items-center gap-1.5 text-[#a23b46]">
@@ -268,6 +347,18 @@ function Trap({ block }: { block: ContentBlock }) {
       {text ? (
         <p className="mt-1.5 text-sm leading-7 text-[#6e4b50]">{renderInline(text)}</p>
       ) : null}
+      {wrong && (
+        <div className="mt-2 flex items-start gap-2">
+          <span className="mt-0.5 text-sm">❌</span>
+          <p className="text-sm leading-7 text-[#a23b46] line-through decoration-[#a23b46]/40">{renderInline(wrong)}</p>
+        </div>
+      )}
+      {correct && (
+        <div className="mt-1.5 flex items-start gap-2">
+          <span className="mt-0.5 text-sm">✅</span>
+          <p className="text-sm leading-7 text-[#2d6a4f] font-medium">{renderInline(correct)}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -341,7 +432,7 @@ function Quiz({ block }: { block: ContentBlock }) {
 function Collapsible({ block }: { block: ContentBlock }) {
   const [open, setOpen] = useState(false);
   const title = (block.title as string) || "Dig deeper";
-  const text = block.text as string | undefined;
+  const text = (block.text as string) || (block.content as string) || undefined;
   const items = block.items as string[] | undefined;
   return (
     <div className="rounded-xl border border-[#dcd5c7] bg-white">
@@ -380,7 +471,7 @@ function Collapsible({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 function Points({ block }: { block: ContentBlock }) {
   const items = (block.items as string[]) || [];
-  const heading = block.heading as string | undefined;
+  const heading = (block.heading as string) || (block.title as string) || undefined;
   if (!items.length) return null;
   return (
     <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, GraduationCap, Newspaper, AlertTriangle, Target, PenLine, Lock, CheckCircle2 } from 'lucide-react';
 import { useFunnelState, TabId, STEP_TAB_MAP } from '@/hooks/useFunnelState';
@@ -57,6 +57,12 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
 
   const [selectedTab, setSelectedTab] = useState<TabId | null>(null);
   const displayTab = selectedTab ?? activeTab;
+
+  // Auto-switch to the correct tab when currentStep advances to a new tab
+  useEffect(() => {
+    // When the funnel advances and the active tab changes, follow it
+    setSelectedTab(null); // Reset override so it follows activeTab
+  }, [activeTab]);
 
   // Determine tab states
   const tabStates = useMemo(() => {

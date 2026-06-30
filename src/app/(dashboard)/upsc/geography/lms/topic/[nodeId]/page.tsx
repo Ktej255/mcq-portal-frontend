@@ -102,13 +102,22 @@ export default function TopicContentPage() {
 
           // Determine which section to show based on SELECTED TAB (allows revisiting)
           // displayTab changes when user clicks a tab; currentStep is the funnel position
-          const tabToSectionIndex: Record<string, number> = {
-            'learn': 0,    // BASIC or ADVANCED
-            'ncert': 1,    // NCERT_LEVEL
-            'current': 3,  // CURRENT_AFFAIRS
-            'traps': 4,    // EXAMINER_TRAPS
+          // Section order in data: 0=BASIC, 1=NCERT, 2=ADVANCED, 3=CURRENT_AFFAIRS, 4=EXAMINER_TRAPS
+          // Tab mapping: learn tab shows BASIC (steps 1-3) OR ADVANCED (steps 6-7)
+          const getViewingSectionIndex = (): number => {
+            if (displayTab === 'ncert') return 1;
+            if (displayTab === 'current') return 3;
+            if (displayTab === 'traps') return 4;
+            // 'learn' tab: show ADVANCED if user is on steps 6-7 or has completed step 5+
+            if (displayTab === 'learn') {
+              if (currentStep >= 6 && currentStep <= 7) return 2;
+              // When revisiting, show BASIC by default (steps 1-3)
+              return 0;
+            }
+            // Fallback based on current step
+            return currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
           };
-          const viewingSectionIndex = tabToSectionIndex[displayTab] ?? (currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4);
+          const viewingSectionIndex = getViewingSectionIndex();
 
           return (
           <>
@@ -157,28 +166,43 @@ export default function TopicContentPage() {
                   );
                 })()}
 
-                {/* Advance button — show when viewing the tab that matches current step */}
-                {currentStep === 1 && (
-                  <button
-                    onClick={() => advanceStep(1)}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
-                  >
-                    Continue to Next Step &rarr;
-                  </button>
-                )}
-                {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && 
-                 (() => {
-                   // Map current step to its tab
-                   const stepTab = currentStep <= 3 ? 'learn' : currentStep <= 5 ? 'ncert' : currentStep <= 7 ? 'learn' : currentStep <= 9 ? 'current' : 'traps';
-                   return stepTab === displayTab;
-                 })() && (
-                  <button
-                    onClick={() => advanceStep(currentStep)}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
-                  >
-                    I&apos;ve Read This Section &rarr; Continue
-                  </button>
-                )}
+                {/* Advance button — show on content-reading steps when user is on the matching tab */}
+                {/* Step 1: auto-advance after discussion gate (fallback button if auto didn't fire) */}
+                {/* Content steps: 2 (BASIC), 4 (NCERT), 6 (ADVANCED), 8 (CURRENT_AFFAIRS), 10 (TRAPS) */}
+                {(() => {
+                  // Step 1 fallback
+                  if (currentStep === 1) {
+                    return (
+                      <button
+                        onClick={() => advanceStep(1)}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+                      >
+                        Continue to Next Step &rarr;
+                      </button>
+                    );
+                  }
+                  // Only show Continue on even content-reading steps
+                  if (![2, 4, 6, 8, 10].includes(currentStep)) return null;
+                  // Map each content step to the tab it belongs to (from STEP_TAB_MAP)
+                  const stepToTab: Record<number, string> = {
+                    2: 'learn',
+                    4: 'ncert',
+                    6: 'learn',
+                    8: 'current',
+                    10: 'traps',
+                  };
+                  const expectedTab = stepToTab[currentStep];
+                  // Only show the button when the user is viewing the correct tab
+                  if (displayTab !== expectedTab) return null;
+                  return (
+                    <button
+                      onClick={() => advanceStep(currentStep)}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+                    >
+                      I&apos;ve Read This Section &rarr; Continue
+                    </button>
+                  );
+                })()}
               </div>
             )}
 
