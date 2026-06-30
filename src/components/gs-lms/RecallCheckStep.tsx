@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, MicOff, CheckCircle2, XCircle, RefreshCw, Keyboard } from 'lucide-react';
 // Web Speech API used instead of useAudioRecorder for live transcription
@@ -34,6 +34,7 @@ export function RecallCheckStep({
   const [retryCount, setRetryCount] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const transcriptRef = useRef('');
 
   // Web Speech API for live transcription
   const startLiveTranscription = useCallback(() => {
@@ -47,41 +48,36 @@ export function RecallCheckStep({
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-IN'; // Indian English
+    recognition.lang = 'en-IN';
     recognition.maxAlternatives = 1;
 
-    let finalTranscript = textInput;
-    let shouldRestart = true; // Flag to control auto-restart
+    let shouldRestart = true;
 
     recognition.onresult = (event: any) => {
+      let final = '';
       let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+          final += event.results[i][0].transcript + ' ';
         } else {
           interim += event.results[i][0].transcript;
         }
       }
-      setTextInput(finalTranscript + interim);
+      transcriptRef.current = final;
+      setTextInput(final + interim);
     };
 
     recognition.onerror = (event: any) => {
-      // Don't stop on 'no-speech' error — just keep listening
       if (event.error === 'no-speech' || event.error === 'aborted') {
-        return; // Will auto-restart via onend
+        return;
       }
       shouldRestart = false;
       setIsListening(false);
     };
 
     recognition.onend = () => {
-      // Auto-restart if user hasn't clicked Stop
       if (shouldRestart) {
-        try {
-          recognition.start();
-        } catch {
-          setIsListening(false);
-        }
+        try { recognition.start(); } catch { setIsListening(false); }
       } else {
         setIsListening(false);
       }
@@ -92,27 +88,28 @@ export function RecallCheckStep({
       setIsListening(true);
       setMode('text-fallback');
     } catch {
-      setSubmitError('Could not start speech recognition.');
+      setSubmitError('Could not start speech recognition. Check microphone permissions.');
       setMode('text-fallback');
     }
 
-    // Store reference with stop control
     (window as any).__recallRecognition = recognition;
-    (window as any).__recallShouldRestart = (val: boolean) => { shouldRestart = val; };
-  }, [textInput]);
+    (window as any).__recallStop = () => { shouldRestart = false; };
+  }, []);
 
   const stopLiveTranscription = useCallback(() => {
-    // Set flag to prevent auto-restart
-    const setRestart = (window as any).__recallShouldRestart;
-    if (setRestart) setRestart(false);
-
+    const stop = (window as any).__recallStop;
+    if (stop) stop();
     const recognition = (window as any).__recallRecognition;
     if (recognition) {
       recognition.stop();
       (window as any).__recallRecognition = null;
-      (window as any).__recallShouldRestart = null;
+      (window as any).__recallStop = null;
     }
     setIsListening(false);
+    // Ensure final transcript is in the text input
+    if (transcriptRef.current) {
+      setTextInput(transcriptRef.current);
+    }
   }, []);
 
   const handleTextSubmit = useCallback(async () => {
