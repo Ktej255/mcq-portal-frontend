@@ -88,29 +88,6 @@ export function RecallCheckStep({
     setIsListening(false);
   }, []);
 
-  const { isRecording, duration, startRecording, stopRecording, error: audioError, isSupported } = useAudioRecorder({
-    maxDuration: 180,
-    minDuration: 5,
-  });
-
-  const handleStartRecording = useCallback(async () => {
-    setSubmitError(null);
-    await startRecording();
-    setMode('recording');
-  }, [startRecording]);
-
-  const handleStopRecording = useCallback(async () => {
-    const blob = await stopRecording();
-    if (!blob) return;
-
-    setMode('processing');
-
-    // Use browser's Web Speech API for live transcription instead of backend STT
-    // This gives real-time text display as the student speaks
-    setSubmitError('Audio processing failed. Please type your recall instead.');
-    setMode('text-fallback');
-  }, [stopRecording]);
-
   const handleTextSubmit = useCallback(async () => {
     if (!textInput.trim() || textInput.length < 5) {
       setSubmitError('Please enter at least 5 characters of what you recall.');
@@ -167,28 +144,6 @@ export function RecallCheckStep({
           >
             <Keyboard className="h-3 w-3" />
             Type instead
-          </button>
-        </div>
-      )}
-
-      {/* Recording State */}
-      {mode === 'recording' && (
-        <div className="flex flex-col items-center gap-3">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ repeat: Infinity, duration: 1.5 }}
-            className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center"
-          >
-            <Mic className="h-6 w-6 text-red-600" />
-          </motion.div>
-          <p className="text-sm font-black text-[#1a3a2a]">{duration}s</p>
-          <p className="text-[10px] text-[#49675e]">Min 5s • Max 180s</p>
-          <button
-            onClick={handleStopRecording}
-            disabled={duration < 5}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-black disabled:opacity-50"
-          >
-            Stop Recording
           </button>
         </div>
       )}
