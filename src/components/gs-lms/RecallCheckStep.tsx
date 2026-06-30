@@ -191,7 +191,7 @@ export function RecallCheckStep({
 
       {/* Prompt State */}
       {mode === 'prompt' && (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-4">
           <button
             onClick={() => startLiveTranscription()}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black shadow-md hover:scale-105 transition-transform"
@@ -199,6 +199,16 @@ export function RecallCheckStep({
             <Mic className="h-4 w-4" />
             Start Speaking (Live Transcription)
           </button>
+
+          {/* Voice typing instructions */}
+          <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-center max-w-sm">
+            <p className="text-[10px] font-black text-[#085041] uppercase mb-1">💡 Voice Typing Tip</p>
+            <p className="text-[10px] text-[#49675e] leading-relaxed">
+              <strong>Laptop:</strong> Click the text box below, then press <kbd className="px-1 py-0.5 bg-white rounded border border-[#b9d9cd] font-mono text-[9px]">Win + H</kbd> to activate Windows dictation<br/>
+              <strong>Phone:</strong> Tap the text box and use your keyboard&apos;s 🎤 mic button
+            </p>
+          </div>
+
           <button
             onClick={() => setMode('text-fallback')}
             className="flex items-center gap-1.5 text-xs font-semibold text-[#49675e] hover:text-[#1d9e75]"
@@ -237,10 +247,21 @@ export function RecallCheckStep({
               </button>
             </div>
           )}
+
+          {/* Voice typing hint — always visible in text mode */}
+          {!isListening && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd]">
+              <Mic className="h-3.5 w-3.5 text-[#1d9e75]" />
+              <p className="text-[10px] text-[#49675e]">
+                <strong>Voice type:</strong> Click below, then <kbd className="px-1 py-0.5 bg-white rounded border text-[9px] font-mono">Win+H</kbd> (laptop) or 🎤 button (phone)
+              </p>
+            </div>
+          )}
+
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Type what you remember OR click 'Start Speaking' above for voice input..."
+            placeholder="Click here and speak using Win+H (Windows) or tap the mic on your phone keyboard..."
             className="w-full h-32 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
           />
           <div className="flex justify-between items-center">
