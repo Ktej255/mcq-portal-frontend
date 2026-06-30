@@ -178,7 +178,7 @@ export function RecallCheckStep({
       {mode === 'prompt' && (
         <div className="flex flex-col items-center gap-3">
           <button
-            onClick={startLiveTranscription}
+            onClick={() => startLiveTranscription()}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black shadow-md hover:scale-105 transition-transform"
           >
             <Mic className="h-4 w-4" />
@@ -232,7 +232,7 @@ export function RecallCheckStep({
               <span className="text-[10px] text-[#49675e]">{textInput.length} chars</span>
               {!isListening && (
                 <button
-                  onClick={startLiveTranscription}
+                  onClick={() => startLiveTranscription()}
                   className="flex items-center gap-1 text-[10px] font-black text-[#1d9e75]"
                 >
                   <Mic className="h-3 w-3" /> Speak more
