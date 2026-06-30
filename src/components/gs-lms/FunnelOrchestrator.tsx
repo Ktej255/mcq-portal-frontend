@@ -12,10 +12,18 @@ import { useFunnelState, TabId, STEP_TAB_MAP } from '@/hooks/useFunnelState';
  * Requirements: 1.1, 1.3, 1.4, 1.5, 11.1, 11.3
  */
 
+export interface FunnelRenderContext {
+  currentStep: number;
+  completedSteps: number[];
+  completeStep: (step: number) => Promise<void>;
+  canAccessStep: (step: number) => boolean;
+  isStepComplete: (step: number) => boolean;
+}
+
 interface FunnelOrchestratorProps {
   nodeId: number;
   subject?: string;
-  children?: React.ReactNode;
+  children?: React.ReactNode | ((ctx: FunnelRenderContext) => React.ReactNode);
 }
 
 interface TabConfig {
@@ -164,7 +172,9 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
           transition={{ duration: 0.2 }}
           className="min-h-[400px]"
         >
-          {children}
+          {typeof children === 'function'
+            ? children({ currentStep, completedSteps, completeStep, canAccessStep, isStepComplete })
+            : children}
         </motion.div>
       </AnimatePresence>
     </div>

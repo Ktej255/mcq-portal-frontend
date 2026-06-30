@@ -17,7 +17,7 @@ import { GrowthReportStep } from "@/components/gs-lms/GrowthReportStep";
 import { ExternalResourceCards } from "@/components/gs-lms/ExternalResourceCards";
 import { RichBlocks } from "@/components/gs-lms/RichBlockRenderer";
 import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
-import { useFunnelState } from "@/hooks/useFunnelState";
+// useFunnelState is now managed solely by FunnelOrchestrator via render-prop
 
 export default function TopicContentPage() {
   const params = useParams();
@@ -27,9 +27,6 @@ export default function TopicContentPage() {
   const [data, setData] = useState<TopicSectionsOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Interactive Learning Funnel state
-  const funnel = useFunnelState(nodeId, "geography");
 
   const fetchSections = useCallback(() => {
     setLoading(true);
@@ -52,12 +49,10 @@ export default function TopicContentPage() {
   // Called when student clicks "Proceed to Content" in the discussion overlay.
   const handleGateComplete = useCallback(() => {
     setForceGatePassed(true);
-    // Also advance funnel step 1
-    funnel.completeStep(1).catch(() => {});
     fetchSections();
-  }, [fetchSections, funnel]);
+  }, [fetchSections]);
 
-  if (loading || funnel.loading) {
+  if (loading) {
     return (
       <div className="p-6">
         <LmsLoadingSkeleton variant="content" />
@@ -79,11 +74,11 @@ export default function TopicContentPage() {
   // INTERACTIVE LEARNING FUNNEL (14-step guided experience)
   // ---------------------------------------------------------------------------
 
-  // Determine which funnel step to render
-  const { currentStep, completeStep: advanceStep } = funnel;
+  // Step 1: Discussion Gate — handled before FunnelOrchestrator renders
+  const discussionGateActive =
+    !data.discussion_gate_passed && !forceGatePassed;
 
-  // Step 1: Discussion Gate
-  if (currentStep === 1 && !data.discussion_gate_passed && !forceGatePassed) {
+  if (discussionGateActive) {
     return <DiscussionOverlay nodeId={nodeId} topicTitle={data.title} onComplete={handleGateComplete} />;
   }
 
@@ -95,109 +90,115 @@ export default function TopicContentPage() {
       <h1 className="text-xl font-semibold text-[#1a3a2a]">{data.title}</h1>
 
       {/* Funnel Orchestrator — 6-tab navigation with progress */}
+      {/* children is a render-prop: receives { currentStep, completeStep } from
+          the single useFunnelState instance inside FunnelOrchestrator */}
       <FunnelOrchestrator nodeId={nodeId} subject="geography">
-        {/* Content Steps (2-11): Progressive disclosure + recall checks */}
-        {currentStep >= 2 && currentStep <= 11 && (
-          <div className="space-y-6">
-            {/* Video player — rendered only when topic has a video */}
-            {data.video_url && (
-              <VideoPlayer
-                videoUrl={data.video_url}
-                watched={data.video_watched}
-                nodeId={nodeId}
-                onWatched={fetchSections}
-              />
-            )}
+        {({ currentStep, completeStep: advanceStep }) => (
+          <>
+            {/* Content Steps (2-11): Progressive disclosure + recall checks */}
+            {currentStep >= 2 && currentStep <= 11 && (
+              <div className="space-y-6">
+                {/* Video player — rendered only when topic has a video */}
+                {data.video_url && (
+                  <VideoPlayer
+                    videoUrl={data.video_url}
+                    watched={data.video_watched}
+                    nodeId={nodeId}
+                    onWatched={fetchSections}
+                  />
+                )}
 
-            {/* Render actual content blocks from the current section */}
-            {data.sections && data.sections.length > 0 && (() => {
-              // Determine which section to show based on current funnel step
-              const sectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
-              const activeSection = data.sections[sectionIndex];
-              if (!activeSection) return null;
-              return (
-                <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
-                  <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
-                  {activeSection.blocks && activeSection.blocks.length > 0 ? (
-                    <RichBlocks blocks={activeSection.blocks} />
-                  ) : (
-                    <p className="text-sm text-[#5d675f]">Content for this section is being authored.</p>
-                  )}
-                </div>
-              );
-            })()}
+                {/* Render actual content blocks from the current section */}
+                {data.sections && data.sections.length > 0 && (() => {
+                  // Map funnel step to section index
+                  const sectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
+                  const activeSection = data.sections[sectionIndex];
+                  if (!activeSection) return null;
+                  return (
+                    <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
+                      <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
+                      {activeSection.blocks && activeSection.blocks.length > 0 ? (
+                        <RichBlocks blocks={activeSection.blocks} />
+                      ) : (
+                        <p className="text-sm text-[#5d675f]">Content for this section is being authored.</p>
+                      )}
+                    </div>
+                  );
+                })()}
 
-            {/* External resources (shown after content, before recall) */}
-            <ExternalResourceCards nodeId={nodeId} />
+                {/* External resources (shown after content, before recall) */}
+                <ExternalResourceCards nodeId={nodeId} />
 
-            {/* Recall Check — shown after content section is read */}
-            {(currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (
-              <RecallCheckStep
-                nodeId={nodeId}
-                sectionLabel={
-                  currentStep === 3 ? "BASIC" :
-                  currentStep === 5 ? "NCERT_LEVEL" :
-                  currentStep === 7 ? "ADVANCED" :
-                  currentStep === 9 ? "CURRENT_AFFAIRS" :
-                  "EXAMINER_TRAPS"
-                }
-                onComplete={() => advanceStep(currentStep)}
-              />
-            )}
+                {/* Recall Check — shown after content section is read */}
+                {(currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (
+                  <RecallCheckStep
+                    nodeId={nodeId}
+                    sectionLabel={
+                      currentStep === 3 ? "BASIC" :
+                      currentStep === 5 ? "NCERT_LEVEL" :
+                      currentStep === 7 ? "ADVANCED" :
+                      currentStep === 9 ? "CURRENT_AFFAIRS" :
+                      "EXAMINER_TRAPS"
+                    }
+                    onComplete={() => advanceStep(currentStep)}
+                  />
+                )}
 
-            {/* Advance to next content step */}
-            {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (
-              <button
-                onClick={() => advanceStep(currentStep)}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
-              >
-                I&apos;ve Read This Section → Continue
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Step 12: MCQ Lab */}
-        {currentStep === 12 && (
-          <McqLabStep
-            nodeId={nodeId}
-            onComplete={() => advanceStep(12)}
-          />
-        )}
-
-        {/* Step 13: Mains Practice */}
-        {currentStep === 13 && (
-          <MainsPracticeStep
-            nodeId={nodeId}
-            onComplete={() => advanceStep(13)}
-          />
-        )}
-
-        {/* Step 14: Growth Report */}
-        {currentStep === 14 && (
-          <GrowthReportStep
-            nodeId={nodeId}
-            onComplete={() => advanceStep(14)}
-          />
-        )}
-
-        {/* Funnel complete — show completion state */}
-        {currentStep > 14 && (
-          <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-8 text-center text-white">
-            <h2 className="text-lg font-black">🎉 Topic Complete!</h2>
-            <p className="text-sm opacity-80 mt-2">
-              You've completed all 14 steps for this topic. Check your Growth Report for insights.
-            </p>
-            {data.topic_completed && (
-              <div className="mt-4">
-                <PdfDownloadButton
-                  nodeId={nodeId}
-                  topicCompleted={data.topic_completed}
-                  topicTitle={data.title}
-                />
+                {/* Advance to next content step */}
+                {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (
+                  <button
+                    onClick={() => advanceStep(currentStep)}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+                  >
+                    I&apos;ve Read This Section &rarr; Continue
+                  </button>
+                )}
               </div>
             )}
-          </div>
+
+            {/* Step 12: MCQ Lab */}
+            {currentStep === 12 && (
+              <McqLabStep
+                nodeId={nodeId}
+                onComplete={() => advanceStep(12)}
+              />
+            )}
+
+            {/* Step 13: Mains Practice */}
+            {currentStep === 13 && (
+              <MainsPracticeStep
+                nodeId={nodeId}
+                onComplete={() => advanceStep(13)}
+              />
+            )}
+
+            {/* Step 14: Growth Report */}
+            {currentStep === 14 && (
+              <GrowthReportStep
+                nodeId={nodeId}
+                onComplete={() => advanceStep(14)}
+              />
+            )}
+
+            {/* Funnel complete — show completion state */}
+            {currentStep > 14 && (
+              <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-8 text-center text-white">
+                <h2 className="text-lg font-black">Topic Complete!</h2>
+                <p className="text-sm opacity-80 mt-2">
+                  You&apos;ve completed all 14 steps for this topic. Check your Growth Report for insights.
+                </p>
+                {data.topic_completed && (
+                  <div className="mt-4">
+                    <PdfDownloadButton
+                      nodeId={nodeId}
+                      topicCompleted={data.topic_completed}
+                      topicTitle={data.title}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </FunnelOrchestrator>
     </div>
