@@ -130,19 +130,21 @@ export default function TopicContentPage() {
                 <ExternalResourceCards nodeId={nodeId} />
 
                 {/* Recall Check — shown after content section is read */}
-                {(currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (
-                  <RecallCheckStep
-                    nodeId={nodeId}
-                    sectionLabel={
-                      currentStep === 3 ? "BASIC" :
-                      currentStep === 5 ? "NCERT_LEVEL" :
-                      currentStep === 7 ? "ADVANCED" :
-                      currentStep === 9 ? "CURRENT_AFFAIRS" :
-                      "EXAMINER_TRAPS"
-                    }
-                    onComplete={() => advanceStep(currentStep)}
-                  />
-                )}
+                {(currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (() => {
+                  // Use the actual section_label from loaded data to stay in sync
+                  // with whatever content was displayed (avoids mismatch when
+                  // CURRENT_AFFAIRS section hasn't been generated yet)
+                  const recallSectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
+                  const recallSection = data.sections?.[recallSectionIndex];
+                  if (!recallSection) return null;
+                  return (
+                    <RecallCheckStep
+                      nodeId={nodeId}
+                      sectionLabel={recallSection.section_label}
+                      onComplete={() => advanceStep(currentStep)}
+                    />
+                  );
+                })()}
 
                 {/* Advance to next content step */}
                 {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (

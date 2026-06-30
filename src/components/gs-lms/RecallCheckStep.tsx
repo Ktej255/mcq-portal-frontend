@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, MicOff, CheckCircle2, XCircle, RefreshCw, Keyboard } from 'lucide-react';
 // Web Speech API used instead of useAudioRecorder for live transcription
@@ -35,10 +35,14 @@ export function RecallCheckStep({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  
+  // textRef holds the current live text shown in the textarea
   const textRef = useRef('');
+  // accumulatedTextRef holds the text completed in previous segments/sessions
+  const accumulatedTextRef = useRef('');
 
   // Web Speech API for live transcription
-  const startLiveTranscription = useCallback(() => {
+  const startLiveTranscription = useCallback((isRestart = false) => {
     setSubmitError(null);
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -47,31 +51,46 @@ export function RecallCheckStep({
       return;
     }
 
+    // Clean up any existing instance first
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch {}
+    }
+
+    if (!isRestart) {
+      textRef.current = '';
+      accumulatedTextRef.current = '';
+      setTextInput('');
+    }
+
     const rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = 'en-IN';
 
     rec.onresult = (e: any) => {
-      let text = '';
+      let sessionText = '';
       for (let i = 0; i < e.results.length; i++) {
-        text += e.results[i][0].transcript;
-        if (e.results[i].isFinal) text += ' ';
+        sessionText += e.results[i][0].transcript;
+        if (e.results[i].isFinal) sessionText += ' ';
       }
-      textRef.current = text;
-      setTextInput(text); // This updates the textarea
+      // Combine accumulated text from previous sessions with current session text
+      const fullText = accumulatedTextRef.current + sessionText;
+      textRef.current = fullText;
+      setTextInput(fullText);
     };
 
     rec.onerror = (e: any) => {
+      console.error('Speech recognition error:', e.error);
       if (e.error !== 'no-speech' && e.error !== 'aborted') {
         setIsListening(false);
       }
     };
 
     rec.onend = () => {
-      // Auto-restart to keep listening
+      // Auto-restart to keep listening (SpeechRecognition instances cannot be restarted once stopped)
       if (recognitionRef.current === rec) {
-        try { rec.start(); } catch {}
+        accumulatedTextRef.current = textRef.current;
+        startLiveTranscription(true);
       }
     };
 
@@ -80,20 +99,34 @@ export function RecallCheckStep({
       recognitionRef.current = rec;
       setIsListening(true);
       setMode('text-fallback'); // Show the textarea
-    } catch {
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
       setSubmitError('Could not start speech recognition. Check microphone permissions.');
       setMode('text-fallback');
+      setIsListening(false);
     }
   }, []);
 
   const stopLiveTranscription = useCallback(() => {
     if (recognitionRef.current) {
       const rec = recognitionRef.current;
-      recognitionRef.current = null; // Prevent auto-restart
-      rec.stop();
+      recognitionRef.current = null; // Prevent auto-restart in onend
+      try { rec.stop(); } catch {}
     }
     setIsListening(false);
     setTextInput(textRef.current); // Ensure final text is captured
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null; // Clear handler to prevent restarts
+          recognitionRef.current.abort();
+        } catch {}
+      }
+    };
   }, []);
 
   const handleTextSubmit = useCallback(async () => {
@@ -109,8 +142,13 @@ export function RecallCheckStep({
       const res = await funnelService.submitRecallText(subject, nodeId, sectionLabel, textInput);
       setResult(res);
       setMode('result');
-    } catch (err) {
-      setSubmitError('Failed to submit recall. Please try again.');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (detail) {
+        setSubmitError(detail);
+      } else {
+        setSubmitError('Failed to submit recall. Please try again.');
+      }
       setMode('text-fallback');
     }
   }, [textInput, subject, nodeId, sectionLabel]);

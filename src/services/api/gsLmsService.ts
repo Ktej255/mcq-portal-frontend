@@ -46,7 +46,7 @@ export interface SyllabusTreeOut {
 
 export interface ContentSectionOut {
   section_id: number;
-  section_label: 'BASIC' | 'ADVANCED' | 'NCERT_LEVEL' | 'EXAMINER_TRAPS';
+  section_label: 'BASIC' | 'ADVANCED' | 'NCERT_LEVEL' | 'CURRENT_AFFAIRS' | 'EXAMINER_TRAPS';
   title: string;
   display_order: number;
   locked: boolean;
