@@ -18,6 +18,7 @@ export interface FunnelRenderContext {
   completeStep: (step: number) => Promise<void>;
   canAccessStep: (step: number) => boolean;
   isStepComplete: (step: number) => boolean;
+  displayTab: string;
 }
 
 interface FunnelOrchestratorProps {
@@ -173,7 +174,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
           className="min-h-[400px]"
         >
           {typeof children === 'function'
-            ? children({ currentStep, completedSteps, completeStep, canAccessStep, isStepComplete })
+            ? children({ currentStep, completedSteps, completeStep, canAccessStep, isStepComplete, displayTab })
             : children}
         </motion.div>
       </AnimatePresence>

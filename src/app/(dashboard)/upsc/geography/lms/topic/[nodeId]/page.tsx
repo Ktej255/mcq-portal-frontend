@@ -93,13 +93,24 @@ export default function TopicContentPage() {
       {/* children is a render-prop: receives { currentStep, completeStep } from
           the single useFunnelState instance inside FunnelOrchestrator */}
       <FunnelOrchestrator nodeId={nodeId} subject="geography">
-        {({ currentStep, completeStep: advanceStep }) => (
+        {({ currentStep, completeStep: advanceStep, displayTab }) => {
+          // Determine which section to show based on SELECTED TAB (allows revisiting)
+          // displayTab changes when user clicks a tab; currentStep is the funnel position
+          const tabToSectionIndex: Record<string, number> = {
+            'learn': 0,    // BASIC or ADVANCED
+            'ncert': 1,    // NCERT_LEVEL
+            'current': 3,  // CURRENT_AFFAIRS
+            'traps': 4,    // EXAMINER_TRAPS
+          };
+          const viewingSectionIndex = tabToSectionIndex[displayTab] ?? (currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4);
+
+          return (
           <>
-            {/* Content Steps (2-11): Progressive disclosure + recall checks */}
-            {currentStep >= 2 && currentStep <= 11 && (
+            {/* Content Steps — show content for the SELECTED tab (allows revisiting) */}
+            {(displayTab === 'learn' || displayTab === 'ncert' || displayTab === 'current' || displayTab === 'traps') && (
               <div className="space-y-6">
                 {/* Video player — rendered only when topic has a video */}
-                {data.video_url && (
+                {data.video_url && displayTab === 'learn' && (
                   <VideoPlayer
                     videoUrl={data.video_url}
                     watched={data.video_watched}
@@ -108,11 +119,9 @@ export default function TopicContentPage() {
                   />
                 )}
 
-                {/* Render actual content blocks from the current section */}
+                {/* Render actual content blocks from the selected section */}
                 {data.sections && data.sections.length > 0 && (() => {
-                  // Map funnel step to section index
-                  const sectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
-                  const activeSection = data.sections[sectionIndex];
+                  const activeSection = data.sections[viewingSectionIndex];
                   if (!activeSection) return null;
                   return (
                     <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
@@ -126,16 +135,12 @@ export default function TopicContentPage() {
                   );
                 })()}
 
-                {/* External resources (shown after content, before recall) */}
+                {/* External resources */}
                 <ExternalResourceCards nodeId={nodeId} />
 
-                {/* Recall Check — shown after content section is read */}
-                {(currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (() => {
-                  // Use the actual section_label from loaded data to stay in sync
-                  // with whatever content was displayed (avoids mismatch when
-                  // CURRENT_AFFAIRS section hasn't been generated yet)
-                  const recallSectionIndex = currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
-                  const recallSection = data.sections?.[recallSectionIndex];
+                {/* Recall Check — only on the CURRENT step (not when revisiting) */}
+                {currentStep === (viewingSectionIndex * 2 + 3) && (currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (() => {
+                  const recallSection = data.sections?.[viewingSectionIndex];
                   if (!recallSection) return null;
                   return (
                     <RecallCheckStep
@@ -146,7 +151,7 @@ export default function TopicContentPage() {
                   );
                 })()}
 
-                {/* Advance to next content step */}
+                {/* Advance button — only on current content step (not when revisiting) */}
                 {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (
                   <button
                     onClick={() => advanceStep(currentStep)}
@@ -159,35 +164,34 @@ export default function TopicContentPage() {
             )}
 
             {/* Step 12: MCQ Lab */}
-            {currentStep === 12 && (
+            {displayTab === 'mcq-lab' && (
               <McqLabStep
                 nodeId={nodeId}
                 onComplete={() => advanceStep(12)}
               />
             )}
 
-            {/* Step 13: Mains Practice */}
-            {currentStep === 13 && (
+            {/* Step 13-14: Mains + Growth Report */}
+            {displayTab === 'mains' && currentStep === 13 && (
               <MainsPracticeStep
                 nodeId={nodeId}
                 onComplete={() => advanceStep(13)}
               />
             )}
 
-            {/* Step 14: Growth Report */}
-            {currentStep === 14 && (
+            {displayTab === 'mains' && currentStep === 14 && (
               <GrowthReportStep
                 nodeId={nodeId}
                 onComplete={() => advanceStep(14)}
               />
             )}
 
-            {/* Funnel complete — show completion state */}
+            {/* Funnel complete */}
             {currentStep > 14 && (
               <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-8 text-center text-white">
                 <h2 className="text-lg font-black">Topic Complete!</h2>
                 <p className="text-sm opacity-80 mt-2">
-                  You&apos;ve completed all 14 steps for this topic. Check your Growth Report for insights.
+                  You&apos;ve completed all 14 steps for this topic.
                 </p>
                 {data.topic_completed && (
                   <div className="mt-4">
@@ -201,7 +205,8 @@ export default function TopicContentPage() {
               </div>
             )}
           </>
-        )}
+          );
+        }}
       </FunnelOrchestrator>
     </div>
   );
