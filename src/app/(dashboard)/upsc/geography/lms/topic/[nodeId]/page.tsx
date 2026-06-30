@@ -94,6 +94,12 @@ export default function TopicContentPage() {
           the single useFunnelState instance inside FunnelOrchestrator */}
       <FunnelOrchestrator nodeId={nodeId} subject="geography">
         {({ currentStep, completeStep: advanceStep, displayTab }) => {
+          // Auto-complete Step 1 if discussion gate is already passed but funnel hasn't recorded it
+          if (currentStep === 1 && data.discussion_gate_passed) {
+            // Auto-advance step 1 since discussion is done
+            advanceStep(1).catch(() => {});
+          }
+
           // Determine which section to show based on SELECTED TAB (allows revisiting)
           // displayTab changes when user clicks a tab; currentStep is the funnel position
           const tabToSectionIndex: Record<string, number> = {
@@ -152,6 +158,14 @@ export default function TopicContentPage() {
                 })()}
 
                 {/* Advance button — show when viewing the tab that matches current step */}
+                {currentStep === 1 && (
+                  <button
+                    onClick={() => advanceStep(1)}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+                  >
+                    Continue to Next Step &rarr;
+                  </button>
+                )}
                 {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && 
                  (() => {
                    // Map current step to its tab
