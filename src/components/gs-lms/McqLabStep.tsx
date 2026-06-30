@@ -38,7 +38,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
   }, [nodeId, subject]);
 
   const answeredCount = Object.keys(answers).length;
-  const allAnswered = answeredCount === 15;
+  const allAnswered = questions.length > 0 && answeredCount === questions.length;
 
   const handleSelectAnswer = useCallback((questionId: number, option: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: option }));
@@ -206,7 +206,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
               <RefreshCw className="h-4 w-4 animate-spin" /> Submitting...
             </span>
           ) : (
-            `Submit All (${answeredCount}/15 answered)`
+            `Submit All (${answeredCount}/${questions.length} answered)`
           )}
         </button>
         {error && <p className="text-xs text-red-600 text-center mt-2">{error}</p>}

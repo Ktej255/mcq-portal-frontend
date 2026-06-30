@@ -17,6 +17,7 @@ import { GrowthReportStep } from "@/components/gs-lms/GrowthReportStep";
 import { ExternalResourceCards } from "@/components/gs-lms/ExternalResourceCards";
 import { RichBlocks } from "@/components/gs-lms/RichBlockRenderer";
 import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
+import { PrelimsPyqPanel } from "@/components/gs-lms/PrelimsPyqPanel";
 // useFunnelState is now managed solely by FunnelOrchestrator via render-prop
 
 export default function TopicContentPage() {
@@ -216,10 +217,14 @@ export default function TopicContentPage() {
 
             {/* Step 13-14: Mains + Growth Report */}
             {displayTab === 'mains' && currentStep === 13 && (
-              <MainsPracticeStep
-                nodeId={nodeId}
-                onComplete={() => advanceStep(13)}
-              />
+              <div className="space-y-6">
+                {/* Prelims PYQs surfaced alongside Mains practice */}
+                <PrelimsPyqPanel nodeId={nodeId} subject="geography" />
+                <MainsPracticeStep
+                  nodeId={nodeId}
+                  onComplete={() => advanceStep(13)}
+                />
+              </div>
             )}
 
             {displayTab === 'mains' && currentStep === 14 && (
