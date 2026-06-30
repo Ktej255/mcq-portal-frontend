@@ -76,7 +76,8 @@ export function RecallCheckStep({
       // Combine accumulated text from previous sessions with current session text
       const fullText = accumulatedTextRef.current + sessionText;
       textRef.current = fullText;
-      setTextInput(fullText);
+      // Force state update
+      setTextInput(() => fullText);
     };
 
     rec.onerror = (e: any) => {
@@ -87,10 +88,15 @@ export function RecallCheckStep({
     };
 
     rec.onend = () => {
-      // Auto-restart to keep listening (SpeechRecognition instances cannot be restarted once stopped)
+      // Only auto-restart if we're still supposed to be listening
+      // Add a small delay to prevent rapid restart loops
       if (recognitionRef.current === rec) {
-        accumulatedTextRef.current = textRef.current;
-        startLiveTranscription(true);
+        setTimeout(() => {
+          if (recognitionRef.current === rec) {
+            accumulatedTextRef.current = textRef.current;
+            startLiveTranscription(true);
+          }
+        }, 300);
       }
     };
 
@@ -215,6 +221,7 @@ export function RecallCheckStep({
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-xs font-black text-red-700">Listening... speak now</span>
+                {textInput.length > 0 && <span className="text-[10px] text-green-600">({textInput.length} chars received)</span>}
               </div>
               <button onClick={stopLiveTranscription} className="text-xs font-black text-red-600 px-2 py-1 rounded bg-red-100">
                 Stop
