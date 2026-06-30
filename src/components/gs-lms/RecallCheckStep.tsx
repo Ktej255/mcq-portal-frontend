@@ -34,10 +34,12 @@ export function RecallCheckStep({
   const [retryCount, setRetryCount] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
-  const transcriptRef = useRef('');
+  const recognitionRef = useRef<any>(null);
+  const textRef = useRef('');
 
   // Web Speech API for live transcription
   const startLiveTranscription = useCallback(() => {
+    setSubmitError(null);
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSubmitError('Speech recognition not supported in this browser. Please type instead.');
@@ -45,71 +47,53 @@ export function RecallCheckStep({
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-IN';
-    recognition.maxAlternatives = 1;
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-IN';
 
-    let shouldRestart = true;
-
-    recognition.onresult = (event: any) => {
-      let final = '';
-      let interim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript + ' ';
-        } else {
-          interim += event.results[i][0].transcript;
-        }
+    rec.onresult = (e: any) => {
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) {
+        text += e.results[i][0].transcript;
+        if (e.results[i].isFinal) text += ' ';
       }
-      transcriptRef.current = final;
-      setTextInput(final + interim);
+      textRef.current = text;
+      setTextInput(text); // This updates the textarea
     };
 
-    recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') {
-        return;
-      }
-      shouldRestart = false;
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      if (shouldRestart) {
-        try { recognition.start(); } catch { setIsListening(false); }
-      } else {
+    rec.onerror = (e: any) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
         setIsListening(false);
       }
     };
 
+    rec.onend = () => {
+      // Auto-restart to keep listening
+      if (recognitionRef.current === rec) {
+        try { rec.start(); } catch {}
+      }
+    };
+
     try {
-      recognition.start();
+      rec.start();
+      recognitionRef.current = rec;
       setIsListening(true);
-      setMode('text-fallback');
+      setMode('text-fallback'); // Show the textarea
     } catch {
       setSubmitError('Could not start speech recognition. Check microphone permissions.');
       setMode('text-fallback');
     }
-
-    (window as any).__recallRecognition = recognition;
-    (window as any).__recallStop = () => { shouldRestart = false; };
   }, []);
 
   const stopLiveTranscription = useCallback(() => {
-    const stop = (window as any).__recallStop;
-    if (stop) stop();
-    const recognition = (window as any).__recallRecognition;
-    if (recognition) {
-      recognition.stop();
-      (window as any).__recallRecognition = null;
-      (window as any).__recallStop = null;
+    if (recognitionRef.current) {
+      const rec = recognitionRef.current;
+      recognitionRef.current = null; // Prevent auto-restart
+      rec.stop();
     }
     setIsListening(false);
-    // Ensure final transcript is in the text input
-    if (transcriptRef.current) {
-      setTextInput(transcriptRef.current);
-    }
+    setTextInput(textRef.current); // Ensure final text is captured
   }, []);
 
   const handleTextSubmit = useCallback(async () => {
