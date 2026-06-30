@@ -151,8 +151,13 @@ export default function TopicContentPage() {
                   );
                 })()}
 
-                {/* Advance button — only on current content step (not when revisiting) */}
-                {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && (
+                {/* Advance button — show when viewing the tab that matches current step */}
+                {(currentStep === 2 || currentStep === 4 || currentStep === 6 || currentStep === 8 || currentStep === 10) && 
+                 (() => {
+                   // Map current step to its tab
+                   const stepTab = currentStep <= 3 ? 'learn' : currentStep <= 5 ? 'ncert' : currentStep <= 7 ? 'learn' : currentStep <= 9 ? 'current' : 'traps';
+                   return stepTab === displayTab;
+                 })() && (
                   <button
                     onClick={() => advanceStep(currentStep)}
                     className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
