@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, MicOff, CheckCircle2, XCircle, RefreshCw, Keyboard } from 'lucide-react';
-import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+// Web Speech API used instead of useAudioRecorder for live transcription
 import { funnelService, RecallCheckOut } from '@/services/api/funnelService';
 
 /**
@@ -33,6 +33,60 @@ export function RecallCheckStep({
   const [textInput, setTextInput] = useState('');
   const [retryCount, setRetryCount] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+
+  // Web Speech API for live transcription
+  const startLiveTranscription = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSubmitError('Speech recognition not supported in this browser. Please type instead.');
+      setMode('text-fallback');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-IN'; // Indian English
+
+    let finalTranscript = textInput;
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setTextInput(finalTranscript + interim);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+    setIsListening(true);
+    setMode('text-fallback');
+
+    // Store reference to stop later
+    (window as any).__recallRecognition = recognition;
+  }, [textInput]);
+
+  const stopLiveTranscription = useCallback(() => {
+    const recognition = (window as any).__recallRecognition;
+    if (recognition) {
+      recognition.stop();
+      (window as any).__recallRecognition = null;
+    }
+    setIsListening(false);
+  }, []);
 
   const { isRecording, duration, startRecording, stopRecording, error: audioError, isSupported } = useAudioRecorder({
     maxDuration: 180,
@@ -51,42 +105,11 @@ export function RecallCheckStep({
 
     setMode('processing');
 
-    try {
-      // Upload audio blob to backend for STT transcription + scoring
-      const formData = new FormData();
-      formData.append('audio', blob, 'recall.webm');
-      formData.append('section_label', sectionLabel);
-
-      const response = await fetch(`/api/v1/gs-lms/${subject}/funnel/${nodeId}/recall/audio`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          // Auth header will be injected by the API interceptor if using apiClient
-          // For direct fetch, we rely on cookies or manual token
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Audio transcription failed');
-      }
-
-      const data = await response.json();
-      const res = (data.data || data) as RecallCheckOut;
-      setResult(res);
-
-      // Check STT confidence — if low, allow re-record or text fallback
-      if (res.stt_confidence !== null && res.stt_confidence < 0.6) {
-        setSubmitError('Low transcription confidence. You can re-record or type your recall instead.');
-        setMode('text-fallback');
-      } else {
-        setMode('result');
-      }
-    } catch {
-      // Fallback to text input on audio upload failure
-      setSubmitError('Audio processing failed. Please type your recall instead.');
-      setMode('text-fallback');
-    }
-  }, [stopRecording, subject, nodeId, sectionLabel]);
+    // Use browser's Web Speech API for live transcription instead of backend STT
+    // This gives real-time text display as the student speaks
+    setSubmitError('Audio processing failed. Please type your recall instead.');
+    setMode('text-fallback');
+  }, [stopRecording]);
 
   const handleTextSubmit = useCallback(async () => {
     if (!textInput.trim() || textInput.length < 5) {
@@ -131,15 +154,13 @@ export function RecallCheckStep({
       {/* Prompt State */}
       {mode === 'prompt' && (
         <div className="flex flex-col items-center gap-3">
-          {isSupported ? (
-            <button
-              onClick={handleStartRecording}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black shadow-md hover:scale-105 transition-transform"
-            >
-              <Mic className="h-4 w-4" />
-              Start Recording
-            </button>
-          ) : null}
+          <button
+            onClick={startLiveTranscription}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black shadow-md hover:scale-105 transition-transform"
+          >
+            <Mic className="h-4 w-4" />
+            Start Speaking (Live Transcription)
+          </button>
           <button
             onClick={() => setMode('text-fallback')}
             className="flex items-center gap-1.5 text-xs font-semibold text-[#49675e] hover:text-[#1d9e75]"
@@ -147,9 +168,6 @@ export function RecallCheckStep({
             <Keyboard className="h-3 w-3" />
             Type instead
           </button>
-          {audioError && (
-            <p className="text-xs text-red-600 text-center">{audioError}</p>
-          )}
         </div>
       )}
 
@@ -188,17 +206,38 @@ export function RecallCheckStep({
         </div>
       )}
 
-      {/* Text Fallback */}
+      {/* Text Fallback (also used for live speech-to-text) */}
       {mode === 'text-fallback' && (
         <div className="space-y-3">
+          {isListening && (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-black text-red-700">Listening... speak now</span>
+              </div>
+              <button onClick={stopLiveTranscription} className="text-xs font-black text-red-600 px-2 py-1 rounded bg-red-100">
+                Stop
+              </button>
+            </div>
+          )}
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Type what you remember from this section..."
+            placeholder="Type what you remember OR click 'Start Speaking' above for voice input..."
             className="w-full h-32 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
           />
           <div className="flex justify-between items-center">
-            <span className="text-[10px] text-[#49675e]">{textInput.length} chars</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[#49675e]">{textInput.length} chars</span>
+              {!isListening && (
+                <button
+                  onClick={startLiveTranscription}
+                  className="flex items-center gap-1 text-[10px] font-black text-[#1d9e75]"
+                >
+                  <Mic className="h-3 w-3" /> Speak more
+                </button>
+              )}
+            </div>
             <button
               onClick={handleTextSubmit}
               disabled={textInput.length < 5}
