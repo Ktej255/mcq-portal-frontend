@@ -82,21 +82,30 @@ export function RecallCheckStep({
 
     rec.onerror = (e: any) => {
       console.error('Speech recognition error:', e.error);
+      if (e.error === 'network') {
+        // Chrome's speech API requires network access to Google servers
+        // Show typing fallback with helpful message
+        setSubmitError('Voice input requires internet connection to Google services. Please type your recall instead, or try using your browser\'s built-in dictation (Windows: Win+H, Mac: Fn key twice).');
+        recognitionRef.current = null;
+        setIsListening(false);
+        return;
+      }
       if (e.error !== 'no-speech' && e.error !== 'aborted') {
         setIsListening(false);
       }
     };
 
     rec.onend = () => {
-      // Only auto-restart if we're still supposed to be listening
-      // Add a small delay to prevent rapid restart loops
+      // Only auto-restart if we're still supposed to be listening AND no error occurred
       if (recognitionRef.current === rec) {
         setTimeout(() => {
           if (recognitionRef.current === rec) {
             accumulatedTextRef.current = textRef.current;
             startLiveTranscription(true);
           }
-        }, 300);
+        }, 500);
+      } else {
+        setIsListening(false);
       }
     };
 
