@@ -48,8 +48,10 @@ export function RecallCheckStep({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-IN'; // Indian English
+    recognition.maxAlternatives = 1;
 
     let finalTranscript = textInput;
+    let shouldRestart = true; // Flag to control auto-restart
 
     recognition.onresult = (event: any) => {
       let interim = '';
@@ -63,27 +65,52 @@ export function RecallCheckStep({
       setTextInput(finalTranscript + interim);
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      // Don't stop on 'no-speech' error — just keep listening
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return; // Will auto-restart via onend
+      }
+      shouldRestart = false;
       setIsListening(false);
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // Auto-restart if user hasn't clicked Stop
+      if (shouldRestart) {
+        try {
+          recognition.start();
+        } catch {
+          setIsListening(false);
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
-    recognition.start();
-    setIsListening(true);
-    setMode('text-fallback');
+    try {
+      recognition.start();
+      setIsListening(true);
+      setMode('text-fallback');
+    } catch {
+      setSubmitError('Could not start speech recognition.');
+      setMode('text-fallback');
+    }
 
-    // Store reference to stop later
+    // Store reference with stop control
     (window as any).__recallRecognition = recognition;
+    (window as any).__recallShouldRestart = (val: boolean) => { shouldRestart = val; };
   }, [textInput]);
 
   const stopLiveTranscription = useCallback(() => {
+    // Set flag to prevent auto-restart
+    const setRestart = (window as any).__recallShouldRestart;
+    if (setRestart) setRestart(false);
+
     const recognition = (window as any).__recallRecognition;
     if (recognition) {
       recognition.stop();
       (window as any).__recallRecognition = null;
+      (window as any).__recallShouldRestart = null;
     }
     setIsListening(false);
   }, []);
