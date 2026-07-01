@@ -16,6 +16,7 @@ import {
   PieChart,
   PlayCircle,
   ScrollText,
+  Users,
 } from "lucide-react";
 
 import {
@@ -37,6 +38,7 @@ import { SyllabusView } from "@/components/upsc/SyllabusView";
 import { GapPanel } from "@/components/upsc/GapPanel";
 import { RecallPlayer } from "@/components/upsc/RecallPlayer";
 import { MappingModule } from "@/components/upsc/MappingModule";
+import { ThinkersModule } from "@/components/upsc/ThinkersModule";
 import { CurrentAffairsFeed } from "@/components/upsc/CurrentAffairsFeed";
 import { useSubjectFeatures } from "@/components/upsc/SubjectFeatureSlot";
 import {
@@ -64,6 +66,15 @@ function normalizeTitle(title: string): string {
  * map features are authored (Phase 2).
  */
 const SUBJECTS_WITH_MAPPING = new Set<string>(["geography"]);
+
+/**
+ * Subjects that define the "Thinkers" subject-specific feature (R4.2 / R4.5).
+ * Thinkers is the Sociology analog of Geography's Mapping, so the affordance is
+ * shown only for these subjects. Sociology is the only one today; this set is
+ * the graceful static fallback that carries `["thinkers"]` while the DB-backed
+ * config loads or if its fetch fails, mirroring SUBJECTS_WITH_MAPPING.
+ */
+const SUBJECTS_WITH_THINKERS = new Set<string>(["sociology"]);
 
 /**
  * SubjectShell — the navigational shell for one optional subject (task 5.3).
@@ -186,16 +197,24 @@ function ResolvedSubjectShell({
   // MappingModule (topic-wise locations + 26-year map questions). Shows an
   // honest empty state while mapping content is unreviewed/draft.
   const [showMapping, setShowMapping] = useState(false);
+  // Thinkers module (task 5.3): a subject-level "Thinkers" affordance — shown
+  // only for subjects with the thinkers feature (R4.2) — opens the
+  // backend-served ThinkersModule (the six sociological thinkers, each reusing
+  // the existing Read-layer deep notes). Mirrors the Mapping affordance.
+  const [showThinkers, setShowThinkers] = useState(false);
   // Config-driven (task 15.3 / R11.2): the Mapping affordance is shown when the
   // subject's DB-backed config enables the "mapping" feature module — proving
   // the per-subject framework on Geography. The static SUBJECTS_WITH_MAPPING set
   // is the graceful fallback while the config loads or if the fetch fails, so a
-  // subject never loses an already-shipping affordance.
-  const subjectFeatures = useSubjectFeatures(
-    slug,
-    SUBJECTS_WITH_MAPPING.has(slug) ? ["mapping"] : [],
-  );
+  // subject never loses an already-shipping affordance. The Thinkers affordance
+  // (R4.2 / R4.5) is wired the same way with SUBJECTS_WITH_THINKERS as its
+  // static fallback.
+  const subjectFeatures = useSubjectFeatures(slug, [
+    ...(SUBJECTS_WITH_MAPPING.has(slug) ? ["mapping"] : []),
+    ...(SUBJECTS_WITH_THINKERS.has(slug) ? ["thinkers"] : []),
+  ]);
   const hasMapping = subjectFeatures.has("mapping");
+  const hasThinkers = subjectFeatures.has("thinkers");
 
   // Current-affairs (task 17.1 / R11.4): a subject-specific feature shown when
   // the subject's config enables the "currentAffairs" module (Public
@@ -330,6 +349,13 @@ function ResolvedSubjectShell({
     return <MappingModule slug={slug} onClose={() => setShowMapping(false)} />;
   }
 
+  // When the Thinkers affordance is active, show the backend-served thinkers
+  // module (subject-specific; the six sociological thinkers, each reusing the
+  // existing Read-layer deep notes for its subtopic node).
+  if (showThinkers) {
+    return <ThinkersModule slug={slug} onClose={() => setShowThinkers(false)} />;
+  }
+
   // When the Current-affairs affordance is active, show the subject-specific
   // current-affairs feed (config-driven; Public Administration today).
   if (showCurrentAffairs) {
@@ -417,6 +443,17 @@ function ResolvedSubjectShell({
                 >
                   <MapPin className="h-4 w-4" />
                   Mapping
+                </button>
+              ) : null}
+              {hasThinkers ? (
+                <button
+                  type="button"
+                  data-testid="open-thinkers-module"
+                  onClick={() => setShowThinkers(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                >
+                  <Users className="h-4 w-4" />
+                  Thinkers
                 </button>
               ) : null}
             </div>
