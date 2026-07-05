@@ -558,7 +558,7 @@ function Diagram({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 function NcertReference({ block }: { block: ContentBlock }) {
   const [showPdf, setShowPdf] = useState(false);
-  const [useFallbackViewer, setUseFallbackViewer] = useState(false);
+  const [useFallbackViewer, setUseFallbackViewer] = useState(true);
   const book = block.book as string | undefined;
   const classNum = block.class as string | undefined;
   const chapter = block.chapter as string | undefined;
@@ -598,7 +598,7 @@ function NcertReference({ block }: { block: ContentBlock }) {
           {externalUrl && (
             <button
               onClick={() => {
-                setUseFallbackViewer(false);
+                setUseFallbackViewer(true);
                 setShowPdf((open) => !open);
               }}
               className="flex items-center gap-1 flex-shrink-0 rounded-lg border border-[#e8d5a8] bg-white px-2.5 py-1.5 text-[9px] font-black text-[#8c5d14] hover:bg-[#fef9ec] hover:shadow-sm transition-all"
