@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { ContentBlock } from "@/services/api/gsLmsService";
-import { NcertPdfViewer } from "@/components/gs-lms/NcertPdfViewer";
 import {
   Sparkles,
   Lightbulb,
@@ -13,6 +12,8 @@ import {
   Target,
   Quote,
   BookOpen,
+  ExternalLink,
+  X,
 } from "lucide-react";
 
 /**
@@ -557,6 +558,7 @@ function Diagram({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 function NcertReference({ block }: { block: ContentBlock }) {
   const [showPdf, setShowPdf] = useState(false);
+  const [useFallbackViewer, setUseFallbackViewer] = useState(false);
   const book = block.book as string | undefined;
   const classNum = block.class as string | undefined;
   const chapter = block.chapter as string | undefined;
@@ -567,14 +569,22 @@ function NcertReference({ block }: { block: ContentBlock }) {
   const keyFacts = block.key_facts as string[] | undefined;
 
   const pageRange = pageStart && pageEnd
-    ? `pp. ${pageStart}–${pageEnd}`
+    ? `pp. ${pageStart}-${pageEnd}`
     : pageStart
       ? `p. ${pageStart}`
       : '';
+  const directPdfUrl = externalUrl && pageStart ? `${externalUrl}#page=${pageStart}` : externalUrl;
+  const fallbackPdfUrl = externalUrl
+    ? `https://docs.google.com/viewer?url=${encodeURIComponent(externalUrl)}&embedded=true`
+    : undefined;
+  const viewerUrl = useFallbackViewer ? fallbackPdfUrl : directPdfUrl;
+  const referenceLabel = [classNum && `Class ${classNum}`, chapter && `Ch. ${chapter}`, pageRange]
+    .filter(Boolean)
+    .join(' - ');
 
   return (
-    <>
-      <div className="my-4 rounded-xl border border-[#e8d5a8] bg-gradient-to-br from-[#fef9ec] to-[#fffbeb] p-4">
+    <div className="my-4 space-y-3">
+      <div className="rounded-xl border border-[#e8d5a8] bg-gradient-to-br from-[#fef9ec] to-[#fffbeb] p-4">
         {/* Header with book info */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div>
@@ -582,17 +592,20 @@ function NcertReference({ block }: { block: ContentBlock }) {
               <p className="text-xs font-black text-[#8c5d14]">{book}</p>
             )}
             <p className="text-[10px] text-[#8c5d14]/70">
-              {[classNum && `Class ${classNum}`, chapter && `Ch. ${chapter}`, pageRange]
-                .filter(Boolean)
-                .join(' • ')}
+              {referenceLabel}
             </p>
           </div>
           {externalUrl && (
             <button
-              onClick={() => setShowPdf(true)}
+              onClick={() => {
+                setUseFallbackViewer(false);
+                setShowPdf((open) => !open);
+              }}
               className="flex items-center gap-1 flex-shrink-0 rounded-lg border border-[#e8d5a8] bg-white px-2.5 py-1.5 text-[9px] font-black text-[#8c5d14] hover:bg-[#fef9ec] hover:shadow-sm transition-all"
+              aria-expanded={showPdf}
             >
-              📖 Read in NCERT
+              <BookOpen className="h-3 w-3" />
+              {showPdf ? 'Hide NCERT' : 'Read NCERT here'}
             </button>
           )}
         </div>
@@ -622,17 +635,48 @@ function NcertReference({ block }: { block: ContentBlock }) {
         )}
       </div>
 
-      {/* Inline PDF Viewer Modal */}
-      {showPdf && externalUrl && (
-        <NcertPdfViewer
-          url={externalUrl}
-          pageStart={pageStart}
-          bookTitle={book || 'NCERT'}
-          chapter={chapter}
-          onClose={() => setShowPdf(false)}
-        />
+      {showPdf && externalUrl && viewerUrl && (
+        <div className="overflow-hidden rounded-xl border border-[#d8c79b] bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[#efe2bf] bg-[#fff8e8] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black text-[#5d4212]">NCERT Reader</p>
+              <p className="text-[10px] text-[#8c5d14]/75">
+                {[book, referenceLabel].filter(Boolean).join(' - ')}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setUseFallbackViewer((useFallback) => !useFallback)}
+                className="rounded-lg border border-[#e8d5a8] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#8c5d14] hover:bg-[#fef9ec]"
+              >
+                {useFallbackViewer ? 'Use direct PDF' : 'Use fallback viewer'}
+              </button>
+              <a
+                href={directPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 rounded-lg border border-[#e8d5a8] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#8c5d14] hover:bg-[#fef9ec]"
+              >
+                Open tab
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              <button
+                onClick={() => setShowPdf(false)}
+                className="rounded-lg border border-[#e8d5a8] bg-white p-1.5 text-[#8c5d14] hover:bg-[#fef9ec]"
+                aria-label="Close NCERT reader"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            title={`${book || 'NCERT'} reader`}
+            src={viewerUrl}
+            className="h-[72vh] min-h-[460px] w-full bg-[#f7f4ee]"
+          />
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

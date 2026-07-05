@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, MicOff, CheckCircle2, XCircle, RefreshCw, Keyboard } from 'lucide-react';
+import { Mic, CheckCircle2, XCircle, RefreshCw, Keyboard, ArrowRight } from 'lucide-react';
 // Web Speech API used instead of useAudioRecorder for live transcription
 import { funnelService, RecallCheckOut } from '@/services/api/funnelService';
 
@@ -40,6 +40,16 @@ export function RecallCheckStep({
   const textRef = useRef('');
   // accumulatedTextRef holds the text completed in previous segments/sessions
   const accumulatedTextRef = useRef('');
+
+  const handleContinueWithoutRecall = useCallback(() => {
+    if (recognitionRef.current) {
+      const rec = recognitionRef.current;
+      recognitionRef.current = null;
+      try { rec.stop(); } catch {}
+    }
+    setIsListening(false);
+    onComplete();
+  }, [onComplete]);
 
   // Web Speech API for live transcription
   const startLiveTranscription = useCallback((isRestart = false) => {
@@ -216,6 +226,14 @@ export function RecallCheckStep({
             <Keyboard className="h-3 w-3" />
             Type instead
           </button>
+
+          <button
+            onClick={handleContinueWithoutRecall}
+            className="flex items-center gap-1.5 rounded-lg border border-[#b9d9cd] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] hover:border-[#1d9e75] hover:text-[#1d9e75]"
+          >
+            Continue without recall
+            <ArrowRight className="h-3 w-3" />
+          </button>
         </div>
       )}
 
@@ -264,7 +282,7 @@ export function RecallCheckStep({
             placeholder="Click here and speak using Win+H (Windows) or tap the mic on your phone keyboard..."
             className="w-full h-32 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
           />
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-[#49675e]">{textInput.length} chars</span>
               {!isListening && (
@@ -276,13 +294,21 @@ export function RecallCheckStep({
                 </button>
               )}
             </div>
-            <button
-              onClick={handleTextSubmit}
-              disabled={textInput.length < 5}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50"
-            >
-              Submit Recall
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleContinueWithoutRecall}
+                className="px-3 py-2 rounded-lg border border-[#b9d9cd] bg-white text-xs font-black text-[#49675e] hover:border-[#1d9e75] hover:text-[#1d9e75]"
+              >
+                Skip recall
+              </button>
+              <button
+                onClick={handleTextSubmit}
+                disabled={textInput.length < 5}
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50"
+              >
+                Submit Recall
+              </button>
+            </div>
           </div>
           {submitError && <p className="text-xs text-red-600">{submitError}</p>}
         </div>

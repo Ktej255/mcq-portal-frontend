@@ -74,7 +74,22 @@ export function useFunnelState(nodeId: number, subject = "geography"): UseFunnel
   const completeStep = useCallback(async (step: number) => {
     try {
       const newState = await funnelService.completeStep(subject, nodeId, step);
-      setState(newState);
+      setState((previousState) => {
+        const completed_steps = Array.from(new Set([
+          ...((previousState?.completed_steps ?? []) as number[]),
+          ...((newState.completed_steps ?? []) as number[]),
+          step,
+        ])).sort((a, b) => a - b);
+        const nextStep = Math.min(step + 1, 14);
+        const current_step = Math.max(newState.current_step ?? nextStep, nextStep);
+
+        return {
+          ...(previousState ?? newState),
+          ...newState,
+          current_step,
+          completed_steps,
+        };
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to complete step';
       setError(message);
