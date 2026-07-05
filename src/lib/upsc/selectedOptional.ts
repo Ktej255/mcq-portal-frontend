@@ -20,6 +20,7 @@ export type SelectedOptional = {
 
 /** Route to a specific optional subject's shell. */
 export function optionalSubjectRoute(slug: string): string {
+  if (slug === "geography") return `${OPTIONAL_CATALOG_ROUTE}/geography-optional`;
   return `${OPTIONAL_CATALOG_ROUTE}/${slug}`;
 }
 
