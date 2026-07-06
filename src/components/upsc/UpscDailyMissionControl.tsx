@@ -724,233 +724,83 @@ export function UpscDailyMissionControl() {
         <OptionalHomeEntry />
         {activeTab === "today" && (
           <>
-            <section
-              data-testid="daily-command-student-focus"
-              data-visible-mode="single-action-planner-proof"
-              data-active-subject={activeSubject.slug}
-              data-active-day={activeSession.day}
-              data-next-action-href={dailyPlanner.sessionReadiness.href}
-              data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
-              data-readiness-status={dailyPlanner.sessionReadiness.statusLabel}
-              data-readiness-score={dailyPlanner.sessionReadiness.scorePercent}
-              data-learning-gap={dailyPlanner.learningGap.title}
-              data-revision-href={dailyPlanner.revision.href}
-              data-after-this-decision={dailyPlanner.nextSessionProof.decision}
-              data-after-this-route={dailyPlanner.tomorrowAdjustment.href}
-              data-yesterday-decision={dailyPlanner.todayOriginProof.statusLabel}
-              data-yesterday-source-day={dailyPlanner.todayOriginProof.sourceDay}
-              data-yesterday-target-day={dailyPlanner.todayOriginProof.targetDay}
-              data-question-bank-attempts={activeDayQuestionBankAttempts.length}
-              className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm md:p-6"
-            >
-              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div className="min-w-0">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-md bg-[#1a3a2a] px-3 py-1 text-white">Today</Badge>
-                    <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
-                      {activeSubject.title} / Day {activeSession.day}
-                    </span>
-                    <span className="rounded-md bg-white/75 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#085041]">
-                      {dailyPlanner.sessionReadiness.scorePercent}% ready
-                    </span>
+            {/* Quick LMS Navigator Dashboard */}
+            <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  title: "Study Syllabus",
+                  description: "Access progressive content sections (Basic, NCERT, Advanced, Traps) and video lectures.",
+                  href: `/upsc/geography/lms`,
+                  icon: BookOpen,
+                  badge: "Core LMS",
+                  color: "from-[#1a3a2a] to-[#1d9e75]",
+                },
+                {
+                  title: "Practice MCQs",
+                  description: "Solve adaptive topic-wise questions to evaluate understanding and clear gaps.",
+                  href: `/upsc/geography/lms/practice`,
+                  icon: ClipboardCheck,
+                  badge: "15-MCQ Lab",
+                  color: "from-[#085041] to-[#1d9e75]",
+                },
+                {
+                  title: "Learning Gaps",
+                  description: "Review subject weakness metrics, incorrect attempt history, and gap suggestions.",
+                  href: `/upsc/geography/lms/gaps`,
+                  icon: LineChart,
+                  badge: "Gap Analytics",
+                  color: "from-[#13251d] to-[#085041]",
+                },
+                {
+                  title: "Mains Uploader",
+                  description: "Practice UPSC Mains answer writing with typed reviews and handwritten OCR checking.",
+                  href: `/upsc/answer-upload`,
+                  icon: UploadCloud,
+                  badge: "Mains Writing",
+                  color: "from-[#1a3a2a] to-[#085041]",
+                },
+              ].map((item) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="group flex flex-col justify-between rounded-2xl border border-[#dcd5c7] bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#1d9e75] hover:shadow-md"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="inline-flex items-center rounded-md bg-[#e7f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#085041]">
+                        {item.badge}
+                      </span>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f7f4ee] text-[#085041] transition-colors group-hover:bg-[#1d9e75] group-hover:text-white">
+                        <item.icon className="h-4.5 w-4.5" />
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-black text-[#13251d] group-hover:text-[#1d9e75] transition-colors">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">
+                      {item.description}
+                    </p>
                   </div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1d9e75]">Do this now</p>
-                  <h1 className="mt-2 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
-                    {dailyPlanner.sessionReadiness.title}
-                  </h1>
-                  <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#49675e]">
-                    {dailyPlanner.sessionReadiness.detail}
-                  </p>
-                  <div className="mt-4 grid gap-2 md:grid-cols-3">
-                    {[
-                      ["Gap", dailyPlanner.learningGap.title],
-                      ["Revision", dailyPlanner.revision.dueLabel],
-                      ["After this", dailyPlanner.tomorrowAdjustment.statusLabel],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-md border border-[#cfe5dc] bg-white/75 px-3 py-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">{label}</p>
-                        <p className="mt-1 text-xs font-black leading-5 text-[#13251d]">{value}</p>
-                      </div>
-                    ))}
+                  <div className="mt-6 flex items-center gap-1 text-xs font-black text-[#1d9e75]">
+                    <span>Open Dashboard</span>
+                    <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
                   </div>
-                  <details
-                    data-testid="daily-command-focus-proof"
-                    className="mt-4 rounded-md border border-[#cfe5dc] bg-white/75 p-3"
-                  >
-                    <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-[#085041]">
-                      Why this action?
-                    </summary>
-                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                      {dailyPlanner.nextSessionProof.evidenceSummary}
-                    </p>
-                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                      Why today: {dailyPlanner.todayOriginProof.title}. {dailyPlanner.todayOriginProof.evidenceSummary}
-                    </p>
-                    <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">
-                      After this: {dailyPlanner.tomorrowAdjustment.title}
-                    </p>
-                  </details>
-                </div>
-                {profile && !profile.inductionCompleted ? (
-                  <button
-                    type="button"
-                    disabled
-                    data-testid="daily-command-locked"
-                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-5 text-sm font-black text-[#756f64] cursor-not-allowed lg:w-auto"
-                  >
-                    Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <Link
-                    href={dailyPlanner.sessionReadiness.href}
-                    data-testid="daily-command-primary-action"
-                    data-next-action-href={dailyPlanner.sessionReadiness.href}
-                    data-next-action-label={dailyPlanner.sessionReadiness.actionLabel}
-                    data-session-readiness={dailyPlanner.sessionReadiness.statusLabel}
-                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d] lg:w-auto"
-                  >
-                    {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                )}
-              </div>
+                </Link>
+              ))}
             </section>
 
-            <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-              <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-                <Link href="/upsc" className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#085041]">
-                  <ArrowLeft className="h-4 w-4" /> UPSC command home
-                </Link>
-
-                <div className="mb-5 flex flex-wrap items-center gap-3">
-                  <Badge className="rounded-md bg-[#1d9e75] px-3 py-1 text-white">Daily Mission</Badge>
-                  <span className="text-sm font-bold text-[#776f64]">Student launch control</span>
-                </div>
-
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1d9e75]">{activeSubject.window}</p>
-                <h1 className="mt-3 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
-                  {activeSubject.title}: Day {activeSession.day}
-                </h1>
-                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#5d675f]">{activeSession.anchor}</p>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    ["Batch", activeBatchCode],
-                    ["Chapter", activeSession.chapter],
-                    ["Duration", activeSession.duration],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
-                      <p className="mt-2 break-words text-sm font-black leading-5 text-[#13251d]">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid min-w-0 gap-5">
-                <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Today loop</p>
-                      <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Move through the class sequence</h2>
-                    </div>
-                    <Target className="h-6 w-6 text-[#085041]" />
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {[
-                      {
-                        label: "Watch",
-                        detail: activeProgress?.watched ? "Watched" : contentReady ? "Ready to watch" : "Content pending",
-                        href: `/upsc/geography/lms/syllabus`,
-                        icon: PlayCircle,
-                        active: true,
-                      },
-                      {
-                        label: "Talk",
-                        detail: activeProgress?.reflection ? "Reflection saved" : "Explain after watch",
-                        href: `/upsc/geography/lms/syllabus`,
-                        icon: BrainCircuit,
-                        active: Boolean(activeProgress?.watched),
-                      },
-                      {
-                        label: "Lab",
-                        detail: activeSession.lab,
-                        href: `/upsc/geography/lms/syllabus`,
-                        icon: Layers3,
-                        active: Boolean(activeLabSlug),
-                      },
-                      {
-                        label: "MCQ",
-                        detail: activeMcqCommand
-                          ? `Command ${activeProgress?.mcqScorePercent ?? 0}%`
-                          : activeProgress?.mcqOutcome === "Revisit"
-                            ? "Revisit required"
-                            : activeMcqBatch.ready
-                              ? "Practice pending"
-                              : `${activeMcqBatch.drafted}/${activeMcqBatch.planned} drafted`,
-                        href: `/upsc/geography/lms/practice`,
-                        icon: ClipboardCheck,
-                        active: true,
-                      },
-                      {
-                        label: "Retro",
-                        detail: activeProgress?.retroCompleted ? "Retrospective completed" : "Review Saturday test",
-                        href: `/upsc/geography/lms/retro`,
-                        icon: Sparkles,
-                        active: profile ? Boolean(profile.inductionCompleted) : true,
-                      },
-                      {
-                        label: "Mains",
-                        detail: "Frictionless Answer Uploader",
-                        href: "/upsc/answer-upload",
-                        icon: UploadCloud,
-                        active: profile ? Boolean(profile.inductionCompleted) : true,
-                      },
-                      {
-                        label: "Track",
-                        detail: "Subject progress",
-                        href: `/upsc/geography/lms/gaps`,
-                        icon: LineChart,
-                        active: true,
-                      },
-                      {
-                        label: "Revisit",
-                        detail: activeProgress?.revisitQueued ? "Repair now" : "Recovery room",
-                        href: `/upsc/geography/lms/planner`,
-                        icon: RefreshCcw,
-                        active: true,
-                      },
-                    ].map((item) => (
-                      <Link
-                        key={item.label}
-                        href={item.href}
-                        className={cn(
-                          "group flex min-h-16 items-center gap-3 rounded-md border px-3 text-left transition hover:-translate-y-0.5",
-                          item.active
-                            ? "border-[#dcd5c7] bg-[#f7f4ee] text-[#1a3a2a] hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
-                            : "pointer-events-none border-[#dcd5c7] bg-[#f7f4ee] text-[#8a8174] opacity-60"
-                        )}
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-[#085041] group-hover:bg-[#1d9e75] group-hover:text-white">
-                          <item.icon className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-black leading-5">{item.label}</span>
-                          <span className="mt-0.5 block break-words text-xs font-semibold opacity-70">{item.detail}</span>
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="min-w-0 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-                  <div className="mb-5 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#ef9f27] text-[#13251d]">
+            {/* Target Note & Mind State Container */}
+            <section className="grid gap-5 md:grid-cols-2">
+              {/* Daily Session Target Note */}
+              <div className="rounded-2xl border border-[#dcd5c7] bg-white p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ef9f27]/10 text-[#ef9f27]">
                       <FileText className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-black text-[#13251d]">Daily note</p>
-                      <p className="text-xs font-semibold text-[#746f66]">Saved locally for the selected day</p>
+                      <h3 className="text-base font-black text-[#13251d]">Session Targets & Notes</h3>
+                      <p className="text-xs font-semibold text-[#746f66]">Draft targets or notes for today's session</p>
                     </div>
                   </div>
 
@@ -960,88 +810,76 @@ export function UpscDailyMissionControl() {
                       setDailyState((current) => ({ ...current, note: event.target.value }));
                       setSaved(false);
                     }}
-                    placeholder="Write today's target, doubt, or class instruction here."
-                    className="min-h-28 w-full resize-y rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-6 text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                    placeholder="Write down your goals, tricky concepts, or doubts you want to check today."
+                    className="min-h-32 w-full resize-none rounded-xl border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-relaxed text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
+                </div>
 
+                <div className="mt-4 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={saveNote}
-                    className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#1a3a2a] px-4 text-xs font-bold text-white transition hover:bg-[#10291d]"
                   >
-                    <Save className="h-4 w-4" /> Save daily mission
+                    <Save className="h-3.5 w-3.5" /> Save Session Note
                   </button>
                   {saved && (
-                    <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                      <p className="text-sm font-bold leading-6 text-[#085041]">Daily mission saved locally.</p>
-                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-[#1d9e75]">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+                    </span>
                   )}
                 </div>
               </div>
-            </section>
 
-            <section
-              id="daily-me-time-checkin"
-              data-testid="daily-me-time-checkin"
-              data-active-mood={activeProgress?.meTimeMood ?? "pending"}
-              data-completed={activeProgress?.meTimeCompletedAt ? "true" : "false"}
-              className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
-            >
-              <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+              {/* Mind-State Check-in */}
+              <div className="rounded-2xl border border-[#dcd5c7] bg-white p-6 shadow-sm flex flex-col justify-between">
                 <div>
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
-                    <HeartPulse className="h-5 w-5" />
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1d9e75]/10 text-[#1d9e75]">
+                      <HeartPulse className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-[#13251d]">Mind-State Check-in</h3>
+                      <p className="text-xs font-semibold text-[#746f66]">Select your current learning focus state</p>
+                    </div>
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                    Me-time before class
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight text-[#13251d]">
-                    Start with the student&apos;s mind-state.
-                  </h2>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-                    This check-in is saved to the selected subject/day and becomes part of growth reports.
-                  </p>
-                  <div className="mt-4 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Current reset</p>
-                    <p className="mt-1 text-sm font-bold leading-6 text-[#31443a]">
-                      {activeMeTimeOption?.resetPlan ?? "Choose a state once before opening the next class action."}
-                    </p>
+
+                  <div className="grid gap-2 grid-cols-2">
+                    {meTimeOptions.slice(0, 4).map((option) => {
+                      const isActive = activeProgress?.meTimeMood === option.mood;
+                      return (
+                        <button
+                          key={option.mood}
+                          type="button"
+                          onClick={() => saveMeTime(option)}
+                          className={cn(
+                            "rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5",
+                            isActive
+                              ? "border-[#1a3a2a] bg-[#1a3a2a] text-white shadow-sm"
+                              : "border-[#dcd5c7] bg-[#f7f4ee]/50 text-[#34453b] hover:border-[#1d9e75]"
+                          )}
+                        >
+                          <span className="block text-xs font-black leading-tight">{option.label}</span>
+                          <span className="mt-1 block text-[10px] font-semibold leading-normal opacity-80">{option.detail}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {meTimeOptions.map((option) => {
-                    const isActive = activeProgress?.meTimeMood === option.mood;
 
-                    return (
-                      <button
-                        key={option.mood}
-                        type="button"
-                        data-testid={`daily-me-time-${option.mood}`}
-                        aria-pressed={isActive}
-                        onClick={() => saveMeTime(option)}
-                        className={cn(
-                          "min-h-24 rounded-md border p-3 text-left transition hover:-translate-y-0.5",
-                          isActive
-                            ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                            : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
-                        )}
-                      >
-                        <span className="block text-sm font-black leading-5">{option.label}</span>
-                        <span className="mt-2 block text-xs font-semibold leading-5 opacity-80">{option.detail}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mt-4">
+                  {(meTimeSaved || activeProgress?.meTimeCompletedAt) ? (
+                    <div className="flex items-center gap-2 rounded-xl bg-[#e7f5ee] p-3 text-xs font-bold text-[#085041]">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#1d9e75]" />
+                      <span>Check-in saved. Reset plan: {activeMeTimeOption?.resetPlan}</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] font-semibold text-[#8a8174]">
+                      Choose your mind-state above to align your daily learning pace.
+                    </p>
+                  )}
                 </div>
               </div>
-              {(meTimeSaved || activeProgress?.meTimeCompletedAt) && (
-                <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
-                  <p className="text-sm font-bold leading-6 text-[#085041]">
-                    Me-time saved for {activeSubject.title} Day {activeSession.day}. Growth and reports will include this check.
-                  </p>
-                </div>
-              )}
             </section>
           </>
         )}

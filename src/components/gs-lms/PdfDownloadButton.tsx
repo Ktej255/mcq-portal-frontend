@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 interface PdfDownloadButtonProps {
   nodeId: number;
@@ -12,6 +13,7 @@ interface PdfDownloadButtonProps {
 export function PdfDownloadButton({ nodeId, topicCompleted, topicTitle }: PdfDownloadButtonProps) {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { subject } = useSubjectLms();
 
   if (!topicCompleted) return null;
 
@@ -20,7 +22,7 @@ export function PdfDownloadButton({ nodeId, topicCompleted, topicTitle }: PdfDow
     setError(null);
 
     try {
-      const blob = await gsLmsService.getTopicPdf("geography", nodeId);
+      const blob = await gsLmsService.getTopicPdf(subject, nodeId);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
