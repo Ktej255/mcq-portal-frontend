@@ -1,7 +1,9 @@
 // Generic course-player data for ANY optional subject.
-// Geography keeps its bespoke Paper I/II split; every other subject is built
-// directly from its scraped syllabus (optionalSubjectsContent).
+// Geography keeps its bespoke LMS; authored optional shells such as
+// Anthropology use the curated Paper I/II structure as upload-ready slots.
+// Remaining subjects fall back to scraped syllabus content when available.
 import { getOptionalSubjectContent } from "./optionalSubjectContent";
+import { getSubjectStructure, hasBespokeStructure } from "./optionalSubjectStructure";
 import {
   GEOGRAPHY_FREE_LESSON_COUNT,
   GEOGRAPHY_OPTIONAL_SLUG,
@@ -9,8 +11,53 @@ import {
   type LmsPaper,
 } from "./optionalGeographyLms";
 
+function lessonFromTopic(topic: string, id: string, lessonIndex: number) {
+  return {
+    id,
+    title: topic,
+    durationLabel: "Video coming soon",
+    free: lessonIndex < GEOGRAPHY_FREE_LESSON_COUNT,
+  };
+}
+
 export function getOptionalCoursePapers(slug: string): LmsPaper[] {
   if (slug === GEOGRAPHY_OPTIONAL_SLUG) return getGeographyPapers();
+
+  if (hasBespokeStructure(slug)) {
+    const structure = getSubjectStructure(slug);
+    let lessonIndex = 0;
+    const paperOneModules = structure.paperOne.sections.map((section, si) => ({
+      id: `p0-m${si}`,
+      title: `${section.label}: ${section.title}`,
+      lessons: section.topics.map((topic, ti) => {
+        const lesson = lessonFromTopic(topic, `p0-m${si}-l${ti}`, lessonIndex);
+        lessonIndex += 1;
+        return lesson;
+      }),
+    }));
+    const paperTwoModule = {
+      id: "p1-m0",
+      title: structure.paperTwo.title,
+      lessons: structure.paperTwo.topics.map((topic, ti) => {
+        const lesson = lessonFromTopic(topic, `p1-m0-l${ti}`, lessonIndex);
+        lessonIndex += 1;
+        return lesson;
+      }),
+    };
+
+    return [
+      {
+        paper: structure.paperOne.label,
+        subtitle: `${structure.paperOne.sections.length} sections`,
+        modules: paperOneModules,
+      },
+      {
+        paper: structure.paperTwo.label,
+        subtitle: structure.paperTwo.title,
+        modules: [paperTwoModule],
+      },
+    ];
+  }
 
   const content = getOptionalSubjectContent(slug);
   if (!content) return [];
@@ -23,16 +70,14 @@ export function getOptionalCoursePapers(slug: string): LmsPaper[] {
       id: `p${pi}-m${si}`,
       title: section.heading,
       lessons: section.topics.map((topic, ti) => {
-        const free = lessonIndex < GEOGRAPHY_FREE_LESSON_COUNT;
+        const lesson = lessonFromTopic(topic, `p${pi}-m${si}-l${ti}`, lessonIndex);
         lessonIndex += 1;
-        return { id: `p${pi}-m${si}-l${ti}`, title: topic, durationLabel: "Video coming soon", free };
+        return lesson;
       }),
     })),
   }));
 }
 
-
-// ─── Study plan + spaced revision (generated from the subject's syllabus) ───
 export type StudyDay = { day: number; kind: "study" | "revision"; title: string; detail: string };
 
 export function buildStudyPlan(papers: LmsPaper[]): StudyDay[] {
@@ -44,7 +89,7 @@ export function buildStudyPlan(papers: LmsPaper[]): StudyDay[] {
       day: day++,
       kind: "study",
       title: `${m.paper}: ${m.title}`,
-      detail: `${m.count} topic${m.count === 1 ? "" : "s"} — learn, recall to 95%, then a fresh practice answer.`,
+      detail: `${m.count} topic${m.count === 1 ? "" : "s"} - learn, recall to 95%, then a fresh practice answer.`,
     });
     if ((i + 1) % 4 === 0) {
       days.push({

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { DiscussionTurnOut, DiscussionSessionOut } from "@/services/api/gsLmsService";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -491,6 +492,7 @@ function CompletionScreen({
 // ---------------------------------------------------------------------------
 
 export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: DiscussionOverlayProps) {
+  const { subject } = useSubjectLms();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [turns, setTurns] = useState<DiscussionTurnOut[]>([]);
   const [input, setInput] = useState("");
@@ -523,7 +525,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   // Load / resume existing session
   useEffect(() => {
     gsLmsService
-      .startDiscussion("geography", nodeId)
+      .startDiscussion(subject, nodeId)
       .then((session: DiscussionSessionOut) => {
         setSessionId(session.session_id);
         setTurns(session.turns);
@@ -704,7 +706,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       setPhase(1); // Move to active discussion phase
 
       try {
-        const response = await gsLmsService.submitDiscussionTurn("geography", sessionId, text);
+        const response = await gsLmsService.submitDiscussionTurn(subject, sessionId, text);
         setTurns((prev) => [...prev, response.student_turn, response.ai_turn]);
 
         if (

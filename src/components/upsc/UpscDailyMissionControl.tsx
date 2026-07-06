@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { BrainDumpModal } from "@/components/upsc/BrainDumpModal";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
 import { OptionalHomeEntry } from "@/components/upsc/OptionalHomeEntry";
 import { UpscYearlyPlanner } from "@/components/upsc/UpscYearlyPlanner";
@@ -286,7 +285,6 @@ export function UpscDailyMissionControl() {
     return false;
   });
   const [dailyState, setDailyState] = useState<DailyState>({ subjectSlug: "geography", day: 1, note: "" });
-  const [brainDumpOpen, setBrainDumpOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [meTimeSaved, setMeTimeSaved] = useState(false);
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
@@ -2186,49 +2184,6 @@ export function UpscDailyMissionControl() {
         )}
       </div>
 
-      {/* ── Phase 5: Brain Dump FAB ── */}
-      <button
-        id="brain-dump-fab"
-        type="button"
-        onClick={() => setBrainDumpOpen(true)}
-        title="Brain Dump — safe space to vent"
-        aria-label="Open Brain Dump"
-        style={{
-          position: "fixed",
-          bottom: "1.5rem",
-          right: "1.5rem",
-          zIndex: 9000,
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.75rem 1.1rem",
-          background: "#13251d",
-          color: "#fff",
-          border: "none",
-          borderRadius: "2rem",
-          boxShadow: "0 4px 16px rgba(10,20,14,0.22)",
-          cursor: "pointer",
-          fontSize: "0.8rem",
-          fontWeight: 900,
-          letterSpacing: "0.04em",
-          transition: "transform 0.15s, box-shadow 0.15s",
-        }}
-        onMouseOver={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(10,20,14,0.3)";
-        }}
-        onMouseOut={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "";
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(10,20,14,0.22)";
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 2a9 9 0 0 1 9 9c0 3.87-2.44 7.17-6 8.49V22l-3-2-3 2v-2.51C5.44 18.17 3 14.87 3 11a9 9 0 0 1 9-9z"/>
-        </svg>
-        Brain Dump
-      </button>
-
-      <BrainDumpModal isOpen={brainDumpOpen} onClose={() => setBrainDumpOpen(false)} />
     </div>
   );
 }

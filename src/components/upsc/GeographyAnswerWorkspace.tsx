@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ChevronDown, Highlighter, Lightbulb, MessageCircle, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
 
-import { answerScaffold, evaluationLevels, getPyqQuestion } from "@/lib/upsc/optionalGeographyLms";
+import { answerScaffold, evaluationLevels } from "@/lib/upsc/optionalGeographyLms";
+import { getSubjectPyqQuestion } from "@/lib/upsc/optionalSubjectStandards";
 import { buildAnswerFramework, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
 import { evaluateOptionalAnswer } from "@/services/optionalEvaluationService";
 import { digitiseAnswerImage, fileToBase64 } from "@/services/optionalOcrService";
@@ -21,9 +22,9 @@ export function GeographyAnswerWorkspace() {
   const level = params.get("level");
   const subject = params.get("subject") ?? "geography";
 
-  const pyq = id ? getPyqQuestion(id) : null;
+  const pyq = id ? getSubjectPyqQuestion(subject, id) : null;
   const questionText = pyq?.text ?? textParam ?? "Question not found.";
-  const meta = pyq ? `${pyq.year} · ${pyq.paper}` : level ? `Practice · ${level}` : "Practice";
+  const meta = pyq ? `${pyq.year} - ${pyq.paper}` : level ? `Practice - ${level}` : "Practice";
 
   const [parts, setParts] = useState({ Introduction: "", Body: "", Conclusion: "" });
   const [evalId, setEvalId] = useState("medium");
@@ -84,7 +85,7 @@ export function GeographyAnswerWorkspace() {
       refId: id ?? practiceRefId(textParam ?? questionText),
       kind: id ? "pyq" : "practice",
       title: questionText,
-      level: `${selectedEval?.label ?? "Medium"}${level ? ` · ${level}` : ""}`,
+      level: `${selectedEval?.label ?? "Medium"}${level ? ` - ${level}` : ""}`,
       score: report?.overall ?? 0,
       status: report?.status ?? (evalSource === "pdf" ? "uploaded" : "saved"),
       at: Date.now(),
@@ -114,7 +115,7 @@ export function GeographyAnswerWorkspace() {
           <h1 className="mt-3 text-xl font-black leading-7 tracking-tight md:text-2xl">{questionText}</h1>
         </section>
 
-        {/* Model-answer framework — how to structure THIS question */}
+        {/* Model-answer framework - how to structure THIS question */}
         <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] shadow-sm">
           <button type="button" onClick={() => setShowFramework((v) => !v)} className="flex w-full items-center justify-between gap-3 p-4">
             <span className="inline-flex items-center gap-2 text-sm font-black"><Lightbulb className="h-4 w-4 text-[#1d9e75]" /> Model-answer framework</span>
@@ -123,16 +124,16 @@ export function GeographyAnswerWorkspace() {
           {showFramework && (
             <div className="space-y-2 border-t border-[#dcd5c7] p-4 text-xs font-semibold leading-6 text-[#34453b]">
               <p><span className="font-black uppercase tracking-[0.1em] text-[#085041]">Directive:</span> {framework.directive}</p>
-              <p><span className="font-black text-[#085041]">Introduction —</span> {framework.intro}</p>
+              <p><span className="font-black text-[#085041]">Introduction -</span> {framework.intro}</p>
               <div>
-                <p className="font-black text-[#085041]">Body —</p>
+                <p className="font-black text-[#085041]">Body -</p>
                 <ul className="mt-1 space-y-1">
                   {framework.body.map((b, i) => (
                     <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#1d9e75]" />{b}</li>
                   ))}
                 </ul>
               </div>
-              <p><span className="font-black text-[#085041]">Conclusion —</span> {framework.conclusion}</p>
+              <p><span className="font-black text-[#085041]">Conclusion -</span> {framework.conclusion}</p>
               {framework.keywords.length > 0 && (
                 <p className="flex flex-wrap items-center gap-1.5"><span className="font-black text-[#085041]">Must-hit keywords:</span>{framework.keywords.map((k) => <span key={k} className="rounded bg-[#e7f5ee] px-1.5 py-0.5 text-[10px] font-bold text-[#085041]">{k}</span>)}</p>
               )}
@@ -140,7 +141,7 @@ export function GeographyAnswerWorkspace() {
           )}
         </section>
 
-        {/* Evaluation depth — shared selector (parameters, not credits/model) */}
+        {/* Evaluation depth - shared selector (parameters, not credits/model) */}
         <section className="mt-4 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Evaluation depth</p>
           <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">Pick how deep the AI checks your answer. This applies to whichever you evaluate below.</p>
@@ -185,7 +186,7 @@ export function GeographyAnswerWorkspace() {
                     rows={part.part === "Body" ? 5 : 2}
                     value={parts[key]}
                     onChange={(e) => { setParts((p) => ({ ...p, [key]: e.target.value })); if (evalSource === "typed") setEvalState("idle"); }}
-                    placeholder={`Your ${part.part.toLowerCase()}…`}
+                    placeholder={`Your ${part.part.toLowerCase()}...`}
                     className="mt-2 w-full resize-y rounded-md border border-[#dcd5c7] bg-[#fffdf8] p-2 text-sm font-semibold leading-6 text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
                 </div>
@@ -195,7 +196,7 @@ export function GeographyAnswerWorkspace() {
           <div className="mt-4 flex flex-col items-center">
             <button type="button" disabled={!hasTyped || evalState === "evaluating"} onClick={() => runEval("typed")}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-8 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#168864] disabled:cursor-not-allowed disabled:opacity-50">
-              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "typed" ? "Evaluating…" : "Evaluate"}
+              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "typed" ? "Evaluating..." : "Evaluate"}
             </button>
             {!hasTyped && <p className="mt-2 text-[11px] font-semibold text-[#8a8174]">Type your answer above to evaluate.</p>}
           </div>
@@ -205,7 +206,7 @@ export function GeographyAnswerWorkspace() {
         {/* Upload handwritten copy + its OWN evaluate button */}
         <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Or upload a handwritten copy</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Upload a photo/PDF of your written answer. It is digitised and your copy is marked (underline / encircle) where it falls short — then evaluate just the copy.</p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-[#5d675f]">Upload a photo/PDF of your written answer. It is digitised and your copy is marked (underline / encircle) where it falls short - then evaluate just the copy.</p>
           <div className="mt-3 flex flex-col items-center gap-3">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-[#1a3a2a] transition hover:bg-[#f2eadc]">
               <UploadCloud className="h-4 w-4" /> {uploadName ? "Change file" : "Upload PDF / image"}
@@ -214,29 +215,29 @@ export function GeographyAnswerWorkspace() {
             {uploadName && <p className="text-xs font-bold text-[#085041]">Uploaded: {uploadName}</p>}
             <button type="button" disabled={!uploadName || evalState === "evaluating"} onClick={() => runEval("pdf")}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-8 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#168864] disabled:cursor-not-allowed disabled:opacity-50">
-              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "pdf" ? "Evaluating…" : "Evaluate"}
+              <Sparkles className="h-4 w-4" /> {evalState === "evaluating" && evalSource === "pdf" ? "Evaluating..." : "Evaluate"}
             </button>
             {!uploadName && <p className="text-[11px] font-semibold text-[#8a8174]">Upload a copy to evaluate it.</p>}
           </div>
         </section>
 
 
-        {/* Report — reflects whichever source was evaluated */}
+        {/* Report - reflects whichever source was evaluated */}
         {evalState === "done" && (
           <section className="mt-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-              Evaluation report · {selectedEval?.label} · {selectedEval?.parameterCount} parameters · {evalSource === "pdf" ? "uploaded copy" : "typed answer"}
+              Evaluation report - {selectedEval?.label} - {selectedEval?.parameterCount} parameters - {evalSource === "pdf" ? "uploaded copy" : "typed answer"}
             </p>
 
             {evalSource === "pdf" ? (
               <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
-                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Uploaded copy — OCR pending</p>
+                <p className="inline-flex items-center gap-2 text-xs font-black text-[#13251d]"><Highlighter className="h-3.5 w-3.5 text-[#be4444]" /> Uploaded copy - OCR pending</p>
                 <p className="mt-2 text-xs font-semibold leading-6 text-[#34453b]">Content-aware scoring of a handwritten copy needs OCR (digitising your writing), which connects to the backend. Until then, use the <span className="font-black">typed answer</span> above for a real, parameter-wise evaluation.</p>
-                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} — queued for OCR + copy-marking.</p>
+                <p className="mt-1 text-[10px] font-semibold text-[#8a8174]">{uploadName} - queued for OCR + copy-marking.</p>
               </div>
             ) : report ? (
               <>
-                {/* Verdict banner — colour reflects real status */}
+                {/* Verdict banner - colour reflects real status */}
                 <div className={`mt-3 rounded-lg border p-3 ${report.status === "strong" || report.status === "ontrack" ? "border-[#b9d9cd] bg-[#e7f5ee]" : report.status === "weak" ? "border-[#ef9f27]/50 bg-[#fff4df]" : "border-[#f0c5b8] bg-[#fff1ed]"}`}>
                   <p className={`text-sm font-black leading-6 ${report.status === "strong" || report.status === "ontrack" ? "text-[#085041]" : report.status === "weak" ? "text-[#6f4a12]" : "text-[#7d3827]"}`}>{report.verdict}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.1em]">
@@ -257,7 +258,7 @@ export function GeographyAnswerWorkspace() {
                 </div>
                 <p className="mt-1 text-[10px] font-bold text-[#8a8174]">Expected ~{report.wordStats.expected} words.</p>
 
-                {/* Keyword coverage — proves it read your content */}
+                {/* Keyword coverage - proves it read your content */}
                 <div className="mt-3 rounded-md border border-[#e7e0d2] bg-white p-3">
                   <p className="text-xs font-black text-[#13251d]">Question coverage</p>
                   {report.matchedKeywords.length > 0 && (
@@ -271,7 +272,7 @@ export function GeographyAnswerWorkspace() {
                   )}
                 </div>
 
-                {/* Parameter-wise — REAL per-parameter scores + feedback */}
+                {/* Parameter-wise - REAL per-parameter scores + feedback */}
                 <div className="mt-3 space-y-1.5">
                   <p className="text-xs font-black text-[#13251d]">Parameter-wise assessment ({report.params.length} checked)</p>
                   {report.params.map((p) => (
@@ -304,11 +305,11 @@ export function GeographyAnswerWorkspace() {
               <div className="grid gap-3 border-t border-[#dcd5c7] p-4 md:grid-cols-3">
                 <div className="rounded-md border border-[#e7e0d2] bg-[#fdfaf3] p-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">Your answer</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[#34453b]">{wordCount(typed)} words — Intro {wordCount(parts.Introduction)} / Body {wordCount(parts.Body)} / Concl {wordCount(parts.Conclusion)}.</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#34453b]">{wordCount(typed)} words - Intro {wordCount(parts.Introduction)} / Body {wordCount(parts.Body)} / Concl {wordCount(parts.Conclusion)}.</p>
                 </div>
                 <div className="rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">UPSC demands</p>
-                  <ul className="mt-1 space-y-1">{framework.body.map((b, i) => <li key={i} className="text-xs font-semibold leading-5 text-[#34453b]">• {b}</li>)}</ul>
+                  <ul className="mt-1 space-y-1">{framework.body.map((b, i) => <li key={i} className="text-xs font-semibold leading-5 text-[#34453b]">- {b}</li>)}</ul>
                 </div>
                 <div className="rounded-md border border-[#e7e0d2] bg-white p-3">
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#6f4a12]">Topper approach</p>
@@ -340,8 +341,8 @@ export function GeographyAnswerWorkspace() {
           <div className="p-3">
             <p className="text-xs font-semibold leading-5 text-[#5d675f]">Ask anything about this question or your evaluation report.</p>
             {doubtReply && <div className="mt-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] p-2 text-xs font-semibold leading-5 text-[#34453b]">{doubtReply}</div>}
-            <textarea value={doubtInput} onChange={(e) => setDoubtInput(e.target.value)} rows={3} placeholder="Type your question…" className="mt-2 w-full resize-none rounded-md border border-[#dcd5c7] bg-white p-2 text-sm font-semibold text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20" />
-            <button type="button" onClick={sendDoubt} disabled={doubtSending || !doubtInput.trim()} className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#1d9e75] text-xs font-black uppercase tracking-[0.1em] text-white disabled:opacity-50"><Send className="h-3.5 w-3.5" /> {doubtSending ? "Sending…" : "Send"}</button>
+            <textarea value={doubtInput} onChange={(e) => setDoubtInput(e.target.value)} rows={3} placeholder="Type your question..." className="mt-2 w-full resize-none rounded-md border border-[#dcd5c7] bg-white p-2 text-sm font-semibold text-[#25382f] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20" />
+            <button type="button" onClick={sendDoubt} disabled={doubtSending || !doubtInput.trim()} className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#1d9e75] text-xs font-black uppercase tracking-[0.1em] text-white disabled:opacity-50"><Send className="h-3.5 w-3.5" /> {doubtSending ? "Sending..." : "Send"}</button>
           </div>
         </div>
       ) : (

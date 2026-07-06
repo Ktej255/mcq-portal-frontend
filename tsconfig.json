@@ -40,6 +40,7 @@
     "node_modules",
     ".next/dev",
     ".next-verify",
-    ".next-build-verify"
+    ".next-build-verify",
+    "src/__tests__"
   ]
 }

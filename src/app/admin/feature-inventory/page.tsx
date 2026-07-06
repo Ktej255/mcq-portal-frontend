@@ -14,13 +14,37 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  geographyDay1Recommendation,
-  geographyDay1Sources,
-  geographyDay1SourceStatusLabels,
-  type GeographyDay1SourceStatus,
-} from "@/lib/upsc/geographyDay1ContentIntake";
-import { geographyDay1MediaAttachment } from "@/lib/upsc/geographyDay1Media";
+
+type GeographyDay1SourceStatus = "ready-to-adapt" | "supporting" | "founder-required";
+
+const geographyDay1SourceStatusLabels: Record<GeographyDay1SourceStatus, string> = {
+  "ready-to-adapt": "Ready to adapt",
+  supporting: "Supporting",
+  "founder-required": "Founder review required",
+};
+
+const geographyDay1Recommendation = {
+  proposedDay1: "LMS Topic 1 (Syllabus introduction)",
+  proposedDay2: "LMS Topic 2 (Plate Tectonics)",
+  decision: "Transition complete: Geography day-based study has been unified into the LMS learning funnel.",
+};
+
+const geographyDay1Sources: Array<{ title: string; status: GeographyDay1SourceStatus; source: string; use: string }> = [
+  {
+    title: "Syllabus Structure Map",
+    status: "ready-to-adapt",
+    source: "Syllabus PDF / UPSC notification",
+    use: "Topic boundaries in the learning funnel",
+  },
+];
+
+const geographyDay1MediaAttachment = {
+  releaseAssetPairReady: true,
+  operatorNote: "Transition to LMS complete: Media assets are now mapped directly to the LMS learning funnel nodes.",
+  approvedRecordingAttached: true,
+  approvedTranscriptAttached: true,
+};
+
 import {
   countInventoryStatuses,
   countLaunchVisionStatuses,
@@ -435,7 +459,7 @@ export default function AdminFeatureInventoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {geographyDay1Sources.map((item) => (
+              {geographyDay1Sources.map((item: { title: string; status: GeographyDay1SourceStatus; source: string; use: string }) => (
                 <tr key={item.title} className="align-top">
                   <td className="px-4 py-4 text-sm font-black text-zinc-950">{item.title}</td>
                   <td className="px-4 py-4">

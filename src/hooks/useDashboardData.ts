@@ -24,10 +24,7 @@ import {
   studentReportSubjects,
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
-import {
-  useGeographyProgress,
-  type GeographyMeTimeMood,
-} from "@/lib/upsc/useGeographyProgress";
+type GeographyMeTimeMood = "calm" | "focused" | "tired" | "overloaded" | "low-confidence" | "exam-stress";
 
 const dailyMissionStorageKey = "sarit-upsc-daily-command-v1";
 
@@ -81,9 +78,33 @@ export function useDashboardData() {
     Record<string, ReturnType<typeof readLocalQuestionBankAttempts>>
   >({});
 
-  const { progress, saveDayProgress, stats } = useGeographyProgress();
+  const geographyProgress = progressBySubject.geography ?? {};
+  const saveDayProgress = (day: number, patch: Partial<DailyPlannerProgress>) => {
+    setProgressBySubject((current) => {
+      const key = String(day);
+      const currentSubjectProgress = current.geography ?? {};
+      const nextSubjectProgress = {
+        ...currentSubjectProgress,
+        [key]: {
+          ...currentSubjectProgress[key],
+          day,
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      window.localStorage.setItem(
+        "sarit-upsc-geography-progress-v1",
+        JSON.stringify(nextSubjectProgress)
+      );
+      return {
+        ...current,
+        geography: nextSubjectProgress,
+      };
+    });
+  };
+  const stats = { watchedCount: 0, mcqCompletedCount: 0 };
   const geographyQuestionBankAttempts = questionBankAttemptsBySubject.geography ?? [];
-  const today = getCurrentGeographyTopic(progress, geographyQuestionBankAttempts);
+  const today = getCurrentGeographyTopic(geographyProgress as any, geographyQuestionBankAttempts);
 
   // Active mission subject
   const activeMissionSubject =
@@ -100,10 +121,9 @@ export function useDashboardData() {
     activeMissionSubject.sessions.find((session) => session.day === activeMissionDay) ??
     activeMissionSubject.sessions[0];
 
-  // Progress for active mission
   const activeMissionProgressMap = (
     activeMissionSubject.slug === "geography"
-      ? progress
+      ? geographyProgress
       : progressBySubject[activeMissionSubject.slug] ?? {}
   ) as Record<string, DailyPlannerProgress | undefined>;
   const activeMissionProgress = activeMissionProgressMap[String(activeMissionDay)];

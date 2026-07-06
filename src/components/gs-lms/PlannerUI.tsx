@@ -6,10 +6,12 @@ import { gsLmsService } from "@/services/api/gsLmsService";
 import type { DailyPlanOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "./LmsLoadingSkeleton";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 export function PlannerUI() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [plan, setPlan] = useState<DailyPlanOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export function PlannerUI() {
     setLoading(true);
     setError(null);
     gsLmsService
-      .getTodayPlan("geography")
+      .getTodayPlan(subject)
       .then((data) => {
         setPlan(data);
         setBandwidthVal(data.bandwidth);
@@ -30,7 +32,7 @@ export function PlannerUI() {
         setError(err.response?.data?.message || "Failed to load plan")
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [subject]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -40,7 +42,7 @@ export function PlannerUI() {
   const handleUpdateBandwidth = async () => {
     setUpdating(true);
     try {
-      const updated = await gsLmsService.setBandwidth("geography", bandwidth);
+      const updated = await gsLmsService.setBandwidth(subject, bandwidth);
       setPlan(updated);
     } catch {
       // revert
@@ -52,8 +54,8 @@ export function PlannerUI() {
   const handleReplan = async () => {
     setReplanning(true);
     try {
-      await gsLmsService.replan("geography");
-      const refreshed = await gsLmsService.getTodayPlan("geography");
+      await gsLmsService.replan(subject);
+      const refreshed = await gsLmsService.getTodayPlan(subject);
       setPlan(refreshed);
     } catch {
       // silent
@@ -127,12 +129,12 @@ export function PlannerUI() {
           plan.planned_items.map((item, idx) => {
             const isRevisit = item.item_type === 'revisit';
             const dest = isRevisit
-              ? `/upsc/geography/lms/topic/${item.node_id}?mode=revisit`
+              ? `${lmsBase}/topic/${item.node_id}?mode=revisit`
               : item.item_type === "retro"
-                ? "/upsc/geography/lms/retro"
+                ? `${lmsBase}/retro`
                 : item.item_type === "practice"
-                  ? "/upsc/geography/lms/practice"
-                  : `/upsc/geography/lms/topic/${item.node_id}`;
+                  ? `${lmsBase}/practice`
+                  : `${lmsBase}/topic/${item.node_id}`;
             return (
               <button
                 key={`${item.node_id}-${item.item_type}-${idx}`}

@@ -7,10 +7,12 @@ import type { GapOut, ProgressOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "./LmsLoadingSkeleton";
 import { LmsEmptyState } from "./LmsEmptyState";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 export function GapDashboard() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [gaps, setGaps] = useState<GapOut | null>(null);
   const [progress, setProgress] = useState<ProgressOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +21,7 @@ export function GapDashboard() {
   const fetchData = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([gsLmsService.getGaps("geography"), gsLmsService.getProgress("geography")])
+    Promise.all([gsLmsService.getGaps(subject), gsLmsService.getProgress(subject)])
       .then(([gapData, progressData]) => {
         setGaps(gapData);
         setProgress(progressData);
@@ -89,7 +91,7 @@ export function GapDashboard() {
                   <button
                     key={topic.node_id}
                     onClick={() =>
-                      router.push(`/upsc/geography/lms/topic/${topic.node_id}`)
+                      router.push(`${lmsBase}/topic/${topic.node_id}`)
                     }
                     className="w-full text-left flex items-center justify-between p-3 md:p-4 rounded-lg border border-[#dcd5c7] bg-white hover:border-red-200 transition-colors"
                   >

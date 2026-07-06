@@ -13,7 +13,6 @@ import {
 
 import { useAuth } from "@/lib/contexts/AuthContext";
 import DashboardLayout from "../(dashboard)/layout";
-import { useGeographyStudentOverview } from "@/lib/upsc/useGeographyStudentOverview";
 import { PageShell, PageHero, StartFreeCta } from "@/components/marketing/PageShell";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { testFormats, testFeatures } from "@/components/marketing/site-data";
@@ -47,9 +46,6 @@ export default function TestsClient() {
 
 // Student Dashboard View
 function StudentTestsView() {
-  const overview = useGeographyStudentOverview();
-  const practiceReady = overview.loopState.room === "mcq";
-
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
@@ -58,37 +54,42 @@ function StudentTestsView() {
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Practice</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">
-                {practiceReady ? "Your fresh MCQ is ready" : "Practice opens after proof"}
+                UPSC Practice and MCQs
               </h1>
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                MCQs stay attached to the active class day. Complete the next learning step and the correct practice set opens automatically.
+                MCQs stay attached to your learning topics. Access the structured Geography LMS practice or browse all practice sets in the custom Question Bank.
               </p>
             </div>
-            <Link
-              href={overview.loopState.href}
-              data-testid="student-practice-primary-action"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-            >
-              {overview.loopState.cta} <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
           </div>
         </section>
 
         <section className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
             <ClipboardCheck className="h-5 w-5 text-[#085041]" />
-            <h2 className="mt-4 text-xl font-black tracking-tight">Day {overview.activeSession.day}: {overview.activeSession.title}</h2>
+            <h2 className="mt-4 text-xl font-black tracking-tight">Geography LMS Practice</h2>
             <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">
-              {practiceReady ? "The fresh set is connected to your current proof." : `Current gate: ${overview.loopState.label}.`}
+              Complete daily topic checks and practice sets sequentially on the LMS.
             </p>
+            <Link
+              href="/upsc/geography/lms/practice"
+              className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
+            >
+              Open LMS Practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
+            </Link>
           </div>
 
           <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <LockKeyhole className="h-5 w-5 text-[#6f4a12]" />
-            <h2 className="mt-4 text-xl font-black tracking-tight">No batch browsing</h2>
+            <ClipboardCheck className="h-5 w-5 text-[#085041]" />
+            <h2 className="mt-4 text-xl font-black tracking-tight">Question Bank</h2>
             <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">
-              Students see one relevant set only. Wrong answers flow into Learning Gaps and Revise.
+              Build custom MCQ practice sets from your accumulated learning evidence.
             </p>
+            <Link
+              href="/upsc/question-bank"
+              className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
+            >
+              Open Question Bank <ArrowRight className="ml-2 h-3.5 w-3.5" />
+            </Link>
           </div>
         </section>
       </div>

@@ -18,7 +18,13 @@ import {
   morningBatchCorpusSummary,
   releaseGates,
 } from "@/lib/upsc/featureInventory";
-import { geographyDay1Recommendation } from "@/lib/upsc/geographyDay1ContentIntake";
+
+const geographyDay1Recommendation = {
+  proposedDay1: "LMS Topic 1 (Syllabus introduction)",
+  proposedDay2: "LMS Topic 2 (Plate Tectonics)",
+  decision: "Transition complete: Geography day-based study has been unified into the LMS learning funnel.",
+};
+
 import {
   immediateLaunchActions,
   launchReadinessMetrics,

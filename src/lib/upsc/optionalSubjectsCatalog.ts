@@ -29,7 +29,7 @@ export type OptionalSubjectCatalogEntry = {
 
 /**
  * The 25 standard UPSC optional subjects (alphabetical by display name).
- * Geography is the only subject currently authored/available (Phase 1).
+ * Geography and Anthropology are currently authored/available.
  */
 export const OPTIONAL_SUBJECTS: readonly OptionalSubjectCatalogEntry[] = [
   { slug: "agriculture", name: "Agriculture", status: "coming-soon" },
@@ -38,7 +38,7 @@ export const OPTIONAL_SUBJECTS: readonly OptionalSubjectCatalogEntry[] = [
     name: "Animal Husbandry & Veterinary Science",
     status: "coming-soon",
   },
-  { slug: "anthropology", name: "Anthropology", status: "coming-soon" },
+  { slug: "anthropology", name: "Anthropology", status: "available" },
   { slug: "botany", name: "Botany", status: "coming-soon" },
   { slug: "chemistry", name: "Chemistry", status: "coming-soon" },
   { slug: "civil-engineering", name: "Civil Engineering", status: "coming-soon" },
@@ -104,7 +104,7 @@ export const SUBJECT_STATUS_META: Record<
 > = {
   available: {
     label: "Available now",
-    description: "Authored content is live — open to start preparing.",
+    description: "Authored content is live - open to start preparing.",
   },
   "coming-soon": {
     label: "Coming soon",

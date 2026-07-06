@@ -18,7 +18,7 @@ import {
 import { optionalService } from "@/services/api/optionalService";
 
 /**
- * OptionalCatalog — grid of all 25 standard UPSC optional subjects.
+ * OptionalCatalog - grid of all 25 standard UPSC optional subjects.
  *
  * Requirements:
  * - R1.2: lists all 25 optional subjects.
@@ -42,7 +42,7 @@ export function OptionalCatalog() {
     setIsLoaded(true);
     // Hydrate from the backend-persisted selection when available (R15.3):
     // reloads the student's choice across devices, not just this browser.
-    // Best-effort — falls back silently to the localStorage value when the
+    // Best-effort - falls back silently to the localStorage value when the
     // student is unauthenticated/offline or the call fails.
     optionalService
       .getSelection()
@@ -53,14 +53,14 @@ export function OptionalCatalog() {
         }
       })
       .catch(() => {
-        /* offline / unauthenticated — keep the localStorage value */
+        /* offline / unauthenticated - keep the localStorage value */
       });
   }, []);
 
   function handleSelect(subject: OptionalSubjectCatalogEntry) {
     // R1.3 / R1.5: record (or change) the student's selected subject, then
     // navigate into its route. Persist to localStorage (synchronous cache) AND
-    // to the backend (durable, cross-device — R15.2). The backend write is
+    // to the backend (durable, cross-device - R15.2). The backend write is
     // best-effort so navigation never blocks on it.
     writeSelectedOptional({ slug: subject.slug, name: subject.name });
     setSelectedSlug(subject.slug);
@@ -82,7 +82,7 @@ export function OptionalCatalog() {
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
             All {OPTIONAL_SUBJECTS_COUNT} standard optional subjects in one place. Pick one to set it
-            as your optional — you can change it anytime. Geography is fully authored now; the rest
+            as your optional - you can change it anytime. Geography is fully authored now; Anthropology is available next. The rest
             are on the way to the same depth standard.
           </p>
         </section>

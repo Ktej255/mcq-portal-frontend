@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { BrainDumpButton } from "@/components/dashboard/BrainDumpButton";
+
 import { WelcomeVideoOverlay, InductionChecklist } from "@/components/upsc/OnboardingFlow";
 import {
   defaultStudentProfile,
@@ -24,7 +24,7 @@ import {
   type StudentProfile,
 } from "@/lib/upsc/studentProfile";
 import { getGuidedStudyEntryRoute } from "@/lib/upsc/guidedStudy";
-import type { GeographyMeTimeMood } from "@/lib/upsc/useGeographyProgress";
+type GeographyMeTimeMood = "calm" | "focused" | "tired" | "overloaded" | "low-confidence" | "exam-stress";
 
 /* ──── Greeting helpers ────────────────────────────────────────────────────── */
 
@@ -381,8 +381,7 @@ export function ZenDashboard() {
         </div>
       </div>
 
-      {/* ─── Floating Brain Dump Button ───────────────────────────────── */}
-      <BrainDumpButton />
+
     </main>
   );
 }

@@ -110,9 +110,88 @@ const GEOGRAPHY_STRUCTURE: SubjectStructure = {
     ],
   },
 };
+/**
+ * Bespoke structure for Anthropology Optional.
+ *
+ * The current uploaded/authored content will arrive later, so this is kept as
+ * the stable UPSC-facing shell: Paper I split into foundational theory/methods
+ * and biological/applied anthropology, plus Paper II as Indian anthropology.
+ * The LMS can use these headings as upload slots without exposing raw scraped
+ * handout fragments as the main navigation.
+ */
+const ANTHROPOLOGY_STRUCTURE: SubjectStructure = {
+  slug: "anthropology",
+  paperOne: {
+    id: "paper-1",
+    label: "Paper I",
+    sections: [
+      {
+        id: "section-a",
+        label: "Section A",
+        title: "Foundations, Society, Culture and Methods",
+        topics: [
+          "Meaning, scope and development of Anthropology",
+          "Relationship with other disciplines",
+          "Main branches of Anthropology",
+          "Culture, society, marriage, family and kinship",
+          "Economic organization",
+          "Political organization and social control",
+          "Religion",
+          "Anthropological theories",
+          "Culture, language and communication",
+          "Research methods in Anthropology",
+        ],
+      },
+      {
+        id: "section-b",
+        label: "Section B",
+        title: "Biological, Archaeological and Applied Anthropology",
+        topics: [
+          "Human evolution and emergence of man",
+          "Primates and phylogenetic status of hominids",
+          "Biological basis of life",
+          "Principles of prehistoric archaeology",
+          "Human genetics and Mendelian genetics in man",
+          "Genetic polymorphism, selection and chromosomal aberrations",
+          "Race, racism and human variation",
+          "Ecological and epidemiological anthropology",
+          "Human growth, development and demographic theories",
+          "Applications of Anthropology",
+        ],
+      },
+    ],
+  },
+  paperTwo: {
+    id: "paper-2",
+    label: "Paper II",
+    title: "Indian Anthropology",
+    topics: [
+      "Evolution of Indian culture and civilization",
+      "Palaeo-anthropological evidences and ethno-archaeology in India",
+      "Demographic profile of India",
+      "Traditional Indian social system",
+      "Caste system in India",
+      "Sacred complex and Nature-Man-Spirit complex",
+      "Impact of religions on Indian society",
+      "Emergence, growth and development of Anthropology in India",
+      "Indian village, minorities and socio-cultural change",
+      "Tribal situation in India",
+      "Problems of tribal communities",
+      "Developmental projects and tribals",
+      "Problems of SC, ST and OBC",
+      "Social change and contemporary tribal societies",
+      "Ethnicity and political developments",
+      "Tribe and nation state",
+      "Administration of tribal areas and PVTGs",
+      "Role of Anthropology in development",
+      "Anthropological contributions to regionalism and communalism",
+    ],
+  },
+};
 
 /** Bespoke structures keyed by subject slug. */
 const BESPOKE_STRUCTURES: Readonly<Record<string, SubjectStructure>> = {
+  anthropology: ANTHROPOLOGY_STRUCTURE,
   geography: GEOGRAPHY_STRUCTURE,
 };
 

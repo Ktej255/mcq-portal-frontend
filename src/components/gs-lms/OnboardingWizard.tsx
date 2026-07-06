@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { triggerWelcomeEngagement } from "@/lib/engagement/triggerWelcome";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 const DIAGNOSTIC_STORAGE_KEY = "sarit-diagnostic-plan-v1";
 
@@ -55,6 +56,7 @@ const LEARNER_LEVELS: {
 
 export function OnboardingWizard() {
   const router = useRouter();
+  const { subject, lmsBase } = useSubjectLms();
   const [step, setStep] = useState(0);
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>("beginner");
   const [studyWindowMinutes, setStudyWindowMinutes] = useState(90);
@@ -113,7 +115,7 @@ export function OnboardingWizard() {
     setError(null);
     try {
       await gsLmsService.completeOnboarding(
-        "geography",
+        subject,
         bandwidth,
         undefined,
         learnerLevel,
@@ -126,12 +128,12 @@ export function OnboardingWizard() {
           name: diagnosticName || "Student",
           email: diagnosticEmail || "",
           targetYear: "2027",
-          firstTopicUrl: "/upsc/geography/lms/syllabus",
+          firstTopicUrl: `${lmsBase}/syllabus`,
         });
       }
 
       // Go directly to syllabus (the first topic is there)
-      router.push("/upsc/geography/lms/syllabus");
+      router.push(`${lmsBase}/syllabus`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "response" in err

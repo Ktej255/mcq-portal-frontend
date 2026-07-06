@@ -1,29 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, BookOpen, Map as MapIcon, PenTool, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, FileText, Map as MapIcon, PenTool, Sparkles, TrendingUp } from "lucide-react";
 
-const SECTIONS = [
-  { key: "basics", short: "Basics", icon: BookOpen, title: "Basics first", body: "Foundation definitions and the simplest framing of the topic — the starting point before depth. This is where a beginner builds the mental model before any advanced layer." },
-  { key: "concepts", short: "Core concepts", icon: BookOpen, title: "Core concepts & mechanisms", body: "The key processes, models, scholars and cause-effect chains expected at optional depth. Worked explanations and the 'why', not just the 'what'." },
-  { key: "mapping", short: "Mapping", icon: MapIcon, title: "Mapping", body: "Where this topic appears on the map — features to mark and link in answers, with the official India map as the base." },
-  { key: "diagrams", short: "Diagrams", icon: PenTool, title: "Diagrams", body: "Labelled diagrams that raise marks. AI-generated handwritten / 3D diagrams will render here per topic." },
-  { key: "trend", short: "PYQ trend", icon: TrendingUp, title: "PYQ trend (15 years)", body: "How many times this topic was asked, and the shift from direct → conceptual → applied framing across years." },
-  { key: "predict", short: "Likely next", icon: Sparkles, title: "Likely next questions", body: "Predicted 1-2 year question framing for this topic, based on the trend pattern." },
+import { OPTIONAL_SUBJECTS } from "@/lib/upsc/optionalSubjectsCatalog";
+
+const COMMON_SECTIONS = [
+  { key: "basics", short: "Basics", icon: BookOpen, title: "Basics first", body: "Foundation definitions and the simplest framing of the topic - the starting point before depth. This is where a beginner builds the mental model before any advanced layer." },
+  { key: "concepts", short: "Core concepts", icon: BookOpen, title: "Core concepts & mechanisms", body: "The key processes, models, scholars and cause-effect chains expected at optional depth. Worked explanations and the why, not just the what." },
+  { key: "diagrams", short: "Diagrams", icon: PenTool, title: "Diagrams", body: "Labelled diagrams, flowcharts, typologies, and compact visual frames that raise marks for this optional topic." },
+  { key: "trend", short: "PYQ trend", icon: TrendingUp, title: "PYQ trend", body: "How often this topic appears, and the shift from direct to conceptual to applied framing across recent papers." },
+  { key: "predict", short: "Likely next", icon: Sparkles, title: "Likely next questions", body: "Likely question framing for this topic, based on the syllabus slot, PYQ trend, and answer-writing demand." },
 ];
+
+const SUBJECT_SECTION_OVERRIDES: Record<string, typeof COMMON_SECTIONS> = {
+  geography: [
+    COMMON_SECTIONS[0],
+    COMMON_SECTIONS[1],
+    { key: "mapping", short: "Mapping", icon: MapIcon, title: "Mapping", body: "Where this topic appears on the map - features to mark and link in answers, with the official India map as the base." },
+    COMMON_SECTIONS[2],
+    { ...COMMON_SECTIONS[3], title: "PYQ trend (15 years)" },
+    COMMON_SECTIONS[4],
+  ],
+  anthropology: [
+    COMMON_SECTIONS[0],
+    COMMON_SECTIONS[1],
+    { key: "casework", short: "Casework", icon: FileText, title: "Casework and examples", body: "Scholar, tribe, Indian case, policy, fieldwork, or biological example slots for this topic. Uploaded content will fill these examples without copying unlicensed handouts." },
+    { key: "diagrams", short: "Diagrams", icon: PenTool, title: "Diagrams and notation", body: "Evolution plates, kinship notation, biological sketches, and tribal-development flowcharts that make Anthropology answers exam-ready." },
+    COMMON_SECTIONS[3],
+    COMMON_SECTIONS[4],
+  ],
+};
 
 export function GeographyReadContent() {
   const params = useSearchParams();
   const topic = params.get("topic") ?? "Topic";
   const subject = params.get("subject") ?? "geography";
+  const subjectName = useMemo(
+    () => OPTIONAL_SUBJECTS.find((item) => item.slug === subject)?.name ?? subject.replace(/-/g, " "),
+    [subject],
+  );
+  const sections = SUBJECT_SECTION_OVERRIDES[subject] ?? COMMON_SECTIONS;
   const [step, setStep] = useState(0);
-  const section = SECTIONS[step];
+  const section = sections[Math.min(step, sections.length - 1)];
   const Icon = section.icon;
   const isFirst = step === 0;
-  const isLast = step === SECTIONS.length - 1;
-
+  const isLast = step === sections.length - 1;
 
   return (
     <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
@@ -33,13 +57,12 @@ export function GeographyReadContent() {
         </Link>
 
         <div className="mt-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Geography optional · Read</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{subjectName} optional - Read</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight md:text-3xl">{topic}</h1>
         </div>
 
-        {/* Horizontal stepper */}
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {SECTIONS.map((s, i) => (
+          {sections.map((s, i) => (
             <button
               key={s.key}
               type="button"
@@ -58,19 +81,17 @@ export function GeographyReadContent() {
           ))}
         </div>
 
-        {/* Current section */}
         <section className="mt-3 min-h-[40vh] rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
-            <Icon className="h-4 w-4" /> Step {step + 1} of {SECTIONS.length}
+            <Icon className="h-4 w-4" /> Step {step + 1} of {sections.length}
           </p>
           <h2 className="mt-2 text-2xl font-black tracking-tight">{section.title}</h2>
           <p className="mt-3 text-base font-semibold leading-7 text-[#49675e]">{section.body}</p>
           <p className="mt-4 rounded-md border border-[#e7e0d2] bg-[#fdfaf3] p-3 text-xs font-semibold leading-6 text-[#8a8174]">
-            Founder-verified notes, visuals and examples for &ldquo;{topic}&rdquo; will fill this section.
+            Founder-verified notes, visuals and examples for &ldquo;{topic}&rdquo; will fill this section after upload.
           </p>
         </section>
 
-        {/* Bottom navigation */}
         <div className="mt-4 flex items-center justify-between">
           <button
             type="button"
@@ -87,10 +108,10 @@ export function GeographyReadContent() {
           ) : (
             <button
               type="button"
-              onClick={() => setStep((s) => Math.min(SECTIONS.length - 1, s + 1))}
+              onClick={() => setStep((s) => Math.min(sections.length - 1, s + 1))}
               className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1a3a2a] px-5 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
-              Next: {SECTIONS[step + 1]?.short} <ArrowRight className="h-4 w-4" />
+              Next: {sections[step + 1]?.short} <ArrowRight className="h-4 w-4" />
             </button>
           )}
         </div>
