@@ -101,17 +101,25 @@ export function TopicPage() {
       <FunnelOrchestrator nodeId={nodeId} subject={subject}>
         {({ currentStep, completeStep: advanceStep, displayTab }) => {
 
-          const getViewingSectionIndex = (): number => {
-            if (displayTab === 'ncert') return 1;
-            if (displayTab === 'current') return 3;
-            if (displayTab === 'traps') return 4;
+          const getActiveSectionLabel = (): string => {
+            if (displayTab === 'ncert') return 'NCERT_LEVEL';
+            if (displayTab === 'current') return 'ADVANCED';
+            if (displayTab === 'traps') return 'EXAMINER_TRAPS';
             if (displayTab === 'learn') {
-              if (currentStep >= 6 && currentStep <= 7) return 2;
-              return 0;
+              if (currentStep >= 6 && currentStep <= 7) return 'ADVANCED';
+              return 'BASIC';
             }
-            return currentStep <= 3 ? 0 : currentStep <= 5 ? 1 : currentStep <= 7 ? 2 : currentStep <= 9 ? 3 : 4;
+            if (currentStep <= 3) return 'BASIC';
+            if (currentStep <= 5) return 'NCERT_LEVEL';
+            if (currentStep <= 7) return 'ADVANCED';
+            if (currentStep <= 9) return 'ADVANCED';
+            return 'EXAMINER_TRAPS';
           };
-          const viewingSectionIndex = getViewingSectionIndex();
+
+          const activeLabel = getActiveSectionLabel();
+          const activeSection = data.sections?.find(
+            (sec) => sec.section_label.toUpperCase() === activeLabel.toUpperCase()
+          );
 
           return (
           <>
@@ -132,30 +140,38 @@ export function TopicPage() {
                   />
                 )}
 
-                {data.sections && data.sections.length > 0 && (() => {
-                  const activeSection = data.sections[viewingSectionIndex];
-                  if (!activeSection) return null;
-                  return (
-                    <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
-                      <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
-                      {activeSection.blocks && activeSection.blocks.length > 0 ? (
-                        <RichBlocks blocks={activeSection.blocks} />
-                      ) : (
-                        <p className="text-sm text-[#5d675f]">Content for this section is being authored.</p>
-                      )}
-                    </div>
-                  );
-                })()}
+                {activeSection ? (
+                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
+                    <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
+                    {activeSection.blocks && activeSection.blocks.length > 0 ? (
+                      <RichBlocks blocks={activeSection.blocks} />
+                    ) : (
+                      <p className="text-sm text-[#5d675f]">Content for this section is being authored.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5">
+                    <p className="text-sm text-[#5d675f]">Content for this section is not available.</p>
+                  </div>
+                )}
 
                 <ExternalResourceCards nodeId={nodeId} />
 
-                {currentStep === (viewingSectionIndex * 2 + 3) && (currentStep === 3 || currentStep === 5 || currentStep === 7 || currentStep === 9 || currentStep === 11) && (() => {
-                  const recallSection = data.sections?.[viewingSectionIndex];
-                  if (!recallSection) return null;
+                {(() => {
+                  const stepToTabRecall: Record<number, string> = {
+                    3: 'learn',
+                    5: 'ncert',
+                    7: 'learn',
+                    9: 'current',
+                    11: 'traps',
+                  };
+                  const expectedRecallTab = stepToTabRecall[currentStep];
+                  if (displayTab !== expectedRecallTab) return null;
+                  if (!activeSection) return null;
                   return (
                     <RecallCheckStep
                       nodeId={nodeId}
-                      sectionLabel={recallSection.section_label}
+                      sectionLabel={activeSection.section_label}
                       onComplete={() => advanceStep(currentStep)}
                     />
                   );
