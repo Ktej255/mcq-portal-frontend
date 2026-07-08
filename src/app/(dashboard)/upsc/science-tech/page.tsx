@@ -1,5 +1,4 @@
-import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
-
+﻿import { redirect } from "next/navigation";
 export default function ScienceTechPage() {
-  return <GsSubjectComingSoon subjectName="Science & Technology" />;
+  redirect("/upsc/science-tech/lms");
 }

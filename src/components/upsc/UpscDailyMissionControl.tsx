@@ -730,7 +730,7 @@ export function UpscDailyMissionControl() {
                 {
                   title: "Study Syllabus",
                   description: "Access progressive content sections (Basic, NCERT, Advanced, Traps) and video lectures.",
-                  href: `/upsc/geography/lms`,
+                  href: `/upsc/${activeSubject.slug}/lms`,
                   icon: BookOpen,
                   badge: "Core LMS",
                   color: "from-[#1a3a2a] to-[#1d9e75]",
@@ -738,7 +738,7 @@ export function UpscDailyMissionControl() {
                 {
                   title: "Practice MCQs",
                   description: "Solve adaptive topic-wise questions to evaluate understanding and clear gaps.",
-                  href: `/upsc/geography/lms/practice`,
+                  href: `/upsc/${activeSubject.slug}/lms/practice`,
                   icon: ClipboardCheck,
                   badge: "15-MCQ Lab",
                   color: "from-[#085041] to-[#1d9e75]",
@@ -746,7 +746,7 @@ export function UpscDailyMissionControl() {
                 {
                   title: "Learning Gaps",
                   description: "Review subject weakness metrics, incorrect attempt history, and gap suggestions.",
-                  href: `/upsc/geography/lms/gaps`,
+                  href: `/upsc/${activeSubject.slug}/lms/gaps`,
                   icon: LineChart,
                   badge: "Gap Analytics",
                   color: "from-[#13251d] to-[#085041]",

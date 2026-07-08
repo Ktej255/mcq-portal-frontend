@@ -18,6 +18,7 @@ import { ExternalResourceCards } from "@/components/gs-lms/ExternalResourceCards
 import { RichBlocks } from "@/components/gs-lms/RichBlockRenderer";
 import { PdfDownloadButton } from "@/components/gs-lms/PdfDownloadButton";
 import { PrelimsPyqPanel } from "@/components/gs-lms/PrelimsPyqPanel";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 // useFunnelState is now managed solely by FunnelOrchestrator via render-prop
 
 function AutoAdvanceStep({
@@ -41,6 +42,7 @@ export default function TopicContentPage() {
   const params = useParams();
   const nodeId = Number(params.nodeId);
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject } = useSubjectLms();
 
   const [data, setData] = useState<TopicSectionsOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,13 +51,13 @@ export default function TopicContentPage() {
   const fetchSections = useCallback(() => {
     setLoading(true);
     gsLmsService
-      .getTopicSections("geography", nodeId)
+      .getTopicSections(subject, nodeId)
       .then(setData)
       .catch((err) =>
         setError(err.response?.data?.message || "Failed to load topic")
       )
       .finally(() => setLoading(false));
-  }, [nodeId]);
+  }, [nodeId, subject]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -110,7 +112,7 @@ export default function TopicContentPage() {
       {/* Funnel Orchestrator — 6-tab navigation with progress */}
       {/* children is a render-prop: receives { currentStep, completeStep } from
           the single useFunnelState instance inside FunnelOrchestrator */}
-      <FunnelOrchestrator nodeId={nodeId} subject="geography">
+      <FunnelOrchestrator nodeId={nodeId} subject={subject}>
         {({ currentStep, completeStep: advanceStep, displayTab }) => {
 
           // Determine which section to show based on SELECTED TAB (allows revisiting)
@@ -237,7 +239,7 @@ export default function TopicContentPage() {
             {displayTab === 'mains' && currentStep === 13 && (
               <div className="space-y-6">
                 {/* Prelims PYQs surfaced alongside Mains practice */}
-                <PrelimsPyqPanel nodeId={nodeId} subject="geography" />
+                <PrelimsPyqPanel nodeId={nodeId} subject={subject} />
                 <MainsPracticeStep
                   nodeId={nodeId}
                   onComplete={() => advanceStep(13)}

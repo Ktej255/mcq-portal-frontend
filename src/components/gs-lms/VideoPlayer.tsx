@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -17,6 +18,7 @@ interface VideoPlayerProps {
 export function VideoPlayer({ videoUrl, watched, nodeId, onWatched }: VideoPlayerProps) {
   const [isWatched, setIsWatched] = useState(watched);
   const [marking, setMarking] = useState(false);
+  const { subject } = useSubjectLms();
 
   const isYouTube =
     videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be");
@@ -36,7 +38,7 @@ export function VideoPlayer({ videoUrl, watched, nodeId, onWatched }: VideoPlaye
   const handleMarkWatched = async () => {
     setMarking(true);
     try {
-      await gsLmsService.markVideoWatched("geography", nodeId);
+      await gsLmsService.markVideoWatched(subject, nodeId);
       setIsWatched(true);
       onWatched?.();
     } catch {

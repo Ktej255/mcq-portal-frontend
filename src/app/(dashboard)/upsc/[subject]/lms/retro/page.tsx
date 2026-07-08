@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 
 interface RetroStatus {
   id: number;
@@ -19,6 +20,7 @@ interface RetroStatus {
 export default function RetroPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [retro, setRetro] = useState<RetroStatus | null>(null);
   const [reflection, setReflection] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -28,20 +30,20 @@ export default function RetroPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     gsLmsService
-      .getCurrentRetro("geography")
+      .getCurrentRetro(subject)
       .then((data) => {
         setRetro(data);
         if (data.reflection_text) setReflection(data.reflection_text);
         if (data.completed) setDone(true);
       })
       .finally(() => setLoading(false));
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, subject]);
 
   const handleSubmit = async () => {
     if (!reflection.trim()) return;
     setSubmitting(true);
     try {
-      await gsLmsService.completeRetro("geography", reflection);
+      await gsLmsService.completeRetro(subject, reflection);
       setDone(true);
     } finally {
       setSubmitting(false);
@@ -124,7 +126,7 @@ export default function RetroPage() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-[#1d9e75] font-medium">✓ Retro complete for week {retro.week_number}</span>
           <button
-            onClick={() => router.push("/upsc/geography/lms/planner")}
+            onClick={() => router.push(`${lmsBase}/planner`)}
             className="ml-auto px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors"
           >
             Back to Planner
@@ -133,7 +135,7 @@ export default function RetroPage() {
       ) : (
         <div className="flex items-center justify-between">
           <button
-            onClick={() => router.push("/upsc/geography/lms/planner")}
+            onClick={() => router.push(`${lmsBase}/planner`)}
             className="px-4 py-2 text-sm text-[#13251d]/60 hover:text-[#1a3a2a] transition-colors"
           >
             Skip for now

@@ -1,5 +1,4 @@
-import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
-
+﻿import { redirect } from "next/navigation";
 export default function DisasterManagementPage() {
-  return <GsSubjectComingSoon subjectName="Disaster Management" />;
+  redirect("/upsc/disaster-management/lms");
 }

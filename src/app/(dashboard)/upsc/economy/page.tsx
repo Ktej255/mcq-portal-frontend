@@ -1,5 +1,4 @@
-import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
-
+﻿import { redirect } from "next/navigation";
 export default function EconomyPage() {
-  return <GsSubjectComingSoon subjectName="Economy" />;
+  redirect("/upsc/economy/lms");
 }

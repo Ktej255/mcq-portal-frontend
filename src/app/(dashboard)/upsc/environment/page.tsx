@@ -1,5 +1,4 @@
-import { GsSubjectComingSoon } from "@/components/upsc/GsSubjectComingSoon";
-
+﻿import { redirect } from "next/navigation";
 export default function EnvironmentPage() {
-  return <GsSubjectComingSoon subjectName="Environment" />;
+  redirect("/upsc/environment/lms");
 }

@@ -7,10 +7,12 @@ import type { SyllabusNodeOut } from "@/services/api/gsLmsService";
 import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
 import { LmsEmptyState } from "@/components/gs-lms/LmsEmptyState";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 
 export default function PracticeTopicSelectorPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [leafTopics, setLeafTopics] = useState<SyllabusNodeOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<number | null>(null);
@@ -20,7 +22,7 @@ export default function PracticeTopicSelectorPage() {
     setLoading(true);
     setError(null);
     gsLmsService
-      .getSyllabusTree("geography")
+      .getSyllabusTree(subject)
       .then((data) => {
         const leaves: SyllabusNodeOut[] = [];
         const collectLeaves = (nodes: SyllabusNodeOut[]) => {
@@ -40,7 +42,7 @@ export default function PracticeTopicSelectorPage() {
         setError(err.response?.data?.message || "Failed to load topics")
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [subject]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -50,13 +52,13 @@ export default function PracticeTopicSelectorPage() {
   const handleStartPractice = async (nodeId: number) => {
     setStarting(nodeId);
     try {
-      const session = await gsLmsService.startPractice("geography", nodeId);
+      const session = await gsLmsService.startPractice(subject, nodeId);
       // Store session so the session page can restore on mount
       sessionStorage.setItem(
         `practice-session-${session.session_id}`,
         JSON.stringify(session)
       );
-      router.push(`/upsc/geography/lms/practice/${session.session_id}`);
+      router.push(`${lmsBase}/practice/${session.session_id}`);
     } catch {
       setStarting(null);
     }

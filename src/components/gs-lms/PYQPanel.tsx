@@ -5,6 +5,7 @@ import type { PyqOut } from "@/services/api/gsLmsService";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { PYQCard } from "./PYQCard";
 import { LmsEmptyState } from "./LmsEmptyState";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 interface PYQPanelProps {
   nodeId: number;
@@ -14,18 +15,19 @@ export function PYQPanel({ nodeId }: PYQPanelProps) {
   const [activeTab, setActiveTab] = useState<"PRELIMS" | "MAINS">("PRELIMS");
   const [pyqs, setPyqs] = useState<PyqOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const { subject } = useSubjectLms();
 
   useEffect(() => {
     setLoading(true);
     gsLmsService
-      .getTopicPyqs("geography", nodeId, activeTab)
+      .getTopicPyqs(subject, nodeId, activeTab)
       .then((res) => setPyqs(res.pyqs))
       .catch(() => setPyqs([]))
       .finally(() => setLoading(false));
-  }, [nodeId, activeTab]);
+  }, [nodeId, activeTab, subject]);
 
   const handleReveal = async (pyqId: number) => {
-    const updated = await gsLmsService.revealPyqAnswer("geography", pyqId);
+    const updated = await gsLmsService.revealPyqAnswer(subject, pyqId);
     setPyqs((prev) =>
       prev.map((p) => (p.id === pyqId ? { ...p, ...updated, revealed: true } : p))
     );

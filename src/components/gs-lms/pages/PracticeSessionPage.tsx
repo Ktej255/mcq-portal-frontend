@@ -4,15 +4,17 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { PracticeSessionOut, PracticeResultOut } from "@/services/api/gsLmsService";
-import { PracticeUI } from "@/components/gs-lms/PracticeUI";
-import { PracticeResults } from "@/components/gs-lms/PracticeResults";
-import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
+import { PracticeUI } from "../PracticeUI";
+import { PracticeResults } from "../PracticeResults";
+import { LmsLoadingSkeleton } from "../LmsLoadingSkeleton";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "../SubjectLmsContext";
 
-export default function PracticeSessionPage() {
+export function PracticeSessionPage() {
   const params = useParams();
   const sessionId = Number(params.sessionId);
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [session, setSession] = useState<PracticeSessionOut | null>(null);
   const [result, setResult] = useState<PracticeResultOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,17 +27,11 @@ export default function PracticeSessionPage() {
     setError(null);
     setNotFound(false);
     try {
-      const data = await gsLmsService.getPracticeSession("geography", sessionId);
+      const data = await gsLmsService.getPracticeSession(subject, sessionId);
       setSession(data);
-      // Persist to sessionStorage for future reloads
       try {
-        sessionStorage.setItem(
-          `practice-session-${sessionId}`,
-          JSON.stringify(data)
-        );
-      } catch {
-        // sessionStorage unavailable (private browsing) — continue without caching
-      }
+        sessionStorage.setItem(`practice-session-${sessionId}`, JSON.stringify(data));
+      } catch { /* sessionStorage unavailable */ }
     } catch (err: unknown) {
       const status =
         err && typeof err === "object" && "response" in err
@@ -49,12 +45,10 @@ export default function PracticeSessionPage() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, subject]);
 
   useEffect(() => {
-    // Wait for auth before making API calls
     if (!isLoaded || !isSignedIn) return;
-
     let restored = false;
     try {
       const stored = sessionStorage.getItem(`practice-session-${sessionId}`);
@@ -62,59 +56,46 @@ export default function PracticeSessionPage() {
         setSession(JSON.parse(stored));
         restored = true;
       }
-    } catch {
-      // JSON parse failed or sessionStorage unavailable — fall through to API
-    }
-
+    } catch { /* fall through to API */ }
     if (restored) {
       setLoading(false);
     } else {
-      // Fallback: fetch from backend API
       fetchSessionFromApi();
     }
   }, [sessionId, fetchSessionFromApi, isLoaded, isSignedIn]);
 
-  // Persist session to sessionStorage on updates
   useEffect(() => {
     if (session) {
-      sessionStorage.setItem(
-        `practice-session-${sessionId}`,
-        JSON.stringify(session)
-      );
+      sessionStorage.setItem(`practice-session-${sessionId}`, JSON.stringify(session));
     }
   }, [session, sessionId]);
 
   const handleAnswer = async (answer: string) => {
     try {
-      const updated = await gsLmsService.answerQuestion("geography", sessionId, answer);
+      const updated = await gsLmsService.answerQuestion(subject, sessionId, answer);
       if (updated.status === "COMPLETED" || updated.current_question === null) {
-        // All questions answered — submit for results
         handleSubmit();
       } else {
         setSession(updated);
       }
-    } catch {
-      // Let user retry
-    }
+    } catch { /* retry */ }
   };
 
   const handleSkip = async () => {
     try {
-      const updated = await gsLmsService.skipQuestion("geography", sessionId);
+      const updated = await gsLmsService.skipQuestion(subject, sessionId);
       if (updated.status === "COMPLETED" || updated.current_question === null) {
         handleSubmit();
       } else {
         setSession(updated);
       }
-    } catch {
-      // Let user retry
-    }
+    } catch { /* retry */ }
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const res = await gsLmsService.submitPractice("geography", sessionId);
+      const res = await gsLmsService.submitPractice(subject, sessionId);
       setResult(res);
       sessionStorage.removeItem(`practice-session-${sessionId}`);
     } catch (err: unknown) {
@@ -140,10 +121,7 @@ export default function PracticeSessionPage() {
     return (
       <div className="p-6 text-center">
         <p className="text-sm text-red-600 mb-4">{error}</p>
-        <button
-          onClick={fetchSessionFromApi}
-          className="text-sm text-[#1d9e75] hover:underline"
-        >
+        <button onClick={fetchSessionFromApi} className="text-sm text-[#1d9e75] hover:underline">
           Retry
         </button>
       </div>
@@ -156,17 +134,13 @@ export default function PracticeSessionPage() {
         <p className="text-sm text-[#13251d]/60 mb-4">
           Session not found. It may have expired or already been submitted.
         </p>
-        <a
-          href="/upsc/geography/lms/practice"
-          className="text-sm text-[#1d9e75] hover:underline"
-        >
+        <a href={`${lmsBase}/practice`} className="text-sm text-[#1d9e75] hover:underline">
           ← Back to topic selector
         </a>
       </div>
     );
   }
 
-  // Show results if we have them
   if (result) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -175,7 +149,6 @@ export default function PracticeSessionPage() {
     );
   }
 
-  // Show submitting state
   if (submitting) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -187,23 +160,16 @@ export default function PracticeSessionPage() {
     );
   }
 
-  // No session loaded (unexpected — API fallback should have handled this)
   if (!session) {
     return (
       <div className="p-6 text-center">
         <p className="text-sm text-[#13251d]/60 mb-4">
           Session data not found. This may happen on page refresh.
         </p>
-        <button
-          onClick={fetchSessionFromApi}
-          className="text-sm text-[#1d9e75] hover:underline mr-4"
-        >
+        <button onClick={fetchSessionFromApi} className="text-sm text-[#1d9e75] hover:underline mr-4">
           Retry
         </button>
-        <a
-          href="/upsc/geography/lms/practice"
-          className="text-sm text-[#1d9e75] hover:underline"
-        >
+        <a href={`${lmsBase}/practice`} className="text-sm text-[#1d9e75] hover:underline">
           ← Back to topic selector
         </a>
       </div>

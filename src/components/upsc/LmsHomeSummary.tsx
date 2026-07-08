@@ -8,6 +8,21 @@ import { paymentService, type SubscriptionResponse } from "@/services/api/paymen
 import type { DailyPlanOut, PlanItemOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
 
+/** Read the student's active LMS subject from localStorage (set by daily planner state). */
+function getActiveSubject(): string {
+  if (typeof window === "undefined") return "geography";
+  try {
+    const raw = window.localStorage.getItem("sarit-upsc-daily-command-v1");
+    if (raw) {
+      const parsed = JSON.parse(raw) as { subjectSlug?: string };
+      if (parsed?.subjectSlug) return parsed.subjectSlug;
+    }
+  } catch {
+    // ignore
+  }
+  return "geography";
+}
+
 interface RecallGateState {
   recall_needed: boolean;
   topic_id: number | null;
@@ -30,6 +45,11 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const [recallGate, setRecallGate] = useState<RecallGateState | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSubject, setActiveSubject] = useState("geography");
+
+  useEffect(() => {
+    setActiveSubject(getActiveSubject());
+  }, []);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {
@@ -38,8 +58,8 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
     }
 
     Promise.all([
-      gsLmsService.getTodayPlan("geography").catch(() => null),
-      gsLmsService.checkRecallGate("geography").catch(() => null),
+      gsLmsService.getTodayPlan(activeSubject).catch(() => null),
+      gsLmsService.checkRecallGate(activeSubject).catch(() => null),
       paymentService.getSubscription().catch(() => null),
     ])
       .then(([planData, gateData, subData]) => {
@@ -48,7 +68,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
         setSubscription(subData);
       })
       .finally(() => setLoading(false));
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, activeSubject]);
 
   // Don't show anything while loading or if backend is unreachable
   if (loading || (!plan && !recallGate)) return null;
@@ -108,7 +128,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           )}
         </div>
         <Link
-          href="/upsc/geography/lms/planner"
+          href={`/upsc/${activeSubject}/lms/planner`}
           className="text-xs font-bold text-[#1d9e75] hover:text-[#178a65] transition"
         >
           Full planner →
@@ -129,7 +149,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
             </p>
           </div>
           <Link
-            href="/upsc/geography/lms/planner"
+            href={`/upsc/${activeSubject}/lms/planner`}
             className="shrink-0 px-3 py-1.5 text-xs font-bold text-white bg-[#ef9f27] rounded-lg hover:bg-[#d98c1e] transition"
           >
             Recall
@@ -164,7 +184,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
       {/* Quick Actions */}
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
-          href="/upsc/geography/lms"
+          href={`/upsc/${activeSubject}/lms`}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-[#1a3a2a] rounded-lg hover:bg-[#10291d] transition"
         >
           <BookOpen className="h-3.5 w-3.5" />
@@ -178,7 +198,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           📰 Current Affairs
         </Link>
         <Link
-          href="/upsc/geography/lms/gaps"
+          href={`/upsc/${activeSubject}/lms/gaps`}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
         >
           View Gaps
@@ -213,12 +233,12 @@ function PlanItemRow({ item }: { item: PlanItemOut }) {
   );
 
   const dest = isRetro
-    ? "/upsc/geography/lms/retro"
+    ? `/upsc/${getActiveSubject()}/lms/retro`
     : isRevisit
-      ? `/upsc/geography/lms/topic/${item.node_id}?mode=revisit`
+      ? `/upsc/${getActiveSubject()}/lms/topic/${item.node_id}?mode=revisit`
       : item.item_type === "practice"
-        ? "/upsc/geography/lms/practice"
-        : `/upsc/geography/lms/topic/${item.node_id}`;
+        ? `/upsc/${getActiveSubject()}/lms/practice`
+        : `/upsc/${getActiveSubject()}/lms/topic/${item.node_id}`;
 
   return (
     <Link

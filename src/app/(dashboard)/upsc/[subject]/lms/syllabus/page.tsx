@@ -8,10 +8,12 @@ import { SyllabusTree } from "@/components/gs-lms/SyllabusTree";
 import { LmsLoadingSkeleton } from "@/components/gs-lms/LmsLoadingSkeleton";
 import { LmsEmptyState } from "@/components/gs-lms/LmsEmptyState";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 
 export default function SyllabusPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, label, lmsBase } = useSubjectLms();
   const [tree, setTree] = useState<SyllabusNodeOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +23,13 @@ export default function SyllabusPage() {
     setLoading(true);
     setError(null);
     gsLmsService
-      .getSyllabusTree("geography")
+      .getSyllabusTree(subject)
       .then((data) => setTree(data.tree))
       .catch((err) =>
         setError(err.response?.data?.message || "Failed to load syllabus")
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [subject]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -35,7 +37,7 @@ export default function SyllabusPage() {
   }, [isLoaded, isSignedIn, fetchSyllabus]);
 
   const handleLeafClick = (nodeId: number) => {
-    router.push(`/upsc/geography/lms/topic/${nodeId}`);
+    router.push(`${lmsBase}/topic/${nodeId}`);
   };
 
   // Count leaf topics and completed ones
@@ -77,7 +79,7 @@ export default function SyllabusPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">Geography Syllabus</h1>
+        <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">{label} Syllabus</h1>
         <LmsLoadingSkeleton variant="tree" />
       </div>
     );
@@ -101,10 +103,10 @@ export default function SyllabusPage() {
   if (tree.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">Geography Syllabus</h1>
+        <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">{label} Syllabus</h1>
         <LmsEmptyState
           title="No syllabus available"
-          description="The geography syllabus hasn't been set up yet. Check back soon."
+          description={`The ${label.toLowerCase()} syllabus hasn't been set up yet. Check back soon.`}
         />
       </div>
     );
@@ -113,10 +115,10 @@ export default function SyllabusPage() {
   return (
     <div className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl font-semibold text-[#1a3a2a]">Geography Syllabus</h1>
+        <h1 className="text-xl font-semibold text-[#1a3a2a]">{label} Syllabus</h1>
         <div className="flex items-center gap-2">
           <a
-            href="/upsc/geography/lms/planner"
+            href={`${lmsBase}/planner`}
             className="inline-flex items-center gap-2 rounded-md border border-[#1d9e75] bg-[#e7f5ee] px-3 py-2 text-xs font-bold text-[#085041] transition hover:bg-[#1d9e75] hover:text-white"
           >
             📅 Today&apos;s Plan

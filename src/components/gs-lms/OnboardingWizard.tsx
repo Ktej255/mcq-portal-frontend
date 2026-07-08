@@ -56,7 +56,7 @@ const LEARNER_LEVELS: {
 
 export function OnboardingWizard() {
   const router = useRouter();
-  const { subject, lmsBase } = useSubjectLms();
+  const { subject, label, lmsBase } = useSubjectLms();
   const [step, setStep] = useState(0);
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>("beginner");
   const [studyWindowMinutes, setStudyWindowMinutes] = useState(90);
@@ -170,7 +170,7 @@ export function OnboardingWizard() {
         </div>
 
         {/* Step content */}
-        {step === 0 && <StepWelcome />}
+        {step === 0 && <StepWelcome label={label} />}
         {step === 1 && (
           <StepProfile
             learnerLevel={learnerLevel}
@@ -184,6 +184,8 @@ export function OnboardingWizard() {
             bandwidth={bandwidth}
             learnerLevel={learnerLevel}
             studyWindowMinutes={studyWindowMinutes}
+            label={label}
+            subject={subject}
           />
         )}
 
@@ -228,14 +230,14 @@ export function OnboardingWizard() {
 /* Step sub-components                                                         */
 /* -------------------------------------------------------------------------- */
 
-function StepWelcome() {
+function StepWelcome({ label }: { label: string }) {
   return (
     <div className="text-center space-y-4">
       <h2 className="text-xl font-semibold text-[#1a3a2a]">
-        Welcome to Geography LMS
+        Welcome to {label} LMS
       </h2>
       <p className="text-sm text-[#13251d]/70 leading-relaxed">
-        This guided learning system helps you master UPSC Geography through a
+        This guided learning system helps you master UPSC {label} through a
         structured, research-backed method:
       </p>
       <ol className="text-left text-sm text-[#13251d]/80 space-y-2 pl-4">
@@ -389,13 +391,23 @@ function StepConfirmation({
   bandwidth,
   learnerLevel,
   studyWindowMinutes,
+  label,
+  subject,
 }: {
   bandwidth: number;
   learnerLevel: LearnerLevel;
   studyWindowMinutes: number;
+  label: string;
+  subject: string;
 }) {
   const levelLabel =
     LEARNER_LEVELS.find((l) => l.value === learnerLevel)?.title ?? "Beginner";
+
+  const firstTopic = subject === "geography"
+    ? "Physical Geography — Geomorphology"
+    : subject === "csat"
+    ? "Quantitative Aptitude — Number System"
+    : "Introduction & Fundamentals";
 
   return (
     <div className="text-center space-y-4">
@@ -406,15 +418,15 @@ function StepConfirmation({
         Your daily target is set to{" "}
         <span className="font-semibold text-[#1d9e75]">{bandwidth}</span>{" "}
         {bandwidth === 1 ? "topic" : "topics"} per day ({studyWindowMinutes}{" "}
-        min). The syllabus will guide you through Geography starting from
-        Physical Geography fundamentals.
+        min). The syllabus will guide you through {label} starting from
+        fundamental concepts.
       </p>
       <div className="mt-4 p-4 rounded-xl border border-[#1d9e75]/20 bg-[#1d9e75]/5 space-y-2">
         <p className="text-sm font-medium text-[#1a3a2a]">
           Level: {levelLabel}
         </p>
         <p className="text-sm font-medium text-[#1a3a2a]">
-          First topic: Physical Geography — Geomorphology
+          First topic: {firstTopic}
         </p>
         <p className="text-xs text-[#13251d]/50 mt-1">
           Click &quot;Get Started&quot; to begin your journey

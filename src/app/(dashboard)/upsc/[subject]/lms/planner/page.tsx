@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PlannerUI } from "@/components/gs-lms/PlannerUI";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 
 interface RecallGateState {
   recall_needed: boolean;
@@ -15,9 +16,13 @@ interface RecallGateState {
 function RecallGateBanner({
   gate,
   onClear,
+  subject,
+  lmsBase,
 }: {
   gate: RecallGateState;
   onClear: () => void;
+  subject: string;
+  lmsBase: string;
 }) {
   const [clearing, setClearing] = useState(false);
 
@@ -25,7 +30,7 @@ function RecallGateBanner({
     if (!gate.topic_id) return;
     setClearing(true);
     try {
-      await gsLmsService.clearRecallGate("geography", gate.topic_id);
+      await gsLmsService.clearRecallGate(subject, gate.topic_id);
       onClear();
     } finally {
       setClearing(false);
@@ -61,7 +66,7 @@ function RecallGateBanner({
               onClick={() =>
                 gate.topic_id &&
                 window.open(
-                  `/upsc/geography/lms/topic/${gate.topic_id}`,
+                  `${lmsBase}/topic/${gate.topic_id}`,
                   "_self"
                 )
               }
@@ -78,15 +83,16 @@ function RecallGateBanner({
 
 export default function PlannerPage() {
   const { isLoaded, isSignedIn } = useApiConfig();
+  const { subject, lmsBase } = useSubjectLms();
   const [gate, setGate] = useState<RecallGateState | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     gsLmsService
-      .checkRecallGate("geography")
+      .checkRecallGate(subject)
       .then(setGate)
       .catch(() => setGate(null));
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, subject]);
 
   return (
     <div className="p-6">
@@ -94,7 +100,12 @@ export default function PlannerPage() {
         Daily Planner
       </h1>
       {gate?.recall_needed && (
-        <RecallGateBanner gate={gate} onClear={() => setGate(null)} />
+        <RecallGateBanner
+          gate={gate}
+          onClear={() => setGate(null)}
+          subject={subject}
+          lmsBase={lmsBase}
+        />
       )}
       <PlannerUI />
     </div>
