@@ -1,4 +1,3 @@
-const authFallbackKey = "sarit-auth-fallback-unlocked-v1";
 const mockUserEmailKey = "MOCK_USER_EMAIL";
 const mockUserUidKey = "MOCK_USER_UID";
 
@@ -9,22 +8,11 @@ export function isLocalTestingHost(hostname?: string) {
   return resolvedHostname === "localhost" || resolvedHostname === "127.0.0.1";
 }
 
-export function unlockAuthFallback() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(authFallbackKey, "true");
-}
-
-export function isAuthFallbackUnlocked() {
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(authFallbackKey) === "true";
-}
-
+// Preview (mock) sign-in is for local testing, or a deployment that opts in on
+// purpose. It must never switch itself on in production, e.g. after a failed
+// Google sign-in, because every preview visitor shares one account.
 export function canUsePreviewAuth(hostname?: string) {
-  return (
-    isLocalTestingHost(hostname) ||
-    process.env.NEXT_PUBLIC_STUDENT_PREVIEW_LOGIN === "true" ||
-    isAuthFallbackUnlocked()
-  );
+  return isLocalTestingHost(hostname) || process.env.NEXT_PUBLIC_STUDENT_PREVIEW_LOGIN === "true";
 }
 
 export function readLocalMockToken() {

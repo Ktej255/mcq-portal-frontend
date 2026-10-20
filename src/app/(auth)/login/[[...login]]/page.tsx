@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { activeAuthProvider, clerkConfigReady, env, missingClerkEnvVars } from "@/env";
-import { canUsePreviewAuth, isLocalTestingHost, unlockAuthFallback } from "@/lib/auth/local-testing";
+import { canUsePreviewAuth, isLocalTestingHost } from "@/lib/auth/local-testing";
 import { PRIMARY_MASTER_EMAIL } from "@/lib/auth/master-access";
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === "true";
@@ -46,8 +46,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (masterPreviewRequested && isLocalTestingHost() && !user) {
-      unlockAuthFallback();
-      setFallbackAvailable(true);
       devLogin(PRIMARY_MASTER_EMAIL, "local-master-ktej255", redirectPath);
     }
   }, [masterPreviewRequested, user, devLogin, redirectPath]);
@@ -78,14 +76,10 @@ export default function LoginPage() {
   }, [searchParams, devLogin, authLoading, user, redirectPath]);
 
   const handlePreviewLogin = () => {
-    unlockAuthFallback();
-    setFallbackAvailable(true);
     devLogin("student-preview@upsc.local", "student-preview", redirectPath);
   };
 
   const handleMasterPreviewLogin = () => {
-    unlockAuthFallback();
-    setFallbackAvailable(true);
     devLogin(PRIMARY_MASTER_EMAIL, "local-master-ktej255", redirectPath);
   };
 
@@ -114,8 +108,6 @@ export default function LoginPage() {
       await signInWithGoogle(redirectPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google login could not start right now.";
-      unlockAuthFallback();
-      setFallbackAvailable(true);
       setAuthIssue(message);
     } finally {
       setGoogleChecking(false);
@@ -312,7 +304,7 @@ export default function LoginPage() {
             >
               {googleChecking ? "Checking Google login..." : "Connect with Google"} <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            {localTestingHost || fallbackAvailable || authIssue ? (
+            {fallbackAvailable ? (
               <Button
                 type="button"
                 variant="outline"
