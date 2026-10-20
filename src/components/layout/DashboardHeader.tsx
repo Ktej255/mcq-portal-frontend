@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { UpscStudentStats } from '@/components/upsc/UpscStudentStats';
 import { SyncStatus } from '@/components/shared/SyncStatus';
+import { TrialStatus } from '@/components/shared/TrialStatus';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -58,6 +59,7 @@ export function DashboardHeader({ onMenuClick }: HeaderProps) {
       </nav>
 
       <div className="flex items-center gap-3">
+        <TrialStatus />
         <SyncStatus />
         <UpscStudentStats />
         <LanguageSwitcher />
