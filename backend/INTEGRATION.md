@@ -12,7 +12,7 @@ connect. This document is descriptive only — it adds no behavior.
 
 - **Service name:** MCQ Intelligence Portal API (`version 2.0.0`)
 - **API base path:** `/api/v1`
-- **Auth:** Firebase (`firebase-admin` on the backend)
+- **Auth:** Clerk session JWTs, verified with `PyJWT` against `CLERK_JWT_KEY` (`app/core/clerk.py`)
 - **AI:** Google Generative AI (Gemini)
 
 ## API surface
@@ -81,8 +81,10 @@ or `*`). Provided values are merged with the defaults.
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string (`postgres://` is auto-upgraded to `postgresql://`) | `postgresql://postgres:password@localhost:5432/mcq_portal` |
 | `BACKEND_CORS_ORIGINS` | Allowed origins (merged with defaults) | see CORS defaults above |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to Firebase/GCP service-account JSON | _unset_ |
-| `FIREBASE_PROJECT_ID` | Firebase project id | `mcq-intelligence-portal` |
+| `CLERK_JWT_KEY` | Clerk JWT public key (PEM) used to verify session tokens. Required in production | _unset_ |
+| `ALLOW_MOCK_AUTH` | Accept `MOCK_TOKEN` for local/e2e testing only. Must be `false` in production | `false` |
+| `AI_RATE_LIMIT_PER_MINUTE` / `AI_RATE_LIMIT_PER_DAY` | Per-user caps on AI endpoints | `30` / `500` |
+| `PAYWALL_ENABLED`, `TRIAL_DAYS`, `PAYWALL_LAUNCH_DATE` | Free trial and plan limits (off by default) | `false`, `7`, _unset_ |
 | `GOOGLE_API_KEY` | Google Generative AI (Gemini) key | _unset_ |
 | `ADMIN_EMAILS` | Bootstrap admin email(s) | _configured in `config.py`_ |
 | `SCHEMA_CHECK_STRICT` | Strict schema checks | `false` |
@@ -119,8 +121,8 @@ backend is running.
 
 ```
 Browser (Next.js)
-  -> Firebase auth (ID token)
+  -> Clerk sign-in (session JWT)
   -> fetch NEXT_PUBLIC_API_BASE_URL + /<router>/...
-       Authorization: Bearer <Firebase ID token>
-  -> FastAPI verifies token (firebase-admin) -> SQLAlchemy / PostgreSQL
+       Authorization: Bearer <Clerk session token>
+  -> FastAPI verifies the JWT (app/core/clerk.py) -> SQLAlchemy / PostgreSQL
 ```

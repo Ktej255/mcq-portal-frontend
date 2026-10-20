@@ -13,7 +13,7 @@ change. `backend/` is excluded from Vercel uploads, ESLint and TypeScript.
 The backend was imported from `Ktej255/mcq-portal-backend` (commit `23fd91a`) as files
 only. Its git history, local databases and files containing live credentials were left
 out on purpose. Secrets belong in AWS Secrets Manager; see
-`backend/task-definition.example.json`.
+`backend/deploy/aws/task-definition.example.json`.
 
 Backend quick start (Python 3.11, same as production):
 
