@@ -38,11 +38,15 @@ from app.api.v1.gs_lms import recall
 from app.api.v1.gs_lms import mcq_lab
 from app.api.v1.gs_lms import mains
 from app.api.v1.gs_lms import growth
+from app.api.v1.gs_lms import subjects
 
 # All GS LMS routes require authentication. Declaring the dependency at the
 # aggregate level enforces auth-gating uniformly across every sub-router
 # (Requirement 10.2 / design Property 23).
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+# Not subject-specific: lists the subjects and whether students can open them.
+router.include_router(subjects.router, tags=["gs-lms"])
 
 # Subject-specific routes are mounted under /{subject_slug}/ prefix.
 # The subject_slug is a path parameter resolved in each endpoint via the

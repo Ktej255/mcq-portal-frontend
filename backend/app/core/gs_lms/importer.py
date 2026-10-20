@@ -31,7 +31,8 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.content_check import check_subject_content, format_report
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
@@ -477,42 +478,40 @@ def import_mcq_questions(
 # ---------------------------------------------------------------------------
 
 
-def import_gs_geography(
+def import_gs_subject(
     db: Session,
     artifact_path_or_data: Optional[os.PathLike | str | dict[str, Any]] = None,
     *,
+    subject_slug: Optional[str] = None,
     review_status: str = "UNREVIEWED",
 ) -> dict[str, Any]:
-    """Import GS Geography LMS content from a JSON artifact or in-memory dict.
+    """Import one GS subject's LMS content from a JSON artifact or dict.
 
-    This is the main entry point for bulk loading. Accepts either:
-      - A file path (str or PathLike) to a JSON artifact
-      - A dict already parsed in memory
-      - None (uses the default artifact path)
+    The subject is found by ``subject_slug`` (argument, else the artifact's
+    ``"subject_slug"`` key) and falls back to the artifact's ``"subject_id"``.
+    The artifact is checked first (see ``content_check``); a file with errors
+    raises ``ValueError`` and nothing is written. The check summary is stored
+    on ``GsSubject.completeness_status`` and ``is_complete`` is set when every
+    topic is ready.
 
     The expected artifact structure::
 
         {
-            "subject_id": 1,
+            "subject_slug": "geography",
             "tree": [
                 {
                     "title": "Geomorphology",
                     "node_type": "MEGA_TOPIC",
                     "weight": 5.0,
                     "display_order": 1,
-                    "ordering_justification": "Foundation of physical geography",
                     "children": [
                         {
                             "title": "Plate Tectonics",
                             "node_type": "SUB_TOPIC",
-                            "weight": 2.0,
-                            "display_order": 1,
                             "children": [
                                 {
                                     "title": "Continental Drift",
                                     "node_type": "LEAF_TOPIC",
-                                    "weight": 1.0,
-                                    "display_order": 1,
                                     "content_sections": [...],
                                     "pyqs": [...],
                                     "mcq_questions": [...]
@@ -529,7 +528,6 @@ def import_gs_geography(
 
     Returns a summary report with counts of all entities processed.
     """
-    # Resolve the data source.
     if artifact_path_or_data is None:
         data = load_artifact()
     elif isinstance(artifact_path_or_data, dict):
@@ -537,24 +535,52 @@ def import_gs_geography(
     else:
         data = load_artifact(artifact_path_or_data)
 
-    subject_id = data["subject_id"]
-    tree_data = data.get("tree", [])
+    report = check_subject_content(data)
+    if not report.ok_to_import:
+        raise ValueError("Content file has errors; nothing was imported.\n" + format_report(report))
 
-    # Import the syllabus tree (recursively handles sections, PYQs, MCQs).
+    slug = subject_slug or data.get("subject_slug")
+    query = db.query(GsSubject)
+    subject = (
+        query.filter(GsSubject.slug == slug).one_or_none()
+        if slug
+        else query.filter(GsSubject.id == data.get("subject_id")).one_or_none()
+    )
+    if subject is None:
+        raise ValueError(
+            f"GS subject {slug or data.get('subject_id')!r} not found; "
+            "run scripts/seed_production.py first to create the subjects."
+        )
+
     counts = import_syllabus_tree(
         db,
-        tree_data,
-        subject_id,
+        data.get("tree", []),
+        subject.id,
         review_status=review_status,
     )
 
+    subject.completeness_status = report.summary()
+    subject.is_complete = report.ready
     db.flush()
 
     return {
-        "subject_id": subject_id,
+        "subject_id": subject.id,
+        "subject_slug": subject.slug,
         "review_status": review_status,
         **counts,
+        "topics_ready": f"{report.topics_ready}/{report.topics}",
     }
+
+
+def import_gs_geography(
+    db: Session,
+    artifact_path_or_data: Optional[os.PathLike | str | dict[str, Any]] = None,
+    *,
+    review_status: str = "UNREVIEWED",
+) -> dict[str, Any]:
+    """Import GS Geography content (the default artifact). Kept for callers
+    that predate ``import_gs_subject``."""
+    return import_gs_subject(db, artifact_path_or_data, review_status=review_status)
 
 
 # ---------------------------------------------------------------------------
@@ -574,32 +600,37 @@ def _merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint
+    """Check and import one subject's content.
+
+    python -m app.core.gs_lms.importer --artifact content/polity.json --check-only
+    python -m app.core.gs_lms.importer --artifact content/polity.json --subject polity-governance
+    """
     import argparse
+    import sys
 
-    from app.db.session import SessionLocal
-
-    parser = argparse.ArgumentParser(
-        description="Import GS Geography LMS content into the database."
-    )
-    parser.add_argument(
-        "--artifact", default=None, help="Path to the JSON artifact."
-    )
+    parser = argparse.ArgumentParser(description="Check and import GS LMS subject content.")
+    parser.add_argument("--artifact", default=None, help="Path to the JSON content file (default: Geography).")
+    parser.add_argument("--subject", default=None, help='Subject slug, e.g. "polity-governance" (default: from the file).')
+    parser.add_argument("--check-only", action="store_true", help="Only check the file; do not touch the database.")
     parser.add_argument(
         "--review-status",
         default="UNREVIEWED",
         choices=[e.value for e in GsReviewStatusEnum],
-        help="review_status to stamp on imported content (default: UNREVIEWED).",
+        help="review_status to stamp on imported content (default: UNREVIEWED, hidden from students).",
     )
     args = parser.parse_args()
 
+    data = load_artifact(args.artifact)
+    report = check_subject_content(data)
+    print(format_report(report))
+    if args.check_only or not report.ok_to_import:
+        sys.exit(0 if report.ok_to_import else 1)
+
+    from app.db.session import SessionLocal
+
     session = SessionLocal()
     try:
-        if args.artifact:
-            result = import_gs_geography(
-                session, args.artifact, review_status=args.review_status
-            )
-        else:
-            result = import_gs_geography(session, review_status=args.review_status)
+        result = import_gs_subject(session, data, subject_slug=args.subject, review_status=args.review_status)
         session.commit()
     except Exception:
         session.rollback()
@@ -607,8 +638,7 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
     finally:
         session.close()
 
-    print("=== GS LMS Geography import complete ===")
-    print("Import results:")
+    print("=== GS LMS import complete ===")
     for k, v in result.items():
         print(f"  {k:<20} {v}")
 

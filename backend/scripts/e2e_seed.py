@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import app.main  # noqa: F401,E402  (registers every model on Base.metadata)
-from app.core.gs_lms.importer import import_gs_geography  # noqa: E402
+from app.core.gs_lms.importer import DEFAULT_ARTIFACT_PATH, import_gs_geography, import_gs_subject  # noqa: E402
 from app.core.gs_lms.student_models import GsLmsOnboardingStatus  # noqa: E402
 from app.core.payments.models import PaymentOrder, Subscription  # noqa: E402
 from app.db.session import Base, SessionLocal, engine  # noqa: E402
@@ -50,6 +50,11 @@ def main() -> None:
     with SessionLocal() as db:
         _ensure_subjects(db)
         import_gs_geography(db, review_status="REVIEWED")
+        # One reviewed Polity topic (the content template), so the sidebar
+        # shows Polity unlocked while the other subjects stay "Soon".
+        import_gs_subject(
+            db, DEFAULT_ARTIFACT_PATH.parent / "templates" / "gs_subject_template.json", review_status="REVIEWED"
+        )
         for uid, days_old in STUDENTS.items():
             user = User(
                 google_uid=f"TOKEN_local_{uid}",
