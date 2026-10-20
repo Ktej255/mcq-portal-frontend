@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Python backend lives in the same repo but is not part of the Next.js app.
+    "backend/**",
   ]),
 ]);
 

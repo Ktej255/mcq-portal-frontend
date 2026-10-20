@@ -1,0 +1,20 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+*.sqlite3
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Never bake databases, caches, logs or deploy config into the image
+*.db
+.hypothesis/
+scratch/
+*.log
+task-definition*.json

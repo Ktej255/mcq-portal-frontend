@@ -1,0 +1,72 @@
+{
+  "family": "mcq-portal-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/<ECS_EXECUTION_ROLE>",
+  "containerDefinitions": [
+    {
+      "name": "mcq-portal-backend",
+      "image": "<ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/mcq-portal-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080
+        }
+      ],
+      "environment": [
+        {
+          "name": "ALLOW_MOCK_AUTH",
+          "value": "false"
+        },
+        {
+          "name": "CASHFREE_ENVIRONMENT",
+          "value": "production"
+        },
+        {
+          "name": "BACKEND_CORS_ORIGINS",
+          "value": "https://upsc-command.vercel.app"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/DATABASE_URL"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/SECRET_KEY"
+        },
+        {
+          "name": "GOOGLE_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/GOOGLE_API_KEY"
+        },
+        {
+          "name": "CLERK_JWT_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/CLERK_JWT_KEY"
+        },
+        {
+          "name": "CASHFREE_APP_ID",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/CASHFREE_APP_ID"
+        },
+        {
+          "name": "CASHFREE_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/CASHFREE_SECRET_KEY"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/aws/ecs/mcq-portal-backend",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

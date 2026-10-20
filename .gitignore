@@ -48,3 +48,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Backend secrets and local databases never go in git
+/backend/task-definition.json
+/backend/**/*.db
+/backend/.hypothesis/
