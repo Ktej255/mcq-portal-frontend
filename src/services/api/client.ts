@@ -2,6 +2,13 @@ import axios from 'axios';
 import { env } from '@/env';
 import { isUpgradeRequired, upgradeRequiredEvent } from '@/lib/upsc/upgradePrompt';
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** Background reads set this so a 402 doesn't open the upgrade dialog. */
+    skipUpgradePrompt?: boolean;
+  }
+}
+
 const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
 // Ensure baseURL ends with /api/v1/ if it's pointing to the root domain
 let normalizedBaseUrl = rawBaseUrl;
@@ -128,7 +135,7 @@ apiClient.interceptors.response.use(
     }
 
     const upgradeDetail = error.response?.status === 402 ? error.response?.data?.detail : null;
-    if (typeof window !== 'undefined' && isUpgradeRequired(upgradeDetail)) {
+    if (typeof window !== 'undefined' && isUpgradeRequired(upgradeDetail) && !originalRequest?.skipUpgradePrompt) {
       window.dispatchEvent(new CustomEvent(upgradeRequiredEvent, { detail: upgradeDetail }));
     }
 
