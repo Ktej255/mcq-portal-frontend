@@ -54,6 +54,8 @@ from app.core.gs_lms.funnel_models import (  # noqa: F401
     GsLmsExternalResource,
 )
 
+from app.core.leads.models import MarketingLead  # noqa: F401
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

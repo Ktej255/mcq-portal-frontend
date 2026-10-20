@@ -82,6 +82,7 @@ from app.api.v1 import profile
 from app.api.v1 import payments
 from app.api.v1 import engagement
 from app.api.v1 import entitlements
+from app.api.v1 import leads
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(admin_legacy.router, prefix="/api/v1/admin", tags=["admin"])
@@ -102,6 +103,7 @@ app.include_router(profile.router, prefix="/api/v1/student", tags=["student-prof
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(engagement.router, prefix="/api/v1/engagement", tags=["engagement"])
 app.include_router(entitlements.router, prefix="/api/v1/entitlements", tags=["entitlements"])
+app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 
 # Current Affairs Platform & Admin CMS routers
 from app.api.v1.current_affairs import router as ca_router
