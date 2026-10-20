@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, mcq_quota
 from app.schemas.common import StandardResponse
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
@@ -247,7 +247,7 @@ def start_practice_session(
     )
 
 
-@router.post("/practice/{session_id}/answer")
+@router.post("/practice/{session_id}/answer", dependencies=[Depends(mcq_quota(1))])
 def answer_question(
     session_id: int,
     body: GsLmsPracticeAnswerIn,

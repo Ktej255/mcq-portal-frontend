@@ -5,11 +5,15 @@ from app.db.session import get_db
 from app.models.domain import User, RoleEnum
 from app.core.clerk import verify_token
 from app.core.config import settings
+from app.core.usage.models import DailyUsage
 
 import threading
 import time
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 security = HTTPBearer(auto_error=False)
 
@@ -168,3 +172,190 @@ def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
             )
 
         hits.append(now)
+
+
+# ---------------------------------------------------------------------------
+# Plan access (paywall). While settings.PAYWALL_ENABLED is off, the
+# dependencies below do nothing at all (no checks, no DB queries, no counting),
+# so behaviour is exactly as before until the paywall is switched on.
+#
+# Order: admins get everything, then an active subscription's tier, then the
+# free trial (full access for TRIAL_DAYS from sign-up, or from
+# PAYWALL_LAUNCH_DATE for older accounts), otherwise "expired".
+# Limits per tier live in app.core.entitlements (they match the pricing page).
+# ---------------------------------------------------------------------------
+
+UPGRADE_PATH = "/upsc/pricing"
+_INDIA = ZoneInfo("Asia/Kolkata")
+
+
+@dataclass
+class Access:
+    tier: str  # whose limits apply
+    source: str  # "admin" | "subscription" | "trial" | "open" | "expired"
+    trial_ends_at: Optional[datetime]
+    entitlements: dict
+
+
+def _as_utc(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def trial_ends_at(user: User) -> datetime:
+    start = _as_utc(user.created_at) or datetime.now(timezone.utc)
+    if settings.PAYWALL_LAUNCH_DATE:
+        launch = datetime.combine(settings.PAYWALL_LAUNCH_DATE, datetime.min.time(), tzinfo=_INDIA)
+        start = max(start, launch.astimezone(timezone.utc))
+    return start + timedelta(days=settings.TRIAL_DAYS)
+
+
+def resolve_access(user: User, db: Session) -> Access:
+    from app.core.entitlements import get_entitlements, normalize_tier
+    from app.core.payments.models import Subscription
+
+    if user.role == RoleEnum.ADMIN or user.role == "ADMIN":
+        return Access("ultimate", "admin", None, get_entitlements("ultimate"))
+
+    now = datetime.now(timezone.utc)
+    sub = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == user.google_uid, Subscription.status == "active")
+        .order_by(Subscription.end_date.desc())
+        .first()
+    )
+    if sub is not None and (_as_utc(sub.end_date) or now) > now:
+        tier = normalize_tier(sub.plan_tier)
+        return Access(tier, "subscription", None, get_entitlements(tier))
+
+    ends = trial_ends_at(user)
+    if not settings.PAYWALL_ENABLED:
+        return Access("ultimate", "open", None, get_entitlements("ultimate"))
+    if now < ends:
+        return Access("ultimate", "trial", ends, get_entitlements("ultimate"))
+    return Access("free", "expired", ends, get_entitlements("free"))
+
+
+def _upgrade_required(reason: str, message: str, required_tier: Optional[str] = None, feature: Optional[str] = None):
+    raise HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail={
+            "code": "upgrade_required",
+            "reason": reason,
+            "message": message,
+            "feature": feature,
+            "required_tier": required_tier,
+            "upgrade_path": UPGRADE_PATH,
+        },
+    )
+
+
+def _lowest_tier_with(feature: str) -> Optional[str]:
+    from app.core.entitlements import ENTITLEMENTS, TIER_ORDER
+
+    return next((t for t in TIER_ORDER if ENTITLEMENTS[t].get(feature)), None)
+
+
+_FEATURE_NAMES = {
+    "optional_subjects": "Optional subjects",
+    "mains_upload": "Mains answer uploads",
+}
+
+
+def _enforce(access: Access, feature: Optional[str] = None) -> None:
+    if not settings.PAYWALL_ENABLED or access.source == "admin":
+        return
+    if access.source == "expired":
+        _upgrade_required(
+            "trial_expired",
+            f"Your {settings.TRIAL_DAYS}-day free trial has ended. Choose a plan to keep learning.",
+        )
+    if feature and not access.entitlements.get(feature):
+        from app.core.entitlements import TIER_LABEL
+
+        tier = _lowest_tier_with(feature)
+        name = _FEATURE_NAMES.get(feature, "This feature")
+        label = TIER_LABEL.get(tier, "a higher") if tier else "a higher"
+        _upgrade_required("feature", f"{name} are included from the {label} plan.", tier, feature)
+
+
+def require_access(feature: Optional[str] = None):
+    """Dependency factory: an active trial or plan, plus ``feature`` if given."""
+
+    def dependency(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+    ) -> Optional[Access]:
+        if not settings.PAYWALL_ENABLED:
+            return None
+        access = resolve_access(current_user, db)
+        _enforce(access, feature)
+        return access
+
+    return dependency
+
+
+def _today_in_india():
+    return datetime.now(_INDIA).date()
+
+
+def mcqs_answered_today(db: Session, user: User) -> int:
+
+    row = (
+        db.query(DailyUsage)
+        .filter(DailyUsage.user_id == user.id, DailyUsage.usage_date == _today_in_india(), DailyUsage.metric == "mcq_answers")
+        .one_or_none()
+    )
+    return row.count if row else 0
+
+
+def consume_mcq_quota(db: Session, user: User, count: int = 1) -> None:
+    """Count ``count`` MCQ answers for today; 402 if that would pass the plan's daily limit."""
+    from app.core.entitlements import TIER_LABEL, TIER_ORDER, ENTITLEMENTS
+
+    if count <= 0 or not settings.PAYWALL_ENABLED:
+        return
+    access = resolve_access(user, db)
+    _enforce(access)
+
+    today = _today_in_india()
+    row = (
+        db.query(DailyUsage)
+        .filter(DailyUsage.user_id == user.id, DailyUsage.usage_date == today, DailyUsage.metric == "mcq_answers")
+        .one_or_none()
+    )
+    used = row.count if row else 0
+
+    limit = access.entitlements.get("daily_mcq_limit")
+    if access.source != "admin" and limit is not None and used + count > limit:
+        better = next(
+            (t for t in TIER_ORDER[TIER_ORDER.index(access.tier) + 1:]
+             if ENTITLEMENTS[t]["daily_mcq_limit"] is None or ENTITLEMENTS[t]["daily_mcq_limit"] > limit),
+            None,
+        )
+        _upgrade_required(
+            "mcq_limit",
+            f"You've used today's {limit} MCQs on the {TIER_LABEL[access.tier]} plan. "
+            "Upgrade for more, or come back tomorrow.",
+            better,
+            "daily_mcq_limit",
+        )
+
+    if row is None:
+        row = DailyUsage(user_id=user.id, usage_date=today, metric="mcq_answers", count=0)
+        db.add(row)
+    row.count = used + count
+    db.commit()
+
+
+def mcq_quota(count: int = 1):
+    """Dependency factory: consume ``count`` MCQ answers before the endpoint runs."""
+
+    def dependency(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+    ) -> None:
+        consume_mcq_quota(db, current_user, count)
+
+    return dependency

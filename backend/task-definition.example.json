@@ -30,6 +30,18 @@
         {
           "name": "BACKEND_CORS_ORIGINS",
           "value": "https://upsc-command.vercel.app"
+        },
+        {
+          "name": "PAYWALL_ENABLED",
+          "value": "false"
+        },
+        {
+          "name": "TRIAL_DAYS",
+          "value": "7"
+        },
+        {
+          "name": "PAYWALL_LAUNCH_DATE",
+          "value": "<YYYY-MM-DD you switch the paywall on>"
         }
       ],
       "secrets": [

@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
@@ -83,18 +83,19 @@ from app.api.v1 import payments
 from app.api.v1 import engagement
 from app.api.v1 import entitlements
 from app.api.v1 import leads
+from app.api.dependencies import require_access
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(admin_legacy.router, prefix="/api/v1/admin", tags=["admin"])
-app.include_router(tests.router, prefix="/api/v1/tests", tags=["tests"])
+app.include_router(tests.router, prefix="/api/v1/tests", tags=["tests"], dependencies=[Depends(require_access())])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
-app.include_router(revision.router, prefix="/api/v1/revision", tags=["revision"])
-app.include_router(attempts.router, prefix="/api/v1/attempts", tags=["attempts"])
-app.include_router(simulation.router, prefix="/api/v1/simulation", tags=["simulation"])
-app.include_router(mains_upload.router, prefix="/api/v1/mains-upload", tags=["mains-upload"])
-app.include_router(optional.router, prefix="/api/v1/optional", tags=["optional"])
-app.include_router(gs_lms.router, prefix="/api/v1/gs-lms", tags=["gs-lms"])
+app.include_router(revision.router, prefix="/api/v1/revision", tags=["revision"], dependencies=[Depends(require_access())])
+app.include_router(attempts.router, prefix="/api/v1/attempts", tags=["attempts"], dependencies=[Depends(require_access())])
+app.include_router(simulation.router, prefix="/api/v1/simulation", tags=["simulation"], dependencies=[Depends(require_access())])
+app.include_router(mains_upload.router, prefix="/api/v1/mains-upload", tags=["mains-upload"], dependencies=[Depends(require_access("mains_upload"))])
+app.include_router(optional.router, prefix="/api/v1/optional", tags=["optional"], dependencies=[Depends(require_access("optional_subjects"))])
+app.include_router(gs_lms.router, prefix="/api/v1/gs-lms", tags=["gs-lms"], dependencies=[Depends(require_access())])
 
 # Dev preview route (no auth) for GS LMS content preview
 from app.api.v1.gs_lms.preview import router as gs_lms_preview_router
@@ -109,7 +110,7 @@ app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 from app.api.v1.current_affairs import router as ca_router
 from app.api.v1.admin import router as ca_admin_router
 
-app.include_router(ca_router, prefix="/api/v1/current-affairs", tags=["current-affairs"])
+app.include_router(ca_router, prefix="/api/v1/current-affairs", tags=["current-affairs"], dependencies=[Depends(require_access())])
 app.include_router(ca_admin_router, prefix="/api/v1/admin", tags=["admin-cms"])
 
 

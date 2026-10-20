@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, mcq_quota
 from app.core.gs.models import GsSubject, GsReviewStatusEnum
 from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsMcqQuestion
 from app.core.gs_lms.funnel_models import (
@@ -194,7 +194,7 @@ def get_mcq_lab_questions(
     ]
 
 
-@router.post("/funnel/{node_id}/mcq-lab/submit", response_model=McqLabResultOut)
+@router.post("/funnel/{node_id}/mcq-lab/submit", response_model=McqLabResultOut, dependencies=[Depends(mcq_quota(15))])
 def submit_mcq_lab(
     node_id: int,
     body: McqLabSubmitIn,

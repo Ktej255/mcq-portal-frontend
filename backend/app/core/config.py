@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import Optional, List, Union, Any, ClassVar
@@ -79,6 +80,16 @@ class Settings(BaseSettings):
     # transcription, evaluation) so one account can't run up the AI bill.
     AI_RATE_LIMIT_PER_MINUTE: int = 30
     AI_RATE_LIMIT_PER_DAY: int = 500
+
+    # Paywall. Off by default so deploying the code changes nothing until it is
+    # switched on (after Cashfree is confirmed live). When on, a student needs a
+    # free trial or an active subscription for learning features, and paid plans
+    # get the limits in app.core.entitlements.
+    PAYWALL_ENABLED: bool = False
+    TRIAL_DAYS: int = 7
+    # Students who signed up before this date get their trial counted from it,
+    # so switching the paywall on does not lock out existing students.
+    PAYWALL_LAUNCH_DATE: Optional[date] = None
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

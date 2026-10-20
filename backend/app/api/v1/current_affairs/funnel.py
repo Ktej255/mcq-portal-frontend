@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, consume_mcq_quota
 from app.core.current_affairs.ca_models import CAItem, CAStudentProgress
 from app.core.current_affairs.ca_funnel_adapter import (
     get_ca_funnel_state,
@@ -164,6 +164,7 @@ def submit_mcqs(
     db: Session = Depends(get_db),
 ):
     """Submit MCQ answers for a CA item. All-or-nothing scoring."""
+    consume_mcq_quota(db, current_user, len(body.answers))
     mcqs = get_ca_mcqs(db, item_id)
     if not mcqs:
         raise HTTPException(status_code=404, detail="No MCQs for this item")

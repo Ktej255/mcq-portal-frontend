@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import ai_rate_limit, get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user, require_access
 from app.schemas.common import StandardResponse
 from app.core.gs_lms.models import (
     GsLmsAnswerAttempt,
@@ -222,7 +222,7 @@ def submit_typed_answer(
 # ---------------------------------------------------------------------------
 # Handwritten attempt + page upload (R11, R12)
 # ---------------------------------------------------------------------------
-@router.post("/answers/handwritten", dependencies=[Depends(ai_rate_limit)])
+@router.post("/answers/handwritten", dependencies=[Depends(require_access("mains_upload")), Depends(ai_rate_limit)])
 def create_handwritten_attempt(
     payload: GsAnswerSubmitIn,
     db: Session = Depends(get_db),
@@ -250,7 +250,7 @@ def create_handwritten_attempt(
     )
 
 
-@router.post("/answers/{attempt_id}/pages")
+@router.post("/answers/{attempt_id}/pages", dependencies=[Depends(require_access("mains_upload"))])
 async def upload_answer_page(
     attempt_id: int,
     image: UploadFile = File(..., description="Handwritten answer page image"),
