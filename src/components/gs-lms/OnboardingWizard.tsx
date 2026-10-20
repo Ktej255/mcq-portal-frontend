@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { triggerWelcomeEngagement } from "@/lib/engagement/triggerWelcome";
+import {
+  defaultStudentProfile,
+  readStudentProfile,
+  saveStudentProfile,
+  type StudyWindow,
+} from "@/lib/upsc/studentProfile";
 import { useSubjectLms } from "./SubjectLmsContext";
 
 const DIAGNOSTIC_STORAGE_KEY = "sarit-diagnostic-plan-v1";
@@ -121,6 +127,15 @@ export function OnboardingWizard() {
         learnerLevel,
         studyWindowMinutes,
       );
+
+      // Setup also counts as the student's self-study profile, so the profile
+      // gate lets them into the rest of UPSC Command afterwards.
+      saveStudentProfile({
+        ...(readStudentProfile() ?? defaultStudentProfile),
+        level: learnerLevel,
+        studyWindow: String(studyWindowMinutes) as StudyWindow,
+        updatedAt: new Date().toISOString(),
+      });
 
       // Fire welcome engagement (email + WhatsApp) — fire and forget
       if (diagnosticName || diagnosticEmail) {
