@@ -56,3 +56,7 @@ next-env.d.ts
 
 # Local browser profiles (hold cookies and saved logins) — never commit
 /.playwright*/
+
+# Playwright output
+/test-results/
+/playwright-report/
