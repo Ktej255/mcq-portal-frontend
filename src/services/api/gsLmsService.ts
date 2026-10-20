@@ -378,7 +378,10 @@ export const gsLmsService = {
       `gs-lms/${subject}/practice/${sessionId}/answer`,
       payload,
     );
-    return unwrap<PracticeSessionOut>(response.data);
+    // The backend answers with { session, attempt_result }. Returning the whole
+    // object as the session made every session end after the first answer.
+    const data = unwrap<{ session: PracticeSessionOut } | PracticeSessionOut>(response.data);
+    return "session" in data ? data.session : data;
   },
 
   /**
