@@ -1,10 +1,13 @@
+import { resolveToken } from "@/lib/auth/token-strategy";
+
 // Digitises an uploaded answer image via the OCR route. Returns text when a
 // vision key is configured; null otherwise (client then shows "OCR pending").
 export async function digitiseAnswerImage(imageBase64: string, mimeType: string): Promise<{ text: string | null; live: boolean }> {
   try {
+    const token = await resolveToken();
     const res = await fetch("/api/optional/ocr", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ imageBase64, mimeType }),
     });
     const data = await res.json();

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { clampText, guardOptionalAiRequest } from "@/lib/auth/optional-ai-guard";
+
 export const runtime = "nodejs";
 
 // Discussion mentor seam. Uses Gemini when a key is configured; otherwise the
 // client service shows a structured fallback message.
 export async function POST(req: NextRequest) {
+  const denied = await guardOptionalAiRequest(req);
+  if (denied) return denied;
+
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) return NextResponse.json({ ok: false, reason: "no-key" });
 
@@ -15,7 +20,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "bad-request" });
   }
 
-  const { subject = "", context = "", message = "" } = body ?? {};
+  const subject = clampText(body?.subject);
+  const context = clampText(body?.context);
+  const message = clampText(body?.message);
   const prompt =
     `You are a supportive but rigorous UPSC ${subject} optional mentor. ` +
     `Context the student is working on: ${context}. ` +
