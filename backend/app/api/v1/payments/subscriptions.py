@@ -47,9 +47,13 @@ def get_subscription(
     if not subscription:
         return SubscriptionResponse(status="inactive", plan_tier=None)
 
-    remaining_days = math.ceil(
-        (subscription.end_date - now).total_seconds() / 86400
-    )
+    # end_date is a timezone-less column (UTC), so the database returns naive
+    # datetimes; subtracting one from the aware `now` raised TypeError (500)
+    # for every active subscriber.
+    end_date = subscription.end_date
+    if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=timezone.utc)
+    remaining_days = math.ceil((end_date - now).total_seconds() / 86400)
 
     return SubscriptionResponse(
         status="active",
