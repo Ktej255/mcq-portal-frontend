@@ -43,7 +43,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.optional.providers import (
     OcrProvider,
@@ -74,7 +74,7 @@ def get_ocr_provider_dep() -> OcrProvider:
     return get_ocr_provider()
 
 
-@router.post("/ocr")
+@router.post("/ocr", dependencies=[Depends(ai_rate_limit)])
 async def extract_handwriting(
     image: UploadFile = File(..., description="Uploaded handwritten-answer image"),
     subject: Optional[str] = Form(

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Any
 
@@ -188,8 +188,9 @@ def search_questions(
     is_ca: bool = None,
     is_outdated: bool = None,
     min_quality: float = None,
-    limit: int = 50,
-    db: Session = Depends(get_db)
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin)
 ):
     query = db.query(Question)
     if q: query = query.filter(Question.text_en.ilike(f"%{q}%"))

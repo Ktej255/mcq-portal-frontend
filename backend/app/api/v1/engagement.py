@@ -3,6 +3,9 @@ POST /api/v1/engagement/welcome — Trigger welcome messages for a new student.
 Called after signup/profile creation.
 Sends WhatsApp + Email based on available contact info.
 
+Requires a signed-in user and only ever messages that user's own account
+email; addresses or numbers in the request body are ignored, so the
+endpoint cannot be used to send messages to strangers.
 This endpoint is fire-and-forget from the frontend's perspective.
 It never fails with a 5xx even if the underlying services are unconfigured.
 """
@@ -10,11 +13,13 @@ It never fails with a 5xx even if the underlying services are unconfigured.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, EmailStr
 
 from app.core.engagement.email_service import send_welcome_email
 from app.core.engagement.whatsapp_service import send_welcome_message
+from app.api.dependencies import get_current_user
+from app.models.domain import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -82,6 +87,7 @@ def _send_engagement_messages(data: WelcomeEngagementRequest) -> None:
 async def trigger_welcome_engagement(
     data: WelcomeEngagementRequest,
     background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Trigger welcome messages (WhatsApp + Email) for a newly signed-up student.
@@ -89,8 +95,11 @@ async def trigger_welcome_engagement(
     This endpoint returns immediately and processes messages in the background.
     It always returns 200 — engagement failures are logged, never surfaced to client.
     """
-    email_queued = data.email is not None
-    whatsapp_queued = data.phone is not None
+    # Only message the signed-in user's own account email. A phone number can't
+    # be verified here, so WhatsApp stays off until profiles store a verified one.
+    data = data.model_copy(update={"email": current_user.email, "phone": None})
+    email_queued = bool(data.email)
+    whatsapp_queued = False
 
     if email_queued or whatsapp_queued:
         background_tasks.add_task(_send_engagement_messages, data)

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.core.gs.models import GsSubject, GsReviewStatusEnum
 from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsContentSection
 from app.core.gs_lms.funnel_models import GsLmsRecallAttempt
@@ -65,7 +65,7 @@ class RecallCheckOut(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/funnel/{node_id}/recall/text", response_model=RecallCheckOut)
+@router.post("/funnel/{node_id}/recall/text", response_model=RecallCheckOut, dependencies=[Depends(ai_rate_limit)])
 def submit_recall_text(
     node_id: int,
     body: RecallTextIn,
@@ -147,7 +147,7 @@ def submit_recall_text(
     )
 
 
-@router.post("/funnel/{node_id}/recall/audio", response_model=RecallCheckOut)
+@router.post("/funnel/{node_id}/recall/audio", response_model=RecallCheckOut, dependencies=[Depends(ai_rate_limit)])
 async def submit_recall_audio(
     node_id: int,
     section_label: str = Form(...),

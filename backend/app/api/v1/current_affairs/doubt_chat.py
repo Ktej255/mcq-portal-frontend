@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.core.current_affairs.ca_models import CAItem, CADoubtChat
 
 router = APIRouter()
@@ -81,7 +81,7 @@ def get_doubt_chat(
     )
 
 
-@router.post("/items/{item_id}/doubt-chat", response_model=ChatSessionOut)
+@router.post("/items/{item_id}/doubt-chat", response_model=ChatSessionOut, dependencies=[Depends(ai_rate_limit)])
 def send_doubt_message(
     item_id: int,
     body: ChatMessageIn,

@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.gs.models import GsSubject
 from app.core.gs_lms.student_models import (
@@ -133,7 +133,7 @@ def _turn_to_out(turn) -> GsLmsDiscussionTurnOut:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/discussion/start")
+@router.post("/discussion/start", dependencies=[Depends(ai_rate_limit)])
 def start_discussion(
     body: GsLmsDiscussionStartIn,
     subject: GsSubject = Depends(resolve_subject),
@@ -193,7 +193,7 @@ def start_discussion(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/discussion/{session_id}/turn")
+@router.post("/discussion/{session_id}/turn", dependencies=[Depends(ai_rate_limit)])
 def submit_turn(
     session_id: int,
     body: GsLmsDiscussionTurnIn,

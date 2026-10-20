@@ -4,8 +4,7 @@
  * Best-effort — never blocks the UX. Failures are silently logged.
  */
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiClient } from "@/services/api/client";
 
 interface WelcomeEngagementData {
   name: string;
@@ -33,33 +32,18 @@ export async function triggerWelcomeEngagement(
   data: WelcomeEngagementData
 ): Promise<void> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/engagement/welcome`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          phone: data.phone || null,
-          target_year: data.targetYear,
-          first_topic_url: data.firstTopicUrl,
-          first_topic_title: extractTopicTitle(data.firstTopicUrl),
-        }),
-      }
-    );
+    // apiClient adds the learner's token; the backend only emails the
+    // signed-in account's own address.
+    const response = await apiClient.post<WelcomeEngagementResponse>("engagement/welcome", {
+      name: data.name,
+      email: data.email,
+      phone: data.phone || null,
+      target_year: data.targetYear,
+      first_topic_url: data.firstTopicUrl,
+      first_topic_title: extractTopicTitle(data.firstTopicUrl),
+    });
 
-    if (!response.ok) {
-      console.warn(
-        `[engagement] Welcome trigger returned ${response.status}`,
-        await response.text().catch(() => "")
-      );
-      return;
-    }
-
-    const result: WelcomeEngagementResponse = await response.json();
+    const result = response.data;
     console.info(`[engagement] Welcome ${result.status}`, {
       email: result.email_queued,
       whatsapp: result.whatsapp_queued,

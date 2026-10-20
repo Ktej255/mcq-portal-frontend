@@ -6,6 +6,9 @@ from app.models.domain import User, RoleEnum
 from app.core.clerk import verify_token
 from app.core.config import settings
 
+import threading
+import time
+from collections import defaultdict, deque
 from typing import Optional
 
 security = HTTPBearer(auto_error=False)
@@ -33,7 +36,6 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
     
     try:
         token_cred = auth.credentials.strip() if auth.credentials else ""
-        logger.info(f"FORENSIC | Received credentials: '{token_cred}'")
         if token_cred.startswith("MOCK_TOKEN"):
             # SECURITY: the MOCK_TOKEN bypass is a dev/test/e2e affordance only.
             # It is honored ONLY when explicitly enabled (settings.ALLOW_MOCK_AUTH),
@@ -46,7 +48,7 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
                     "disabled — rejecting as invalid credential"
                 )
                 raise credentials_exception
-            logger.warning(f"FORENSIC | Using MOCK_TOKEN bypass: {token_cred}")
+            logger.warning("FORENSIC | Using MOCK_TOKEN bypass")
             
             # Support MOCK_TOKEN_<google_uid> for persona simulation
             if "_" in token_cred:
@@ -78,7 +80,7 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
     name = decoded_token.get("name")
     picture = decoded_token.get("picture")
     
-    logger.info(f"FORENSIC | Token Decoded | UID: {google_uid} | Email: {email}")
+    logger.debug("FORENSIC | Token decoded | UID: %s", google_uid)
 
     if not google_uid or not email:
         logger.error("FORENSIC | Token missing UID or Email claims")
@@ -113,7 +115,7 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
     return user
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    logger.info(f"FORENSIC | get_current_admin check | User: {current_user.email} | Role: {current_user.role}")
+    logger.debug("FORENSIC | get_current_admin check | User id: %s | Role: %s", current_user.id, current_user.role)
     if current_user.role != "ADMIN" and current_user.role != RoleEnum.ADMIN:
         logger.warning(f"FORENSIC | ACCESS DENIED | User {current_user.email} attempted admin access with role {current_user.role}")
         raise HTTPException(
@@ -121,3 +123,48 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
             detail=f"Admin privileges required. Your current role is {current_user.role}"
         )
     return current_user
+
+
+# ---------------------------------------------------------------------------
+# Per-user rate limit for AI-backed endpoints (Gemini discussion, OCR,
+# transcription, evaluation). Attach with
+# ``dependencies=[Depends(ai_rate_limit)]``. Counts live in process memory (a
+# sliding window per user for the last minute and the last day), which suits
+# the single ECS task this service runs as; move the store to Redis or
+# Postgres before running several tasks.
+# ---------------------------------------------------------------------------
+
+_AI_MINUTE = 60
+_AI_DAY = 24 * 60 * 60
+_ai_lock = threading.Lock()
+_ai_hits: "defaultdict[int, deque[float]]" = defaultdict(deque)
+
+
+def reset_ai_rate_limits() -> None:
+    """Clear all AI rate-limit counters (used by tests)."""
+    with _ai_lock:
+        _ai_hits.clear()
+
+
+def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
+    now = time.time()
+    with _ai_lock:
+        hits = _ai_hits[current_user.id]
+        while hits and hits[0] <= now - _AI_DAY:
+            hits.popleft()
+
+        recent = [t for t in hits if t > now - _AI_MINUTE]
+        if len(recent) >= settings.AI_RATE_LIMIT_PER_MINUTE:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many AI requests. Please wait a minute and try again.",
+                headers={"Retry-After": str(max(1, int(recent[0] + _AI_MINUTE - now) + 1))},
+            )
+        if len(hits) >= settings.AI_RATE_LIMIT_PER_DAY:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Daily AI limit reached. It resets within 24 hours.",
+                headers={"Retry-After": str(max(1, int(hits[0] + _AI_DAY - now) + 1))},
+            )
+
+        hits.append(now)

@@ -47,7 +47,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.optional.models import OptionalSubject
 from app.core.optional.providers import SttProvider, SttNotConfiguredError, get_stt_provider
@@ -109,7 +109,7 @@ def _vocabulary_hint(
     return terms
 
 
-@router.post("/transcribe")
+@router.post("/transcribe", dependencies=[Depends(ai_rate_limit)])
 async def transcribe_audio(
     audio: UploadFile = File(..., description="Recorded spoken-answer audio blob"),
     subject: Optional[str] = Form(

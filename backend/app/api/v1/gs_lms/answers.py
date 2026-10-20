@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.gs_lms.models import (
     GsLmsAnswerAttempt,
@@ -173,7 +173,7 @@ def _enforce_cost_gates(db: Session, student_id: int, text: str) -> None:
 # ---------------------------------------------------------------------------
 # Typed submission (R10)
 # ---------------------------------------------------------------------------
-@router.post("/answers/typed")
+@router.post("/answers/typed", dependencies=[Depends(ai_rate_limit)])
 def submit_typed_answer(
     payload: GsAnswerSubmitIn,
     db: Session = Depends(get_db),
@@ -222,7 +222,7 @@ def submit_typed_answer(
 # ---------------------------------------------------------------------------
 # Handwritten attempt + page upload (R11, R12)
 # ---------------------------------------------------------------------------
-@router.post("/answers/handwritten")
+@router.post("/answers/handwritten", dependencies=[Depends(ai_rate_limit)])
 def create_handwritten_attempt(
     payload: GsAnswerSubmitIn,
     db: Session = Depends(get_db),
@@ -340,7 +340,7 @@ async def upload_answer_page(
     )
 
 
-@router.post("/answers/{attempt_id}/submit")
+@router.post("/answers/{attempt_id}/submit", dependencies=[Depends(ai_rate_limit)])
 def submit_attempt(
     attempt_id: int,
     acknowledge_review: bool = Form(default=False),

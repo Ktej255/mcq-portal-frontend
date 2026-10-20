@@ -6,3 +6,14 @@ from pathlib import Path
 backend_dir = str(Path(__file__).resolve().parent)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_ai_rate_limits():
+    """Each test starts with fresh per-user AI rate-limit counters."""
+    from app.api.dependencies import reset_ai_rate_limits
+
+    reset_ai_rate_limits()
+    yield

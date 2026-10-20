@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     # When off, a `MOCK_TOKEN` is treated as an invalid credential (401).
     ALLOW_MOCK_AUTH: bool = False
 
+    # Per-user caps on AI-backed endpoints (Gemini discussion, OCR,
+    # transcription, evaluation) so one account can't run up the AI bill.
+    AI_RATE_LIMIT_PER_MINUTE: int = 30
+    AI_RATE_LIMIT_PER_DAY: int = 500
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

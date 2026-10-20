@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.optional.models import (
     OptionalSubject,
@@ -237,7 +237,7 @@ def _report_out(report: EvaluationReport) -> EvaluationReportOut:
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("/{slug}/answers")
+@router.post("/{slug}/answers", dependencies=[Depends(ai_rate_limit)])
 def submit_answer(
     slug: str,
     payload: AnswerSubmitIn,
