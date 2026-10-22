@@ -11,6 +11,7 @@ import {
   FolderTree,
   GitBranch,
   GraduationCap,
+  Inbox,
   LayoutDashboard,
   LibraryBig,
   ListChecks,
@@ -18,6 +19,7 @@ import {
   Newspaper,
   RefreshCcw,
   Route,
+  Search,
   ShieldAlert,
   UploadCloud,
   type LucideIcon,
@@ -122,6 +124,12 @@ export const studentNavSections: StudentNavSection[] = [
     label: "Study",
     items: [
       {
+        name: "Study",
+        href: "/upsc/study",
+        icon: Search,
+        match: (pathname) => pathname.startsWith("/upsc/study"),
+      },
+      {
         name: "Today",
         href: "/upsc",
         icon: CalendarCheck,
@@ -199,4 +207,5 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
   { name: "Integrity Logs", href: "/admin/integrity", icon: ShieldAlert },
   { name: "Leads", href: "/admin/leads", icon: Mail },
+  { name: "Content requests", href: "/admin/content-requests", icon: Inbox },
 ];

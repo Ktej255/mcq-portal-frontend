@@ -254,6 +254,97 @@ export interface ReplanOut {
   triggered_at: string;
 }
 
+// -- Study flow (search -> card -> explain -> next) -------------------------
+
+export interface StudyHit {
+  kind: 'concept' | 'topic';
+  subject_slug: string;
+  subject_name: string;
+  leaf_id: number;
+  leaf_title: string;
+  concept_id: number | null;
+  concept_title: string | null;
+  start_concept_id: number | null;
+  breadcrumb: string[];
+  score: number;
+  matched_terms: string[];
+}
+
+export interface StudyNext {
+  type: 'concept' | 'mcq_lab' | 'checkpoint' | 'done';
+  subject_slug: string | null;
+  leaf_id: number | null;
+  concept_id: number | null;
+  checkpoint_id: number | null;
+  label: string;
+}
+
+export interface ConceptVersionBrief {
+  id: number;
+  level: string;
+  style: string;
+  source: string;
+  title: string;
+}
+
+export interface ConceptVersion extends ConceptVersionBrief {
+  concept_id: number;
+  blocks: ContentBlock[];
+  video_url: string | null;
+  duration_minutes: number | null;
+}
+
+export interface StudyMastery {
+  status: string;
+  best_score: number;
+  last_score: number | null;
+  attempts: number;
+  passed: boolean;
+}
+
+export interface StudyCard {
+  subject_slug: string;
+  subject_name: string;
+  leaf_id: number;
+  leaf_title: string;
+  breadcrumb: string[];
+  concept_id: number;
+  concept_title: string;
+  position: number;
+  total_concepts: number;
+  version: ConceptVersion | null;
+  alternatives: ConceptVersionBrief[];
+  key_points_count: number;
+  mastery: StudyMastery;
+  next: StudyNext | null;
+}
+
+export interface ExplainResult {
+  score: number;
+  passed: boolean;
+  covered_points: string[];
+  missed_points: string[];
+  attempts: number;
+  status: string;
+  suggested_version: number | null;
+  next: StudyNext | null;
+}
+
+export type ContentRequestStatus = 'OPEN' | 'PLANNED' | 'ADDRESSED';
+
+export interface ContentRequest {
+  id: number;
+  normalized_query: string;
+  sample_query: string;
+  subject_slug: string | null;
+  request_count: number;
+  distinct_students: number;
+  first_requested_at: string | null;
+  last_requested_at: string | null;
+  status: ContentRequestStatus;
+  note: string | null;
+}
+
 // -- Onboarding -------------------------------------------------------------
 
 export interface OnboardingStatusOut {
@@ -818,5 +909,61 @@ export const gsLmsService = {
       learner_level: learnerLevel,
     });
     return unwrap<OnboardingStatusOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Study flow
+  // -------------------------------------------------------------------------
+
+  studySearch: async (q: string, subject?: string): Promise<StudyHit[]> => {
+    const response = await apiClient.get('gs-lms/study/search', {
+      params: { q, ...(subject ? { subject } : {}) },
+    });
+    return unwrap<StudyHit[]>(response.data);
+  },
+
+  /** 423 (locked topic) rejects; read the reason with `getGateError`. */
+  getStudyCard: async (conceptId: number): Promise<StudyCard> => {
+    const response = await apiClient.get(`gs-lms/study/concepts/${conceptId}`);
+    return unwrap<StudyCard>(response.data);
+  },
+
+  explainConcept: async (conceptId: number, text: string): Promise<ExplainResult> => {
+    const response = await apiClient.post(`gs-lms/study/concepts/${conceptId}/explain`, { text });
+    return unwrap<ExplainResult>(response.data);
+  },
+
+  getStudyNext: async (subject?: string): Promise<StudyNext> => {
+    const response = await apiClient.get('gs-lms/study/next', {
+      params: subject ? { subject } : undefined,
+    });
+    return unwrap<StudyNext>(response.data);
+  },
+
+  getConceptVersion: async (
+    subject: string,
+    conceptId: number,
+    versionId: number,
+  ): Promise<ConceptVersion> => {
+    const response = await apiClient.get(
+      `gs-lms/${subject}/concepts/${conceptId}/versions/${versionId}`,
+    );
+    return unwrap<ConceptVersion>(response.data);
+  },
+
+  // Admin: what students searched for that the LMS could not answer.
+  listContentRequests: async (status?: ContentRequestStatus): Promise<ContentRequest[]> => {
+    const response = await apiClient.get('admin/gs-lms/content-requests', {
+      params: { ...(status ? { status } : {}), limit: 500 },
+    });
+    return unwrap<ContentRequest[]>(response.data);
+  },
+
+  updateContentRequest: async (
+    id: number,
+    patch: { status?: ContentRequestStatus; note?: string | null },
+  ): Promise<ContentRequest> => {
+    const response = await apiClient.patch(`admin/gs-lms/content-requests/${id}`, patch);
+    return unwrap<ContentRequest>(response.data);
   },
 };
