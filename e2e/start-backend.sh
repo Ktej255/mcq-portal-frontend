@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starts a throwaway FastAPI backend for the Playwright tests: a fresh SQLite
 # database seeded with the Geography content and the e2e test students, local
-# mock sign-in allowed, and the paywall switched on.
+# mock sign-in and mock AI allowed, and the paywall switched on.
 #
 #   E2E_PYTHON        Python with backend/requirements.txt installed (default: python)
 #   E2E_DB_FILE       SQLite file to (re)create (default: $TMPDIR/upsc-command-e2e.db)
@@ -17,6 +17,8 @@ rm -f "$DB_FILE"
 
 export DATABASE_URL="sqlite:///$DB_FILE"
 export ALLOW_MOCK_AUTH=true
+# The e2e flows use the deterministic mock OCR/evaluation providers.
+export ALLOW_MOCK_AI=true
 export PAYWALL_ENABLED=true
 export TRIAL_DAYS=7
 export GS_LMS_ENFORCE_PROGRESSION="${E2E_ENFORCE_PROGRESSION:-false}"

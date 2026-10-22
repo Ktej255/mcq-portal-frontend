@@ -581,14 +581,23 @@ class GsLmsAnswerSheetImage(Base, InstitutionalAuditMixin):
         Integer, ForeignKey("gs_lms_answer_attempts.id"), nullable=False, index=True
     )
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    # Server-authored MediaStore key (R11.2).
-    media_ref = Column(String, nullable=False)
+    # Server-authored MediaStore key (R11.2). NULL once the image was deleted
+    # (student request or retention); the extracted text below is kept.
+    media_ref = Column(String, nullable=True)
     # Ascending assembly order (R12.1/R12.2).
     page_order = Column(Integer, nullable=False)
     content_type = Column(String, nullable=True)
     uploaded_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+    # Per-page OCR result. ``ocr_status``: "ok" (read by the OCR provider),
+    # "failed" (provider error; retry possible), "skipped" (text supplied by
+    # the client). NULL on rows uploaded before this column existed.
+    ocr_text = Column(Text, nullable=True)
+    ocr_confidence = Column(Float, nullable=True)
+    ocr_status = Column(String(16), nullable=True)
+    # When the stored image was removed from the MediaStore.
+    deleted_at = Column(DateTime, nullable=True)
 
     attempt = relationship("GsLmsAnswerAttempt", back_populates="images")
     student = relationship("User")

@@ -38,9 +38,14 @@ class GeminiAIResponseProvider:
     MockAIResponseProvider and logs the error.
     """
 
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str | None = None):
         from app.core.config import settings
-        api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
+        model_name = model_name or settings.GEMINI_MODEL_ID
+        api_key = (
+            os.environ.get("GOOGLE_API_KEY", "")
+            or (settings.GOOGLE_API_KEY or "")
+            or (settings.GEMINI_API_KEY or "")
+        )
         if not api_key:
             raise ValueError("GOOGLE_API_KEY is required for GeminiAIResponseProvider")
         genai.configure(api_key=api_key)
@@ -128,7 +133,11 @@ def register_discussion_provider() -> None:
     instantiation fails, the Discussion_Engine retains the MockAIResponseProvider.
     """
     from app.core.config import settings
-    api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
+    api_key = (
+        os.environ.get("GOOGLE_API_KEY", "")
+        or (settings.GOOGLE_API_KEY or "")
+        or (settings.GEMINI_API_KEY or "")
+    )
     if not api_key:
         logger.warning(
             "GOOGLE_API_KEY not set — Discussion_Engine retaining MockAIResponseProvider"

@@ -658,4 +658,4 @@ def test_migration_is_the_single_alembic_head():
     root = Path(__file__).resolve().parents[2]
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["l9f0a1b2c3d4"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["m0a1b2c3d4e5"]

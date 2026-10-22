@@ -175,6 +175,43 @@ def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
 
 
 # ---------------------------------------------------------------------------
+# AI readiness guards. The OCR / evaluation providers default to a mock that
+# returns fake text and scores, so endpoints that need them answer 503 instead
+# unless a real provider is configured (or settings.ALLOW_MOCK_AI is on).
+# ---------------------------------------------------------------------------
+
+def _ai_not_set_up() -> HTTPException:
+    from app.core.evaluation.providers import readiness
+
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=readiness.NOT_SET_UP_DETAIL,
+    )
+
+
+def require_ocr_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.ocr_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_gs_evaluation_available() -> None:
+    from app.core.evaluation.providers import readiness
+    from app.core.evaluation.providers.config import active_provider_key
+
+    if not readiness.is_available(active_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_optional_evaluation_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.optional_evaluation_provider_key()):
+        raise _ai_not_set_up()
+
+
+# ---------------------------------------------------------------------------
 # Plan access (paywall). While settings.PAYWALL_ENABLED is off, the
 # dependencies below do nothing at all (no checks, no DB queries, no counting),
 # so behaviour is exactly as before until the paywall is switched on.

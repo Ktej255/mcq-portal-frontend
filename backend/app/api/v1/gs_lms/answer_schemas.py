@@ -42,6 +42,41 @@ class GsPageUploadOut(BaseModel):
     image_id: int
     page_order: int
     total_pages: int
+    # OCR outcome for this page: ok | failed | skipped. When "failed" the page
+    # image is saved and ``retry_possible`` is true (POST .../retry-ocr).
+    ocr_status: Optional[str] = None
+    ocr_text: Optional[str] = None
+    ocr_confidence: Optional[float] = None
+    retry_possible: bool = False
+    message: Optional[str] = None
+
+
+class GsPageInfoOut(BaseModel):
+    """One stored page of a handwritten attempt (no image bytes)."""
+
+    page_order: int
+    ocr_status: Optional[str] = None
+    ocr_confidence: Optional[float] = None
+    has_image: bool = True
+
+
+class GsAnswerPagesOut(BaseModel):
+    attempt_id: int
+    pages: List[GsPageInfoOut] = Field(default_factory=list)
+
+
+class GsPagesDeletedOut(BaseModel):
+    attempt_id: int
+    deleted_pages: int
+
+
+class GsAnswerCapabilitiesOut(BaseModel):
+    """Whether real OCR / answer checking is configured (no model call)."""
+
+    ocr_live: bool
+    evaluation_live: bool
+    mock_in_use: bool = False
+    message: Optional[str] = None
 
 
 class GsEvaluationSectionOut(BaseModel):
@@ -87,6 +122,10 @@ __all__ = [
     "GsAnswerSubmitIn",
     "GsAnswerAckOut",
     "GsPageUploadOut",
+    "GsPageInfoOut",
+    "GsAnswerPagesOut",
+    "GsPagesDeletedOut",
+    "GsAnswerCapabilitiesOut",
     "GsEvaluationSectionOut",
     "GsEvaluationReportOut",
     "GsAnswerStatusOut",

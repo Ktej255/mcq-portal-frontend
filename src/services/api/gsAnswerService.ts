@@ -41,11 +41,38 @@ export interface AnswerAck {
   review_required?: boolean;
 }
 
+export type PageOcrStatus = 'ok' | 'failed' | 'skipped';
+
 export interface PageUploadOut {
   attempt_id: number;
   image_id: number;
   page_order: number;
   total_pages: number;
+  /** "failed" means the page image is saved but its text could not be read. */
+  ocr_status?: PageOcrStatus | null;
+  ocr_text?: string | null;
+  ocr_confidence?: number | null;
+  retry_possible?: boolean;
+  message?: string | null;
+}
+
+export interface PageInfo {
+  page_order: number;
+  ocr_status: PageOcrStatus | null;
+  ocr_confidence: number | null;
+  has_image: boolean;
+}
+
+export interface AnswerPagesOut {
+  attempt_id: number;
+  pages: PageInfo[];
+}
+
+export interface AnswerCapabilities {
+  ocr_live: boolean;
+  evaluation_live: boolean;
+  mock_in_use: boolean;
+  message?: string | null;
 }
 
 export interface EvaluationSection {
@@ -124,6 +151,44 @@ export const gsAnswerService = {
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return unwrap<PageUploadOut>(response.data);
+  },
+
+  /** Whether real OCR / answer checking is set up on the server. */
+  getCapabilities: async (subject = 'geography'): Promise<AnswerCapabilities> => {
+    const response = await apiClient.get(`gs-lms/${subject}/answers/capabilities`);
+    return unwrap<AnswerCapabilities>(response.data);
+  },
+
+  /** List the stored pages of an attempt with their OCR status. */
+  listPages: async (subject = 'geography', attemptId: number): Promise<AnswerPagesOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/answers/${attemptId}/pages`);
+    return unwrap<AnswerPagesOut>(response.data);
+  },
+
+  /** Re-run OCR for a page, or save text the student typed for it. */
+  retryPageOcr: async (
+    subject = 'geography',
+    attemptId: number,
+    pageOrder: number,
+    typedText?: string,
+  ): Promise<PageUploadOut> => {
+    const form = new FormData();
+    if (typedText != null) form.append('ocr_text', typedText);
+    const response = await apiClient.post(
+      `gs-lms/${subject}/answers/${attemptId}/pages/${pageOrder}/retry-ocr`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return unwrap<PageUploadOut>(response.data);
+  },
+
+  /** Delete the student's stored page images (text and report are kept). */
+  deletePageImages: async (
+    subject = 'geography',
+    attemptId: number,
+  ): Promise<{ attempt_id: number; deleted_pages: number }> => {
+    const response = await apiClient.delete(`gs-lms/${subject}/answers/${attemptId}/pages`);
+    return unwrap<{ attempt_id: number; deleted_pages: number }>(response.data);
   },
 
   /** Submit a handwritten attempt for evaluation (optionally acknowledging review). */

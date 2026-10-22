@@ -65,7 +65,12 @@ class Settings(BaseSettings):
     CLERK_JWT_KEY: Optional[str] = None
     CLERK_JWKS_URL: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
-    
+    # Gemini model + timeout used by every Gemini-backed AI feature. The key is
+    # read from GOOGLE_API_KEY, falling back to GEMINI_API_KEY.
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL_ID: str = "gemini-2.5-flash"
+    GEMINI_TIMEOUT_SECONDS: float = 60.0
+
     # GS LMS learning loop. GS_LMS_ENFORCE_PROGRESSION is the MASTER switch for all
     # new rules (step-1 discussion gate, recall gates, step-12 MCQ requirement,
     # topic order lock, checkpoint blocking). Off (default) = old behaviour: step
@@ -86,6 +91,20 @@ class Settings(BaseSettings):
     # Playwright/local flows that authenticate via `Bearer MOCK_TOKEN[_<uid>]`.
     # When off, a `MOCK_TOKEN` is treated as an invalid credential (401).
     ALLOW_MOCK_AUTH: bool = False
+
+    # Security/honesty: the AI providers (OCR + answer evaluation) default to a
+    # deterministic MOCK that returns fake text and fake scores. That is a
+    # dev/test/e2e affordance ONLY. It is gated behind this flag and defaults to
+    # OFF so a production deploy that forgot to configure a real provider says
+    # "Answer checking is not set up yet" (503) instead of showing fake results
+    # as real. Enable it explicitly (e.g. `ALLOW_MOCK_AI=true` in an untracked
+    # local `.env` or a CI/e2e env).
+    ALLOW_MOCK_AI: bool = False
+
+    # Student answer images are deleted after this many days by
+    # `python -m app.core.gs_lms.answer_retention`. The extracted text and the
+    # evaluation report are kept.
+    ANSWER_IMAGE_RETENTION_DAYS: int = 180
 
     # Per-user caps on AI-backed endpoints (Gemini discussion, OCR,
     # transcription, evaluation) so one account can't run up the AI bill.

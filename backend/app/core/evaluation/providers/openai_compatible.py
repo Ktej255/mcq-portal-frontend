@@ -22,6 +22,7 @@ from app.core.inference.contracts import (
     IInferenceProvider,
     InferenceRequest,
     InferenceResponse,
+    sniff_image_mime,
 )
 from app.core.evaluation.providers.config import ConfigurationError, ProviderConfig
 
@@ -47,19 +48,16 @@ class OpenAICompatibleProvider(IInferenceProvider):
         if request.system_instruction:
             messages.append({"role": "system", "content": request.system_instruction})
 
-        if request.image is not None and self.config.supports_vision:
-            mime = request.image_mime_type or "image/png"
-            b64 = base64.b64encode(request.image).decode("ascii")
-            data_url = f"data:{mime};base64,{b64}"
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": request.prompt},
-                        {"type": "image_url", "image_url": {"url": data_url}},
-                    ],
-                }
-            )
+        pages = list(request.images or ([request.image] if request.image is not None else []))
+        if pages and self.config.supports_vision:
+            content: List[Dict[str, Any]] = [{"type": "text", "text": request.prompt}]
+            for page in pages:
+                mime = sniff_image_mime(page, request.image_mime_type or "image/png")
+                b64 = base64.b64encode(page).decode("ascii")
+                content.append(
+                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
+                )
+            messages.append({"role": "user", "content": content})
         else:
             messages.append({"role": "user", "content": request.prompt})
         return messages
