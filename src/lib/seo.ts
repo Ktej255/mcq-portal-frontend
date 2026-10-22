@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 /**
  * Canonical site constants for Sarit Classes — UPSC Command.
- * Canonical domain is taken from beyond-seo/KIRO_INSTRUCTIONS.md (upsccommand.com).
+ * Canonical domain is taken from docs/beyond-seo/KIRO_INSTRUCTIONS.md (upsccommand.com).
  */
 export const SITE_URL = "https://upsccommand.com";
 export const SITE_NAME = "Sarit Classes — UPSC Command";

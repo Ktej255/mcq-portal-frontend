@@ -1,3 +1,4 @@
+import { resolveToken } from "@/lib/auth/token-strategy";
 import { evaluateAnswer, type EvaluationResult } from "@/lib/upsc/optionalEvaluation";
 
 export type EvaluateInput = {
@@ -25,9 +26,10 @@ export async function evaluateOptionalAnswer(input: EvaluateInput): Promise<Eval
 
   try {
     const answer = `${input.parts.Introduction}\n${input.parts.Body}\n${input.parts.Conclusion}`.trim();
+    const token = await resolveToken();
     const res = await fetch("/api/optional/evaluate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ subject: input.subject, question: input.question, answer, parameters: input.parameters }),
     });
     const data = await res.json();

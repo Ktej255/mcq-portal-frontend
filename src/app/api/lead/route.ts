@@ -16,12 +16,19 @@ type LeadPayload = {
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// Server-side address of the FastAPI backend (same env var as the /api/v1 rewrite).
+function backendLeadsUrl() {
+  const base = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000")
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/, "");
+  return `${base}/api/v1/leads`;
+}
+
 /**
  * Marketing lead capture (lead magnet).
- * Accepts a lead from the diagnostic and, when RESEND_API_KEY + LEADS_NOTIFY_EMAIL
- * are configured, emails the team via Resend (consistent with the existing
- * delivery layer). Without those env vars it still accepts gracefully so the
- * user flow never breaks; the lead is also persisted client-side.
+ * Saves the lead in the backend database first, so no lead is lost, then emails
+ * the team via Resend when RESEND_API_KEY + LEADS_NOTIFY_EMAIL are configured.
+ * Delivery problems never break the visitor's flow.
  */
 export async function POST(request: Request) {
   let data: LeadPayload;
@@ -34,6 +41,36 @@ export async function POST(request: Request) {
   const email = (data.email ?? "").trim();
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ ok: false, error: "A valid email is required" }, { status: 422 });
+  }
+
+  let stored = false;
+  try {
+    const res = await fetch(backendLeadsUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Lets the backend rate-limit by the visitor's IP rather than Vercel's.
+        "X-Forwarded-For": request.headers.get("x-forwarded-for") ?? "",
+      },
+      body: JSON.stringify({
+        name: data.name || null,
+        email,
+        phone: data.phone || null,
+        source: data.source || "diagnostic",
+        answers: {
+          year: data.year,
+          stage: data.stage,
+          hours: data.hours,
+          optional: data.optional,
+          subjects: data.subjects ?? [],
+        },
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    stored = res.ok;
+    if (!res.ok) console.error(`[lead] backend returned ${res.status}`);
+  } catch (error) {
+    console.error("[lead] could not reach backend", error);
   }
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -66,5 +103,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, stored });
 }

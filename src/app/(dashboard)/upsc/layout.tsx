@@ -18,8 +18,10 @@ export default function UpscLayout({ children }: { children: React.ReactNode }) 
     return <ProtectedRoute requiredRole="ADMIN">{children}</ProtectedRoute>;
   }
 
-  // The UPSC root is open without a profile gate (landing/onboarding)
-  if (profileOpenRoutes.has(pathname)) {
+  // The UPSC root and every subject's setup page are open without the profile
+  // gate. The gate's "Start setup" button links to setup, so gating setup too
+  // sent new students straight back to the gate in a loop.
+  if (profileOpenRoutes.has(pathname) || /\/lms\/onboarding\/?$/.test(pathname)) {
     return <>{children}</>;
   }
 

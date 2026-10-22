@@ -1,0 +1,511 @@
+{
+  "_readme": "Template for one GS subject. Copy it, set subject_slug, and add mega-topics > sub-topics > leaf topics. Each leaf topic needs the 5 sections, 15 MCQs and at least one PYQ to be 'ready'. See docs/CONTENT_PIPELINE.md.",
+  "subject_slug": "polity-governance",
+  "tree": [
+    {
+      "title": "Constitutional Framework",
+      "node_type": "MEGA_TOPIC",
+      "weight": 1.0,
+      "display_order": 1,
+      "children": [
+        {
+          "title": "Making of the Constitution",
+          "node_type": "SUB_TOPIC",
+          "weight": 1.0,
+          "display_order": 1,
+          "children": [
+            {
+              "title": "Preamble — Ideals and Legal Status",
+              "node_type": "LEAF_TOPIC",
+              "weight": 1.0,
+              "display_order": 1,
+              "ordering_justification": "The Preamble states the objectives every later topic builds on.",
+              "video_url": null,
+              "concept_checklist": [
+                "Objectives Resolution (1946)",
+                "42nd Amendment additions",
+                "Berubari vs Kesavananda Bharati",
+                "Sources of the ideals"
+              ],
+              "content_sections": [
+                {
+                  "section_label": "BASIC",
+                  "title": "Foundation Understanding",
+                  "display_order": 1,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "callout",
+                      "tone": "hook",
+                      "title": "Start Here",
+                      "text": "The Preamble is the Constitution's introduction: who gives it authority, what kind of state India is, and what it aims to achieve."
+                    },
+                    {
+                      "type": "para",
+                      "text": "It declares India a **Sovereign Socialist Secular Democratic Republic** and sets four objectives: **Justice, Liberty, Equality and Fraternity**."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "NCERT_LEVEL",
+                  "title": "NCERT Reference — Philosophy of the Constitution",
+                  "display_order": 2,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "ncert_reference",
+                      "book": "Indian Constitution at Work",
+                      "class": "11",
+                      "chapter": "10",
+                      "text": "The chapter 'The Philosophy of the Constitution' discusses the Preamble's values.",
+                      "key_facts": [
+                        "Based on the Objectives Resolution",
+                        "Adopted on 26 November 1949"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "section_label": "ADVANCED",
+                  "title": "Advanced Analysis — Legal Status",
+                  "display_order": 3,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "heading",
+                      "text": "Is the Preamble part of the Constitution?"
+                    },
+                    {
+                      "type": "para",
+                      "text": "**Berubari (1960)**: no. **Kesavananda Bharati (1973)**: yes, and it can be amended under Article 368 without destroying the basic structure. **LIC of India (1995)**: reaffirmed."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "CURRENT_AFFAIRS",
+                  "title": "Current Affairs Connections",
+                  "display_order": 4,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "callout",
+                      "tone": "note",
+                      "title": "Write one dated news link per topic",
+                      "text": "Connect the topic to a recent judgment, debate or event, with its date and source."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "EXAMINER_TRAPS",
+                  "title": "Examiner Traps",
+                  "display_order": 5,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "trap",
+                      "wrong": "The Preamble has never been amended.",
+                      "correct": "It was amended once, by the 42nd Amendment (1976)."
+                    },
+                    {
+                      "type": "trap",
+                      "wrong": "Courts can strike down a law for violating the Preamble.",
+                      "correct": "The Preamble is non-justiciable; courts use it to interpret ambiguous provisions."
+                    }
+                  ]
+                }
+              ],
+              "pyqs": [
+                {
+                  "exam_type": "PRELIMS",
+                  "year": 2017,
+                  "question_text": "Which one of the following objectives is not embodied in the Preamble to the Constitution of India?\n(a) Liberty of thought\n(b) Economic liberty\n(c) Liberty of expression\n(d) Liberty of belief",
+                  "answer_text": "B",
+                  "explanation": "The Preamble lists liberty of thought, expression, belief, faith and worship; economic liberty is not among them.",
+                  "question_type": "FACTUAL",
+                  "marks": null
+                }
+              ],
+              "mcq_questions": [
+                {
+                  "question_text": "Which Constitutional Amendment added the words 'Socialist' and 'Secular' to the Preamble?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "24th Amendment, 1971"
+                    },
+                    {
+                      "label": "B",
+                      "text": "42nd Amendment, 1976"
+                    },
+                    {
+                      "label": "C",
+                      "text": "44th Amendment, 1978"
+                    },
+                    {
+                      "label": "D",
+                      "text": "52nd Amendment, 1985"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "The 42nd Amendment (1976) added 'Socialist', 'Secular' and 'Integrity'. It is the only amendment so far to the Preamble.",
+                  "question_type": "FACTUAL",
+                  "display_order": 1
+                },
+                {
+                  "question_text": "Consider the following statements:\n1. The Preamble is part of the Constitution.\n2. The Preamble is enforceable in a court of law.\nWhich of the statements given above is/are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "1 only"
+                    },
+                    {
+                      "label": "B",
+                      "text": "2 only"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Both 1 and 2"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Neither 1 nor 2"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Kesavananda Bharati (1973) held the Preamble to be part of the Constitution, but it is non-justiciable: it is neither a source of power nor a limit on it.",
+                  "question_type": "STATEMENT_BASED",
+                  "display_order": 2
+                },
+                {
+                  "question_text": "In which case did the Supreme Court first say that the Preamble is NOT part of the Constitution?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Berubari Union case (1960)"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Golaknath case (1967)"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Kesavananda Bharati case (1973)"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Minerva Mills case (1980)"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "The Berubari reference (1960) said the Preamble is not part of the Constitution; Kesavananda Bharati (1973) reversed this.",
+                  "question_type": "FACTUAL",
+                  "display_order": 3
+                },
+                {
+                  "question_text": "The Objectives Resolution, on which the Preamble is based, was moved in the Constituent Assembly by:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Dr. B. R. Ambedkar"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Jawaharlal Nehru"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Dr. Rajendra Prasad"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Sardar Vallabhbhai Patel"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Nehru moved the Objectives Resolution on 13 December 1946; the Assembly adopted it on 22 January 1947.",
+                  "question_type": "FACTUAL",
+                  "display_order": 4
+                },
+                {
+                  "question_text": "According to the Preamble, the source of authority of the Constitution is:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The Parliament of India"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The Constituent Assembly"
+                    },
+                    {
+                      "label": "C",
+                      "text": "The people of India"
+                    },
+                    {
+                      "label": "D",
+                      "text": "The British Parliament (Indian Independence Act, 1947)"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "The Preamble opens with 'We, the people of India', placing authority in the people.",
+                  "question_type": "FACTUAL",
+                  "display_order": 5
+                },
+                {
+                  "question_text": "Which date is mentioned in the Preamble?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "15 August 1947"
+                    },
+                    {
+                      "label": "B",
+                      "text": "26 January 1950"
+                    },
+                    {
+                      "label": "C",
+                      "text": "26 November 1949"
+                    },
+                    {
+                      "label": "D",
+                      "text": "22 January 1947"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "The Preamble records that the Constitution was adopted, enacted and given to ourselves on 26 November 1949. It came into force on 26 January 1950.",
+                  "question_type": "FACTUAL",
+                  "display_order": 6
+                },
+                {
+                  "question_text": "What is the correct order of the words describing India in the Preamble?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Sovereign, Secular, Socialist, Democratic, Republic"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Sovereign, Socialist, Secular, Democratic, Republic"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Socialist, Sovereign, Secular, Democratic, Republic"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Sovereign, Democratic, Socialist, Secular, Republic"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "The Preamble reads 'SOVEREIGN SOCIALIST SECULAR DEMOCRATIC REPUBLIC'.",
+                  "question_type": "CHRONOLOGICAL",
+                  "display_order": 7
+                },
+                {
+                  "question_text": "The ideals of justice — social, economic and political — in the Preamble are taken from:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The French Revolution"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The Russian Revolution"
+                    },
+                    {
+                      "label": "C",
+                      "text": "The American Constitution"
+                    },
+                    {
+                      "label": "D",
+                      "text": "The Irish Constitution"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Social, economic and political justice is drawn from the Russian Revolution (1917).",
+                  "question_type": "FACTUAL",
+                  "display_order": 8
+                },
+                {
+                  "question_text": "The ideals of liberty, equality and fraternity in the Preamble are taken from:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The French Revolution"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The Russian Revolution"
+                    },
+                    {
+                      "label": "C",
+                      "text": "The Weimar Constitution"
+                    },
+                    {
+                      "label": "D",
+                      "text": "The Canadian Constitution"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Liberty, equality and fraternity are the ideals of the French Revolution.",
+                  "question_type": "FACTUAL",
+                  "display_order": 9
+                },
+                {
+                  "question_text": "'Republic' in the Preamble means that:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "India has a written Constitution"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The head of state is elected and not hereditary"
+                    },
+                    {
+                      "label": "C",
+                      "text": "India has a parliamentary form of government"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Sovereignty lies with Parliament"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "A republic has an elected head of state; India's President is elected indirectly for a fixed term.",
+                  "question_type": "FACTUAL",
+                  "display_order": 10
+                },
+                {
+                  "question_text": "Which of the following is NOT one of the liberties mentioned in the Preamble?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Liberty of thought"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Liberty of belief"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Economic liberty"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Liberty of worship"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "The Preamble lists liberty of thought, expression, belief, faith and worship. Economic liberty is not listed.",
+                  "question_type": "FACTUAL",
+                  "display_order": 11
+                },
+                {
+                  "question_text": "According to the Preamble, fraternity assures:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The dignity of the individual and the unity and integrity of the Nation"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Equality of status and of opportunity"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Social, economic and political justice"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Liberty of thought and expression"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "The Preamble promotes 'FRATERNITY assuring the dignity of the individual and the unity and integrity of the Nation'.",
+                  "question_type": "FACTUAL",
+                  "display_order": 12
+                },
+                {
+                  "question_text": "Consider the following statements:\n1. The Preamble can be amended under Article 368.\n2. An amendment to the Preamble may alter the basic structure of the Constitution.\nWhich of the statements given above is/are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "1 only"
+                    },
+                    {
+                      "label": "B",
+                      "text": "2 only"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Both 1 and 2"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Neither 1 nor 2"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Kesavananda Bharati held the Preamble can be amended under Article 368, but not so as to destroy the basic structure.",
+                  "question_type": "STATEMENT_BASED",
+                  "display_order": 13
+                },
+                {
+                  "question_text": "In which case did the Supreme Court again hold that the Preamble is an integral part of the Constitution?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "LIC of India case (1995)"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Indra Sawhney case (1992)"
+                    },
+                    {
+                      "label": "C",
+                      "text": "S. R. Bommai case (1994)"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Maneka Gandhi case (1978)"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "In LIC of India (1995) the Court reaffirmed that the Preamble is an integral part of the Constitution.",
+                  "question_type": "FACTUAL",
+                  "display_order": 14
+                },
+                {
+                  "question_text": "Assertion (A): The Preamble is not a source of power to the legislature.\nReason (R): The Preamble is non-justiciable.\nChoose the correct answer:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Both A and R are true and R is the correct explanation of A"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Both A and R are true but R is not the correct explanation of A"
+                    },
+                    {
+                      "label": "C",
+                      "text": "A is true but R is false"
+                    },
+                    {
+                      "label": "D",
+                      "text": "A is false but R is true"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Both are true. The Preamble gives no power because it is an introduction stating the Constitution's objectives; non-justiciability (not enforceable in court) is a separate feature, so R does not explain A.",
+                  "question_type": "ASSERTION_REASON",
+                  "display_order": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

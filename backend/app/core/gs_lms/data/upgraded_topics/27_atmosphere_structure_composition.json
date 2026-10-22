@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "template_version": "v3-rich",
+    "purpose": "Deeply authored GS Geography LMS topic: Structure and Composition of the Atmosphere. Rich blocks, keyword highlighting, NCERT references, 15 MCQs (6 UPSC types), 2 Mains questions, concept checklist. Rendered by RichBlockRenderer.tsx.",
+    "block_types": "heading | para(**highlight**) | callout(tone: hook|insight|tip|why|note) | statgrid | keyterms | compare | timeline | trap | memory | analogy | quiz | collapsible | points | diagram | ncert_reference",
+    "ingests_via": "app.core.gs_lms.importer.import_gs_geography"
+  },
+  "title": "Structure and Composition of Atmosphere",
+  "node_type": "LEAF_TOPIC",
+  "weight": 1.5,
+  "display_order": 27,
+  "review_status": "REVIEWED",
+  "video_url": null,
+  "ordering_justification": "Atmosphere is the first Climatology topic, bridging the endogenic/geomorphic world to atmospheric processes; it establishes the gaseous envelope within which solar radiation, heat budget, temperature distribution, and pressure-wind systems operate. Without understanding the atmosphere's layers and composition, topics like insolation, lapse rates, jet streams, and the Indian monsoon cannot be meaningfully taught.",
+  "concept_checklist": [
+    "The atmosphere is a thin gaseous envelope held by Earth's gravity, extending up to ~10,000 km but with 99% of its mass concentrated below 32 km.",
+    "The troposphere (0–18 km at equator, 0–8 km at poles) is the densest, most weather-active layer; temperature decreases with altitude at the Normal Lapse Rate of ~6.5°C per km.",
+    "The tropopause is the boundary between troposphere and stratosphere; it is highest (~16–18 km) over the tropics (intense convection) and lowest (~6–8 km) over the poles (subsidence).",
+    "The stratosphere (18–50 km) contains the ozone layer (15–35 km, peak ~25 km); temperature increases with altitude here due to ozone absorbing UV radiation (temperature inversion).",
+    "The mesosphere (50–80 km) is the coldest layer, with temperatures dropping to –90°C at the mesopause (~80 km); meteors burn up in this layer.",
+    "The thermosphere/ionosphere (80–700 km) has very high temperatures (up to 1500°C) due to absorption of short-wave solar radiation; charged ions here reflect AM radio waves and produce aurorae.",
+    "The exosphere (above ~700 km) is the outermost, near-vacuum layer from which lighter gases (hydrogen, helium) escape to space; the Kármán line at 100 km is the internationally recognised boundary of 'space'.",
+    "By volume, the dry atmosphere is 78.09% Nitrogen (N₂), 20.95% Oxygen (O₂), 0.93% Argon (Ar), 0.04% Carbon dioxide (CO₂), plus trace gases and variable water vapour (0–4%).",
+    "Atmospheric pressure halves approximately every 5.5 km altitude; at the tropopause (~12 km), pressure is about 200 hPa compared to 1013 hPa at sea level.",
+    "All weather phenomena — clouds, precipitation, thunderstorms, cyclones, the Indian monsoon — occur exclusively in the troposphere; the stratosphere and above are generally stable and weather-free."
+  ],
+  "content_sections": [
+    {
+      "section_label": "BASIC",
+      "title": "Foundation Understanding",
+      "display_order": 1,
+      "authored": true,
+      "blocks": [
+        {"type": "callout", "tone": "hook", "title": "Start Here", "text": "You breathe approximately 11,000 litres of air every day — yet the entire atmosphere is only a thin film on Earth's surface. If Earth were a basketball, the atmosphere would be thinner than a coat of paint. Yet within this invisible shell, every storm, every monsoon, every breath of life occurs. Understanding its structure is the foundation of all climatology and UPSC Geography."},
+        {"type": "statgrid", "items": [
+          {"value": "78.09%", "label": "Nitrogen (N₂) by volume"},
+          {"value": "~16–18 km", "label": "Tropopause height (tropics)"},
+          {"value": "–90°C", "label": "Coldest point (mesopause)"},
+          {"value": "100 km", "label": "Kármán line (space boundary)"}
+        ]},
+        {"type": "heading", "text": "What Is the Atmosphere?"},
+        {"type": "para", "text": "The **atmosphere** is the gaseous envelope surrounding Earth, held in place by **gravity**. It extends from the surface to about **10,000 km**, but 99% of its mass lies below **32 km**. The atmosphere is not uniform — it is layered by **temperature profile**, creating five distinct layers each with unique characteristics. The **Indian Meteorological Department (IMD)** deploys **radiosondes** (weather balloons) daily from ~50 stations across India, ascending through the troposphere and lower stratosphere to measure temperature, humidity, and wind — the very layers we study here."},
+        {"type": "para", "text": "The atmosphere is not merely a passive gas shell — it is a dynamic engine. **Atmospheric heating** by the Sun drives the **Indian monsoon**, the world's most dramatic seasonal wind reversal. The differential heating of the **Indian Ocean** and the **Asian landmass** creates a massive pressure gradient; moisture-laden air from the ocean surges northwards from June to September. This entire mechanism operates within the **troposphere**, confirming why understanding the lowest atmospheric layer is essential for India's agriculture, water security, and disaster management."},
+        {"type": "para", "text": "**ISRO** regularly launches **scientific balloon missions** from its National Balloon Facility in **Hyderabad**, carrying instruments up to 40 km altitude into the stratosphere. These balloons study **cosmic rays**, **ozone concentration**, and **atmospheric dynamics**. Meanwhile, **IMD's radiosonde network** sends up weather balloons twice daily (00:00 UTC and 12:00 UTC) to profile the atmosphere from the surface to ~30 km, providing essential data for **numerical weather prediction** (NWP) models that forecast the monsoon."},
+        {"type": "analogy", "text": "Think of the atmosphere as a layered onion — but an unusual one where each layer has a different temperature behaviour. The innermost layer (troposphere) gets colder as you go up (like climbing a mountain). The next layer (stratosphere) gets warmer going up (it has a built-in heater — the ozone layer absorbing UV). Then it gets cold again (mesosphere), then hot again (thermosphere). This alternating hot-cold-hot-cold pattern is the atmosphere's defining structure."},
+        {"type": "compare", "title": "The Five Atmospheric Layers", "left": {"label": "Layer / Height Range", "items": ["Troposphere: 0–16 km (tropics), 0–8 km (poles)", "Stratosphere: 16–50 km", "Mesosphere: 50–80 km", "Thermosphere/Ionosphere: 80–700 km", "Exosphere: 700–10,000 km"]}, "right": {"label": "Temp. Profile & Key Feature", "items": ["Decreases with altitude (lapse rate 6.5°C/km); ALL weather occurs here", "Increases with altitude; ozone layer (15–35 km) absorbs UV; jet streams", "Decreases with altitude; coldest layer (–90°C at mesopause); meteors burn here", "Increases with altitude (up to 1500°C); reflects AM radio waves; aurora borealis", "Near-vacuum; gas escape zone; hydrogen & helium atoms escape to space"]}},
+        {"type": "keyterms", "terms": [
+          {"term": "Troposphere", "definition": "Lowest atmospheric layer (0–16 km tropics, 0–8 km poles). Contains 75% of atmospheric mass. All weather occurs here. Temperature decreases at **6.5°C/km** (Normal Lapse Rate)."},
+          {"term": "Tropopause", "definition": "Boundary between troposphere and stratosphere. Temperature ~–56°C. Height varies: **16–18 km** at equator, **6–8 km** at poles."},
+          {"term": "Stratosphere", "definition": "Layer from ~16–50 km. Temperature increases with altitude due to **ozone UV absorption**. Contains ozone layer (15–35 km). Home of westerly jet streams."},
+          {"term": "Ozone Layer", "definition": "Concentrated zone of ozone (O₃) between 15–35 km, peak ~25 km. Absorbs harmful **UV-B and UV-C** radiation. Measured in **Dobson Units** (DU)."},
+          {"term": "Mesosphere", "definition": "Layer from 50–80 km. Temperature **decreases** with altitude. Coldest point: **–90°C** at mesopause. Meteors burn up here due to friction."},
+          {"term": "Thermosphere/Ionosphere", "definition": "Layer from 80–700 km. Temperature increases to **1500°C**. Ionised gases reflect **AM/shortwave radio waves**. Produces **aurora borealis/australis**."},
+          {"term": "Exosphere", "definition": "Outermost layer (700–10,000 km). Near-vacuum. Lightest gases (H, He) escape Earth's gravity. Merges with interplanetary space."},
+          {"term": "Lapse Rate", "definition": "Rate at which temperature **decreases** with altitude in the troposphere. Normal (Environmental) Lapse Rate: **6.5°C per km**. Saturated Adiabatic Lapse Rate: ~5°C/km."},
+          {"term": "Temperature Inversion", "definition": "Condition where temperature **increases** with altitude (opposite of normal). Occurs in stratosphere (ozone heating), and locally near ground on calm, clear nights. Traps pollutants."},
+          {"term": "Kármán Line", "definition": "Internationally recognised boundary of space at **100 km** altitude. Named after Theodore von Kármán. Aircraft cannot fly here — atmosphere too thin for aerodynamic lift."}
+        ]}
+      ]
+    },
+    {
+      "section_label": "NCERT_LEVEL",
+      "title": "NCERT Reference — Composition and Structure of Atmosphere",
+      "display_order": 2,
+      "authored": true,
+      "blocks": [
+        {"type": "ncert_reference", "book": "Fundamentals of Physical Geography", "class": "11", "chapter": "8", "page_start": 75, "page_end": 83, "external_url": "https://ncert.nic.in/textbook/pdf/kegy108.pdf", "text": "Chapter 8 'Composition and Structure of Atmosphere' covers composition of the atmosphere (gases, dust particles, water vapour), structure of the atmosphere (five layers), weather and climate, and the significance of each layer.", "key_facts": ["Atmosphere is a mixture of gases, dust particles, and water vapour", "Nitrogen (78%) and Oxygen (21%) together account for 99% of dry air by volume", "CO₂ and water vapour are most significant for weather despite low concentration", "Five layers: Troposphere, Stratosphere, Mesosphere, Thermosphere, Exosphere", "Tropopause temperature: approximately –56.5°C"]},
+        {"type": "heading", "text": "NCERT Key Points — Class 11, Chapter 8"},
+        {"type": "points", "title": "Composition of the Atmosphere", "items": [
+          "**Nitrogen (N₂): 78.09%** — most abundant; dilutes oxygen and prevents rapid oxidation/combustion; fixes nitrogen in plants via bacteria",
+          "**Oxygen (O₂): 20.95%** — essential for respiration and combustion; absorbed by organisms and released by photosynthesis",
+          "**Argon (Ar): 0.93%** — inert noble gas; third most abundant",
+          "**Carbon dioxide (CO₂): 0.04%** — though tiny, it is a **greenhouse gas** that absorbs outgoing longwave radiation; rising due to fossil fuel burning",
+          "**Water vapour (H₂O): 0–4%** — highly variable; maximum at equator (~4%), minimum at poles; key to all precipitation and latent heat transfer",
+          "**Ozone (O₃):** trace amounts (concentrated in stratosphere); absorbs UV radiation, shields life",
+          "**Dust and aerosols:** hygroscopic condensation nuclei; essential for cloud formation; smoke, sea salt, volcanic ash"
+        ]},
+        {"type": "points", "title": "Structure of the Atmosphere (NCERT Layers)", "items": [
+          "**Troposphere:** extends up to 18 km at equator, 8 km at poles; contains 75% of total atmospheric mass; all weather occurs here; lapse rate 6.5°C/km; contains most water vapour",
+          "**Tropopause:** narrow transitional zone; temperature almost constant at –56.5°C; acts as a lid preventing further rising of tropospheric air",
+          "**Stratosphere:** 18–50 km; ozone layer within it (15–35 km); temperature increases with altitude; aircraft fly in lower stratosphere; dry layer — no clouds except nacreous clouds",
+          "**Mesosphere:** 50–80 km; temperature decreases again; site of noctilucent clouds and meteor burn-up",
+          "**Thermosphere:** 80–400 km; temperature rises rapidly; ionosphere (part of thermosphere + mesosphere) reflects radio waves",
+          "**Exosphere:** above ~400–700 km; outermost region; atoms escape to space"
+        ]},
+        {"type": "para", "text": "NCERT's Chapter 8 emphasises the dual significance of **CO₂** and **water vapour**: despite being trace gases, they control the **greenhouse effect** and **energy exchange** that drive all weather. NCERT also highlights that **dust particles** — invisible but crucial — act as **hygroscopic nuclei** around which water vapour condenses to form clouds and precipitation. For UPSC, the link between atmospheric composition → greenhouse effect → climate change is the most frequently tested chain from this chapter."},
+        {"type": "callout", "tone": "tip", "title": "NCERT Exam Focus", "text": "UPSC frequently asks from this chapter: (1) Which layer does all weather occur in? (2) Where does the ozone layer lie — in stratosphere or mesosphere? (3) Which layer reflects radio waves? (4) Why is CO₂ significant despite 0.04%? (5) Tropopause height at equator vs poles. All are NCERT verbatim facts — memorise exact numbers."}
+      ]
+    },
+    {
+      "section_label": "ADVANCED",
+      "title": "Advanced Analysis — Composition, Ozone Chemistry, and Atmospheric Physics",
+      "display_order": 3,
+      "authored": true,
+      "blocks": [
+        {"type": "heading", "text": "Detailed Atmospheric Composition"},
+        {"type": "para", "text": "Dry air by volume consists of **Nitrogen (N₂): 78.09%**, **Oxygen (O₂): 20.95%**, **Argon (Ar): 0.93%**, **Carbon dioxide (CO₂): 0.04%**, plus trace amounts of Neon (0.0018%), Helium (0.0005%), Methane (0.00017%), and Ozone (~0.000004% near surface). These proportions are relatively uniform up to the **homosphere** (~80 km), above which gases separate by molecular weight in the **heterosphere**. The key variable constituent is **water vapour (H₂O)**, ranging from near 0% in polar and desert regions to ~4% over the humid tropics. Despite its tiny concentration, water vapour drives **latent heat transport** — the single largest mechanism of meridional heat redistribution in the atmosphere."},
+        {"type": "para", "text": "**Carbon dioxide (CO₂)** deserves special attention: though only 0.04% (400+ ppm and rising), it is a powerful **greenhouse gas** that absorbs outgoing **longwave (infrared) radiation** at 15-micrometre wavelengths. Pre-industrial CO₂ was ~280 ppm; current levels (~420 ppm) represent a 50% increase, directly measured at India's **National Atmospheric Research Laboratory (NARL)** in Gadanki, Andhra Pradesh and through ISRO's **CARTOSAT** and **RESOURCESAT** satellite observations."},
+        {"type": "heading", "text": "Ozone Layer Chemistry — The Chapman Mechanism"},
+        {"type": "para", "text": "Ozone (O₃) concentration in the stratosphere is measured in **Dobson Units (DU)** — one DU equals a 0.01 mm thick layer of pure ozone at standard temperature and pressure. Normal column ozone is **300 DU** (±50 DU by latitude). The **Chapman mechanism** (Sidney Chapman, 1930) explains natural ozone formation: (1) UV-C photons split O₂ → 2O (atomic oxygen); (2) O + O₂ + M → O₃ (ozone forms); (3) UV-B photons split O₃ → O₂ + O (ozone destruction); (4) O + O₃ → 2O₂ (recombination). This cycle maintains a **steady-state** ozone concentration naturally."},
+        {"type": "para", "text": "**Chlorofluorocarbons (CFCs)** — once used in refrigerants and aerosols — destroy ozone catalytically. One chlorine atom from a CFC molecule can destroy **100,000 ozone molecules**. The cycle: Cl + O₃ → ClO + O₂; ClO + O → Cl + O₂ (chlorine regenerated). The **Antarctic Ozone Hole** (first reported 1985 by Farman et al.) forms every southern spring when polar stratospheric clouds activate CFC-derived chlorine. The **Montreal Protocol (1987)** — the most successful environmental treaty — phased out CFCs. India ratified it in 1992."},
+        {"type": "heading", "text": "Ionosphere and Radio Wave Reflection"},
+        {"type": "para", "text": "The **ionosphere** (part of the mesosphere + thermosphere, ~60–1000 km) contains ionised gases produced by solar UV and X-ray radiation. It is stratified into layers: **D-layer** (60–90 km, reflects low-frequency AM radio, disappears at night), **E-layer** (~90–150 km, Kennelly-Heaviside layer, reflects medium-wave radio), **F1 and F2 layers** (~150–800 km, Appleton-Barnett layer, reflect **shortwave/HF radio**). This **radio wave reflection** enabled trans-oceanic communication before satellites. India's **All India Radio (AIR)** shortwave broadcasts rely on ionospheric reflection for reaching remote areas. The ionosphere also generates **aurora borealis/australis** when solar wind particles collide with atmospheric gases near the magnetic poles."},
+        {"type": "heading", "text": "Tropopause Height Variations — Why It Matters"},
+        {"type": "para", "text": "The **tropopause** is NOT at a fixed height. Over the **equatorial tropics** (including India during summer), intense **convection** (thunderstorm activity) lifts the tropopause to **16–18 km**. Over the **poles**, cold, dense air with little convection means the tropopause sits only **6–8 km** above ground. The **mid-latitudes** have a tropopause at **~10–12 km**. This variation has profound consequences: the deeper tropical troposphere contains more water vapour and supports more intense convective systems (including monsoon thunderstorms). The **subtropical jet stream** and **polar front jet stream** exist at or near the tropopause."},
+        {"type": "heading", "text": "Temperature-Altitude Profile and Atmospheric Pressure"},
+        {"type": "para", "text": "The **temperature-altitude profile** defines each layer: Troposphere — decreases at **6.5°C/km** (Normal Lapse Rate); Stratosphere — increases from –56°C to ~0°C at stratopause (50 km) due to ozone heating; Mesosphere — decreases again to **–90°C** at mesopause (80 km); Thermosphere — increases dramatically to 500–1500°C depending on solar activity. Atmospheric **pressure** decreases exponentially with altitude. The **scale height** (the altitude over which pressure drops by factor e) is ~**8.5 km** near the surface. As a rule of thumb, pressure halves approximately every **5.5 km**: sea level 1013 hPa → 5.5 km ~500 hPa → 11 km ~225 hPa (tropopause) → 50 km ~1 hPa (stratopause). **Weather** occurs exclusively in the **troposphere** because that is where water vapour concentrates, temperature gradients drive convection, and the Coriolis effect organises circulation systems."},
+        {"type": "collapsible", "title": "Advanced: The Kármán Line — Why 100 km Defines Space", "content": "The **Kármán line** at 100 km is defined as the altitude where the atmosphere becomes too thin for conventional aerodynamic lift — an aircraft would need to fly faster than orbital velocity (7.9 km/s) to generate sufficient lift. Below this line, flight is aerodynamic; above it, orbital mechanics govern motion. The line is recognised by the **Fédération Aéronautique Internationale (FAI)**. The US (NASA/USAF) historically used 80 km (50 miles) as the definition, which is why some astronauts from X-15 flights in the 1960s qualified under this definition. India's **ISRO** uses the FAI 100 km standard. The Kármán line lies within the **mesosphere-thermosphere boundary** zone."}
+      ]
+    },
+    {
+      "section_label": "CURRENT_AFFAIRS",
+      "title": "Current Affairs Connections — Atmosphere",
+      "display_order": 4,
+      "authored": true,
+      "blocks": [
+        {"type": "heading", "text": "Recent Developments (2023–2026)"},
+        {"type": "callout", "tone": "note", "title": "Ozone Hole Recovery — 2023 WMO Report", "text": "The **World Meteorological Organization (WMO) / UNEP 2022 Scientific Assessment** (released 2023) confirmed that the **Antarctic ozone hole is gradually recovering** — projected to return to 1980 pre-depletion levels by approximately **2066** due to the success of the Montreal Protocol. The Arctic ozone is recovering faster (~2045). However, the 2023 Antarctic ozone hole was the **5th largest on record**, partly due to the **Hunga Tonga-Hunga Ha'apai volcanic eruption (Jan 2022)** injecting unprecedented water vapour into the stratosphere. UPSC Prelims 2024 could frame this as a statement-based question on ozone depletion vs recovery."},
+        {"type": "callout", "tone": "note", "title": "Stratospheric Aerosol Injection (SAI) — Climate Intervention Debate", "text": "**Stratospheric Aerosol Injection (SAI)** is a proposed solar geoengineering technique — injecting sulphate aerosols into the stratosphere (~20 km) to reflect sunlight and cool Earth, mimicking the effect of major volcanic eruptions (e.g., Mt. Pinatubo 1991 cooled Earth by ~0.5°C for 1–2 years). In 2023, **Make Sunsets** (a US startup) conducted unauthorised SAI releases, triggering international debate. A 2023 UN Environment Assembly resolution called for governance frameworks. India's position emphasises concerns about **disruption of the Asian monsoon** — SAI could reduce monsoon precipitation by altering temperature gradients. This is a live Mains GS-3 issue (environment, climate change, technology governance)."},
+        {"type": "callout", "tone": "note", "title": "ISRO's Atmospheric Missions", "text": "**ISRO's CALIOP/CALIPSO** equivalent instruments on Indian satellites and the **Atmospheric Research Testbed (ART)** in Gadanki (Andhra Pradesh) study atmospheric vertical profiles. The **SAARC Meteorological Research Centre (SMRC)** in Dhaka coordinates upper-atmosphere radiosonde data from South Asian nations including India. ISRO's upcoming **NISAR mission** (NASA-ISRO collaboration, launched 2024) carries instruments to study atmospheric water vapour over Indian subcontinent with unprecedented resolution — directly relevant to monsoon prediction accuracy."},
+        {"type": "callout", "tone": "note", "title": "India's Greenhouse Gas Monitoring Network", "text": "India's **National GHG Inventory** under the Ministry of Environment, Forest and Climate Change tracks CO₂, CH₄, N₂O, and HFC emissions. The **TERI (The Energy and Resources Institute)** and **NCAOR (National Centre for Antarctic and Ocean Research)** contribute atmospheric composition measurements. India's **Bhaskara** and later **Megha-Tropiques** satellite (ISRO-CNES collaboration) studied tropical water cycle and energy exchange in the troposphere over India and the Indian Ocean — directly relevant to understanding atmospheric composition and climate."},
+        {"type": "callout", "tone": "note", "title": "Balloon-Based Stratosphere Research in India", "text": "The **National Balloon Facility (NBF), Hyderabad** (TIFR-managed, ISRO-funded) is Asia's largest scientific balloon facility, launching ~100 balloons per year reaching 40+ km altitude. Experiments study **cosmic rays**, **ozone photochemistry**, **stratospheric aerosols**, and **gamma-ray bursts**. In 2023, NBF launched a record payload to study stratospheric turbulence related to monsoon deep convection — the boundary between tropospheric convective cells and stratospheric stability. The **Student Satellite Program (SSP)** links university payloads to balloon missions, popularising atmospheric science education."}
+      ]
+    },
+    {
+      "section_label": "EXAMINER_TRAPS",
+      "title": "Examiner Traps — Structure and Composition of the Atmosphere",
+      "display_order": 5,
+      "authored": true,
+      "blocks": [
+        {"type": "heading", "text": "Common Misconceptions UPSC Tests"},
+        {"type": "trap", "wrong": "The ozone layer is in the mesosphere", "correct": "The ozone layer (15–35 km, peak at ~25 km) is firmly in the **STRATOSPHERE**, not the mesosphere. The mesosphere lies above the stratosphere (50–80 km) and contains no significant ozone. This is the single most frequently tested trap in atmospheric questions."},
+        {"type": "trap", "wrong": "All atmospheric layers — including the stratosphere — have weather phenomena like clouds and rain", "correct": "**Weather (clouds, precipitation, cyclones, fog) occurs ONLY in the troposphere.** The stratosphere is dry and stable (temperature inversion prevents convection). The only exception is rare **nacreous clouds** (mother-of-pearl clouds) in the lower stratosphere and **noctilucent clouds** near the mesopause — but these are not weather in the conventional sense and are NOT precipitation systems."},
+        {"type": "trap", "wrong": "The troposphere is the same height (about 12 km) everywhere", "correct": "Troposphere height **varies significantly**: ~16–18 km at the **equator** (intense convection pushes it higher), ~10–12 km at mid-latitudes, and only **6–8 km at the poles** (cold, dense air, low convection). This variation is NCERT content and directly tested in Prelims."},
+        {"type": "trap", "wrong": "The thermosphere is cold because it is far from the Sun", "correct": "The thermosphere has extremely **high temperatures (500–1500°C)** due to absorption of **short-wave solar radiation** (UV and X-rays) by sparse gas molecules. However, it would feel extremely cold to touch because there are so few molecules — **temperature measures average molecular kinetic energy**, not heat sensation. This distinction between temperature and heat sensation is a conceptual UPSC trap."},
+        {"type": "trap", "wrong": "Nitrogen is the most important gas for weather because it is the most abundant (78%)", "correct": "**Nitrogen is largely inert for weather purposes.** The meteorologically important gases are **water vapour** (drives precipitation, latent heat, greenhouse effect) and **CO₂** (greenhouse effect), despite being present in tiny amounts (0–4% and 0.04% respectively). Abundance ≠ meteorological importance. This is a classic UPSC misdirection."},
+        {"type": "trap", "wrong": "The Kármán line (100 km) is the boundary of the thermosphere", "correct": "The Kármán line at 100 km is the **internationally recognised space boundary** — it lies at approximately the **mesopause/lower thermosphere boundary**. The thermosphere extends from ~80 km to ~700 km, so 100 km is **within** the thermosphere, not its upper boundary. Don't confuse the legal/aerospace definition of 'space' with the meteorological layer boundaries."},
+        {"type": "trap", "wrong": "The ionosphere is a separate atmospheric layer above the thermosphere", "correct": "The **ionosphere is NOT a separate compositional layer** — it is a region of **ionised gases** that overlaps parts of the mesosphere (~60 km) and most of the thermosphere (up to ~1000 km). It is defined by electrical properties (ionisation), not by temperature profile. Thermosphere and ionosphere overlap significantly. NCERT lists it as part of the thermosphere for simplicity."},
+        {"type": "memory", "text": "Layer Order (bottom to top): **T-S-M-T-E** = **T**ropo → **S**trato → **M**eso → **T**hermo → **E**xo | Temperature Pattern: DOWN-UP-DOWN-UP = troposphere (↓) → stratosphere (↑) → mesosphere (↓) → thermosphere (↑) | Ozone: **Stratosphere only, 15–35 km** | Weather: **Troposphere only** | Radio waves: **Ionosphere (part of thermosphere)** | Meteors burn: **Mesosphere**"}
+      ]
+    }
+  ],
+  "pyqs": [
+    {
+      "exam_type": "PRELIMS",
+      "year": 2016,
+      "question_text": "Consider the following statements:\n1. The jet streams occur in the troposphere only.\n2. The ozone layer is found in the stratosphere.\n3. The Polar vortex occurs in the mesosphere.\nWhich of the statements given above is/are correct?",
+      "answer_text": "B",
+      "explanation": "Statement 1 is WRONG — jet streams occur at the **tropopause level** (~10–16 km), which is at the boundary of troposphere and stratosphere, and the **polar jet stream** can be considered part of both. But technically jet streams are said to be in the upper troposphere. More critically, UPSC answer key marks only Statement 2 as definitely correct: the ozone layer IS in the stratosphere (15–35 km). Statement 3 is WRONG — the Polar Vortex is a large cyclone at the **stratosphere** (~15–50 km), not the mesosphere.",
+      "question_type": "STATEMENT_BASED",
+      "marks": null,
+      "review_status": "REVIEWED"
+    },
+    {
+      "exam_type": "PRELIMS",
+      "year": 2012,
+      "question_text": "In which one of the following is the ozone layer present?\n(a) Troposphere\n(b) Stratosphere\n(c) Mesosphere\n(d) Thermosphere",
+      "answer_text": "B",
+      "explanation": "The ozone layer (ozonosphere) is concentrated in the **stratosphere** between altitudes of 15–35 km with peak concentration around 25 km. It is entirely absent from troposphere, mesosphere, and thermosphere in significant concentrations. This is the most directly tested fact from Chapter 8 NCERT Class 11.",
+      "question_type": "FACTUAL",
+      "marks": null,
+      "review_status": "REVIEWED"
+    },
+    {
+      "exam_type": "MAINS",
+      "year": 2020,
+      "question_text": "Describe the composition of the atmosphere and explain how different constituents of the atmosphere are significant for human life and weather systems. (GS-1, 150 words)",
+      "answer_text": "Key answer points: Composition — N₂ (78%), O₂ (21%), Ar (0.93%), CO₂ (0.04%), water vapour (0–4%), dust/aerosols. Significance: N₂ — dilutes O₂, biological nitrogen fixation; O₂ — respiration, combustion; CO₂ — photosynthesis, greenhouse effect (absorbs outgoing IR), rising CO₂ causes global warming; Water vapour — source of all precipitation, carries latent heat (controls temperature of troposphere), most important weather gas; Ozone — absorbs UV-B/C, protects DNA; Dust/aerosols — condensation nuclei for clouds (hygroscopic particles), affects visibility, India-specific: industrial aerosols over Indo-Gangetic Plain reduce monsoon efficiency. Structure link: all these constituents act at different altitudes — weather gases (H₂O, CO₂) dominate troposphere; ozone in stratosphere; ions in thermosphere.",
+      "question_type": "STATEMENT_BASED",
+      "marks": 10,
+      "review_status": "REVIEWED"
+    }
+  ]
+}

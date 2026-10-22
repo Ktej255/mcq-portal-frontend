@@ -26,3 +26,6 @@ yarn-error.log*
 .DS_Store
 *.pem
 *.tsbuildinfo
+
+# Python backend is deployed separately (AWS ECS), not on Vercel
+backend/

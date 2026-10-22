@@ -14,7 +14,7 @@ function configuredMasterEmails() {
 
 export function isMasterEmail(email: string | null | undefined) {
   if (!email) return false;
-  return configuredMasterEmails().includes(email.toLowerCase()) || email.toLowerCase().endsWith("@admin.com");
+  return configuredMasterEmails().includes(email.toLowerCase());
 }
 
 export function isExplicitLocalMockMasterToken(token: string | null | undefined) {

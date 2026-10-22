@@ -260,6 +260,17 @@ export interface OnboardingStatusOut {
   study_window_minutes: number | null;
 }
 
+// -- Subjects ---------------------------------------------------------------
+
+export interface GsSubjectAvailabilityOut {
+  slug: string;
+  name: string;
+  /** True once the subject has reviewed topics with reviewed MCQs. */
+  available: boolean;
+  topics: number;
+  topics_with_mcqs: number;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -270,6 +281,13 @@ const unwrap = <T>(data: unknown): T => {
 };
 
 export const gsLmsService = {
+  /** Which GS subjects students can open (drives the sidebar's locks). */
+  getSubjects: async (): Promise<GsSubjectAvailabilityOut[]> => {
+    // Read on every page load, so an ended trial must not pop the dialog here.
+    const response = await apiClient.get('gs-lms/subjects', { skipUpgradePrompt: true });
+    return unwrap<GsSubjectAvailabilityOut[]>(response.data);
+  },
+
   // -------------------------------------------------------------------------
   // Syllabus
   // -------------------------------------------------------------------------
@@ -378,7 +396,10 @@ export const gsLmsService = {
       `gs-lms/${subject}/practice/${sessionId}/answer`,
       payload,
     );
-    return unwrap<PracticeSessionOut>(response.data);
+    // The backend answers with { session, attempt_result }. Returning the whole
+    // object as the session made every session end after the first answer.
+    const data = unwrap<{ session: PracticeSessionOut } | PracticeSessionOut>(response.data);
+    return "session" in data ? data.session : data;
   },
 
   /**

@@ -1,10 +1,13 @@
+import { resolveToken } from "@/lib/auth/token-strategy";
+
 // Discussion mentor client service. Tries the live AI route; falls back to a
 // structured, useful message when no AI key is configured yet.
 export async function askOptionalDoubt(input: { subject: string; context: string; message: string }): Promise<{ reply: string; live: boolean }> {
   try {
+    const token = await resolveToken();
     const res = await fetch("/api/optional/discuss", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(input),
     });
     const data = await res.json();

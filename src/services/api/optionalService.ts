@@ -988,7 +988,9 @@ export const optionalService = {
    * storage. Returns the honest "none selected" state for a fresh student.
    */
   getSelection: async (): Promise<SubjectSelectionOut> => {
-    const response = await apiClient.get('optional/selection');
+    // Read on page load (dashboard, catalog), so a plan without Optional must
+    // not pop the upgrade dialog here; choosing a subject still does.
+    const response = await apiClient.get('optional/selection', { skipUpgradePrompt: true });
     return unwrap<SubjectSelectionOut>(response.data);
   },
 

@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { isLocalMockMasterSession, isMasterEmail } from '@/lib/auth/master-access';
 import { activateUpscMasterPass } from '@/lib/upsc/masterPass';
+import { gsLmsService } from '@/services/api/gsLmsService';
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -29,6 +30,8 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   const { user, logout } = useAuth();
   const hasMasterAccess = isAdmin || isMasterEmail(user?.email) || isLocalMockMasterSession();
   const currentTab = currentSearchParams.get('tab');
+  const openSubjectSlugs = useOpenSubjectSlugs(!isAdmin && !!user);
+  const subjectSlug = (item: StudentNavItem) => item.href.split('/').pop() ?? '';
 
   const openMasterPass = () => {
     activateUpscMasterPass(user?.email, { notify: true });
@@ -110,7 +113,10 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                   More subjects
                 </p>
                 <div className="space-y-1">
-                  {lockedSubjectNavItems.map((item) => (
+                  {lockedSubjectNavItems.map((item) =>
+                    openSubjectSlugs.has(subjectSlug(item)) ? (
+                      renderNavLink(item)
+                    ) : (
                     <div
                       key={item.name}
                       aria-disabled
@@ -123,7 +129,8 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                         Soon
                       </span>
                     </div>
-                  ))}
+                    ),
+                  )}
                 </div>
               </div>
             </>
@@ -197,4 +204,24 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
       </aside>
     </>
   );
+}
+
+/** Slugs of GS subjects whose content is live. Until the backend answers (or
+ *  if it fails) every subject in `lockedSubjectNavItems` stays locked. */
+function useOpenSubjectSlugs(enabled: boolean): Set<string> {
+  const [slugs, setSlugs] = React.useState<Set<string>>(() => new Set());
+  React.useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    gsLmsService
+      .getSubjects()
+      .then((subjects) => {
+        if (!cancelled) setSlugs(new Set(subjects.filter((s) => s.available).map((s) => s.slug)));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+  return slugs;
 }

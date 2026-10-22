@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
+import { UpgradePrompt } from "@/components/shared/UpgradePrompt";
 import { isOperatorRoute } from "@/lib/navigation/studentNav";
 
 export default function DashboardLayout({
@@ -47,6 +48,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
+      <UpgradePrompt />
     </ProtectedRoute>
   );
 }

@@ -41,6 +41,7 @@
     ".next/dev",
     ".next-verify",
     ".next-build-verify",
-    "src/__tests__"
+    "src/__tests__",
+    "backend"
   ]
 }

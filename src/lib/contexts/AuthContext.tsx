@@ -230,7 +230,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clerkUser, isLoaded, isSignedIn, replaceRoute, devLogin]);
 
-  // Sync profile & progress back to Clerk unsafeMetadata when updated locally
+  // Mirror the (small) profile into Clerk unsafeMetadata when updated locally.
+  // Subject progress is saved to the backend only (see learnerPersistence);
+  // progress already in Clerk metadata is still hydrated above at sign-in.
   useEffect(() => {
     if (!isSignedIn || !clerkUser) return;
 
@@ -249,31 +251,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    const handleProgressUpdate = async (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { subjectSlug, progress } = customEvent.detail;
-      try {
-        const currentProgress = (clerkUser.unsafeMetadata?.progress as Record<string, any>) || {};
-        await clerkUser.update({
-          unsafeMetadata: {
-            ...clerkUser.unsafeMetadata,
-            progress: {
-              ...currentProgress,
-              [subjectSlug]: progress,
-            },
-          },
-        });
-      } catch (err) {
-        console.error("Clerk | Failed to save subject progress metadata:", err);
-      }
-    };
-
     window.addEventListener("sarit-upsc-profile-updated", handleProfileUpdate);
-    window.addEventListener("sarit-upsc-progress-updated", handleProgressUpdate);
 
     return () => {
       window.removeEventListener("sarit-upsc-profile-updated", handleProfileUpdate);
-      window.removeEventListener("sarit-upsc-progress-updated", handleProgressUpdate);
     };
   }, [isSignedIn, clerkUser]);
 

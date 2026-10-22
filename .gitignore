@@ -48,3 +48,15 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Backend secrets and local databases never go in git
+/backend/task-definition.json
+/backend/**/*.db
+/backend/.hypothesis/
+
+# Local browser profiles (hold cookies and saved logins) — never commit
+/.playwright*/
+
+# Playwright output
+/test-results/
+/playwright-report/

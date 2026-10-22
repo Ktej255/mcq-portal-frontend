@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   ListChecks,
+  Mail,
   Newspaper,
   RefreshCcw,
   Route,
@@ -197,4 +198,5 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Question Bank", href: "/admin/questions", icon: Database },
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
   { name: "Integrity Logs", href: "/admin/integrity", icon: ShieldAlert },
+  { name: "Leads", href: "/admin/leads", icon: Mail },
 ];
