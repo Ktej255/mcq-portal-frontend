@@ -100,6 +100,37 @@ class GsLmsAnswerAttemptStatusEnum(str, enum.Enum):
     FAILED = "FAILED"
 
 
+class GsLmsVersionLevelEnum(str, enum.Enum):
+    """How deep a concept version goes."""
+    BASIC = "BASIC"
+    STANDARD = "STANDARD"
+    ADVANCED = "ADVANCED"
+
+
+class GsLmsVersionStyleEnum(str, enum.Enum):
+    """How a concept version teaches."""
+    TEXT = "TEXT"
+    VISUAL = "VISUAL"
+    VIDEO = "VIDEO"
+    STORY = "STORY"
+
+
+class GsLmsVersionSourceEnum(str, enum.Enum):
+    """Where a concept version's material comes from."""
+    NCERT = "NCERT"
+    COACHING = "COACHING"
+    REFERENCE_BOOK = "REFERENCE_BOOK"
+    ORIGINAL = "ORIGINAL"
+
+
+class GsLmsStudyPathEnum(str, enum.Enum):
+    """What a student mainly studies from."""
+    COACHING = "COACHING"
+    REFERENCE_BOOKS = "REFERENCE_BOOKS"
+    NCERT_ONLY = "NCERT_ONLY"
+    MIXED = "MIXED"
+
+
 # ---------------------------------------------------------------------------
 # Syllabus Tree (self-referencing weighted tree)
 # ---------------------------------------------------------------------------
@@ -257,6 +288,129 @@ class GsLmsConcept(Base, InstitutionalAuditMixin):
 
     # Relationships
     syllabus_node = relationship("GsLmsSyllabusNode", back_populates="concepts")
+    versions = relationship(
+        "GsLmsConceptVersion",
+        back_populates="concept",
+        cascade="all, delete-orphan",
+        order_by="GsLmsConceptVersion.display_order",
+    )
+    book_refs = relationship(
+        "GsLmsConceptBookRef",
+        back_populates="concept",
+        cascade="all, delete-orphan",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Concept versions, books and learner profile
+# ---------------------------------------------------------------------------
+
+class GsLmsConceptVersion(Base, InstitutionalAuditMixin):
+    """One ready-made way of teaching a concept (level x style x source).
+
+    ``blocks`` use the same block format as ``GsLmsContentSection.blocks``.
+    ``app.core.gs_lms.versions`` picks the most suitable REVIEWED version for
+    each student.
+    """
+    __tablename__ = "gs_lms_concept_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "concept_id", "level", "style", "source",
+            name="uq_gs_lms_concept_versions_combo",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    concept_id = Column(
+        Integer, ForeignKey("gs_lms_concepts.id"), nullable=False, index=True
+    )
+    level = Column(Enum(GsLmsVersionLevelEnum), nullable=False)
+    style = Column(Enum(GsLmsVersionStyleEnum), nullable=False)
+    source = Column(Enum(GsLmsVersionSourceEnum), nullable=False)
+    title = Column(String, nullable=False)
+    blocks = Column(JSON, nullable=True)
+    video_url = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    display_order = Column(Integer, default=0, nullable=False)
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    concept = relationship("GsLmsConcept", back_populates="versions")
+
+
+class GsLmsBook(Base, InstitutionalAuditMixin):
+    """A book (and edition) students study from, e.g. Laxmikanth 7th edition."""
+    __tablename__ = "gs_lms_books"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String, nullable=False, unique=True, index=True)
+    title = Column(String, nullable=False)
+    author = Column(String, nullable=False)
+    edition = Column(String, nullable=False)
+    publisher = Column(String, nullable=True)
+    exam_tag = Column(String, default="UPSC", nullable=False)
+    subject_slug = Column(String, nullable=True, index=True)
+
+    chapters = relationship(
+        "GsLmsBookChapter",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        order_by="GsLmsBookChapter.number",
+    )
+
+
+class GsLmsBookChapter(Base):
+    """A numbered chapter of a book."""
+    __tablename__ = "gs_lms_book_chapters"
+    __table_args__ = (
+        UniqueConstraint("book_id", "number", name="uq_gs_lms_book_chapters_number"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    book_id = Column(
+        Integer, ForeignKey("gs_lms_books.id"), nullable=False, index=True
+    )
+    number = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+
+    book = relationship("GsLmsBook", back_populates="chapters")
+
+
+class GsLmsConceptBookRef(Base):
+    """Where a concept is covered in a book: a chapter and optional pages."""
+    __tablename__ = "gs_lms_concept_book_refs"
+
+    concept_id = Column(
+        Integer, ForeignKey("gs_lms_concepts.id"), primary_key=True
+    )
+    chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), primary_key=True, index=True
+    )
+    pages = Column(String, nullable=True)
+
+    concept = relationship("GsLmsConcept", back_populates="book_refs")
+    chapter = relationship("GsLmsBookChapter")
+
+
+class GsLmsLearnerProfile(Base, InstitutionalAuditMixin):
+    """A student's learning preferences, used to pick concept versions."""
+    __tablename__ = "gs_lms_learner_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True
+    )
+    preferred_style = Column(Enum(GsLmsVersionStyleEnum), nullable=True)
+    preferred_level = Column(Enum(GsLmsVersionLevelEnum), nullable=True)
+    study_path = Column(Enum(GsLmsStudyPathEnum), nullable=True)
+    # JSON list of GsLmsBook ids the student studies from.
+    book_ids = Column(JSON, nullable=True)
+
+    student = relationship("User")
 
 
 # ---------------------------------------------------------------------------
@@ -484,10 +638,19 @@ __all__ = [
     "GsLmsPaperEnum",
     "GsLmsAnswerModeEnum",
     "GsLmsAnswerAttemptStatusEnum",
+    "GsLmsVersionLevelEnum",
+    "GsLmsVersionStyleEnum",
+    "GsLmsVersionSourceEnum",
+    "GsLmsStudyPathEnum",
     # Models
     "GsLmsSyllabusNode",
     "GsLmsContentSection",
     "GsLmsConcept",
+    "GsLmsConceptVersion",
+    "GsLmsBook",
+    "GsLmsBookChapter",
+    "GsLmsConceptBookRef",
+    "GsLmsLearnerProfile",
     "GsLmsPyq",
     "GsLmsMcqQuestion",
     "GsLmsAnswerAttempt",

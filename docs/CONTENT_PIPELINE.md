@@ -45,6 +45,92 @@ Geography file shows every block type in use (`para`, `heading`, `callout`,
 Write a whole mega-topic before starting the next one, so each import gives
 students something complete.
 
+## Optional: versions, books and book references
+
+A concept can be explained in several ready-made ways. The app then shows each
+student the version that suits them. You write the versions yourself; nothing is
+generated. All of this is optional, and a file without it works exactly as before.
+
+### Versions
+
+Add a `versions` list to a concept. Each version has:
+
+| Field | Meaning |
+|---|---|
+| `level` | `BASIC` (first time, simple words), `STANDARD` (the normal depth), `ADVANCED` (exam-depth detail) |
+| `style` | `TEXT`, `VISUAL` (tables, comparisons, key terms), `VIDEO`, `STORY` |
+| `source` | Where the material comes from: `NCERT`, `COACHING`, `REFERENCE_BOOK`, `ORIGINAL` (written by us) |
+| `title` | Short heading the student sees |
+| `blocks` | The content, in the same block format as the topic sections (`para`, `callout`, `compare`, `keyterms`, ...) |
+| `video_url` | Optional link starting `http://` or `https://`. A `VIDEO` version may have only this and no blocks |
+| `duration_minutes` | Optional reading or watching time |
+
+A concept can have only one version of each level + style + source
+combination. Every version needs `blocks`, a `video_url`, or both.
+
+How a student's version is chosen: a student who has tried the concept twice
+or more without passing gets `BASIC` first; otherwise their preferred level (or
+`STANDARD`). Then their preferred style, then the source that matches how they
+study (NCERT only, coaching, or reference books). If the exact match does not
+exist, the nearest one is shown, so you do not need all 24 combinations. One
+good `STANDARD` + `TEXT` version per concept is a sound start.
+
+By default a concept with no versions is fine. To make versions compulsory, add
+`"require_versions": true` at the top of the file: every concept without one is
+then reported as a gap.
+
+### Books and book references
+
+Students study from different books and editions (for example Laxmikanth 7th
+and 8th edition), and chapter numbers change between editions. So list each
+book edition once, at the top of the file, and point concepts at its chapters:
+
+```json
+"books": [
+  {
+    "slug": "laxmikanth-indian-polity-7e",
+    "title": "Indian Polity",
+    "author": "M. Laxmikanth",
+    "edition": "7th",
+    "publisher": "McGraw Hill Education",
+    "chapters": [{ "number": 1, "title": "Preamble of the Constitution" }]
+  }
+],
+"tree": [ ... ]
+```
+
+On a concept:
+
+```json
+"book_refs": [
+  { "book": "laxmikanth-indian-polity-7e", "chapter": 1, "pages": "12-15" }
+],
+"versions": [
+  {
+    "level": "BASIC", "style": "TEXT", "source": "ORIGINAL",
+    "title": "The five descriptions, in plain words",
+    "blocks": [{ "type": "para", "text": "..." }]
+  }
+]
+```
+
+- `slug` is a unique short name for the book edition. Use a new slug for a new
+  edition (`...-8e`); do not reuse the old one.
+- `book` in a reference must be a slug listed under `books` **in the same file**,
+  and `chapter` must be a chapter number listed for that book. The check reports
+  an error otherwise.
+- `pages` is optional text such as `"12-15"`; leave it out or `null` if unsure.
+- Only list chapters whose numbers and titles you have checked in that edition.
+
+The check reports as **errors**: a level, style or source that is not in the
+lists above, the same combination twice in one concept, a version with no
+content, a video link that is not `http(s)`, a reference to an unlisted book or
+chapter, and two books with the same slug.
+
+Importing again updates the same books, chapters, versions and references; it
+does not duplicate them. Versions follow the same review step as other content:
+they are hidden from students until the import uses `--review-status REVIEWED`.
+
 ## 2. Check it
 
 ```bash

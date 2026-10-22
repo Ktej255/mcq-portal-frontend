@@ -8,11 +8,15 @@ The importer handles:
   2. Content sections per leaf node (5 sections each with blocks)
   3. PYQs (Prelims + Mains with metadata)
   4. MCQ questions (with options, correct answer, type classification)
-  5. Concepts per leaf node (title, key points, misconceptions)
+  5. Concepts per leaf node (title, key points, misconceptions), each with
+     optional ready-made versions and book references
+  6. Books and their chapters (top-level "books" list, imported before the tree)
 
 Idempotency strategy: match existing records by (title + parent_id) for tree
 nodes, (syllabus_node_id + section_label) for content sections,
-(syllabus_node_id + title) for concepts, and
+(syllabus_node_id + title) for concepts, (concept_id + level + style + source)
+for concept versions, slug for books, (book_id + number) for chapters,
+(concept_id + chapter_id) for book refs, and
 (syllabus_node_id + question_text) for PYQs/MCQs. On re-run, existing records
 are updated rather than duplicated — running twice produces the same DB state
 as running once (Design Property 20).
@@ -42,6 +46,13 @@ from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
     GsLmsConcept,
+    GsLmsConceptVersion,
+    GsLmsBook,
+    GsLmsBookChapter,
+    GsLmsConceptBookRef,
+    GsLmsVersionLevelEnum,
+    GsLmsVersionStyleEnum,
+    GsLmsVersionSourceEnum,
     GsLmsPyq,
     GsLmsMcqQuestion,
     GsLmsNodeTypeEnum,
@@ -125,6 +136,10 @@ def import_syllabus_tree(
         "pyqs_updated": 0,
         "mcqs_created": 0,
         "mcqs_updated": 0,
+        "versions_created": 0,
+        "versions_updated": 0,
+        "book_refs_created": 0,
+        "book_refs_updated": 0,
     }
 
     for node_data in tree_data:
@@ -164,6 +179,10 @@ def _import_node(
         "pyqs_updated": 0,
         "mcqs_created": 0,
         "mcqs_updated": 0,
+        "versions_created": 0,
+        "versions_updated": 0,
+        "book_refs_created": 0,
+        "book_refs_updated": 0,
     }
 
     title = node_data["title"]
@@ -236,6 +255,8 @@ def _import_node(
         )
         counts["concepts_created"] += concept_counts["created"]
         counts["concepts_updated"] += concept_counts["updated"]
+        for key in ("versions_created", "versions_updated", "book_refs_created", "book_refs_updated"):
+            counts[key] += concept_counts[key]
 
     # Import PYQs for this node (if provided).
     pyqs_data = node_data.get("pyqs")
@@ -357,14 +378,17 @@ def import_concepts(
       - key_points (list[str]): 2-6 short phrases a student must convey
       - misconceptions (list[str] | None): Common wrong beliefs
       - display_order (int | None): Defaults to the concept's position in the list
+      - versions (list[dict] | None): see ``import_concept_versions``
+      - book_refs (list[dict] | None): see ``import_book_refs``
 
     Idempotency: matches by (syllabus_node_id + title).
 
-    Returns counts of created and updated concepts.
+    Returns counts of created and updated concepts, versions and book refs.
     """
     rs_enum = GsReviewStatusEnum(review_status)
     created = 0
     updated = 0
+    extra = {"versions_created": 0, "versions_updated": 0, "book_refs_created": 0, "book_refs_updated": 0}
 
     for position, c_data in enumerate(concepts_data, start=1):
         title = c_data["title"].strip()
@@ -384,22 +408,167 @@ def import_concepts(
             existing.display_order = display_order
             existing.review_status = rs_enum
             existing.updated_by = _ACTOR
+            concept = existing
+            updated += 1
+        else:
+            concept = GsLmsConcept(
+                syllabus_node_id=node_id,
+                title=title,
+                key_points=c_data["key_points"],
+                misconceptions=c_data.get("misconceptions"),
+                display_order=display_order,
+                review_status=rs_enum,
+                created_by=_ACTOR,
+                updated_by=_ACTOR,
+            )
+            db.add(concept)
+            db.flush()
+            created += 1
+
+        if c_data.get("versions"):
+            v = import_concept_versions(db, c_data["versions"], concept.id, review_status=review_status)
+            extra["versions_created"] += v["created"]
+            extra["versions_updated"] += v["updated"]
+        if c_data.get("book_refs"):
+            r = import_book_refs(db, c_data["book_refs"], concept.id)
+            extra["book_refs_created"] += r["created"]
+            extra["book_refs_updated"] += r["updated"]
+
+    db.flush()
+    return {"created": created, "updated": updated, **extra}
+
+
+# ---------------------------------------------------------------------------
+# Concept versions, books and book refs
+# ---------------------------------------------------------------------------
+
+
+def import_concept_versions(
+    db: Session,
+    versions_data: list[dict[str, Any]],
+    concept_id: int,
+    *,
+    review_status: str = "UNREVIEWED",
+) -> dict[str, int]:
+    """Import the ready-made versions of one concept.
+
+    Each dict has: level, style, source (enum names), title, blocks,
+    video_url (optional), duration_minutes (optional), display_order (optional,
+    defaults to the position in the list).
+
+    Idempotency: matches by (concept_id + level + style + source). Versions get
+    the same review_status as the rest of the import.
+    """
+    rs_enum = GsReviewStatusEnum(review_status)
+    created = updated = 0
+    for position, v_data in enumerate(versions_data, start=1):
+        level = GsLmsVersionLevelEnum(v_data["level"])
+        style = GsLmsVersionStyleEnum(v_data["style"])
+        source = GsLmsVersionSourceEnum(v_data["source"])
+        row = (
+            db.query(GsLmsConceptVersion)
+            .filter(
+                GsLmsConceptVersion.concept_id == concept_id,
+                GsLmsConceptVersion.level == level,
+                GsLmsConceptVersion.style == style,
+                GsLmsConceptVersion.source == source,
+            )
+            .one_or_none()
+        )
+        fields = dict(
+            title=v_data["title"].strip(),
+            blocks=v_data.get("blocks"),
+            video_url=v_data.get("video_url"),
+            duration_minutes=v_data.get("duration_minutes"),
+            display_order=v_data.get("display_order", position),
+            review_status=rs_enum,
+            updated_by=_ACTOR,
+        )
+        if row:
+            for key, value in fields.items():
+                setattr(row, key, value)
             updated += 1
         else:
             db.add(
-                GsLmsConcept(
-                    syllabus_node_id=node_id,
-                    title=title,
-                    key_points=c_data["key_points"],
-                    misconceptions=c_data.get("misconceptions"),
-                    display_order=display_order,
-                    review_status=rs_enum,
-                    created_by=_ACTOR,
-                    updated_by=_ACTOR,
+                GsLmsConceptVersion(
+                    concept_id=concept_id, level=level, style=style, source=source,
+                    created_by=_ACTOR, **fields,
                 )
             )
             created += 1
+    db.flush()
+    return {"created": created, "updated": updated}
 
+
+def import_books(db: Session, books_data: list[dict[str, Any]]) -> dict[str, int]:
+    """Import books and their chapters.
+
+    Each book dict has: slug, title, author, edition, publisher (optional),
+    exam_tag (optional, default "UPSC"), subject_slug (optional), chapters
+    ([{number, title}]). Idempotency: books match by slug, chapters by
+    (book + number). Books are not review-gated.
+    """
+    counts = {"books_created": 0, "books_updated": 0, "chapters_created": 0, "chapters_updated": 0}
+    for b_data in books_data:
+        slug = b_data["slug"].strip()
+        fields = dict(
+            title=b_data["title"].strip(),
+            author=b_data["author"].strip(),
+            edition=str(b_data["edition"]).strip(),
+            publisher=b_data.get("publisher"),
+            exam_tag=b_data.get("exam_tag") or "UPSC",
+            subject_slug=b_data.get("subject_slug"),
+            updated_by=_ACTOR,
+        )
+        book = db.query(GsLmsBook).filter(GsLmsBook.slug == slug).one_or_none()
+        if book:
+            for key, value in fields.items():
+                setattr(book, key, value)
+            counts["books_updated"] += 1
+        else:
+            book = GsLmsBook(slug=slug, created_by=_ACTOR, **fields)
+            db.add(book)
+            counts["books_created"] += 1
+        db.flush()
+        for c_data in b_data.get("chapters") or []:
+            chapter = (
+                db.query(GsLmsBookChapter)
+                .filter(GsLmsBookChapter.book_id == book.id, GsLmsBookChapter.number == c_data["number"])
+                .one_or_none()
+            )
+            if chapter:
+                chapter.title = c_data["title"].strip()
+                counts["chapters_updated"] += 1
+            else:
+                db.add(GsLmsBookChapter(book_id=book.id, number=c_data["number"], title=c_data["title"].strip()))
+                counts["chapters_created"] += 1
+        db.flush()
+    return counts
+
+
+def import_book_refs(db: Session, refs_data: list[dict[str, Any]], concept_id: int) -> dict[str, int]:
+    """Link a concept to book chapters: [{book: slug, chapter: number, pages}].
+
+    Idempotency: matches by (concept_id + chapter_id). The book and chapter
+    must already exist (``import_books`` runs first).
+    """
+    created = updated = 0
+    for r_data in refs_data:
+        chapter = (
+            db.query(GsLmsBookChapter)
+            .join(GsLmsBook, GsLmsBook.id == GsLmsBookChapter.book_id)
+            .filter(GsLmsBook.slug == r_data["book"], GsLmsBookChapter.number == r_data["chapter"])
+            .one_or_none()
+        )
+        if chapter is None:
+            raise ValueError(f"Book chapter {r_data['book']!r} #{r_data['chapter']} not found.")
+        row = db.get(GsLmsConceptBookRef, (concept_id, chapter.id))
+        if row:
+            row.pages = r_data.get("pages")
+            updated += 1
+        else:
+            db.add(GsLmsConceptBookRef(concept_id=concept_id, chapter_id=chapter.id, pages=r_data.get("pages")))
+            created += 1
     db.flush()
     return {"created": created, "updated": updated}
 
@@ -716,12 +885,14 @@ def import_gs_subject(
             "run scripts/seed_production.py first to create the subjects."
         )
 
+    book_counts = import_books(db, data.get("books") or [])
     counts = import_syllabus_tree(
         db,
         data.get("tree", []),
         subject.id,
         review_status=review_status,
     )
+    counts.update(book_counts)
 
     subject.completeness_status = report.summary()
     subject.is_complete = report.ready

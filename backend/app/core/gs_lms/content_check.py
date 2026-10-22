@@ -13,6 +13,13 @@ Two kinds of findings:
 ``check_subject_content`` returns a report; ``format_report`` turns it into the
 text the importer CLI prints. A subject is "ready" when it has no errors and
 no gaps.
+
+Concept versions and books (all optional): a concept may carry ``versions``
+(level / style / source plus blocks and/or a video_url) and ``book_refs`` (a
+book slug, chapter number and pages). Books are declared once at the top of the
+file under ``"books"``. The checker only sees the file, so every book a
+``book_refs`` entry names must be declared in that same file. A concept without
+versions is a gap only when the file sets ``"require_versions": true``.
 """
 
 from __future__ import annotations
@@ -26,6 +33,9 @@ from app.core.gs_lms.models import (
     GsLmsNodeTypeEnum,
     GsLmsQuestionTypeEnum,
     GsLmsSectionLabelEnum,
+    GsLmsVersionLevelEnum,
+    GsLmsVersionSourceEnum,
+    GsLmsVersionStyleEnum,
 )
 
 # The MCQ Lab serves exactly this many questions per topic.
@@ -39,6 +49,9 @@ OPTION_LABELS = ["A", "B", "C", "D"]
 _NODE_TYPES = {e.value for e in GsLmsNodeTypeEnum}
 _QUESTION_TYPES = {e.value for e in GsLmsQuestionTypeEnum}
 _EXAM_TYPES = {e.value for e in GsLmsExamTypeEnum}
+_VERSION_LEVELS = {e.value for e in GsLmsVersionLevelEnum}
+_VERSION_STYLES = {e.value for e in GsLmsVersionStyleEnum}
+_VERSION_SOURCES = {e.value for e in GsLmsVersionSourceEnum}
 
 
 @dataclass
@@ -54,8 +67,14 @@ class ContentReport:
     sub_topics: int = 0
     sections: int = 0
     concepts: int = 0
+    versions: int = 0
+    books: int = 0
     mcqs: int = 0
     pyqs: int = 0
+    # Set from the file's top-level "require_versions" flag.
+    require_versions: bool = False
+    # Book slug -> chapter numbers listed for it in the file (for book_refs checks).
+    book_chapters: dict[str, set[int]] = field(default_factory=dict, repr=False)
 
     @property
     def ok_to_import(self) -> bool:
@@ -80,6 +99,8 @@ class ContentReport:
             "sub_topics": self.sub_topics,
             "sections": self.sections,
             "concepts": self.concepts,
+            "versions": self.versions,
+            "books": self.books,
             "mcqs": self.mcqs,
             "pyqs": self.pyqs,
             "gaps": len(self.gaps),
@@ -97,6 +118,8 @@ def check_subject_content(data: dict[str, Any]) -> ContentReport:
         report.gaps.append("The tree has no topics yet.")
     if not (data.get("subject_slug") or data.get("subject_id")):
         report.errors.append('The file needs "subject_slug" (e.g. "polity-governance").')
+    report.require_versions = data.get("require_versions") is True
+    _check_books(_items(data.get("books"), "books", report), report)
     _check_siblings(tree, "", report)
     return report
 
@@ -213,8 +236,106 @@ def _check_concepts(concepts: list[Any], path: str, report: ContentReport) -> No
         misconceptions = _items(concept.get("misconceptions"), f"{where}: misconceptions", report)
         if any(not _text(m) for m in misconceptions):
             report.errors.append(f"{where} has a blank misconception.")
+        versions = _items(concept.get("versions"), f"{where}: versions", report)
+        _check_versions(versions, where, report)
+        if report.require_versions and not versions:
+            report.gaps.append(f"{where} has no versions.")
+        _check_book_refs(_items(concept.get("book_refs"), f"{where}: book_refs", report), where, report)
     if not concepts:
         report.gaps.append(f"{path}: no concepts.")
+
+
+def _check_books(books: list[Any], report: ContentReport) -> None:
+    for i, book in enumerate(books, start=1):
+        if not isinstance(book, dict):
+            report.errors.append(f"books: book {i} must be an object.")
+            continue
+        slug = _text(book.get("slug"))
+        where = f'books: book {i}' + (f' "{slug}"' if slug else "")
+        if not slug:
+            report.errors.append(f"{where} has no slug.")
+        elif slug in report.book_chapters:
+            report.errors.append(f'{where}: another book already uses the slug "{slug}".')
+        for key in ("title", "author", "edition"):
+            if not _text(book.get(key)):
+                report.errors.append(f"{where} has no {key}.")
+        report.books += 1
+        numbers: set[int] = set()
+        for j, chapter in enumerate(_items(book.get("chapters"), f"{where}: chapters", report), start=1):
+            number = chapter.get("number") if isinstance(chapter, dict) else None
+            if not isinstance(number, int) or isinstance(number, bool):
+                report.errors.append(f"{where}: chapter {j} needs a whole-number \"number\".")
+                continue
+            if number in numbers:
+                report.errors.append(f"{where}: chapter number {number} is listed twice.")
+            numbers.add(number)
+            if not _text(chapter.get("title")):
+                report.errors.append(f"{where}: chapter {number} has no title.")
+        if slug:
+            report.book_chapters.setdefault(slug, set()).update(numbers)
+
+
+def _check_versions(versions: list[Any], where: str, report: ContentReport) -> None:
+    seen = set()
+    for i, version in enumerate(versions, start=1):
+        label = f"{where}: version {i}"
+        if not isinstance(version, dict):
+            report.errors.append(f"{label} must be an object.")
+            continue
+        report.versions += 1
+        level, style, source = version.get("level"), version.get("style"), version.get("source")
+        valid = True
+        for name, value, allowed in (
+            ("level", level, _VERSION_LEVELS),
+            ("style", style, _VERSION_STYLES),
+            ("source", source, _VERSION_SOURCES),
+        ):
+            if value not in allowed:
+                report.errors.append(f"{label}: {name} {value!r} must be one of {sorted(allowed)}.")
+                valid = False
+        if valid:
+            combo = (level, style, source)
+            if combo in seen:
+                report.errors.append(f"{label}: another version of this concept is already {level}/{style}/{source}.")
+            seen.add(combo)
+        if not _text(version.get("title")):
+            report.errors.append(f"{label} has no title.")
+        blocks = version.get("blocks")
+        if blocks is not None and (not isinstance(blocks, list) or any(not isinstance(b, dict) for b in blocks)):
+            report.errors.append(f"{label}: blocks must be a list of objects.")
+            blocks = None
+        video_url = version.get("video_url")
+        if video_url is not None and not (
+            isinstance(video_url, str) and video_url.strip().lower().startswith(("http://", "https://"))
+        ):
+            report.errors.append(f"{label}: video_url {video_url!r} must start with http:// or https://.")
+        if not blocks and not video_url:
+            report.errors.append(f"{label} has neither blocks nor a video_url.")
+        minutes = version.get("duration_minutes")
+        if minutes is not None and (not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 0):
+            report.errors.append(f"{label}: duration_minutes must be a whole number of minutes.")
+
+
+def _check_book_refs(refs: list[Any], where: str, report: ContentReport) -> None:
+    seen = set()
+    for i, ref in enumerate(refs, start=1):
+        label = f"{where}: book_ref {i}"
+        if not isinstance(ref, dict):
+            report.errors.append(f"{label} must be an object.")
+            continue
+        slug, chapter = ref.get("book"), ref.get("chapter")
+        if not isinstance(slug, str) or slug not in report.book_chapters:
+            report.errors.append(f'{label}: book {slug!r} is not listed under "books" in this file.')
+            continue
+        if not isinstance(chapter, int) or isinstance(chapter, bool) or chapter not in report.book_chapters[slug]:
+            report.errors.append(f'{label}: chapter {chapter!r} is not listed for book "{slug}".')
+            continue
+        if (slug, chapter) in seen:
+            report.errors.append(f'{label}: chapter {chapter} of "{slug}" is referenced twice.')
+        seen.add((slug, chapter))
+        pages = ref.get("pages")
+        if pages is not None and not isinstance(pages, str):
+            report.errors.append(f'{label}: pages must be text such as "12-15".')
 
 
 def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
@@ -271,6 +392,8 @@ def format_report(report: ContentReport, *, max_lines: int = 40) -> str:
         f"({report.mega_topics} mega-topics, {report.sub_topics} sub-topics)",
         f"Content: {report.sections} sections, {report.concepts} concepts, {report.mcqs} MCQs, {report.pyqs} PYQs",
     ]
+    if report.versions or report.books:
+        lines.append(f"Versions and books: {report.versions} concept versions, {report.books} books")
     for heading, items in (("ERRORS (fix before importing)", report.errors), ("Gaps (topic not ready yet)", report.gaps)):
         if items:
             lines.append(f"{heading}: {len(items)}")

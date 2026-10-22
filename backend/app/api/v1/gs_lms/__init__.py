@@ -20,6 +20,7 @@ from app.api.dependencies import get_current_user
 from app.api.v1.gs_lms import syllabus
 from app.api.v1.gs_lms import content
 from app.api.v1.gs_lms import concepts
+from app.api.v1.gs_lms import concept_versions
 from app.api.v1.gs_lms import pyqs
 from app.api.v1.gs_lms import practice
 from app.api.v1.gs_lms import discussion
@@ -49,6 +50,8 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 # Not subject-specific: lists the subjects and whether students can open them.
 router.include_router(subjects.router, tags=["gs-lms"])
+# Learner profile and books are per-student / cross-subject, so also not under a slug.
+router.include_router(concept_versions.global_router, tags=["gs-lms"])
 
 # Subject-specific routes are mounted under /{subject_slug}/ prefix.
 # The subject_slug is a path parameter resolved in each endpoint via the
@@ -56,6 +59,7 @@ router.include_router(subjects.router, tags=["gs-lms"])
 router.include_router(syllabus.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(content.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(concepts.router, prefix="/{subject_slug}", tags=["gs-lms"])
+router.include_router(concept_versions.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(pyqs.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(practice.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(discussion.router, prefix="/{subject_slug}", tags=["gs-lms"])

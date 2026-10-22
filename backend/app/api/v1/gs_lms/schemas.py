@@ -108,6 +108,16 @@ class GsLmsConceptMasteryOut(BaseModel):
     last_assessed_at: Optional[str] = None
 
 
+class GsLmsBookRefOut(BaseModel):
+    """Where a concept is covered in a book edition."""
+    book_slug: str
+    book_title: str
+    edition: str
+    chapter_number: int
+    chapter_title: str
+    pages: Optional[str] = None
+
+
 class GsLmsConceptOut(BaseModel):
     concept_id: int
     title: str
@@ -115,6 +125,9 @@ class GsLmsConceptOut(BaseModel):
     key_points: list[str]
     misconceptions: list[str] = []
     mastery: GsLmsConceptMasteryOut
+    # Number of REVIEWED ready-made versions students can be shown.
+    versions_count: int = 0
+    book_refs: list[GsLmsBookRefOut] = []
 
 
 class GsLmsTopicMasteryOut(BaseModel):
