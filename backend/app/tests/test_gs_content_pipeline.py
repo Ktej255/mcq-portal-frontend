@@ -99,6 +99,64 @@ def test_checker_reports_unfinished_topics_as_gaps():
     assert "no PYQs" in gaps
 
 
+def test_blank_and_null_fields_are_errors_not_text():
+    data = _template()
+    leaf = _leaf(data)
+    leaf["mcq_questions"][0]["question_text"] = None
+    leaf["mcq_questions"][1]["options"][0]["text"] = None
+    leaf["mcq_questions"][2]["explanation"] = None
+    leaf["pyqs"][0]["question_text"] = None
+    data["tree"][0]["title"] = None
+
+    report = check_subject_content(data)
+    errors = "\n".join(report.errors)
+    assert "MCQ 1 has no question_text" in errors
+    assert "MCQ 2 needs exactly four options" in errors
+    assert "PYQ 1 has no question_text" in errors
+    assert "topic has no title" in errors
+    assert "MCQ 3 has no explanation" in "\n".join(report.gaps)
+    assert not report.ready
+
+
+def test_wrong_shapes_are_reported_not_crashed_on():
+    data = _template()
+    leaf = _leaf(data)
+    leaf["mcq_questions"][0]["options"][0] = "Option A as a bare string"
+    leaf["mcq_questions"][1]["options"] = "A, B, C, D"
+    leaf["content_sections"] = 5
+
+    report = check_subject_content(data)
+    errors = "\n".join(report.errors)
+    assert "MCQ 1 needs exactly four options" in errors
+    assert "MCQ 2 needs exactly four options" in errors
+    assert "content_sections must be a list" in errors
+    assert not report.ok_to_import
+
+
+def test_titles_that_differ_only_in_case_are_different_topics():
+    data = _template()
+    mega = data["tree"][0]
+    sibling = copy.deepcopy(mega["children"][0])
+    sibling["title"] = sibling["title"].upper()
+    mega["children"].append(sibling)
+
+    report = check_subject_content(data)
+    assert report.errors == [], format_report(report)
+
+
+def test_an_unwritten_sub_topic_keeps_the_subject_from_being_ready():
+    data = _template()
+    data["tree"][0]["children"].append(
+        {"title": "Parliament (not written yet)", "node_type": "SUB_TOPIC", "display_order": 2, "children": []}
+    )
+
+    report = check_subject_content(data)
+    assert report.ok_to_import
+    assert report.unfinished == 1
+    assert not report.ready
+    assert report.summary()["ready"] is False
+
+
 # ---- importer --------------------------------------------------------------
 
 
@@ -129,6 +187,19 @@ def test_import_needs_an_existing_subject(session_factory):
     with session_factory() as db:
         with pytest.raises(ValueError, match="not found"):
             import_gs_subject(db, _template(), subject_slug="economy")
+
+
+def test_import_keeps_a_subject_incomplete_while_a_topic_is_unwritten(session_factory):
+    data = _template()
+    data["tree"][0]["children"].append(
+        {"title": "Parliament (not written yet)", "node_type": "SUB_TOPIC", "display_order": 2, "children": []}
+    )
+    with session_factory() as db:
+        import_gs_subject(db, data, review_status="REVIEWED")
+        db.commit()
+        subject = db.query(GsSubject).filter_by(slug="polity-governance").one()
+        assert subject.is_complete is False
+        assert subject.completeness_status["unfinished"] == 1
 
 
 # ---- subjects endpoint -----------------------------------------------------

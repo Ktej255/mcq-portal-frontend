@@ -60,7 +60,10 @@ python -m app.core.gs_lms.importer --artifact app/core/gs_lms/data/gs_polity_syl
 ```
 
 By default content is imported as `UNREVIEWED`: it is in the database but hidden
-from students. Re-running the import updates what is there; it never duplicates.
+from students. Re-running the import updates the same topics and questions.
+Topics are matched by their exact title and questions by their exact text. If you
+rename a topic or reword a question, the old copy stays in the database, so ask a
+developer to remove it before you open the subject.
 
 Have a subject expert check every fact, MCQ answer and explanation (the Preamble
 example included).

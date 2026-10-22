@@ -19,3 +19,4 @@ python-dateutil==2.9.0.post0
 resend==2.7.0
 anyio==4.15.1
 email-validator==2.3.0
+boto3==1.43.117

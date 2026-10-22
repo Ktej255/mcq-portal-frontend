@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "MCQ Intelligence Portal"
     
     # DB Configuration
-    DATABASE_URL: Optional[str] = "postgresql://postgres:password@localhost:5432/mcq_portal"
+    # No password here: set DATABASE_URL (with credentials) in the environment or .env.
+    DATABASE_URL: Optional[str] = "postgresql://localhost:5432/mcq_portal"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

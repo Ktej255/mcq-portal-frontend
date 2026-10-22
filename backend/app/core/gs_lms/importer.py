@@ -5,7 +5,7 @@ Mirrors the Optional platform ``importer.py`` pattern: takes a JSON artifact
 
 The importer handles:
   1. Syllabus tree nodes (with parent relationships, node types, weights, ordering)
-  2. Content sections per leaf node (4 sections each with blocks)
+  2. Content sections per leaf node (5 sections each with blocks)
   3. PYQs (Prelims + Mains with metadata)
   4. MCQ questions (with options, correct answer, type classification)
 
@@ -265,7 +265,7 @@ def import_content_sections(
     """Import content sections for a syllabus node.
 
     Each section dict has keys:
-      - section_label (str): BASIC, ADVANCED, NCERT_LEVEL, or EXAMINER_TRAPS
+      - section_label (str): BASIC, ADVANCED, NCERT_LEVEL, CURRENT_AFFAIRS, or EXAMINER_TRAPS
       - title (str): Section title
       - blocks (list[dict]): Content blocks
       - display_order (int): 1-4

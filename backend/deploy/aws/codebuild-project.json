@@ -2,9 +2,9 @@
   "name": "mcq-portal-backend-builder",
   "source": {
     "type": "GITHUB",
-    "location": "https://github.com/Ktej255/mcq-portal-backend.git",
+    "location": "https://github.com/Ktej255/mcq-portal-frontend.git",
     "gitCloneDepth": 1,
-    "buildspec": "buildspec.yml"
+    "buildspec": "backend/buildspec.yml"
   },
   "artifacts": {
     "type": "NO_ARTIFACTS"

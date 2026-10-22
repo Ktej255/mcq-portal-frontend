@@ -79,7 +79,7 @@ or `*`). Provided values are merged with the defaults.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string (`postgres://` is auto-upgraded to `postgresql://`) | `postgresql://postgres:password@localhost:5432/mcq_portal` |
+| `DATABASE_URL` | PostgreSQL connection string (`postgres://` is auto-upgraded to `postgresql://`) | none; set it in your `.env`, e.g. `postgresql://USER:PASSWORD@localhost:5432/mcq_portal` |
 | `BACKEND_CORS_ORIGINS` | Allowed origins (merged with defaults) | see CORS defaults above |
 | `CLERK_JWT_KEY` | Clerk JWT public key (PEM) used to verify session tokens. Required in production | _unset_ |
 | `ALLOW_MOCK_AUTH` | Accept `MOCK_TOKEN` for local/e2e testing only. Must be `false` in production | `false` |

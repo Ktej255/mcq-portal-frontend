@@ -7,10 +7,12 @@ Two kinds of findings:
              its options, two sibling topics with the same title, ...).
 * gaps     — the file is valid but a topic is not ready for students yet
              (missing one of the five sections, fewer MCQs than the MCQ Lab
-             needs, an MCQ without an explanation, no PYQs).
+             needs, an MCQ without an explanation, no PYQs, a mega- or
+             sub-topic with no topics under it).
 
 ``check_subject_content`` returns a report; ``format_report`` turns it into the
-text the importer CLI prints. A topic is "ready" when it has no gaps.
+text the importer CLI prints. A subject is "ready" when it has no errors and
+no gaps.
 """
 
 from __future__ import annotations
@@ -42,6 +44,9 @@ class ContentReport:
     gaps: list[str] = field(default_factory=list)
     topics: int = 0
     topics_ready: int = 0
+    # Mega- or sub-topics with nothing under them yet. They keep the subject
+    # from counting as ready, so a half-written syllabus is never marked complete.
+    unfinished: int = 0
     mega_topics: int = 0
     sub_topics: int = 0
     sections: int = 0
@@ -54,13 +59,19 @@ class ContentReport:
 
     @property
     def ready(self) -> bool:
-        return not self.errors and self.topics > 0 and self.topics_ready == self.topics
+        return (
+            not self.errors
+            and self.topics > 0
+            and self.topics_ready == self.topics
+            and self.unfinished == 0
+        )
 
     def summary(self) -> dict[str, Any]:
         """Compact stats stored on GsSubject.completeness_status."""
         return {
             "topics": self.topics,
             "topics_ready": self.topics_ready,
+            "unfinished": self.unfinished,
             "mega_topics": self.mega_topics,
             "sub_topics": self.sub_topics,
             "sections": self.sections,
@@ -85,11 +96,30 @@ def check_subject_content(data: dict[str, Any]) -> ContentReport:
     return report
 
 
+def _text(value: Any) -> str:
+    """A field's text, stripped. Empty when the field is missing, null or not a string."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _items(value: Any, label: str, report: ContentReport) -> list[Any]:
+    """The items of a list field. Anything else is reported as an error, not a crash."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    report.errors.append(f"{label} must be a list.")
+    return []
+
+
 def _check_siblings(nodes: list[Any], path: str, report: ContentReport) -> None:
-    titles = Counter(str(n.get("title", "")).strip().lower() for n in nodes if isinstance(n, dict))
+    # Titles are compared exactly, as the importer matches them: "Foo" and
+    # "foo" are two different topics and import fine.
+    titles = Counter(
+        n["title"] for n in nodes if isinstance(n, dict) and isinstance(n.get("title"), str) and n["title"]
+    )
     for title, count in titles.items():
-        if title and count > 1:
-            report.errors.append(f'{path or "top level"}: {count} topics are titled "{title}" (they would be merged on import).')
+        if count > 1:
+            report.errors.append(f'{path or "top level"}: {count} topics are titled "{title}" (the importer would merge them).')
     for node in nodes:
         if not isinstance(node, dict):
             report.errors.append(f"{path or 'top level'}: every topic must be an object.")
@@ -98,7 +128,7 @@ def _check_siblings(nodes: list[Any], path: str, report: ContentReport) -> None:
 
 
 def _check_node(node: dict[str, Any], parent_path: str, report: ContentReport) -> None:
-    title = str(node.get("title", "")).strip()
+    title = _text(node.get("title"))
     path = f"{parent_path} › {title}" if parent_path else (title or "(untitled)")
     if not title:
         report.errors.append(f"{path}: topic has no title.")
@@ -111,7 +141,7 @@ def _check_node(node: dict[str, Any], parent_path: str, report: ContentReport) -
     elif node_type == "SUB_TOPIC":
         report.sub_topics += 1
 
-    children = node.get("children") or []
+    children = _items(node.get("children"), f"{path}: children", report)
     if children:
         for key in ("content_sections", "mcq_questions"):
             if node.get(key):
@@ -120,15 +150,16 @@ def _check_node(node: dict[str, Any], parent_path: str, report: ContentReport) -
         return
 
     if node_type != "LEAF_TOPIC":
-        # A mega- or sub-topic placeholder whose topics are not written yet.
+        # A mega- or sub-topic with nothing under it yet.
         if node_type in _NODE_TYPES:
             report.gaps.append(f"{path}: has no child topics yet.")
+            report.unfinished += 1
         return
     report.topics += 1
     gaps_before = len(report.gaps)
-    _check_sections(node.get("content_sections") or [], path, report)
-    _check_mcqs(node.get("mcq_questions") or [], path, report)
-    _check_pyqs(node.get("pyqs") or [], path, report)
+    _check_sections(_items(node.get("content_sections"), f"{path}: content_sections", report), path, report)
+    _check_mcqs(_items(node.get("mcq_questions"), f"{path}: mcq_questions", report), path, report)
+    _check_pyqs(_items(node.get("pyqs"), f"{path}: pyqs", report), path, report)
     if len(report.gaps) == gaps_before:
         report.topics_ready += 1
 
@@ -159,7 +190,7 @@ def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
             report.errors.append(f"{where} must be an object.")
             continue
         report.mcqs += 1
-        text = str(mcq.get("question_text", "")).strip()
+        text = _text(mcq.get("question_text"))
         if not text:
             report.errors.append(f"{where} has no question_text.")
         elif text.lower() in seen:
@@ -167,14 +198,18 @@ def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
         seen.add(text.lower())
 
         options = mcq.get("options")
-        labels = [o.get("label") for o in options if isinstance(o, dict)] if isinstance(options, list) else []
-        if labels != OPTION_LABELS or any(not str(o.get("text", "")).strip() for o in options):
+        if isinstance(options, list) and all(isinstance(o, dict) for o in options):
+            labels = [o.get("label") for o in options]
+            texts = [_text(o.get("text")) for o in options]
+        else:
+            labels, texts = [], []
+        if labels != OPTION_LABELS or not all(texts):
             report.errors.append(f"{where} needs exactly four options labelled A, B, C, D, each with text.")
         if mcq.get("correct_option") not in OPTION_LABELS:
             report.errors.append(f"{where}: correct_option {mcq.get('correct_option')!r} must be A, B, C or D.")
         if mcq.get("question_type") not in _QUESTION_TYPES:
             report.errors.append(f"{where}: question_type {mcq.get('question_type')!r} must be one of {sorted(_QUESTION_TYPES)}.")
-        if not str(mcq.get("explanation") or "").strip():
+        if not _text(mcq.get("explanation")):
             report.gaps.append(f"{where} has no explanation.")
     if len(mcqs) < MCQS_PER_TOPIC:
         report.gaps.append(f"{path}: {len(mcqs)} MCQs; the MCQ Lab needs {MCQS_PER_TOPIC}.")
@@ -189,7 +224,7 @@ def _check_pyqs(pyqs: list[Any], path: str, report: ContentReport) -> None:
         report.pyqs += 1
         if pyq.get("exam_type") not in _EXAM_TYPES:
             report.errors.append(f"{where}: exam_type {pyq.get('exam_type')!r} must be PRELIMS or MAINS.")
-        if not str(pyq.get("question_text", "")).strip():
+        if not _text(pyq.get("question_text")):
             report.errors.append(f"{where} has no question_text.")
     if not pyqs:
         report.gaps.append(f"{path}: no PYQs.")

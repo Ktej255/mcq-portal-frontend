@@ -7,6 +7,7 @@
   "cpu": "256",
   "memory": "512",
   "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/<ECS_EXECUTION_ROLE>",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/<ECS_TASK_ROLE>",
   "containerDefinitions": [
     {
       "name": "mcq-portal-backend",
@@ -40,18 +41,22 @@
           "value": "7"
         },
         {
-          "name": "PAYWALL_LAUNCH_DATE",
-          "value": "<YYYY-MM-DD you switch the paywall on>"
+          "name": "MEDIA_STORE_BACKEND",
+          "value": "s3"
+        },
+        {
+          "name": "MEDIA_STORE_S3_BUCKET",
+          "value": "<ANSWER_IMAGE_BUCKET>"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "ap-south-1"
         }
       ],
       "secrets": [
         {
           "name": "DATABASE_URL",
           "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/DATABASE_URL"
-        },
-        {
-          "name": "SECRET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:ap-south-1:<ACCOUNT_ID>:secret:mcq-portal/SECRET_KEY"
         },
         {
           "name": "GOOGLE_API_KEY",
