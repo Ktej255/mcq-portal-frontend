@@ -60,3 +60,7 @@ next-env.d.ts
 # Playwright output
 /test-results/
 /playwright-report/
+
+# Converted EduEcosystem question banks (book-derived; regenerate with
+# backend/scripts/eduecosystem_import/convert.py). Kept out of git while the repo is public.
+backend/app/core/gs_lms/data/retention/*.json
