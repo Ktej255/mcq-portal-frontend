@@ -28,6 +28,8 @@ from app.core.gs_lms.models import (  # noqa: F401
     GsLmsContentSection,
     GsLmsPyq,
     GsLmsMcqQuestion,
+    GsLmsContentRequest,
+    GsLmsContentRequestStudent,
 )
 from app.core.gs_lms.student_models import (  # noqa: F401
     GsLmsStudentSectionProgress,

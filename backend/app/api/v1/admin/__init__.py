@@ -11,7 +11,9 @@ from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_admin
 from app.api.v1.admin import ca_items
+from app.api.v1.admin import gs_lms_content_requests
 
 router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 router.include_router(ca_items.router, prefix="/current-affairs", tags=["admin-cms"])
+router.include_router(gs_lms_content_requests.router, prefix="/gs-lms", tags=["admin-gs-lms"])

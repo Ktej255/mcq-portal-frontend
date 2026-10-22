@@ -131,6 +131,13 @@ class GsLmsStudyPathEnum(str, enum.Enum):
     MIXED = "MIXED"
 
 
+class GsLmsContentRequestStatusEnum(str, enum.Enum):
+    """Where the content team stands on a study request nobody could answer."""
+    OPEN = "OPEN"
+    PLANNED = "PLANNED"
+    ADDRESSED = "ADDRESSED"
+
+
 # ---------------------------------------------------------------------------
 # Syllabus Tree (self-referencing weighted tree)
 # ---------------------------------------------------------------------------
@@ -657,3 +664,50 @@ __all__ = [
     "GsLmsAnswerSheetImage",
     "GsLmsEvaluationReport",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Content requests (what students searched for and we had nothing good for)
+# ---------------------------------------------------------------------------
+
+class GsLmsContentRequest(Base):
+    """A study search that found no (or only a weak) match, counted per query.
+
+    ``normalized_query`` (sorted unique stemmed words, see
+    ``app.core.gs_lms.content_requests``) makes "Plassey battle" and "battle of
+    Plassey" one row. ``distinct_students`` is kept in step with
+    ``GsLmsContentRequestStudent`` so the raw text is never stored per student.
+    """
+    __tablename__ = "gs_lms_content_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    normalized_query = Column(String(200), nullable=False, unique=True, index=True)
+    sample_query = Column(String(200), nullable=False)
+    subject_slug = Column(String, nullable=True, index=True)
+    request_count = Column(Integer, default=1, nullable=False)
+    distinct_students = Column(Integer, default=1, nullable=False)
+    first_requested_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    last_requested_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    status = Column(
+        Enum(GsLmsContentRequestStatusEnum),
+        default=GsLmsContentRequestStatusEnum.OPEN,
+        nullable=False,
+        index=True,
+    )
+    note = Column(Text, nullable=True)
+
+
+class GsLmsContentRequestStudent(Base):
+    """Which students asked for a content request (ids only, no query text)."""
+    __tablename__ = "gs_lms_content_request_students"
+
+    request_id = Column(
+        Integer, ForeignKey("gs_lms_content_requests.id"), primary_key=True
+    )
+    student_id = Column(
+        Integer, ForeignKey("users.id"), primary_key=True, index=True
+    )

@@ -42,6 +42,7 @@ from app.api.v1.gs_lms import mains
 from app.api.v1.gs_lms import growth
 from app.api.v1.gs_lms import subjects
 from app.api.v1.gs_lms import progression
+from app.api.v1.gs_lms import study
 
 # All GS LMS routes require authentication. Declaring the dependency at the
 # aggregate level enforces auth-gating uniformly across every sub-router
@@ -52,6 +53,10 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 router.include_router(subjects.router, tags=["gs-lms"])
 # Learner profile and books are per-student / cross-subject, so also not under a slug.
 router.include_router(concept_versions.global_router, tags=["gs-lms"])
+
+# Study flow (search -> card -> explain -> next) lives under /study. It MUST be
+# registered before the /{subject_slug} routers so "study" never reads as a slug.
+router.include_router(study.router, tags=["gs-lms-study"])
 
 # Subject-specific routes are mounted under /{subject_slug}/ prefix.
 # The subject_slug is a path parameter resolved in each endpoint via the
