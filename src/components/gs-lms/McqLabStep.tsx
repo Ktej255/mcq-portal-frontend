@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Target, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/api/funnelService';
+import { getGateError } from '@/services/api/gsLmsService';
 
 /**
  * McqLabStep — 15-question simultaneous display with submit-all flow.
@@ -15,12 +16,14 @@ import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/ap
 interface McqLabStepProps {
   nodeId: number;
   subject?: string;
+  /** Label of the button shown under the result (default: continue to Mains). */
+  completeLabel?: string;
   onComplete: () => void;
 }
 
 type McqLabMode = 'loading' | 'answering' | 'submitting' | 'result';
 
-export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLabStepProps) {
+export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Continue to Mains Practice →', onComplete }: McqLabStepProps) {
   const [mode, setMode] = useState<McqLabMode>('loading');
   const [questions, setQuestions] = useState<McqLabQuestionOut[]>([]);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -34,7 +37,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
         setQuestions(qs);
         setMode('answering');
       })
-      .catch(() => setError('Failed to load MCQ Lab questions'));
+      .catch((err: unknown) => setError(getGateError(err)?.detail ?? 'Failed to load MCQ Lab questions'));
   }, [nodeId, subject]);
 
   const answeredCount = Object.keys(answers).length;
@@ -138,7 +141,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
           onClick={onComplete}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
         >
-          Continue to Mains Practice →
+          {completeLabel}
         </button>
       </div>
     );

@@ -30,6 +30,12 @@ export interface SyllabusNodeOut {
   review_status: string;
   completion_percent: number | null;
   completed: boolean | null;
+  /** Leaf topics only: funnel done and best MCQ lab score >= 60%. */
+  mastered?: boolean | null;
+  /** Leaf topics only: previous topic not mastered / review test due. */
+  locked?: boolean;
+  /** Why the topic is locked (names the topic or test to finish). */
+  lock_reason?: string | null;
   day_lesson_id: number | null;
   ordering_justification: string | null;
   children: SyllabusNodeOut[];
@@ -260,6 +266,108 @@ export interface OnboardingStatusOut {
   study_window_minutes: number | null;
 }
 
+// -- Progression / Checkpoints / Concepts -----------------------------------
+
+export interface LeafRefOut {
+  node_id: number;
+  title: string;
+}
+
+export interface CheckpointOut {
+  checkpoint_id: number;
+  sub_topic_id: number;
+  sub_topic_title: string;
+  status: string;
+  leaves: LeafRefOut[];
+  attempts: number;
+  /** 0-100, null until attempted. */
+  best_score: number | null;
+  pass_score: number;
+}
+
+export interface ProgressionOut {
+  next_leaf: LeafRefOut | null;
+  mastered_count: number;
+  total_leaves: number;
+  due_checkpoint: CheckpointOut | null;
+  due_checkpoints: CheckpointOut[];
+  /** True when topic order / step gates are enforced for this student. */
+  order_enforced: boolean;
+}
+
+export interface CheckpointQuestionOut {
+  question_id: number;
+  question_type: string;
+  question_text: string;
+  options: Array<{ label: string; text: string }>;
+  display_order: number;
+}
+
+export interface CheckpointStartOut {
+  checkpoint_id: number;
+  total_questions: number;
+  questions: CheckpointQuestionOut[];
+}
+
+export interface CheckpointAttemptOut {
+  question_id: number;
+  leaf_id: number;
+  chosen_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  explanation: string | null;
+}
+
+export interface CheckpointLeafBreakdownOut {
+  leaf_id: number;
+  title: string;
+  total: number;
+  correct: number;
+  /** 0-100 */
+  accuracy: number;
+}
+
+export interface CheckpointResultOut {
+  checkpoint_id: number;
+  total_questions: number;
+  correct_count: number;
+  /** 0-100 */
+  score: number;
+  passed: boolean;
+  pass_score: number;
+  status: string;
+  attempts: CheckpointAttemptOut[];
+  leaf_breakdown: CheckpointLeafBreakdownOut[];
+}
+
+export interface TopicConceptOut {
+  concept_id: number;
+  title: string;
+  display_order: number;
+  key_points: string[];
+  misconceptions: string[];
+  mastery: {
+    status: 'NOT_STARTED' | 'LEARNING' | 'PASSED';
+    score: number;
+    last_score: number | null;
+    attempts: number;
+    passed_at: string | null;
+    last_assessed_at: string | null;
+  };
+}
+
+export interface TopicConceptsOut {
+  node_id: number;
+  title: string;
+  concepts: TopicConceptOut[];
+  topic_mastery: {
+    concepts: number;
+    passed: number;
+    average_score: number;
+    mastered: boolean;
+  };
+}
+
 // -- Subjects ---------------------------------------------------------------
 
 export interface GsSubjectAvailabilityOut {
@@ -274,6 +382,24 @@ export interface GsSubjectAvailabilityOut {
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
+
+/**
+ * A progression rule blocked the request: 409 (a funnel step's gate isn't met)
+ * or 423 (the topic is locked). `detail` is the server's human-readable reason.
+ * Neither is a paywall error, so the upgrade prompt is never involved.
+ */
+export interface GateError {
+  status: 409 | 423;
+  detail: string;
+}
+
+export const getGateError = (err: unknown): GateError | null => {
+  const response = (err as { response?: { status?: number; data?: { detail?: unknown } } } | null)?.response;
+  if (response && (response.status === 409 || response.status === 423) && typeof response.data?.detail === 'string') {
+    return { status: response.status, detail: response.data.detail };
+  }
+  return null;
+};
 
 const unwrap = <T>(data: unknown): T => {
   const record = (data && typeof data === 'object' ? (data as Record<string, unknown>) : {});
@@ -308,6 +434,44 @@ export const gsLmsService = {
   getSyllabusNode: async (subject = "geography", nodeId: number): Promise<SyllabusNodeOut> => {
     const response = await apiClient.get(`gs-lms/${subject}/syllabus/${nodeId}`);
     return unwrap<SyllabusNodeOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Progression, review checkpoints, concepts
+  // -------------------------------------------------------------------------
+
+  /** Next unlocked topic, mastered count and due review test. */
+  getProgression: async (subject = "geography"): Promise<ProgressionOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/progression`, { skipUpgradePrompt: true });
+    return unwrap<ProgressionOut>(response.data);
+  },
+
+  /** Review checkpoints currently due. */
+  getDueCheckpoints: async (subject = "geography"): Promise<CheckpointOut[]> => {
+    const response = await apiClient.get(`gs-lms/${subject}/checkpoints`, { skipUpgradePrompt: true });
+    return unwrap<CheckpointOut[]>(response.data);
+  },
+
+  /** Draw the checkpoint's questions (no answers). Calling again redraws. */
+  startCheckpoint: async (subject = "geography", checkpointId: number): Promise<CheckpointStartOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/checkpoints/${checkpointId}/start`);
+    return unwrap<CheckpointStartOut>(response.data);
+  },
+
+  /** Score a checkpoint attempt (one submission per start). */
+  submitCheckpoint: async (
+    subject = "geography",
+    checkpointId: number,
+    answers: Array<{ question_id: number; chosen_answer: string }>,
+  ): Promise<CheckpointResultOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/checkpoints/${checkpointId}/submit`, { answers });
+    return unwrap<CheckpointResultOut>(response.data);
+  },
+
+  /** A leaf topic's concepts with the student's mastery of each. */
+  getTopicConcepts: async (subject = "geography", nodeId: number): Promise<TopicConceptsOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/topics/${nodeId}/concepts`, { skipUpgradePrompt: true });
+    return unwrap<TopicConceptsOut>(response.data);
   },
 
   // -------------------------------------------------------------------------

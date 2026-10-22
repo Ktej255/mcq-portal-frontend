@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { gsLmsService } from "@/services/api/gsLmsService";
+import { gsLmsService, getGateError } from "@/services/api/gsLmsService";
 import type { TopicSectionsOut } from "@/services/api/gsLmsService";
 import { DiscussionOverlay } from "../DiscussionOverlay";
 import { LmsLoadingSkeleton } from "../LmsLoadingSkeleton";
@@ -18,6 +18,10 @@ import { RichBlocks } from "../RichBlockRenderer";
 import { PdfDownloadButton } from "../PdfDownloadButton";
 import { PrelimsPyqPanel } from "../PrelimsPyqPanel";
 import { useSubjectLms } from "../SubjectLmsContext";
+import { LockedTopicScreen } from "../LockedTopicScreen";
+import { TopicConcepts } from "../TopicConcepts";
+import { MasteryNotice } from "../MasteryNotice";
+import { useProgression } from "@/hooks/useProgression";
 
 function AutoAdvanceStep({
   shouldAdvance,
@@ -36,6 +40,24 @@ function AutoAdvanceStep({
   return null;
 }
 
+/** The server's reason the current step can't be completed yet (HTTP 409). */
+function StepGateMessage({ message }: { message: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [message]);
+  return (
+    <div
+      ref={ref}
+      role="alert"
+      data-testid="step-gate-message"
+      className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+    >
+      {message}
+    </div>
+  );
+}
+
 export function TopicPage() {
   const params = useParams();
   const nodeId = Number(params.nodeId);
@@ -45,15 +67,26 @@ export function TopicPage() {
   const [data, setData] = useState<TopicSectionsOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Set when the server answers 423: the topic isn't open to this student yet.
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
+  const { orderEnforced } = useProgression(subject);
 
   const fetchSections = useCallback(() => {
     setLoading(true);
     gsLmsService
       .getTopicSections(subject, nodeId)
-      .then(setData)
-      .catch((err) =>
-        setError(err.response?.data?.message || "Failed to load topic")
-      )
+      .then((res) => {
+        setLockedReason(null);
+        setData(res);
+      })
+      .catch((err) => {
+        const gate = getGateError(err);
+        if (gate?.status === 423) {
+          setLockedReason(gate.detail);
+          return;
+        }
+        setError(err.response?.data?.message || "Failed to load topic");
+      })
       .finally(() => setLoading(false));
   }, [nodeId, subject]);
 
@@ -65,9 +98,10 @@ export function TopicPage() {
   const [forceGatePassed, setForceGatePassed] = useState(false);
 
   const handleGateComplete = useCallback(() => {
-    setForceGatePassed(true);
+    // When enforced, only the server's record of a finished discussion opens the gate.
+    if (!orderEnforced) setForceGatePassed(true);
     fetchSections();
-  }, [fetchSections]);
+  }, [fetchSections, orderEnforced]);
 
   if (loading) {
     return (
@@ -75,6 +109,10 @@ export function TopicPage() {
         <LmsLoadingSkeleton variant="content" />
       </div>
     );
+  }
+
+  if (lockedReason) {
+    return <LockedTopicScreen reason={lockedReason} nodeId={nodeId} />;
   }
 
   if (error) {
@@ -99,11 +137,11 @@ export function TopicPage() {
       <h1 className="text-xl font-semibold text-[#1a3a2a]">{data.title}</h1>
 
       <FunnelOrchestrator nodeId={nodeId} subject={subject}>
-        {({ currentStep, completeStep: advanceStep, displayTab }) => {
+        {({ currentStep, completeStep: advanceStep, gateMessage, displayTab }) => {
 
           const getActiveSectionLabel = (): string => {
             if (displayTab === 'ncert') return 'NCERT_LEVEL';
-            if (displayTab === 'current') return 'ADVANCED';
+            if (displayTab === 'current') return 'CURRENT_AFFAIRS';
             if (displayTab === 'traps') return 'EXAMINER_TRAPS';
             if (displayTab === 'learn') {
               if (currentStep >= 6 && currentStep <= 7) return 'ADVANCED';
@@ -112,7 +150,7 @@ export function TopicPage() {
             if (currentStep <= 3) return 'BASIC';
             if (currentStep <= 5) return 'NCERT_LEVEL';
             if (currentStep <= 7) return 'ADVANCED';
-            if (currentStep <= 9) return 'ADVANCED';
+            if (currentStep <= 9) return 'CURRENT_AFFAIRS';
             return 'EXAMINER_TRAPS';
           };
 
@@ -123,6 +161,8 @@ export function TopicPage() {
 
           return (
           <>
+            {gateMessage && <StepGateMessage message={gateMessage} />}
+
             <AutoAdvanceStep
               shouldAdvance={currentStep === 1 && data.discussion_gate_passed}
               step={1}
@@ -155,6 +195,8 @@ export function TopicPage() {
                   </div>
                 )}
 
+                {displayTab === 'learn' && <TopicConcepts nodeId={nodeId} subject={subject} />}
+
                 <ExternalResourceCards nodeId={nodeId} />
 
                 {(() => {
@@ -172,6 +214,8 @@ export function TopicPage() {
                     <RecallCheckStep
                       nodeId={nodeId}
                       sectionLabel={activeSection.section_label}
+                      subject={subject}
+                      hideSkip={orderEnforced}
                       onComplete={() => advanceStep(currentStep)}
                     />
                   );
@@ -213,6 +257,7 @@ export function TopicPage() {
             {displayTab === 'mcq-lab' && (
               <McqLabStep
                 nodeId={nodeId}
+                subject={subject}
                 onComplete={() => advanceStep(12)}
               />
             )}
@@ -222,6 +267,7 @@ export function TopicPage() {
                 <PrelimsPyqPanel nodeId={nodeId} subject={subject} />
                 <MainsPracticeStep
                   nodeId={nodeId}
+                  subject={subject}
                   onComplete={() => advanceStep(13)}
                 />
               </div>
@@ -230,6 +276,7 @@ export function TopicPage() {
             {displayTab === 'mains' && currentStep === 14 && (
               <GrowthReportStep
                 nodeId={nodeId}
+                subject={subject}
                 onComplete={() => advanceStep(14)}
               />
             )}
@@ -249,6 +296,7 @@ export function TopicPage() {
                     />
                   </div>
                 )}
+                <MasteryNotice nodeId={nodeId} />
               </div>
             )}
           </>

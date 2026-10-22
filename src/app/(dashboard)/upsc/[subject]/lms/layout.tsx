@@ -15,6 +15,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   gaps: "Gaps",
   planner: "Planner",
   onboarding: "Onboarding",
+  checkpoint: "Review test",
 };
 
 function getBreadcrumbLabel(pathname: string): string {

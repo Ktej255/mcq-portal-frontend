@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { DiscussionTurnOut, DiscussionSessionOut } from "@/services/api/gsLmsService";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useSubjectLms } from "./SubjectLmsContext";
+import { useProgression } from "@/hooks/useProgression";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -246,6 +247,7 @@ function ActiveDiscussionScreen({
   setInput,
   onSubmit,
   onForceComplete,
+  allowSkipAhead,
   sending,
   listening,
   micSupported,
@@ -256,6 +258,8 @@ function ActiveDiscussionScreen({
   setInput: (v: string) => void;
   onSubmit: (text: string) => void;
   onForceComplete: () => void;
+  /** False when the server enforces the discussion gate (no skip-ahead). */
+  allowSkipAhead: boolean;
   sending: boolean;
   listening: boolean;
   micSupported: boolean;
@@ -281,7 +285,7 @@ function ActiveDiscussionScreen({
     lastAiText.includes("you have unlocked");
 
   // Show escape-hatch link after 2+ rounds
-  const canEscape = turns.length >= 4; // 2 student + 2 AI turns
+  const canEscape = allowSkipAhead && turns.length >= 4; // 2 student + 2 AI turns
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -493,6 +497,9 @@ function CompletionScreen({
 
 export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: DiscussionOverlayProps) {
   const { subject } = useSubjectLms();
+  // When progression is enforced the server rejects step 1 without a completed
+  // discussion, so the "skip ahead" escape is removed.
+  const { orderEnforced } = useProgression(subject);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [turns, setTurns] = useState<DiscussionTurnOut[]>([]);
   const [input, setInput] = useState("");
@@ -827,6 +834,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           setInput={setInput}
           onSubmit={handleSubmit}
           onForceComplete={onComplete}
+          allowSkipAhead={!orderEnforced}
           sending={sending}
           listening={listening}
           micSupported={micSupported}

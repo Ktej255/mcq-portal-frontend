@@ -139,6 +139,20 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new CustomEvent(upgradeRequiredEvent, { detail: upgradeDetail }));
     }
 
+    // GS LMS progression rules answer 409 (a step's gate isn't met) and 423
+    // (topic locked) with a human-readable `detail`. Surface it as the error
+    // message so callers can show it; these are never paywall (402) errors.
+    const gateStatus = error.response?.status;
+    const gateDetail = error.response?.data?.detail;
+    if (
+      (gateStatus === 409 || gateStatus === 423) &&
+      typeof gateDetail === 'string' &&
+      typeof originalRequest?.url === 'string' &&
+      originalRequest.url.includes('gs-lms/')
+    ) {
+      error.message = gateDetail;
+    }
+
     if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
       if (apiDebug) console.warn(`[MCQ_DEBUG] Triggering 401/403 retry for ${originalRequest.url}`);
       originalRequest._retry = true;

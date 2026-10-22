@@ -16,6 +16,8 @@ export interface FunnelRenderContext {
   currentStep: number;
   completedSteps: number[];
   completeStep: (step: number) => Promise<void>;
+  /** Server's reason the current step can't be completed yet (409), if any. */
+  gateMessage: string | null;
   canAccessStep: (step: number) => boolean;
   isStepComplete: (step: number) => boolean;
   displayTab: string;
@@ -51,6 +53,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
     completedSteps,
     activeTab,
     completeStep,
+    gateMessage,
     canAccessStep,
     isStepComplete,
   } = useFunnelState(nodeId, subject);
@@ -180,7 +183,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
           className="min-h-[400px]"
         >
           {typeof children === 'function'
-            ? children({ currentStep, completedSteps, completeStep, canAccessStep, isStepComplete, displayTab })
+            ? children({ currentStep, completedSteps, completeStep, gateMessage, canAccessStep, isStepComplete, displayTab })
             : children}
         </motion.div>
       </AnimatePresence>
