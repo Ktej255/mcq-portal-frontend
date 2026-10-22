@@ -1,6 +1,7 @@
 import {
   Activity,
   BadgeIndianRupee,
+  BookOpen,
   BarChart3,
   CalendarCheck,
   ClipboardCheck,
@@ -128,6 +129,12 @@ export const studentNavSections: StudentNavSection[] = [
         href: "/upsc/study",
         icon: Search,
         match: (pathname) => pathname.startsWith("/upsc/study"),
+      },
+      {
+        name: "My books",
+        href: "/upsc/books",
+        icon: BookOpen,
+        match: (pathname) => pathname.startsWith("/upsc/books"),
       },
       {
         name: "Today",

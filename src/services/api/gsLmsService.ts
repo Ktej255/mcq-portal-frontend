@@ -470,6 +470,101 @@ export interface GsSubjectAvailabilityOut {
   topics_with_mcqs: number;
 }
 
+// -- Books, learner profile, retention checks --------------------------------
+
+export type StudyPath = 'NCERT_ONLY' | 'REFERENCE_BOOKS' | 'COACHING' | 'MIXED';
+export type ChapterStatus = 'NOT_STARTED' | 'READING' | 'COMPLETED';
+
+export interface LearnerProfile {
+  preferred_style: string | null;
+  preferred_level: string | null;
+  study_path: StudyPath | null;
+  book_ids: number[];
+  updated_at?: string | null;
+}
+
+export interface BookOut {
+  id: number;
+  slug: string;
+  title: string;
+  author: string;
+  edition: string;
+  publisher: string | null;
+  exam_tag: string;
+  subject_slug: string | null;
+  chapters: { number: number; title: string }[];
+}
+
+export interface ChapterProgress {
+  chapter_id: number;
+  number: number;
+  title: string;
+  status: ChapterStatus;
+  best_score: number | null;
+  last_score: number | null;
+  checks_taken: number;
+  next_review_at: string | null;
+  question_count: number;
+}
+
+export interface BookProgress {
+  book_id: number;
+  slug: string;
+  title: string;
+  author: string;
+  edition: string;
+  chapters: ChapterProgress[];
+}
+
+export interface RetentionQuestion {
+  question_id: number;
+  question_type: string;
+  question_text: string;
+  options: { label: string; text: string }[];
+  display_order: number;
+}
+
+export interface RetentionStart {
+  chapter_id: number;
+  total_questions: number;
+  pass_score: number;
+  questions: RetentionQuestion[];
+}
+
+export interface RetentionAttempt {
+  question_id: number;
+  selected_option: string;
+  correct_option: string;
+  is_correct: boolean;
+  explanation: string | null;
+}
+
+export interface RetentionResult {
+  chapter_id: number;
+  total_questions: number;
+  correct_count: number;
+  score: number;
+  passed: boolean;
+  pass_score: number;
+  best_score: number;
+  checks_taken: number;
+  status: ChapterStatus;
+  next_review_at: string;
+  next_review_in_days: number;
+  attempts: RetentionAttempt[];
+}
+
+export interface DueReview {
+  chapter_id: number;
+  number: number;
+  title: string;
+  book_id: number;
+  book_title: string;
+  book_edition: string;
+  last_score: number | null;
+  next_review_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -965,5 +1060,50 @@ export const gsLmsService = {
   ): Promise<ContentRequest> => {
     const response = await apiClient.patch(`admin/gs-lms/content-requests/${id}`, patch);
     return unwrap<ContentRequest>(response.data);
+  },
+
+  getBooks: async (subject?: string): Promise<BookOut[]> => {
+    const response = await apiClient.get('gs-lms/books', { params: subject ? { subject } : undefined });
+    return unwrap<BookOut[]>(response.data);
+  },
+
+  getLearnerProfile: async (): Promise<LearnerProfile> => {
+    const response = await apiClient.get('gs-lms/profile');
+    return unwrap<LearnerProfile>(response.data);
+  },
+
+  /** Replaces the whole profile: send every field. */
+  saveLearnerProfile: async (profile: Omit<LearnerProfile, 'updated_at'>): Promise<LearnerProfile> => {
+    const response = await apiClient.put('gs-lms/profile', profile);
+    return unwrap<LearnerProfile>(response.data);
+  },
+
+  getBookProgress: async (bookId: number): Promise<BookProgress> => {
+    const response = await apiClient.get(`gs-lms/books/${bookId}/progress`);
+    return unwrap<BookProgress>(response.data);
+  },
+
+  setChapterStatus: async (chapterId: number, status: ChapterStatus): Promise<void> => {
+    await apiClient.put(`gs-lms/books/chapters/${chapterId}/status`, { status });
+  },
+
+  /** 409 = fewer than 3 usable questions (read with `getGateError`). */
+  startRetention: async (chapterId: number): Promise<RetentionStart> => {
+    const response = await apiClient.post(`gs-lms/books/chapters/${chapterId}/retention/start`);
+    return unwrap<RetentionStart>(response.data);
+  },
+
+  /** 409 = not started or stale: start again. 402 is handled by the apiClient. */
+  submitRetention: async (
+    chapterId: number,
+    answers: { question_id: number; selected_option: string }[],
+  ): Promise<RetentionResult> => {
+    const response = await apiClient.post(`gs-lms/books/chapters/${chapterId}/retention/submit`, { answers });
+    return unwrap<RetentionResult>(response.data);
+  },
+
+  getDueReviews: async (): Promise<DueReview[]> => {
+    const response = await apiClient.get('gs-lms/books/reviews/due');
+    return unwrap<DueReview[]>(response.data);
   },
 };
