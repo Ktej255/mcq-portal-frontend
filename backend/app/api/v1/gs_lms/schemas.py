@@ -90,6 +90,44 @@ class GsLmsTopicSectionsOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Concept responses (learning units under a leaf topic + student mastery)
+# ---------------------------------------------------------------------------
+
+class GsLmsConceptMasteryOut(BaseModel):
+    """The current student's mastery of one concept."""
+    status: str  # NOT_STARTED | LEARNING | PASSED
+    score: float = 0.0  # best score so far, 0..1
+    last_score: Optional[float] = None
+    attempts: int = 0
+    passed_at: Optional[str] = None
+    last_assessed_at: Optional[str] = None
+
+
+class GsLmsConceptOut(BaseModel):
+    concept_id: int
+    title: str
+    display_order: int
+    key_points: list[str]
+    misconceptions: list[str] = []
+    mastery: GsLmsConceptMasteryOut
+
+
+class GsLmsTopicMasteryOut(BaseModel):
+    """Roll-up across a topic's reviewed concepts."""
+    concepts: int
+    passed: int
+    average_score: float
+    mastered: bool
+
+
+class GsLmsTopicConceptsOut(BaseModel):
+    node_id: int
+    title: str
+    concepts: list[GsLmsConceptOut] = []
+    topic_mastery: GsLmsTopicMasteryOut
+
+
+# ---------------------------------------------------------------------------
 # PYQ responses
 # ---------------------------------------------------------------------------
 

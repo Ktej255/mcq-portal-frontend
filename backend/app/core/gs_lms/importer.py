@@ -8,9 +8,11 @@ The importer handles:
   2. Content sections per leaf node (5 sections each with blocks)
   3. PYQs (Prelims + Mains with metadata)
   4. MCQ questions (with options, correct answer, type classification)
+  5. Concepts per leaf node (title, key points, misconceptions)
 
 Idempotency strategy: match existing records by (title + parent_id) for tree
-nodes, (syllabus_node_id + section_label) for content sections, and
+nodes, (syllabus_node_id + section_label) for content sections,
+(syllabus_node_id + title) for concepts, and
 (syllabus_node_id + question_text) for PYQs/MCQs. On re-run, existing records
 are updated rather than duplicated — running twice produces the same DB state
 as running once (Design Property 20).
@@ -26,16 +28,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.content_check import check_subject_content, format_report
+from app.core.gs_lms.understanding import tokenize
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
+    GsLmsConcept,
     GsLmsPyq,
     GsLmsMcqQuestion,
     GsLmsNodeTypeEnum,
@@ -98,6 +104,7 @@ def import_syllabus_tree(
       - day_lesson_id (int | None): Bridge to existing day-lesson system
       - children (list[dict]): Child nodes (recursive)
       - content_sections (list[dict] | None): Sections for leaf nodes
+      - concepts (list[dict] | None): Concepts for leaf nodes
       - pyqs (list[dict] | None): PYQs for this node
       - mcq_questions (list[dict] | None): MCQ questions for this node
 
@@ -112,6 +119,8 @@ def import_syllabus_tree(
         "nodes_updated": 0,
         "sections_created": 0,
         "sections_updated": 0,
+        "concepts_created": 0,
+        "concepts_updated": 0,
         "pyqs_created": 0,
         "pyqs_updated": 0,
         "mcqs_created": 0,
@@ -149,6 +158,8 @@ def _import_node(
         "nodes_updated": 0,
         "sections_created": 0,
         "sections_updated": 0,
+        "concepts_created": 0,
+        "concepts_updated": 0,
         "pyqs_created": 0,
         "pyqs_updated": 0,
         "mcqs_created": 0,
@@ -216,6 +227,15 @@ def _import_node(
         )
         counts["sections_created"] += sec_counts["created"]
         counts["sections_updated"] += sec_counts["updated"]
+
+    # Import concepts for this node (if provided).
+    concepts_data = node_data.get("concepts")
+    if concepts_data:
+        concept_counts = import_concepts(
+            db, concepts_data, node.id, review_status=review_status.value
+        )
+        counts["concepts_created"] += concept_counts["created"]
+        counts["concepts_updated"] += concept_counts["updated"]
 
     # Import PYQs for this node (if provided).
     pyqs_data = node_data.get("pyqs")
@@ -316,6 +336,150 @@ def import_content_sections(
 
     db.flush()
     return {"created": created, "updated": updated}
+
+
+# ---------------------------------------------------------------------------
+# Concepts Import
+# ---------------------------------------------------------------------------
+
+
+def import_concepts(
+    db: Session,
+    concepts_data: list[dict[str, Any]],
+    node_id: int,
+    *,
+    review_status: str = "UNREVIEWED",
+) -> dict[str, int]:
+    """Import the concepts of a leaf syllabus node.
+
+    Each concept dict has keys:
+      - title (str): Concept title
+      - key_points (list[str]): 2-6 short phrases a student must convey
+      - misconceptions (list[str] | None): Common wrong beliefs
+      - display_order (int | None): Defaults to the concept's position in the list
+
+    Idempotency: matches by (syllabus_node_id + title).
+
+    Returns counts of created and updated concepts.
+    """
+    rs_enum = GsReviewStatusEnum(review_status)
+    created = 0
+    updated = 0
+
+    for position, c_data in enumerate(concepts_data, start=1):
+        title = c_data["title"].strip()
+        existing = (
+            db.query(GsLmsConcept)
+            .filter(
+                GsLmsConcept.syllabus_node_id == node_id,
+                GsLmsConcept.title == title,
+            )
+            .one_or_none()
+        )
+        display_order = c_data.get("display_order", position)
+
+        if existing:
+            existing.key_points = c_data["key_points"]
+            existing.misconceptions = c_data.get("misconceptions")
+            existing.display_order = display_order
+            existing.review_status = rs_enum
+            existing.updated_by = _ACTOR
+            updated += 1
+        else:
+            db.add(
+                GsLmsConcept(
+                    syllabus_node_id=node_id,
+                    title=title,
+                    key_points=c_data["key_points"],
+                    misconceptions=c_data.get("misconceptions"),
+                    display_order=display_order,
+                    review_status=rs_enum,
+                    created_by=_ACTOR,
+                    updated_by=_ACTOR,
+                )
+            )
+            created += 1
+
+    db.flush()
+    return {"created": created, "updated": updated}
+
+
+# ---------------------------------------------------------------------------
+# Concept backfill from concept_checklist
+# ---------------------------------------------------------------------------
+
+_TITLE_MAX = 120
+_MAX_DERIVED_KEY_POINTS = 4
+_KEY_POINT_SPLIT = re.compile(r"[,;]|\s+and\s+", re.IGNORECASE)
+
+
+def _derive_key_points(sentence: str) -> list[str]:
+    """2-4 short phrases from a checklist sentence (split on commas, semicolons
+    and " and "); the sentence itself when it does not split into at least two."""
+    sentence = sentence.strip()
+    parts = [p.strip(" .:-\t") for p in _KEY_POINT_SPLIT.split(sentence)]
+    parts = [p for p in parts if tokenize(p)]
+    if len(parts) < 2:
+        return [sentence]
+    return parts[:_MAX_DERIVED_KEY_POINTS]
+
+
+def derive_concepts_from_checklist(db: Session, leaf: GsLmsSyllabusNode) -> list[GsLmsConcept]:
+    """Create one concept per concept_checklist sentence of a leaf topic.
+
+    Title = the sentence trimmed to 120 characters; key points = phrases from
+    ``_derive_key_points``. The new concepts take the leaf's review_status.
+    Idempotent: a concept whose title already exists on the leaf is skipped.
+    Returns the concepts created.
+    """
+    checklist = leaf.concept_checklist
+    if not isinstance(checklist, list):
+        return []
+    existing_titles = {
+        t for (t,) in db.query(GsLmsConcept.title).filter(GsLmsConcept.syllabus_node_id == leaf.id)
+    }
+    next_order = (
+        db.query(func.max(GsLmsConcept.display_order))
+        .filter(GsLmsConcept.syllabus_node_id == leaf.id)
+        .scalar()
+        or 0
+    ) + 1
+    created: list[GsLmsConcept] = []
+    for item in checklist:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        title = item.strip()[:_TITLE_MAX].strip()
+        if title in existing_titles:
+            continue
+        concept = GsLmsConcept(
+            syllabus_node_id=leaf.id,
+            title=title,
+            key_points=_derive_key_points(item),
+            display_order=next_order,
+            review_status=leaf.review_status,
+            created_by=_ACTOR,
+            updated_by=_ACTOR,
+        )
+        db.add(concept)
+        existing_titles.add(title)
+        created.append(concept)
+        next_order += 1
+    db.flush()
+    return created
+
+
+def derive_concepts_for_subject(db: Session, subject_id: int) -> int:
+    """Run ``derive_concepts_from_checklist`` on every leaf of a subject that has no concepts yet.
+    Returns the number of concepts created."""
+    leaves = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.subject_id == subject_id,
+            GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
+        )
+        .all()
+    )
+    return sum(len(derive_concepts_from_checklist(db, leaf)) for leaf in leaves if not leaf.concepts)
 
 
 # ---------------------------------------------------------------------------
@@ -618,6 +782,11 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
         choices=[e.value for e in GsReviewStatusEnum],
         help="review_status to stamp on imported content (default: UNREVIEWED, hidden from students).",
     )
+    parser.add_argument(
+        "--derive-concepts",
+        action="store_true",
+        help="After importing, create a concept for every concept_checklist sentence of topics that have none.",
+    )
     args = parser.parse_args()
 
     data = load_artifact(args.artifact)
@@ -631,6 +800,8 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
     session = SessionLocal()
     try:
         result = import_gs_subject(session, data, subject_slug=args.subject, review_status=args.review_status)
+        if args.derive_concepts:
+            result["concepts_derived"] = derive_concepts_for_subject(session, result["subject_id"])
         session.commit()
     except Exception:
         session.rollback()

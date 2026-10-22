@@ -28,7 +28,14 @@ leaf topics. A leaf topic is **ready** when it has:
   `EXAMINER_TRAPS`, each with at least one content block;
 - **15 MCQs** (the MCQ Lab serves 15), each with four options A–D, a
   `correct_option` and an explanation;
-- at least one PYQ.
+- at least one PYQ;
+- **concepts**: the small ideas the topic teaches, one at a time. Each has a
+  `title`, 2–8 `key_points` (short phrases a student must say back to show they
+  understood) and optional `misconceptions`. The AI discussion checks the
+  student's explanation against these key points.
+
+Topics imported before concepts existed can get them from their old concept
+checklist: add `--derive-concepts` to the import command, then review them.
 
 The template has one complete leaf topic (the Preamble) to copy from. The
 Geography file shows every block type in use (`para`, `heading`, `callout`,

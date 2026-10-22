@@ -8,7 +8,7 @@ Two kinds of findings:
 * gaps     — the file is valid but a topic is not ready for students yet
              (missing one of the five sections, fewer MCQs than the MCQ Lab
              needs, an MCQ without an explanation, no PYQs, a mega- or
-             sub-topic with no topics under it).
+             sub-topic with no topics under it, a topic with no concepts).
 
 ``check_subject_content`` returns a report; ``format_report`` turns it into the
 text the importer CLI prints. A subject is "ready" when it has no errors and
@@ -30,6 +30,9 @@ from app.core.gs_lms.models import (
 
 # The MCQ Lab serves exactly this many questions per topic.
 MCQS_PER_TOPIC = 15
+# A concept lists the points a student must convey: at least 2, at most 8.
+MIN_KEY_POINTS = 2
+MAX_KEY_POINTS = 8
 REQUIRED_SECTIONS = [label.value for label in GsLmsSectionLabelEnum]
 OPTION_LABELS = ["A", "B", "C", "D"]
 
@@ -50,6 +53,7 @@ class ContentReport:
     mega_topics: int = 0
     sub_topics: int = 0
     sections: int = 0
+    concepts: int = 0
     mcqs: int = 0
     pyqs: int = 0
 
@@ -75,6 +79,7 @@ class ContentReport:
             "mega_topics": self.mega_topics,
             "sub_topics": self.sub_topics,
             "sections": self.sections,
+            "concepts": self.concepts,
             "mcqs": self.mcqs,
             "pyqs": self.pyqs,
             "gaps": len(self.gaps),
@@ -158,6 +163,7 @@ def _check_node(node: dict[str, Any], parent_path: str, report: ContentReport) -
     report.topics += 1
     gaps_before = len(report.gaps)
     _check_sections(_items(node.get("content_sections"), f"{path}: content_sections", report), path, report)
+    _check_concepts(_items(node.get("concepts"), f"{path}: concepts", report), path, report)
     _check_mcqs(_items(node.get("mcq_questions"), f"{path}: mcq_questions", report), path, report)
     _check_pyqs(_items(node.get("pyqs"), f"{path}: pyqs", report), path, report)
     if len(report.gaps) == gaps_before:
@@ -180,6 +186,35 @@ def _check_sections(sections: list[Any], path: str, report: ContentReport) -> No
     missing = [label for label in REQUIRED_SECTIONS if label not in present]
     if missing:
         report.gaps.append(f"{path}: missing section(s) {', '.join(missing)}.")
+
+
+def _check_concepts(concepts: list[Any], path: str, report: ContentReport) -> None:
+    seen = set()
+    for i, concept in enumerate(concepts, start=1):
+        if not isinstance(concept, dict):
+            report.errors.append(f"{path}: concept {i} must be an object.")
+            continue
+        report.concepts += 1
+        title = _text(concept.get("title"))
+        where = f'{path}: concept {i}' + (f' "{title}"' if title else "")
+        if not title:
+            report.errors.append(f"{where} has no title.")
+        elif title in seen:
+            report.errors.append(f'{where}: another concept in this topic is titled "{title}".')
+        seen.add(title)
+
+        key_points = _items(concept.get("key_points"), f"{where}: key_points", report)
+        if not MIN_KEY_POINTS <= len(key_points) <= MAX_KEY_POINTS:
+            report.errors.append(
+                f"{where} has {len(key_points)} key points; it needs {MIN_KEY_POINTS} to {MAX_KEY_POINTS}."
+            )
+        if any(not _text(kp) for kp in key_points):
+            report.errors.append(f"{where} has a blank key point.")
+        misconceptions = _items(concept.get("misconceptions"), f"{where}: misconceptions", report)
+        if any(not _text(m) for m in misconceptions):
+            report.errors.append(f"{where} has a blank misconception.")
+    if not concepts:
+        report.gaps.append(f"{path}: no concepts.")
 
 
 def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
@@ -234,7 +269,7 @@ def format_report(report: ContentReport, *, max_lines: int = 40) -> str:
     lines = [
         f"Topics ready: {report.topics_ready} of {report.topics} "
         f"({report.mega_topics} mega-topics, {report.sub_topics} sub-topics)",
-        f"Content: {report.sections} sections, {report.mcqs} MCQs, {report.pyqs} PYQs",
+        f"Content: {report.sections} sections, {report.concepts} concepts, {report.mcqs} MCQs, {report.pyqs} PYQs",
     ]
     for heading, items in (("ERRORS (fix before importing)", report.errors), ("Gaps (topic not ready yet)", report.gaps)):
         if items:

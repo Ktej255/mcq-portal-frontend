@@ -1,5 +1,5 @@
 {
-  "_readme": "Template for one GS subject. Copy it, set subject_slug, and add mega-topics > sub-topics > leaf topics. Each leaf topic needs the 5 sections, 15 MCQs and at least one PYQ to be 'ready'. See docs/CONTENT_PIPELINE.md.",
+  "_readme": "Template for one GS subject. Copy it, set subject_slug, and add mega-topics > sub-topics > leaf topics. Each leaf topic needs the 5 sections, 2-8 concepts (each with 2-8 key points), 15 MCQs and at least one PYQ to be 'ready'. See docs/CONTENT_PIPELINE.md.",
   "subject_slug": "polity-governance",
   "tree": [
     {
@@ -26,6 +26,63 @@
                 "42nd Amendment additions",
                 "Berubari vs Kesavananda Bharati",
                 "Sources of the ideals"
+              ],
+              "concepts": [
+                {
+                  "title": "Objectives Resolution as the source of the Preamble",
+                  "key_points": [
+                    "Jawaharlal Nehru moved the Objectives Resolution on 13 December 1946",
+                    "Constituent Assembly adopted it on 22 January 1947",
+                    "it laid down the philosophy that the Preamble later reflected"
+                  ],
+                  "misconceptions": [
+                    "The Preamble was drafted first and the Objectives Resolution came after it"
+                  ]
+                },
+                {
+                  "title": "The five descriptions of the Indian state",
+                  "key_points": [
+                    "India is sovereign, free of external control",
+                    "socialist and secular were added by the 42nd Amendment in 1976",
+                    "democratic means government by the people's elected representatives",
+                    "republic means the head of state is elected, not hereditary"
+                  ],
+                  "misconceptions": [
+                    "Socialist and secular were in the original 1950 Preamble"
+                  ]
+                },
+                {
+                  "title": "Justice, Liberty, Equality and Fraternity",
+                  "key_points": [
+                    "justice is social, economic and political",
+                    "liberty covers thought, expression, belief, faith and worship",
+                    "equality means equality of status and of opportunity",
+                    "fraternity assures the dignity of the individual and the unity and integrity of the nation"
+                  ],
+                  "misconceptions": [
+                    "Fraternity means only brotherhood between communities, not national unity"
+                  ]
+                },
+                {
+                  "title": "Legal status of the Preamble",
+                  "key_points": [
+                    "Berubari Union case 1960 held the Preamble is not part of the Constitution",
+                    "Kesavananda Bharati case 1973 held it is part of the Constitution",
+                    "the Preamble is not enforceable in a court of law",
+                    "it cannot override the specific provisions of the Constitution"
+                  ],
+                  "misconceptions": [
+                    "Courts can enforce the Preamble directly as a fundamental right"
+                  ]
+                },
+                {
+                  "title": "Authority and adoption of the Constitution",
+                  "key_points": [
+                    "We, the People of India are the source of the Constitution's authority",
+                    "the Constitution was adopted on 26 November 1949",
+                    "it came into force on 26 January 1950"
+                  ]
+                }
               ],
               "content_sections": [
                 {

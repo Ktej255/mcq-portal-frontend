@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends
 from app.api.dependencies import get_current_user
 from app.api.v1.gs_lms import syllabus
 from app.api.v1.gs_lms import content
+from app.api.v1.gs_lms import concepts
 from app.api.v1.gs_lms import pyqs
 from app.api.v1.gs_lms import practice
 from app.api.v1.gs_lms import discussion
@@ -53,6 +54,7 @@ router.include_router(subjects.router, tags=["gs-lms"])
 # resolve_subject dependency (e.g., "geography" -> GsSubject record).
 router.include_router(syllabus.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(content.router, prefix="/{subject_slug}", tags=["gs-lms"])
+router.include_router(concepts.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(pyqs.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(practice.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(discussion.router, prefix="/{subject_slug}", tags=["gs-lms"])

@@ -10,8 +10,8 @@ that a single Alembic ``target_metadata`` continues to cover the whole schema.
 Table names are namespaced with a ``gs_lms_`` prefix. The syllabus tree mirrors
 the Optional ``SyllabusNode`` pattern: self-referencing, weighted, review-gated.
 
-Covers entities: GsLmsSyllabusNode, GsLmsContentSection, GsLmsPyq,
-GsLmsMcqQuestion, and supporting enums.
+Covers entities: GsLmsSyllabusNode, GsLmsContentSection, GsLmsConcept,
+GsLmsPyq, GsLmsMcqQuestion, and supporting enums.
 
 Requirements: 1.4, 10.1, 10.4, 11.4
 """
@@ -32,6 +32,7 @@ from sqlalchemy import (
     Enum,
     JSON,
     DateTime,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -170,6 +171,13 @@ class GsLmsSyllabusNode(Base, InstitutionalAuditMixin):
         cascade="all, delete-orphan",
         order_by="GsLmsMcqQuestion.display_order",
     )
+    # Smallest learning units under a leaf topic (see GsLmsConcept).
+    concepts = relationship(
+        "GsLmsConcept",
+        back_populates="syllabus_node",
+        cascade="all, delete-orphan",
+        order_by="GsLmsConcept.display_order",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +216,47 @@ class GsLmsContentSection(Base, InstitutionalAuditMixin):
     syllabus_node = relationship(
         "GsLmsSyllabusNode", back_populates="content_sections"
     )
+
+
+# ---------------------------------------------------------------------------
+# Concepts (smallest learning unit under a leaf topic)
+# ---------------------------------------------------------------------------
+
+class GsLmsConcept(Base, InstitutionalAuditMixin):
+    """The smallest thing a student must understand within a leaf topic.
+
+    Each concept carries 2-8 ``key_points``: short phrases a student has to
+    convey when explaining it. The understanding grader
+    (``app.core.gs_lms.understanding``) scores an explanation against them, and
+    per-student results are kept in ``GsLmsConceptMastery``. ``misconceptions``
+    lists common wrong beliefs, for tutors and later AI prompts.
+    """
+    __tablename__ = "gs_lms_concepts"
+    __table_args__ = (
+        UniqueConstraint(
+            "syllabus_node_id", "title", name="uq_gs_lms_concepts_node_title"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    syllabus_node_id = Column(
+        Integer, ForeignKey("gs_lms_syllabus_nodes.id"), nullable=False, index=True
+    )
+    display_order = Column(Integer, default=0, nullable=False)
+    title = Column(String, nullable=False)
+    # JSON list of short phrases (2-8), each one a point the student must convey.
+    key_points = Column(JSON, nullable=False)
+    # Optional JSON list of common wrong beliefs about this concept.
+    misconceptions = Column(JSON, nullable=True)
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    # Relationships
+    syllabus_node = relationship("GsLmsSyllabusNode", back_populates="concepts")
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +487,7 @@ __all__ = [
     # Models
     "GsLmsSyllabusNode",
     "GsLmsContentSection",
+    "GsLmsConcept",
     "GsLmsPyq",
     "GsLmsMcqQuestion",
     "GsLmsAnswerAttempt",

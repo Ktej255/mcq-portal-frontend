@@ -16,6 +16,7 @@ import google.generativeai as genai
 
 from app.core.gs_lms.discussion import (
     AIResponseProvider,
+    CONCEPT_GATE_THRESHOLD,
     MockAIResponseProvider,
     set_default_provider,
 )
@@ -109,9 +110,10 @@ class GeminiAIResponseProvider:
                 "to guide the student toward explaining it."
             )
             if match_percentage is not None:
+                # match_percentage is on the engine's 0-100 scale.
                 lines.append(
-                    f"(Current concept coverage: {match_percentage:.0%}. "
-                    "The gate opens at 80%.)"
+                    f"(Current concept coverage: {match_percentage:.0f}%. "
+                    f"The gate opens at {CONCEPT_GATE_THRESHOLD:.0f}%.)"
                 )
         else:
             lines.append("\nRespond with a Socratic counter-question:")
