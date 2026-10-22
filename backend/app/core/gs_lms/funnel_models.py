@@ -392,6 +392,44 @@ class GsLmsExternalResource(Base, InstitutionalAuditMixin):
 
 
 # ---------------------------------------------------------------------------
+# Cumulative-review checkpoints
+# ---------------------------------------------------------------------------
+
+class GsLmsCheckpoint(Base, InstitutionalAuditMixin):
+    """A combined review test over several mastered leaf topics.
+
+    Created with status DUE when a student masters enough consecutive leaves of
+    a sub-topic (see ``app.core.gs_lms.progression``); while DUE the next leaf
+    stays locked. Becomes PASSED once a submission scores at least
+    ``CHECKPOINT_PASS``. ``leaf_ids`` lists the covered leaf node ids in
+    syllabus order.
+    """
+    __tablename__ = "gs_lms_checkpoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    subject_id = Column(
+        Integer, ForeignKey("gs_subjects.id"), nullable=False, index=True
+    )
+    sub_topic_node_id = Column(
+        Integer, ForeignKey("gs_lms_syllabus_nodes.id"), nullable=False, index=True
+    )
+    leaf_ids = Column(JSON, nullable=False)
+    status = Column(String(10), default="DUE", nullable=False)  # DUE | PASSED
+    best_score = Column(Float, nullable=True)  # 0.0-1.0
+    attempts = Column(Integer, default=0, nullable=False)
+    passed_at = Column(DateTime, nullable=True)
+    # Ordered question ids drawn by the latest /start; submit must answer exactly these.
+    question_ids = Column(JSON, nullable=True)
+
+    # Relationships
+    student = relationship("User")
+    sub_topic = relationship("GsLmsSyllabusNode")
+
+
+# ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
 
@@ -408,4 +446,5 @@ __all__ = [
     "GsLmsGrowthReport",
     "GsLmsSpacedRepSchedule",
     "GsLmsExternalResource",
+    "GsLmsCheckpoint",
 ]

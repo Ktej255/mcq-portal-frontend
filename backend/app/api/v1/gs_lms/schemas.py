@@ -34,6 +34,11 @@ class GsLmsSyllabusNodeOut(BaseModel):
     # Per-student completion percentage (0.0–100.0 for non-leaf, bool for leaf)
     completion_percent: Optional[float] = None
     completed: Optional[bool] = None
+    # Learning-loop state (leaf topics): mastered = funnel done and best MCQ lab
+    # score >= TOPIC_MCQ_PASS; locked = previous topic not mastered / review due.
+    mastered: Optional[bool] = None
+    locked: bool = False
+    lock_reason: Optional[str] = None
     # Bridge to existing day-lesson system
     day_lesson_id: Optional[int] = None
     ordering_justification: Optional[str] = None

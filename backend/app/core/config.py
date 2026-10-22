@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import Optional, List, Union, Any, ClassVar
@@ -66,6 +66,16 @@ class Settings(BaseSettings):
     CLERK_JWKS_URL: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     
+    # GS LMS learning loop. GS_LMS_ENFORCE_PROGRESSION is the MASTER switch for all
+    # new rules (step-1 discussion gate, recall gates, step-12 MCQ requirement,
+    # topic order lock, checkpoint blocking). Off (default) = old behaviour: step
+    # order only. GS_LMS_ENFORCE_ORDER is a sub-switch for the order lock/checkpoint
+    # blocking; it only matters when the master switch is on (admins always exempt).
+    GS_LMS_ENFORCE_PROGRESSION: bool = False
+    GS_LMS_ENFORCE_ORDER: bool = True
+    # Topics whose step 14 was completed before this moment count as mastered
+    # regardless of MCQ score (grandfathering when the switch is turned on).
+    GS_LMS_PROGRESSION_START: Optional[datetime] = None
     ADMIN_EMAILS: List[str] = ["sarit.kumar.dev@gmail.com"] # Add bootstrap admin
     SCHEMA_CHECK_STRICT: bool = False
 

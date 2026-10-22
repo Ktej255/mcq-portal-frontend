@@ -36,7 +36,8 @@ from app.core.gs_lms.mcq_lab_scoring import (
     WEAKNESS_THRESHOLD,
     WEAKNESS_MIN_ATTEMPTS,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.core.gs_lms.progression import refresh_mastery
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
 
 router = APIRouter()
@@ -116,6 +117,7 @@ def get_mcq_lab_questions(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Get all reviewed questions for this topic
     all_questions = (
@@ -213,6 +215,7 @@ def submit_mcq_lab(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     if len(body.answers) != TOTAL_MCQ_LAB_QUESTIONS:
         raise HTTPException(
@@ -302,6 +305,10 @@ def submit_mcq_lab(
             )
             db.add(pattern)
 
+    # A retake can lift the best score to the mastery bar: this may make a
+    # review checkpoint due.
+    refresh_mastery(db, current_user.id, node_id)
+
     db.commit()
 
     # Build response
@@ -340,6 +347,7 @@ def get_mcq_lab_result(
     db: Session = Depends(get_db),
 ):
     """Get the latest MCQ Lab result for a topic."""
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     session = (
         db.query(GsLmsMcqLabSession)
         .filter(

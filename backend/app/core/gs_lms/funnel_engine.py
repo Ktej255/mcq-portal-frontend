@@ -25,6 +25,7 @@ from app.core.gs_lms.funnel_models import (
     GsLmsFunnelStepEnum,
     GsLmsFunnelProgress,
 )
+from app.core.gs_lms.progression import StepGateError, check_step_gate, refresh_mastery
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +149,7 @@ def complete_step(
     Raises:
         StepNotReachableError: If step != current_step.
         StepAlreadyCompletedError: If step is already in completed_steps.
+        StepGateError: If the step's gate (discussion / recall / MCQ lab) is not met.
         ValueError: If step is outside [1, 14].
     """
     if step < 1 or step > TOTAL_STEPS:
@@ -165,6 +167,9 @@ def complete_step(
             f"Cannot complete step {step}: current step is {state.current_step}. "
             f"Steps must be completed in order."
         )
+
+    # Server-side gates: discussion (1), recall (3,5,7,9,11), MCQ lab (12).
+    check_step_gate(db, student_id, node_id, step)
 
     # Persist completion
     now = datetime.now(timezone.utc)
@@ -197,6 +202,10 @@ def complete_step(
 
     # --- Side effects for specific steps ---
     _trigger_step_side_effects(db, student_id, node_id, step)
+    if step == TOTAL_STEPS:
+        # Completed; if the MCQ lab score also masters the topic, a review
+        # checkpoint may now be due.
+        refresh_mastery(db, student_id, node_id)
 
     # Return updated state
     return get_funnel_state(db, student_id, node_id)
@@ -327,6 +336,7 @@ __all__ = [
     "TOTAL_STEPS",
     "StepNotReachableError",
     "StepAlreadyCompletedError",
+    "StepGateError",
     "FunnelState",
     "get_funnel_state",
     "complete_step",

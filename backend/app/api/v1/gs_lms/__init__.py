@@ -40,6 +40,7 @@ from app.api.v1.gs_lms import mcq_lab
 from app.api.v1.gs_lms import mains
 from app.api.v1.gs_lms import growth
 from app.api.v1.gs_lms import subjects
+from app.api.v1.gs_lms import progression
 
 # All GS LMS routes require authentication. Declaring the dependency at the
 # aggregate level enforces auth-gating uniformly across every sub-router
@@ -73,6 +74,7 @@ router.include_router(recall.router, prefix="/{subject_slug}", tags=["gs-lms-fun
 router.include_router(mcq_lab.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(mains.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(growth.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
+router.include_router(progression.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 
 # Preview routes are NOT subject-specific — they serve dev/preview content
 # without auth or subject resolution.

@@ -28,9 +28,10 @@ from app.core.gs_lms.funnel_engine import (
     complete_step,
     StepNotReachableError,
     StepAlreadyCompletedError,
+    StepGateError,
     TOTAL_STEPS,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
 
 router = APIRouter()
@@ -79,6 +80,7 @@ def get_funnel_state_endpoint(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     state = get_funnel_state(db, current_user.id, node_id)
 
@@ -102,7 +104,8 @@ def complete_funnel_step(
     """Mark a funnel step as complete and advance to the next step.
 
     The step must be the current active step — out-of-order completions
-    are rejected with 409.
+    are rejected with 409, as are steps whose gate is unmet (discussion for step 1,
+    recall for 3/5/7/9/11, MCQ lab for 12).
     """
     # Verify node exists
     node = db.query(GsLmsSyllabusNode).filter(
@@ -111,6 +114,7 @@ def complete_funnel_step(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     try:
         state = complete_step(db, current_user.id, node_id, body.step)
@@ -118,6 +122,9 @@ def complete_funnel_step(
     except StepNotReachableError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except StepAlreadyCompletedError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except StepGateError as e:
+        db.rollback()
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -144,6 +151,7 @@ def submit_reading_time(
     Validates duration is between 1 and 7200 seconds. Adds to cumulative
     total (capped at 7200). Creates or updates the reading time record.
     """
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     # Validate section belongs to the node
     from app.core.gs_lms.models import GsLmsContentSection
     section = db.query(GsLmsContentSection).filter(

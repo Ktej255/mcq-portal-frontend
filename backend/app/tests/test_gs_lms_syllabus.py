@@ -78,6 +78,10 @@ def seeded_engine():
             "gs_lms_syllabus_nodes",
             "gs_lms_content_sections",
             "gs_lms_student_section_progress",
+            # The tree now reports mastered/locked per leaf (progression.py).
+            "gs_lms_funnel_progress",
+            "gs_lms_mcq_lab_sessions",
+            "gs_lms_checkpoints",
         )
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
