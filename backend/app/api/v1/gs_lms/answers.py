@@ -216,6 +216,28 @@ def _run_page_ocr(sheet: GsLmsAnswerSheetImage, data: bytes, content_type: Optio
     sheet.ocr_confidence = result.confidence
 
 
+async def _record_handwriting_sample(
+    db: Session, user_id: int, image_id: int, data: bytes
+) -> None:
+    """Opt-in handwriting trend: measure the page if the student agreed.
+
+    Runs after the upload is committed and never raises or changes the response.
+    """
+    try:
+        from app.core.wellbeing import service as wellbeing
+
+        if not wellbeing.has_consent(db, user_id):
+            return
+        result = await run_in_threadpool(wellbeing.safe_extract, data)
+        wellbeing.record_sample(db, user_id=user_id, answer_image_id=image_id, result=result)
+    except Exception as exc:  # noqa: BLE001 - must never fail the upload
+        logger.warning("handwriting trend skipped: %s", type(exc).__name__)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _rebuild_attempt_text(db: Session, attempt: GsLmsAnswerAttempt) -> None:
     """Rebuild ``raw_text`` / ``ocr_confidence`` from the pages in page order."""
     db.flush()
@@ -451,6 +473,8 @@ async def upload_answer_page(
             store.delete(old_ref)
         except Exception:  # noqa: BLE001 - orphaned object is retention's job
             pass
+
+    await _record_handwriting_sample(db, current_user.id, sheet.id, data)
 
     failed = sheet.ocr_status == "failed"
     return StandardResponse(

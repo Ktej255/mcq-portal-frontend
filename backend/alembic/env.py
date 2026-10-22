@@ -58,6 +58,7 @@ from app.core.gs_lms.funnel_models import (  # noqa: F401
 
 from app.core.leads.models import MarketingLead  # noqa: F401
 from app.core.usage.models import DailyUsage  # noqa: F401
+from app.core.wellbeing.models import HandwritingSample, WellbeingConsent  # noqa: F401
 
 target_metadata = Base.metadata
 

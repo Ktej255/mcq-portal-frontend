@@ -475,6 +475,41 @@ export interface GsSubjectAvailabilityOut {
 export type StudyPath = 'NCERT_ONLY' | 'REFERENCE_BOOKS' | 'COACHING' | 'MIXED';
 export type ChapterStatus = 'NOT_STARTED' | 'READING' | 'COMPLETED';
 
+// --- Wellbeing: opt-in handwriting trend (student-only) ---
+export type HandwritingStatus = 'off' | 'not_enough_data' | 'steady' | 'changed';
+
+export interface HandwritingChange {
+  feature: string;
+  z: number;
+  direction: 'up' | 'down';
+  /** Plain words, e.g. "smaller letters". */
+  phrase: string;
+}
+
+export interface HandwritingPoint {
+  captured_at: string;
+  value: number;
+}
+
+export interface HandwritingInsights {
+  consent: boolean;
+  consented_at: string | null;
+  status: HandwritingStatus;
+  message: string;
+  needs_more_samples: number;
+  days_needed: number;
+  changed_features: HandwritingChange[];
+  /** How many of the newest points in each series are the "recent" window. */
+  recent_count: number;
+  series: Record<string, HandwritingPoint[]>;
+  samples_total: number;
+  samples_usable: number;
+  disclaimer: string;
+  limitations: string;
+  /** Only on the delete response. */
+  deleted_samples?: number;
+}
+
 export interface LearnerProfile {
   preferred_style: string | null;
   preferred_level: string | null;
@@ -1105,5 +1140,21 @@ export const gsLmsService = {
   getDueReviews: async (): Promise<DueReview[]> => {
     const response = await apiClient.get('gs-lms/books/reviews/due');
     return unwrap<DueReview[]>(response.data);
+  },
+
+  // Wellbeing (opt-in handwriting trend)
+  getHandwritingInsights: async (): Promise<HandwritingInsights> => {
+    const response = await apiClient.get('gs-lms/wellbeing/handwriting', { skipUpgradePrompt: true });
+    return unwrap<HandwritingInsights>(response.data);
+  },
+
+  setHandwritingConsent: async (consent: boolean): Promise<HandwritingInsights> => {
+    const response = await apiClient.put('gs-lms/wellbeing/handwriting/consent', { consent });
+    return unwrap<HandwritingInsights>(response.data);
+  },
+
+  deleteHandwritingData: async (): Promise<HandwritingInsights> => {
+    const response = await apiClient.delete('gs-lms/wellbeing/handwriting/data');
+    return unwrap<HandwritingInsights>(response.data);
   },
 };

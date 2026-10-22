@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Inbox,
   LayoutDashboard,
+  Leaf,
   LibraryBig,
   ListChecks,
   Mail,
@@ -135,6 +136,12 @@ export const studentNavSections: StudentNavSection[] = [
         href: "/upsc/books",
         icon: BookOpen,
         match: (pathname) => pathname.startsWith("/upsc/books"),
+      },
+      {
+        name: "Wellbeing",
+        href: "/upsc/wellbeing",
+        icon: Leaf,
+        match: (pathname) => pathname.startsWith("/upsc/wellbeing"),
       },
       {
         name: "Today",
