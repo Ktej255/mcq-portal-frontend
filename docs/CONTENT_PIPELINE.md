@@ -172,6 +172,50 @@ each has. Each import also records the check summary on the subject
 (`gs_subjects.completeness_status`) and sets `is_complete` when every topic is
 ready.
 
+## Retention questions for book chapters
+
+Students who study from a book (Laxmikanth, Spectrum, NCERT...) can mark a
+chapter as read and then take a 10-question check to see whether they remember
+it. Chapters come back for review after a few days, sooner when the score was
+weak. The questions come from the Eduecosystem banks, which are turned into
+files first and then loaded into the database. These questions are separate
+from the topic MCQs above.
+
+1. **Make the files.** Run the converter as described in
+   `backend/scripts/eduecosystem_import/README.md`. It writes one file per
+   subject (long ones are split into `-part1`, `-part2`) to
+   `backend/app/core/gs_lms/data/retention/`. These files are not committed;
+   make them again whenever you need them.
+2. **Load the books first.** A question can only be linked to a chapter that is
+   already in the database, so import the subject file that lists the book and
+   its chapters (see "Books and book references" above).
+3. **Check the book map.** `backend/app/core/gs_lms/data/retention_book_map.json`
+   says which book in the question files (for example "Laxmikanth") is which
+   book edition in the database (for example `laxmikanth-indian-polity-7e`). Only
+   Laxmikanth 7th edition is filled in. The others (Spectrum, RS Sharma, Satish
+   Chandra, NCERT) are placeholders set to `null`; fill in the book slug when
+   that book edition has been loaded. **Chapter numbers differ between
+   editions**, so a question is linked to a chapter only when the numbers match.
+   Check the numbering of each edition against the question files before you
+   point them at each other, and use a separate entry per edition.
+4. **Try it first.** Run
+   `python -m app.core.gs_lms.retention_import --dir app/core/gs_lms/data/retention --dry-run`.
+   It prints, for each subject, how many questions would be created, updated or
+   skipped, and how many are linked to a chapter ("mapped") or not ("unmapped").
+   Nothing is saved.
+5. **Import for review.** Run the same command without `--dry-run`. Questions are
+   saved as `UNREVIEWED` and students cannot see them. Running it again updates
+   the same questions and keeps any that you already marked reviewed.
+6. **Review, then open.** An expert checks the questions and answers for each
+   chapter. Then import again with `--review-status REVIEWED` (add
+   `--subjects polity-governance` to do one subject at a time). Questions whose
+   answer is missing or marked unverified always stay `UNREVIEWED`, even with
+   that flag, and students never see them.
+
+A chapter offers a check once it has at least 3 reviewed questions with an
+answer. Questions with no chapter link are kept in the database but are not
+shown anywhere until the book map links them.
+
 ## On production
 
 Run the same commands where the backend's `DATABASE_URL` points at the

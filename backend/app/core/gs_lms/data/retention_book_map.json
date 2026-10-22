@@ -1,0 +1,14 @@
+{
+  "_about": "Maps (subject slug, source book label in the retention files) to a book slug in gs_lms_books. A question gets a book chapter only when that book exists and has a chapter whose number equals the question's source chapter. Chapter numbers differ between editions: check this per edition before relying on it. A null value is a placeholder: the book is not loaded yet. Keys starting with an underscore are ignored.",
+  "polity-governance": {
+    "Laxmikanth": "laxmikanth-indian-polity-7e"
+  },
+  "history": {
+    "Spectrum": null,
+    "RS Sharma": null,
+    "Satish Chandra": null
+  },
+  "geography": {
+    "NCERT Class 11/12 Geography": null
+  }
+}

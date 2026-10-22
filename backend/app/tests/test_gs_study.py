@@ -641,4 +641,4 @@ def test_migration_head_chain():
     root = Path(__file__).resolve().parents[2]
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["k8e9f0a1b2c3"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["l9f0a1b2c3d4"]

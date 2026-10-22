@@ -658,6 +658,9 @@ __all__ = [
     "GsLmsBookChapter",
     "GsLmsConceptBookRef",
     "GsLmsLearnerProfile",
+    "GsLmsChapterStatusEnum",
+    "GsLmsRetentionQuestion",
+    "GsLmsChapterProgress",
     "GsLmsPyq",
     "GsLmsMcqQuestion",
     "GsLmsAnswerAttempt",
@@ -711,3 +714,88 @@ class GsLmsContentRequestStudent(Base):
     student_id = Column(
         Integer, ForeignKey("users.id"), primary_key=True, index=True
     )
+
+
+# ---------------------------------------------------------------------------
+# Book retention checks ("do I remember this chapter?")
+# ---------------------------------------------------------------------------
+
+class GsLmsChapterStatusEnum(str, enum.Enum):
+    """Where a student is with one book chapter."""
+    NOT_STARTED = "NOT_STARTED"
+    READING = "READING"
+    COMPLETED = "COMPLETED"
+
+
+class GsLmsRetentionQuestion(Base, InstitutionalAuditMixin):
+    """A question from a retention bank, optionally tied to a book chapter.
+
+    ``external_id`` is the converter's stable id, so re-importing updates the
+    same row. Students only see REVIEWED questions that have a correct option.
+    """
+    __tablename__ = "gs_lms_retention_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String, nullable=False, unique=True, index=True)
+    subject_slug = Column(String, nullable=False, index=True)
+    question_text = Column(Text, nullable=False)
+    options = Column(JSON, nullable=False)  # [{"label": "A", "text": "..."}]
+    correct_option = Column(String, nullable=True)
+    explanation = Column(Text, nullable=True)
+    explanation_quality = Column(String, default="missing", nullable=False)  # ok | short | missing
+    answer_status = Column(String, default="ok", nullable=False)  # ok | unverified
+    question_type = Column(String, default="FACTUAL", nullable=False)
+    difficulty = Column(String, nullable=True)
+    is_pyq = Column(Boolean, default=False, nullable=False)
+    pyq_year = Column(Integer, nullable=True)
+    source_book = Column(String, nullable=True)
+    source_chapter = Column(Integer, nullable=True)
+    book_chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), nullable=True, index=True
+    )
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    chapter = relationship("GsLmsBookChapter")
+
+
+class GsLmsChapterProgress(Base):
+    """One student's progress and retention checks for one book chapter."""
+    __tablename__ = "gs_lms_chapter_progress"
+    __table_args__ = (
+        UniqueConstraint("student_id", "chapter_id", name="uq_gs_lms_chapter_progress"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), nullable=False, index=True
+    )
+    status = Column(
+        Enum(GsLmsChapterStatusEnum),
+        default=GsLmsChapterStatusEnum.NOT_STARTED,
+        nullable=False,
+    )
+    completed_at = Column(DateTime, nullable=True)
+    best_score = Column(Float, nullable=True)  # 0.0-1.0
+    last_score = Column(Float, nullable=True)
+    checks_taken = Column(Integer, default=0, nullable=False)
+    last_check_at = Column(DateTime, nullable=True)
+    next_review_at = Column(DateTime, nullable=True, index=True)
+    # Ordered question ids of the check in progress; submit must answer exactly these.
+    question_ids = Column(JSON, nullable=True)
+    # Ids of the last submitted check, so the next draw can avoid repeating them.
+    previous_question_ids = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    chapter = relationship("GsLmsBookChapter")
