@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { hasLearnerApiAccess } from "@/lib/auth/learner-api-access";
+import { getLearnerId } from "@/lib/auth/learner-api-access";
 import {
   consumeDurableAdaptiveTeacherRateLimit,
   requiresDurableAdaptiveTeacherRateLimit,
@@ -189,11 +189,12 @@ async function readBoundedJsonBody(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await hasLearnerApiAccess(request))) {
+  const learnerId = await getLearnerId(request);
+  if (!learnerId) {
     return noStoreJson({ message: "Learner access required" }, { status: 403 });
   }
 
-  const rateLimit = consumeAdaptiveTeacherRateLimit(request);
+  const rateLimit = consumeAdaptiveTeacherRateLimit(request, Date.now(), learnerId);
   if (!rateLimit.allowed) {
     return noStoreJson(
       { message: "Too many teacher requests. Continue after a short pause." },

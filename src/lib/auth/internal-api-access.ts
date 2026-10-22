@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 
 import { activeAuthProvider } from "@/env";
 import { isExplicitLocalMockMasterToken, isMasterEmail } from "@/lib/auth/master-access";
+import { allowsServerMockToken } from "@/lib/auth/server-mock-auth";
 import { supabase } from "@/lib/supabase/client";
 
 function readBearerToken(request: NextRequest) {
@@ -10,14 +11,9 @@ function readBearerToken(request: NextRequest) {
   return authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
 }
 
-function isLocalRequest(request: NextRequest) {
-  const hostname = request.nextUrl.hostname;
-  return hostname === "localhost" || hostname === "127.0.0.1";
-}
-
 export async function hasInternalApiAccess(request: NextRequest) {
   const token = readBearerToken(request);
-  if (token && isLocalRequest(request) && isExplicitLocalMockMasterToken(token)) {
+  if (token && allowsServerMockToken(request) && isExplicitLocalMockMasterToken(token)) {
     return true;
   }
 
