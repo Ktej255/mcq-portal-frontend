@@ -56,6 +56,10 @@ class GsLmsExamTypeEnum(str, enum.Enum):
     """Exam type for Previous Year Questions."""
     PRELIMS = "PRELIMS"
     MAINS = "MAINS"
+    # Non-UPSC exams (see app.core.gs_lms.exam_profiles).
+    NEET = "NEET"
+    JEE_MAIN = "JEE_MAIN"
+    JEE_ADVANCED = "JEE_ADVANCED"
 
 
 class GsLmsQuestionTypeEnum(str, enum.Enum):
@@ -67,6 +71,10 @@ class GsLmsQuestionTypeEnum(str, enum.Enum):
     CAUSE_EFFECT = "CAUSE_EFFECT"
     CHRONOLOGICAL = "CHRONOLOGICAL"
     FACTUAL = "FACTUAL"
+    # Reserved for the next round (numerical / multi-correct formats); the
+    # MCQ lab does not serve them yet (see exam_profiles).
+    NUMERICAL = "NUMERICAL"
+    MULTI_CORRECT = "MULTI_CORRECT"
 
 
 class GsLmsSectionLabelEnum(str, enum.Enum):
@@ -416,6 +424,8 @@ class GsLmsLearnerProfile(Base, InstitutionalAuditMixin):
     study_path = Column(Enum(GsLmsStudyPathEnum), nullable=True)
     # JSON list of GsLmsBook ids the student studies from.
     book_ids = Column(JSON, nullable=True)
+    # Code of the exam the student prepares for (gs_exams.code); null = "upsc".
+    exam_code = Column(String, nullable=True)
 
     student = relationship("User")
 

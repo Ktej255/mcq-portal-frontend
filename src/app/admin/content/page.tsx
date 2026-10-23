@@ -107,6 +107,15 @@ export default function AdminContentStudioPage() {
                     {row.name}
                   </Link>
                   <p className="text-xs text-zinc-500">{row.slug}</p>
+                  {row.exam_name ? (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 text-[10px] font-bold uppercase tracking-widest"
+                      title={row.rules ? `A topic needs ${row.rules.required_sections.length} sections, ${row.rules.mcqs_per_topic} MCQs and a PYQ (${row.rules.pyq_exam_types.join(" or ")})` : undefined}
+                    >
+                      {row.exam_name}
+                    </Badge>
+                  ) : null}
                 </td>
                 <td className="p-3">
                   <Bar value={row.topics_ready} total={row.topics} label={`${row.name} topics fully written`} />

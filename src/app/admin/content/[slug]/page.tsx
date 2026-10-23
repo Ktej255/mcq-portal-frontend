@@ -212,6 +212,15 @@ export default function AdminContentSubjectPage() {
               {subject.mcqs_reviewed} of {subject.mcqs} MCQs approved · {subject.concepts} concepts · {subject.pyqs} PYQs
             </p>
           ) : null}
+          {subject?.rules ? (
+            <p data-testid="content-exam-rules" className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {subject.exam_name} rules: a topic needs {subject.rules.required_sections.map((s) => SECTION_NAMES[s] ?? s).join(", ")} sections,{" "}
+              {subject.rules.mcqs_per_topic} MCQs and a PYQ ({subject.rules.pyq_exam_types.join(" or ")}).
+              {subject.rules.skipped_funnel_steps.length
+                ? ` Funnel steps ${subject.rules.skipped_funnel_steps.join(", ")} are skipped.`
+                : ""}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={downloadWorklist} disabled={busy === "download"}>

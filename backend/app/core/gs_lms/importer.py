@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.content_check import check_subject_content, format_report
+from app.core.gs_lms.exam_profiles import DEFAULT_EXAM_CODE, exam_code_of
 from app.core.gs_lms.content_tree import TopicIndex, normalise_question
 from app.core.gs_lms.understanding import tokenize
 from app.core.gs_lms.models import (
@@ -532,11 +533,13 @@ def import_concept_versions(
     return {"created": created, "updated": updated}
 
 
-def import_books(db: Session, books_data: list[dict[str, Any]]) -> dict[str, int]:
+def import_books(
+    db: Session, books_data: list[dict[str, Any]], default_exam_tag: str = "UPSC"
+) -> dict[str, int]:
     """Import books and their chapters.
 
     Each book dict has: slug, title, author, edition, publisher (optional),
-    exam_tag (optional, default "UPSC"), subject_slug (optional), chapters
+    exam_tag (optional, default: the importing exam's name, "UPSC" for UPSC), subject_slug (optional), chapters
     ([{number, title}]). Idempotency: books match by slug, chapters by
     (book + number). Books are not review-gated.
     """
@@ -548,7 +551,7 @@ def import_books(db: Session, books_data: list[dict[str, Any]]) -> dict[str, int
             author=b_data["author"].strip(),
             edition=str(b_data["edition"]).strip(),
             publisher=b_data.get("publisher"),
-            exam_tag=b_data.get("exam_tag") or "UPSC",
+            exam_tag=b_data.get("exam_tag") or default_exam_tag,
             subject_slug=b_data.get("subject_slug"),
             updated_by=_ACTOR,
         )
@@ -699,7 +702,7 @@ def import_pyqs(
     """Import Previous Year Questions for a subject/node.
 
     Each PYQ dict has keys:
-      - exam_type (str): PRELIMS or MAINS
+      - exam_type (str): PRELIMS or MAINS (UPSC); NEET; JEE_MAIN or JEE_ADVANCED
       - year (int): Year of the question
       - question_text (str): The question
       - answer_text (str | None): Correct answer or model answer
@@ -947,6 +950,9 @@ def import_gs_subject(
             ]
         }
 
+    The file may carry ``"exam": "<code>"`` (default ``upsc``); it must match
+    the subject's exam, otherwise the import is refused.
+
     Idempotent: running twice produces the same DB state (Property 20).
     All imported content starts as UNREVIEWED by default (Property 19).
 
@@ -978,7 +984,14 @@ def import_gs_subject(
             "run scripts/seed_production.py first to create the subjects."
         )
 
-    book_counts = import_books(db, data.get("books") or [])
+    subject_exam = exam_code_of(subject) or DEFAULT_EXAM_CODE
+    if report.exam_code != subject_exam:
+        raise ValueError(
+            f"Content file is for exam {report.exam_code!r} but subject {subject.slug!r} belongs to "
+            f"exam {subject_exam!r}; nothing was imported."
+        )
+
+    book_counts = import_books(db, data.get("books") or [], report.profile.name if report.profile else "UPSC")
     counts = import_syllabus_tree(
         db,
         data.get("tree", []),

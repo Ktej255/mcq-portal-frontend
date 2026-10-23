@@ -7,15 +7,15 @@ import { KeyRound, LockKeyhole, LogOut, Settings, X } from 'lucide-react';
 
 import {
   adminNavItems,
-  lockedSubjectNavItems,
   studentNavSections,
+  subjectNavItemsFor,
   type StudentNavItem,
 } from '@/lib/navigation/studentNav';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { isLocalMockMasterSession, isMasterEmail } from '@/lib/auth/master-access';
 import { activateUpscMasterPass } from '@/lib/upsc/masterPass';
-import { gsLmsService } from '@/services/api/gsLmsService';
+import { gsLmsService, type GsSubjectAvailabilityOut } from '@/services/api/gsLmsService';
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -30,7 +30,8 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   const { user, logout } = useAuth();
   const hasMasterAccess = isAdmin || isMasterEmail(user?.email) || isLocalMockMasterSession();
   const currentTab = currentSearchParams.get('tab');
-  const openSubjectSlugs = useOpenSubjectSlugs(!isAdmin && !!user);
+  const { openSlugs: openSubjectSlugs, subjects: apiSubjects } = useOpenSubjectSlugs(!isAdmin && !!user);
+  const subjectNavItems = subjectNavItemsFor(apiSubjects);
   const subjectSlug = (item: StudentNavItem) => item.href.split('/').pop() ?? '';
 
   const openMasterPass = () => {
@@ -113,7 +114,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                   More subjects
                 </p>
                 <div className="space-y-1">
-                  {lockedSubjectNavItems.map((item) =>
+                  {subjectNavItems.map((item) =>
                     openSubjectSlugs.has(subjectSlug(item)) ? (
                       renderNavLink(item)
                     ) : (
@@ -206,22 +207,34 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   );
 }
 
-/** Slugs of GS subjects whose content is live. Until the backend answers (or
- *  if it fails) every subject in `lockedSubjectNavItems` stays locked. */
-function useOpenSubjectSlugs(enabled: boolean): Set<string> {
-  const [slugs, setSlugs] = React.useState<Set<string>>(() => new Set());
+/** Slugs of GS subjects whose content is live, plus the subject list of the
+ *  student's exam. Until the backend answers (or if it fails) every subject in
+ *  the static `lockedSubjectNavItems` stays locked. */
+function useOpenSubjectSlugs(enabled: boolean): {
+  openSlugs: Set<string>;
+  subjects: GsSubjectAvailabilityOut[] | null;
+} {
+  const [state, setState] = React.useState<{
+    openSlugs: Set<string>;
+    subjects: GsSubjectAvailabilityOut[] | null;
+  }>(() => ({ openSlugs: new Set(), subjects: null }));
   React.useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     gsLmsService
       .getSubjects()
       .then((subjects) => {
-        if (!cancelled) setSlugs(new Set(subjects.filter((s) => s.available).map((s) => s.slug)));
+        if (!cancelled) {
+          setState({
+            openSlugs: new Set(subjects.filter((s) => s.available).map((s) => s.slug)),
+            subjects,
+          });
+        }
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [enabled]);
-  return slugs;
+  return state;
 }

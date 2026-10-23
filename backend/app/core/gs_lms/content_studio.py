@@ -26,11 +26,11 @@ from typing import Any, Iterable, Optional
 from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.exam_profiles import profile_for_subject
 from app.core.gs_lms.content_check import (
     MAX_KEY_POINTS,
     MCQS_PER_TOPIC,
     MIN_KEY_POINTS,
-    REQUIRED_SECTIONS,
 )
 from app.core.gs_lms.models import (
     GsLmsConcept,
@@ -228,13 +228,15 @@ def subject_topics(db: Session, subject: GsSubject) -> list[dict[str, Any]]:
         if node_id is not None:
             concepts[node_id]["book_refs"] += 1
 
+    # Which sections a topic needs depends on the subject's exam (NEET/JEE: no CURRENT_AFFAIRS).
+    required_sections = list(profile_for_subject(subject).section_labels)
     rows: list[dict[str, Any]] = []
     for leaf_id in leaf_ids:
         node = by_id[leaf_id]
         mega, sub = _titles_above(by_id, node)
         have = sections.get(leaf_id, {})
-        present = [s for s in REQUIRED_SECTIONS if have.get(s)]
-        missing = [s for s in REQUIRED_SECTIONS if not have.get(s)]
+        present = [s for s in required_sections if have.get(s)]
+        missing = [s for s in required_sections if not have.get(s)]
         m, p, c = mcq[leaf_id], pyq[leaf_id], concepts[leaf_id]
         todo = _next_to_write(
             missing, m["total"], m["no_explanation"], p["total"], c["total"], c["total"] - c["good_points"]
@@ -300,9 +302,20 @@ def _iso(value: Optional[datetime]) -> Optional[str]:
 
 def subject_readiness(db: Session, subject: GsSubject) -> dict[str, Any]:
     topics = subject_topics(db, subject)
+    profile = profile_for_subject(subject)
     return {
         "slug": subject.slug,
         "name": subject.name,
+        "exam": profile.code,
+        "exam_name": profile.name,
+        "rules": {
+            "required_sections": list(profile.section_labels),
+            "pyq_exam_types": list(profile.pyq_exam_types),
+            "question_types": [t for t in profile.question_types if profile.supports_question_type(t)],
+            "unsupported_question_types": list(profile.unsupported_question_types),
+            "mcqs_per_topic": MCQS_PER_TOPIC,
+            "skipped_funnel_steps": sorted(profile.disabled_funnel_steps),
+        },
         "topics": len(topics),
         "topics_ready": sum(1 for t in topics if t["content_ready"]),
         "topics_reviewed": sum(1 for t in topics if t["review_status"] == "REVIEWED"),

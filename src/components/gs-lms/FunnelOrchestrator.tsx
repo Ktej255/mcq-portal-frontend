@@ -51,12 +51,20 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
     error,
     currentStep,
     completedSteps,
+    enabledSteps,
     activeTab,
     completeStep,
     gateMessage,
     canAccessStep,
     isStepComplete,
   } = useFunnelState(nodeId, subject);
+
+  // Tabs whose steps are all disabled for this exam (e.g. Current Affairs for
+  // NEET/JEE) are hidden. With every step enabled (UPSC) nothing changes.
+  const visibleTabs = useMemo(
+    () => TABS.filter((tab) => tab.steps.some((s) => enabledSteps.includes(s))),
+    [enabledSteps],
+  );
 
   const [selectedTab, setSelectedTab] = useState<TabId | null>(null);
   const displayTab = selectedTab ?? activeTab;
@@ -78,7 +86,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
       'mains': 'locked',
     };
 
-    for (const tab of TABS) {
+    for (const tab of visibleTabs) {
       const anyStepAccessible = tab.steps.some((s) => canAccessStep(s));
       const anyStepCompleted = tab.steps.some((s) => isStepComplete(s));
       const isCurrentTab = displayTab === tab.id;
@@ -93,10 +101,14 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
     }
 
     return states;
-  }, [displayTab, canAccessStep, isStepComplete]);
+  }, [displayTab, canAccessStep, isStepComplete, visibleTabs]);
 
-  // Progress percentage (completed steps / 14)
-  const progressPercent = (completedSteps.length / 14) * 100;
+  // Progress percentage (completed enabled steps / enabled steps; 14 for UPSC)
+  const totalSteps = enabledSteps.length;
+  const doneSteps = completedSteps.filter((s) => enabledSteps.includes(s)).length;
+  const progressPercent = (doneSteps / totalSteps) * 100;
+  // Position of the current step among the enabled steps (equals currentStep when all 14 are enabled).
+  const stepPosition = enabledSteps.filter((s) => s < currentStep).length + 1;
 
   if (loading) {
     return (
@@ -136,7 +148,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
 
       {/* Tab Navigation */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const state = tabStates[tab.id];
           return (
             <button
@@ -159,7 +171,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
               {state === 'locked' ? <Lock className="h-3 w-3" /> : null}
               {state === 'visited' ? <CheckCircle2 className="h-3 w-3" /> : null}
               {state === 'active' || state === 'locked' ? tab.icon : null}
-              <span>{tab.label}</span>
+              <span>{tab.id === 'mains' && !enabledSteps.includes(13) ? 'Report' : tab.label}</span>
             </button>
           );
         })}
@@ -167,9 +179,9 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
 
       {/* Step Indicator */}
       <div className="flex items-center gap-1 text-[10px] font-semibold text-[#49675e]">
-        <span>Step {currentStep} of 14</span>
+        <span>Step {stepPosition} of {totalSteps}</span>
         <span className="text-[#b9d9cd]">•</span>
-        <span>{completedSteps.length} completed</span>
+        <span>{doneSteps} completed</span>
       </div>
 
       {/* Tab Content */}

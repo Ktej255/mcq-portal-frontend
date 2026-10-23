@@ -39,6 +39,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.exams import scope_subjects_to_exam
 from app.core.gs_lms.models import (
     GsLmsBookChapter,
     GsLmsConcept,
@@ -120,9 +121,16 @@ def _score(
 
 
 def search(
-    db: Session, query: str, subject_slug: Optional[str] = None, limit: int = 10
+    db: Session,
+    query: str,
+    subject_slug: Optional[str] = None,
+    limit: int = 10,
+    exam_code: Optional[str] = None,
 ) -> list[SearchHit]:
-    """Ranked hits for ``query`` over REVIEWED leaves and concepts."""
+    """Ranked hits for ``query`` over REVIEWED leaves and concepts.
+
+    With no ``subject_slug``, ``exam_code`` (when given) keeps the search to
+    that exam's subjects so exams are never mixed."""
     q = query_tokens(query)
     if not q or limit <= 0:
         return []
@@ -131,6 +139,8 @@ def search(
     subjects_q = db.query(GsSubject)
     if subject_slug:
         subjects_q = subjects_q.filter(GsSubject.slug == subject_slug)
+    else:
+        subjects_q = scope_subjects_to_exam(subjects_q, exam_code)
     subjects = {s.id: s for s in subjects_q.all()}
     if not subjects:
         return []

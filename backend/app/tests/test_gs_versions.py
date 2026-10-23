@@ -258,7 +258,7 @@ def test_migration_is_the_single_alembic_head():
 
     cfg = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[2] / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["o2c3d4e5f6a7"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["p3d4e5f6a7b8"]
 
 
 # ---------------------------------------------------------------------------

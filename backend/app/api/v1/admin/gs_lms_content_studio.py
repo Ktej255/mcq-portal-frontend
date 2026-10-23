@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_admin
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms import content_studio as studio
+from app.core.gs_lms.exam_profiles import profile_for_subject as studio_profile
 from app.core.gs_lms.content_check import check_subject_content
 from app.core.gs_lms.importer import derive_concepts_for_subject, import_gs_subject
 from app.core.gs_lms.models import (
@@ -135,6 +136,12 @@ def _check_payload(db: Session, data: dict[str, Any]) -> tuple[Any, dict[str, An
         )
     reviewed_now = 0
     if subject is not None:
+        subject_exam = studio_profile(subject).code
+        if report.exam_code != subject_exam:
+            errors.append(
+                f'This file is for exam "{report.exam_code}" but subject "{subject.slug}" belongs to '
+                f'exam "{subject_exam}". Set "exam" in the file to match the subject.'
+            )
         reviewed_now = (
             db.query(GsLmsSyllabusNode)
             .filter(
@@ -147,6 +154,7 @@ def _check_payload(db: Session, data: dict[str, Any]) -> tuple[Any, dict[str, An
     payload = {
         "subject_slug": subject.slug if subject else data.get("subject_slug"),
         "subject_name": subject.name if subject else None,
+        "exam": report.exam_code,
         "summary": report.summary(),
         "errors": errors,
         "gaps": list(report.gaps),

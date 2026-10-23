@@ -18,6 +18,8 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsSubject
+from app.core.gs_lms.exam_profiles import exam_code_of
+from app.core.gs_lms.exams import scope_subjects_to_exam
 from app.core.gs_lms.mastery import get_reviewed_concepts
 from app.core.gs_lms.models import GsLmsConcept
 from app.core.gs_lms.progression import compute_progression, is_order_exempt
@@ -71,10 +73,16 @@ def next_in_subject(db: Session, user: Any, subject: GsSubject) -> NextStep:
     return NextStep("done", subject.slug, None, None, None, "You are all caught up")
 
 
-def next_for_student(db: Session, user: Any, subject_slug: Optional[str] = None) -> NextStep:
+def next_for_student(
+    db: Session, user: Any, subject_slug: Optional[str] = None, exam_code: Optional[str] = None
+) -> NextStep:
+    """Where to continue. With no ``subject_slug``, ``exam_code`` (when given)
+    keeps the walk to that exam's subjects so exams are never mixed."""
     q = db.query(GsSubject)
     if subject_slug:
         q = q.filter(GsSubject.slug == subject_slug)
+    else:
+        q = scope_subjects_to_exam(q, exam_code)
     last: Optional[NextStep] = None
     for subject in q.order_by(GsSubject.display_order, GsSubject.id).all():
         step = next_in_subject(db, user, subject)
@@ -101,7 +109,7 @@ def next_after_concept(db: Session, user: Any, subject: GsSubject, concept: GsLm
             return NextStep("concept", subject.slug, concept.syllabus_node_id, c.id, None, f"Next concept: {c.title}")
     state = compute_progression(db, user.id, subject.id).by_id.get(concept.syllabus_node_id)
     if state is not None and state.mastered:
-        return next_for_student(db, user, None)
+        return next_for_student(db, user, None, exam_code_of(subject))
     leaf_title = state.title if state else concept.syllabus_node.title
     return NextStep("mcq_lab", subject.slug, concept.syllabus_node_id, None, None, f"MCQ lab: {leaf_title}")
 

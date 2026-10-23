@@ -25,6 +25,7 @@ from app.api.v1.gs_lms.concept_versions import ConceptVersionBriefOut, ConceptVe
 from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.content_requests import record_if_unanswered
+from app.core.gs_lms.exams import student_exam_code
 from app.core.gs_lms.mastery import CONCEPT_PASS_THRESHOLD, record_attempt
 from app.core.gs_lms.models import GsLmsConcept, GsLmsNodeTypeEnum, GsLmsSyllabusNode, GsLmsVersionLevelEnum
 from app.core.gs_lms.student_models import GsLmsConceptMastery
@@ -160,7 +161,7 @@ def study_search(
     """Ranked matches; searches with no (or only a weak) match are logged as content requests."""
     if subject and db.query(GsSubject.id).filter(GsSubject.slug == subject).first() is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Subject '{subject}' not found")
-    hits = search(db, q, subject_slug=subject)
+    hits = search(db, q, subject_slug=subject, exam_code=student_exam_code(db, current_user.id))
     record_if_unanswered(db, current_user.id, q, hits, subject)
     db.commit()
     data = [
@@ -177,7 +178,7 @@ def study_next(
 ) -> Any:
     if subject and db.query(GsSubject.id).filter(GsSubject.slug == subject).first() is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Subject '{subject}' not found")
-    step = next_for_student(db, current_user, subject)
+    step = next_for_student(db, current_user, subject, student_exam_code(db, current_user.id))
     return StandardResponse(success=True, message="Next step", data=_next_out(step))
 
 

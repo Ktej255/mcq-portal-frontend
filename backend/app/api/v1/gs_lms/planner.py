@@ -1,9 +1,9 @@
 """Daily Planner endpoints for the GS LMS Platform.
 
 Routes (mounted under /api/v1/gs-lms; auth-gated at the package router):
-* GET /geography/plan/today — Current day's plan with items + projected completion
-* PUT /geography/plan/bandwidth — Set/update daily bandwidth
-* POST /geography/plan/replan — Manual trigger replanning
+* GET /{subject_slug}/plan/today — Current day's plan with items + projected completion
+* PUT /{subject_slug}/plan/bandwidth — Set/update daily bandwidth
+* POST /{subject_slug}/plan/replan — Manual trigger replanning
 
 Design properties enforced:
 * Property 16 (position continuity): day plan contains min(B, remaining)
@@ -62,21 +62,6 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _get_geography_subject(db: Session) -> GsSubject:
-    """Retrieve the GS Geography subject or raise 404."""
-    subject = (
-        db.query(GsSubject)
-        .filter(GsSubject.slug == "geography")
-        .one_or_none()
-    )
-    if subject is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="GS Geography subject not found",
-        )
-    return subject
 
 
 def _get_student_bandwidth(db: Session, student_id: int) -> int:

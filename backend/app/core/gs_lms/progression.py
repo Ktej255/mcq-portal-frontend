@@ -22,7 +22,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.exam_profiles import ExamProfile, ProgressionRules, profile_for_subject
 from app.core.gs_lms.funnel_models import (
     GsLmsCheckpoint,
     GsLmsFunnelProgress,
@@ -76,6 +77,42 @@ class StepGateError(Exception):
 
 
 # ---------------------------------------------------------------------------
+# Exam profile lookups
+#
+# The constants above are the defaults (UPSC today). Every threshold below is
+# read from the subject's exam profile (app.core.gs_lms.exam_profiles), whose
+# UPSC values equal these constants, and falls back to them when the subject
+# cannot be found.
+# ---------------------------------------------------------------------------
+
+def default_rules() -> ProgressionRules:
+    return ProgressionRules(
+        recall_pass_score=RECALL_PASS_SCORE,
+        recall_max_attempts=RECALL_MAX_ATTEMPTS,
+        topic_mcq_pass=TOPIC_MCQ_PASS,
+        checkpoint_every=CHECKPOINT_EVERY,
+        checkpoint_min_leaves=CHECKPOINT_MIN_LEAVES,
+        checkpoint_questions=CHECKPOINT_QUESTIONS,
+        checkpoint_pass=CHECKPOINT_PASS,
+    )
+
+
+def subject_profile(db: Session, subject_id: Optional[int]) -> Optional[ExamProfile]:
+    subject = db.get(GsSubject, subject_id) if subject_id is not None else None
+    return profile_for_subject(subject) if subject is not None else None
+
+
+def rules_for_subject(db: Session, subject_id: Optional[int]) -> ProgressionRules:
+    profile = subject_profile(db, subject_id)
+    return profile.progression if profile is not None else default_rules()
+
+
+def profile_for_node(db: Session, node_id: int) -> Optional[ExamProfile]:
+    node = db.get(GsLmsSyllabusNode, node_id)
+    return subject_profile(db, node.subject_id) if node is not None else None
+
+
+# ---------------------------------------------------------------------------
 # Who is exempt
 # ---------------------------------------------------------------------------
 
@@ -115,9 +152,13 @@ def weak_recall_sections(db: Session, student_id: int, node_id: int) -> list[str
     """Section labels whose recall step was passed only via RECALL_MAX_ATTEMPTS
     (best score still below RECALL_PASS_SCORE)."""
     weak = []
-    for label in RECALL_STEP_SECTIONS.values():
+    profile = profile_for_node(db, node_id)
+    rules = profile.progression if profile is not None else default_rules()
+    for step, label in RECALL_STEP_SECTIONS.items():
+        if profile is not None and step not in profile.enabled_funnel_steps:
+            continue
         best, count = recall_stats(db, student_id, node_id, label)
-        if count >= RECALL_MAX_ATTEMPTS and (best or 0.0) < RECALL_PASS_SCORE:
+        if count >= rules.recall_max_attempts and (best or 0.0) < rules.recall_pass_score:
             weak.append(label)
     return weak
 
@@ -164,23 +205,28 @@ def completed_topic_ids(db: Session, student_id: int, node_ids: list[int]) -> se
     return set(completed_topic_times(db, student_id, node_ids))
 
 
-def _is_mastered(completed_at: Optional[datetime], score: Optional[float]) -> bool:
+def _is_mastered(
+    completed_at: Optional[datetime], score: Optional[float], rules: Optional[ProgressionRules] = None
+) -> bool:
     """Best MCQ score >= TOPIC_MCQ_PASS, or step 14 finished before
     GS_LMS_PROGRESSION_START (grandfathered)."""
+    pass_mark = rules.topic_mcq_pass if rules is not None else TOPIC_MCQ_PASS
     start = settings.GS_LMS_PROGRESSION_START
     if start is not None and completed_at is not None and _naive_utc(completed_at) < _naive_utc(start):
         return True
-    return (score or 0.0) >= TOPIC_MCQ_PASS
+    return (score or 0.0) >= pass_mark
 
 
-def mastered_topic_ids(db: Session, student_id: int, node_ids: list[int]) -> set[int]:
+def mastered_topic_ids(
+    db: Session, student_id: int, node_ids: list[int], rules: Optional[ProgressionRules] = None
+) -> set[int]:
     """Topics that are COMPLETED and have a best MCQ lab score >= TOPIC_MCQ_PASS
     (or were completed before GS_LMS_PROGRESSION_START)."""
     done = completed_topic_times(db, student_id, node_ids)
     if not done:
         return set()
     scores = best_mcq_scores(db, student_id, list(done))
-    return {n for n, at in done.items() if _is_mastered(at, scores.get(n))}
+    return {n for n, at in done.items() if _is_mastered(at, scores.get(n), rules)}
 
 
 def check_step_gate(db: Session, student_id: int, node_id: int, step: int) -> None:
@@ -188,6 +234,8 @@ def check_step_gate(db: Session, student_id: int, node_id: int, step: int) -> No
     GS_LMS_ENFORCE_PROGRESSION is off)."""
     if not settings.GS_LMS_ENFORCE_PROGRESSION:
         return
+    node = db.get(GsLmsSyllabusNode, node_id)
+    rules = rules_for_subject(db, node.subject_id if node is not None else None)
     if step == DISCUSSION_STEP:
         from app.core.gs_lms.discussion import has_completed_discussion
 
@@ -212,14 +260,14 @@ def check_step_gate(db: Session, student_id: int, node_id: int, step: int) -> No
         if not has_section:
             return  # nothing to recall on a section that does not exist
         best, count = recall_stats(db, student_id, node_id, label)
-        if best is not None and best >= RECALL_PASS_SCORE:
+        if best is not None and best >= rules.recall_pass_score:
             return
-        if count >= RECALL_MAX_ATTEMPTS:
+        if count >= rules.recall_max_attempts:
             return
         got = "no recall attempt yet" if best is None else f"best score {round(best * 100)}%"
         raise StepGateError(
             f"Cannot complete step {step}: {label} recall not passed ({got}; need "
-            f"{round(RECALL_PASS_SCORE * 100)}% or {RECALL_MAX_ATTEMPTS} attempts, "
+            f"{round(rules.recall_pass_score * 100)}% or {rules.recall_max_attempts} attempts, "
             f"{count} made)."
         )
 
@@ -322,6 +370,9 @@ def compute_progression(db: Session, student_id: int, subject_id: int) -> Progre
 
     A fixed number of queries regardless of the number of leaves.
     """
+    profile = subject_profile(db, subject_id)
+    rules = profile.progression if profile is not None else default_rules()
+    step_count = len(profile.enabled_funnel_steps) if profile is not None else FINAL_STEP
     leaves = ordered_leaves(db, subject_id)
     ids = [leaf[0] for leaf in leaves]
     completed_at = completed_topic_times(db, student_id, ids)
@@ -350,7 +401,7 @@ def compute_progression(db: Session, student_id: int, subject_id: int) -> Progre
     for node_id, title, sub_topic_id in leaves:
         score = scores.get(node_id)
         done = node_id in completed
-        mastered = done and _is_mastered(completed_at.get(node_id), score)
+        mastered = done and _is_mastered(completed_at.get(node_id), score, rules)
         state = LeafState(
             node_id=node_id,
             title=title,
@@ -367,11 +418,11 @@ def compute_progression(db: Session, student_id: int, subject_id: int) -> Progre
         if not mastered:
             if done:
                 block = (
-                    f"Score at least {round(TOPIC_MCQ_PASS * 100)}% in the MCQ lab of "
+                    f"Score at least {round(rules.topic_mcq_pass * 100)}% in the MCQ lab of "
                     f"'{title}' to master it before moving on."
                 )
             else:
-                block = f"Finish '{title}' first (complete all 14 steps and master it) before moving on."
+                block = f"Finish '{title}' first (complete all {step_count} steps and master it) before moving on."
         elif node_id in due_after:
             names = ", ".join(f"'{titles[i]}'" for i in due_after[node_id].leaf_ids if i in titles)
             block = f"A review test is due before you continue (covers {names})."
@@ -405,14 +456,15 @@ def maybe_create_checkpoints(
     leaf is mastered, the remaining mastered run becomes a checkpoint if it has
     at least CHECKPOINT_MIN_LEAVES leaves.
     """
+    rules = rules_for_subject(db, subject_id)
     leaves = ordered_leaves(db, subject_id)
     me = next((leaf for leaf in leaves if leaf[0] == node_id), None)
     if me is None:
         return []
     group = [leaf[0] for leaf in leaves if leaf[2] == me[2]]
-    if node_id not in mastered_topic_ids(db, student_id, [node_id]):
+    if node_id not in mastered_topic_ids(db, student_id, [node_id], rules):
         return []
-    mastered = mastered_topic_ids(db, student_id, group)
+    mastered = mastered_topic_ids(db, student_id, group, rules)
 
     covered: set[int] = set()
     for (ids,) in (
@@ -451,10 +503,10 @@ def maybe_create_checkpoints(
         db.add(cp)
         created.append(cp)
 
-    while len(run) >= CHECKPOINT_EVERY:
-        make(run[:CHECKPOINT_EVERY])
-        run = run[CHECKPOINT_EVERY:]
-    if run and reached_end and len(run) >= CHECKPOINT_MIN_LEAVES:
+    while len(run) >= rules.checkpoint_every:
+        make(run[:rules.checkpoint_every])
+        run = run[rules.checkpoint_every:]
+    if run and reached_end and len(run) >= rules.checkpoint_min_leaves:
         make(run)
         run = []
     if created:
@@ -477,7 +529,7 @@ def pass_checkpoint(db: Session, cp: GsLmsCheckpoint, score: float) -> bool:
     cp.attempts = (cp.attempts or 0) + 1
     cp.best_score = max(cp.best_score or 0.0, score)
     cp.updated_by = str(cp.student_id)
-    passed = score >= CHECKPOINT_PASS
+    passed = score >= rules_for_subject(db, cp.subject_id).checkpoint_pass
     if passed and cp.status != CHECKPOINT_PASSED:
         cp.status = CHECKPOINT_PASSED
         cp.passed_at = datetime.now(timezone.utc)
@@ -493,5 +545,6 @@ __all__ = [
     "best_mcq_scores", "completed_topic_ids", "mastered_topic_ids",
     "check_step_gate", "LeafState", "Progression", "ordered_leaves",
     "compute_progression", "leaf_lock", "maybe_create_checkpoints",
-    "refresh_mastery", "pass_checkpoint",
+    "refresh_mastery", "pass_checkpoint", "default_rules", "rules_for_subject",
+    "subject_profile", "profile_for_node",
 ]

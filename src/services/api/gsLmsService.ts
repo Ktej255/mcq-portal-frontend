@@ -347,9 +347,23 @@ export interface ContentRequest {
 
 // -- Admin Content studio ---------------------------------------------------
 
+/** What "ready" means for a subject, from its exam profile. */
+export interface ContentExamRules {
+  required_sections: string[];
+  pyq_exam_types: string[];
+  question_types: string[];
+  unsupported_question_types: string[];
+  mcqs_per_topic: number;
+  skipped_funnel_steps: number[];
+}
+
 export interface ContentSubjectReadiness {
   slug: string;
   name: string;
+  /** Exam code (upsc / neet / jee). */
+  exam?: string;
+  exam_name?: string;
+  rules?: ContentExamRules;
   topics: number;
   topics_ready: number;
   topics_reviewed: number;
@@ -549,9 +563,19 @@ export interface TopicConceptsOut {
 
 // -- Subjects ---------------------------------------------------------------
 
+export interface GsExamOut {
+  code: string;
+  name: string;
+  display_order: number;
+  /** Student-facing name of the content levels for this exam. */
+  content_level_label?: string | null;
+}
+
 export interface GsSubjectAvailabilityOut {
   slug: string;
   name: string;
+  /** Exam code; absent for UPSC subjects (absent = "upsc"). */
+  exam?: string;
   /** True once the subject has reviewed topics with reviewed MCQs. */
   available: boolean;
   topics: number;
@@ -604,6 +628,8 @@ export interface LearnerProfile {
   study_path: StudyPath | null;
   book_ids: number[];
   updated_at?: string | null;
+  /** Exam the student prepares for (upsc / neet / jee); absent until set = "upsc". */
+  exam_code?: string | null;
 }
 
 export interface BookOut {
@@ -717,10 +743,20 @@ const unwrap = <T>(data: unknown): T => {
 
 export const gsLmsService = {
   /** Which GS subjects students can open (drives the sidebar's locks). */
-  getSubjects: async (): Promise<GsSubjectAvailabilityOut[]> => {
+  getSubjects: async (exam?: string): Promise<GsSubjectAvailabilityOut[]> => {
     // Read on every page load, so an ended trial must not pop the dialog here.
-    const response = await apiClient.get('gs-lms/subjects', { skipUpgradePrompt: true });
+    // Without `exam`, the server lists the student's own exam (default UPSC).
+    const response = await apiClient.get('gs-lms/subjects', {
+      skipUpgradePrompt: true,
+      params: exam ? { exam } : undefined,
+    });
     return unwrap<GsSubjectAvailabilityOut[]>(response.data);
+  },
+
+  /** Active exams a student can choose from. */
+  getExams: async (): Promise<GsExamOut[]> => {
+    const response = await apiClient.get('gs-lms/exams', { skipUpgradePrompt: true });
+    return unwrap<GsExamOut[]>(response.data);
   },
 
   // -------------------------------------------------------------------------
@@ -1254,7 +1290,7 @@ export const gsLmsService = {
     return unwrap<LearnerProfile>(response.data);
   },
 
-  /** Replaces the whole profile: send every field. */
+  /** Replaces the profile: send every field. `exam_code` is kept when omitted. */
   saveLearnerProfile: async (profile: Omit<LearnerProfile, 'updated_at'>): Promise<LearnerProfile> => {
     const response = await apiClient.put('gs-lms/profile', profile);
     return unwrap<LearnerProfile>(response.data);

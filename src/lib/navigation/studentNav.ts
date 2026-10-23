@@ -120,6 +120,28 @@ export const lockedSubjectNavItems: StudentNavItem[] = [
   { name: "Internal Security & Society", href: "/upsc/internal-security-society", icon: Compass, locked: true },
 ];
 
+/** Subjects that already have their own nav entry (not part of "More subjects"). */
+const primarySubjectSlugs = new Set(["geography"]);
+
+/**
+ * "More subjects" entries for the sidebar. `subjects` is the API subject list
+ * for the student's exam. For UPSC the static list above stays as it is (so
+ * nothing disappears) and only subjects the API adds are appended; for any
+ * other exam the API list is used as is. With no API list, the static list.
+ */
+export function subjectNavItemsFor(
+  subjects: { slug: string; name: string; exam?: string }[] | null,
+): StudentNavItem[] {
+  if (!subjects || subjects.length === 0) return lockedSubjectNavItems;
+  const fromApi: StudentNavItem[] = subjects
+    .filter((s) => !primarySubjectSlugs.has(s.slug))
+    .map((s) => ({ name: s.name, href: `/upsc/${s.slug}`, icon: Compass, locked: true }));
+  const isUpsc = subjects.every((s) => !s.exam || s.exam === "upsc");
+  if (!isUpsc) return fromApi;
+  const known = new Set(lockedSubjectNavItems.map((item) => item.href));
+  return [...lockedSubjectNavItems, ...fromApi.filter((item) => !known.has(item.href))];
+}
+
 /** Navigation shown to students. */
 export const studentNavSections: StudentNavSection[] = [
   {

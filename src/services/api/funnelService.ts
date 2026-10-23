@@ -18,6 +18,8 @@ export interface FunnelStateOut {
   node_id: number;
   current_step: number;        // 1-14
   completed_steps: number[];
+  /** Steps this subject's exam includes; absent = all 14 (UPSC). */
+  enabled_steps?: number[];
   started_at: string | null;
   last_activity_at: string | null;
 }

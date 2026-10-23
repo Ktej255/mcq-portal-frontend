@@ -20,14 +20,25 @@ book slug, chapter number and pages). Books are declared once at the top of the
 file under ``"books"``. The checker only sees the file, so every book a
 ``book_refs`` entry names must be declared in that same file. A concept without
 versions is a gap only when the file sets ``"require_versions": true``.
+
+Exam profiles: the file may carry ``"exam": "<code>"`` (default ``upsc``). The
+section labels, PYQ exam types and MCQ question types are checked against that
+exam's profile (``app.core.gs_lms.exam_profiles``). A NEET or JEE topic needs
+no CURRENT_AFFAIRS section; a UPSC file is checked exactly as before.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
+from app.core.gs_lms.exam_profiles import (
+    DEFAULT_EXAM_CODE,
+    ExamProfile,
+    UnknownExamError,
+    get_profile,
+)
 from app.core.gs_lms.models import (
     GsLmsExamTypeEnum,
     GsLmsNodeTypeEnum,
@@ -43,6 +54,7 @@ MCQS_PER_TOPIC = 15
 # A concept lists the points a student must convey: at least 2, at most 8.
 MIN_KEY_POINTS = 2
 MAX_KEY_POINTS = 8
+# Section labels required of a UPSC topic (every label the engine knows).
 REQUIRED_SECTIONS = [label.value for label in GsLmsSectionLabelEnum]
 OPTION_LABELS = ["A", "B", "C", "D"]
 
@@ -71,6 +83,9 @@ class ContentReport:
     books: int = 0
     mcqs: int = 0
     pyqs: int = 0
+    # The exam profile the file is checked against (the file's "exam", default upsc).
+    exam_code: str = DEFAULT_EXAM_CODE
+    profile: Optional[ExamProfile] = field(default=None, repr=False)
     # Set from the file's top-level "require_versions" flag.
     require_versions: bool = False
     # Book slug -> chapter numbers listed for it in the file (for book_refs checks).
@@ -91,7 +106,7 @@ class ContentReport:
 
     def summary(self) -> dict[str, Any]:
         """Compact stats stored on GsSubject.completeness_status."""
-        return {
+        out = {
             "topics": self.topics,
             "topics_ready": self.topics_ready,
             "unfinished": self.unfinished,
@@ -106,10 +121,20 @@ class ContentReport:
             "gaps": len(self.gaps),
             "ready": self.ready,
         }
+        if self.exam_code != DEFAULT_EXAM_CODE:
+            out["exam"] = self.exam_code
+        return out
 
 
 def check_subject_content(data: dict[str, Any]) -> ContentReport:
     report = ContentReport()
+    exam_value = data.get("exam")
+    try:
+        report.profile = get_profile(exam_value if isinstance(exam_value, str) and exam_value.strip() else None)
+        report.exam_code = report.profile.code
+    except UnknownExamError as exc:
+        report.errors.append(f'"exam": {exc}')
+        report.profile = get_profile(None)
     tree = data.get("tree")
     if not isinstance(tree, list):
         report.errors.append('The file needs a "tree" list of top-level topics.')
@@ -194,11 +219,12 @@ def _check_node(node: dict[str, Any], parent_path: str, report: ContentReport) -
 
 
 def _check_sections(sections: list[Any], path: str, report: ContentReport) -> None:
+    required = list(report.profile.section_labels) if report.profile else REQUIRED_SECTIONS
     present = set()
     for section in sections:
         label = section.get("section_label") if isinstance(section, dict) else None
-        if label not in REQUIRED_SECTIONS:
-            report.errors.append(f"{path}: section_label {label!r} must be one of {REQUIRED_SECTIONS}.")
+        if label not in required:
+            report.errors.append(f"{path}: section_label {label!r} must be one of {required}.")
             continue
         if label in present:
             report.errors.append(f"{path}: section {label} appears twice.")
@@ -206,7 +232,7 @@ def _check_sections(sections: list[Any], path: str, report: ContentReport) -> No
         report.sections += 1
         if not section.get("blocks"):
             report.gaps.append(f"{path}: section {label} has no content blocks.")
-    missing = [label for label in REQUIRED_SECTIONS if label not in present]
+    missing = [label for label in required if label not in present]
     if missing:
         report.gaps.append(f"{path}: missing section(s) {', '.join(missing)}.")
 
@@ -363,12 +389,22 @@ def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
             report.errors.append(f"{where} needs exactly four options labelled A, B, C, D, each with text.")
         if mcq.get("correct_option") not in OPTION_LABELS:
             report.errors.append(f"{where}: correct_option {mcq.get('correct_option')!r} must be A, B, C or D.")
-        if mcq.get("question_type") not in _QUESTION_TYPES:
-            report.errors.append(f"{where}: question_type {mcq.get('question_type')!r} must be one of {sorted(_QUESTION_TYPES)}.")
+        _check_question_type(mcq.get("question_type"), where, report)
         if not _text(mcq.get("explanation")):
             report.gaps.append(f"{where} has no explanation.")
     if len(mcqs) < MCQS_PER_TOPIC:
         report.gaps.append(f"{path}: {len(mcqs)} MCQs; the MCQ Lab needs {MCQS_PER_TOPIC}.")
+
+
+def _check_question_type(value: Any, where: str, report: ContentReport) -> None:
+    profile = report.profile or get_profile(None)
+    if value in profile.unsupported_question_types:
+        report.errors.append(
+            f"{where}: question_type {value!r} is not yet supported in the MCQ lab for {profile.name}."
+        )
+    elif value not in profile.question_types or value not in _QUESTION_TYPES:
+        allowed = sorted(set(profile.question_types) - set(profile.unsupported_question_types))
+        report.errors.append(f"{where}: question_type {value!r} must be one of {allowed}.")
 
 
 def _check_pyqs(pyqs: list[Any], path: str, report: ContentReport) -> None:
@@ -378,8 +414,11 @@ def _check_pyqs(pyqs: list[Any], path: str, report: ContentReport) -> None:
             report.errors.append(f"{where} must be an object.")
             continue
         report.pyqs += 1
-        if pyq.get("exam_type") not in _EXAM_TYPES:
-            report.errors.append(f"{where}: exam_type {pyq.get('exam_type')!r} must be PRELIMS or MAINS.")
+        allowed_exam_types = report.profile.pyq_exam_types if report.profile else ("PRELIMS", "MAINS")
+        if pyq.get("exam_type") not in allowed_exam_types or pyq.get("exam_type") not in _EXAM_TYPES:
+            report.errors.append(
+                f"{where}: exam_type {pyq.get('exam_type')!r} must be " + " or ".join(allowed_exam_types) + "."
+            )
         if not _text(pyq.get("question_text")):
             report.errors.append(f"{where} has no question_text.")
     if not pyqs:

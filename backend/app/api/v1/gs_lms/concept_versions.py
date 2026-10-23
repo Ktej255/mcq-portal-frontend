@@ -5,7 +5,10 @@ Routes (all auth-gated at the package router):
   current student (see ``app.core.gs_lms.versions``) plus alternatives.
 * GET /{subject}/concepts/{concept_id}/versions/{version_id} — one specific
   REVIEWED version.
-* GET /profile, PUT /profile — the student's learner profile.
+* GET /profile, PUT /profile — the student's learner profile. ``exam_code``
+  (upsc / neet / jee) is the exam the student prepares for; it is included in
+  the response only once set (absent = upsc), and PUT leaves it unchanged when
+  omitted, so saving reading preferences never resets a NEET student to UPSC.
 * GET /books?subject=<slug> — books with their chapters.
 
 Only REVIEWED concepts and versions are served. The version routes return 423
@@ -19,11 +22,14 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.exam_profiles import is_known_exam
+from app.core.gs_lms.exams import find_exam, student_exam_code
 from app.core.gs_lms.models import (
     GsLmsBook,
     GsLmsConcept,
@@ -77,6 +83,8 @@ class LearnerProfileIn(BaseModel):
     preferred_level: Optional[GsLmsVersionLevelEnum] = None
     study_path: Optional[GsLmsStudyPathEnum] = None
     book_ids: list[int] = []
+    # Omit to keep the current exam; an unknown or inactive exam is a 422.
+    exam_code: Optional[str] = None
 
 
 class LearnerProfileOut(BaseModel):
@@ -85,6 +93,7 @@ class LearnerProfileOut(BaseModel):
     study_path: Optional[str] = None
     book_ids: list[int] = []
     updated_at: Optional[str] = None
+    exam_code: Optional[str] = None
 
 
 class BookChapterOut(BaseModel):
@@ -192,10 +201,19 @@ def get_specific_version(
     return StandardResponse(success=True, message="Concept version", data=_version_out(version))
 
 
-def _profile_out(profile: Optional[GsLmsLearnerProfile]) -> LearnerProfileOut:
+def _profile_out(profile: Optional[GsLmsLearnerProfile]) -> dict[str, Any]:
+    """The profile as a dict; ``exam_code`` appears only once the student has set it."""
+    data = _profile_model(profile).model_dump()
+    if data["exam_code"] is None:
+        del data["exam_code"]
+    return data
+
+
+def _profile_model(profile: Optional[GsLmsLearnerProfile]) -> LearnerProfileOut:
     if profile is None:
         return LearnerProfileOut()
     return LearnerProfileOut(
+        exam_code=profile.exam_code,
         preferred_style=profile.preferred_style.value if profile.preferred_style else None,
         preferred_level=profile.preferred_level.value if profile.preferred_level else None,
         study_path=profile.study_path.value if profile.study_path else None,
@@ -225,6 +243,15 @@ def put_profile(
 ) -> Any:
     """Replace the student's profile. Enum values are validated by the schema
     (422); every book id must exist (422)."""
+    exam_code = None
+    if body.exam_code is not None:
+        exam_row = find_exam(db, body.exam_code)
+        if exam_row is None or not exam_row.is_active or not is_known_exam(exam_row.code):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown exam {body.exam_code!r}",
+            )
+        exam_code = exam_row.code
     book_ids = sorted(set(body.book_ids))
     if book_ids:
         found = {i for (i,) in db.query(GsLmsBook.id).filter(GsLmsBook.id.in_(book_ids)).all()}
@@ -246,6 +273,8 @@ def put_profile(
     profile.preferred_level = body.preferred_level
     profile.study_path = body.study_path
     profile.book_ids = book_ids
+    if "exam_code" in body.model_fields_set:
+        profile.exam_code = exam_code
     profile.updated_by = str(current_user.id)
     db.commit()
     db.refresh(profile)
@@ -256,10 +285,15 @@ def put_profile(
 def list_books(
     subject: Optional[str] = Query(None, description="Only books for this subject slug"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
+    """Books for a subject; with no subject, the books of the student's exam
+    (matched on ``exam_tag``, which holds the exam name, e.g. "UPSC")."""
     query = db.query(GsLmsBook)
     if subject:
         query = query.filter(GsLmsBook.subject_slug == subject)
+    else:
+        query = query.filter(func.lower(GsLmsBook.exam_tag) == student_exam_code(db, current_user.id))
     books = query.order_by(GsLmsBook.title, GsLmsBook.edition, GsLmsBook.id).all()
     return StandardResponse(
         success=True,

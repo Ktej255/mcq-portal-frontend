@@ -31,6 +31,7 @@ from app.core.gs_lms.progression import (
     compute_progression,
     is_order_exempt,
     pass_checkpoint,
+    rules_for_subject,
 )
 from app.core.gs_lms.funnel_models import GsLmsCheckpoint
 from app.api.v1.gs_lms.dependencies import resolve_subject
@@ -251,7 +252,9 @@ def start_checkpoint(
     cp = _get_checkpoint(db, current_user, subject, checkpoint_id)
     if cp.status != CHECKPOINT_DUE:
         raise HTTPException(status_code=409, detail="This checkpoint is already passed")
-    questions = _draw_evenly(_covered_questions(db, cp), CHECKPOINT_QUESTIONS)
+    questions = _draw_evenly(
+        _covered_questions(db, cp), rules_for_subject(db, subject.id).checkpoint_questions
+    )
     if not questions:
         raise HTTPException(status_code=409, detail="No reviewed questions are available for this checkpoint yet")
     cp.question_ids = [q.id for q in questions]  # a new /start replaces the stored set
@@ -327,7 +330,7 @@ def submit_checkpoint(
         correct_count=correct,
         score=round(score * 100, 1),
         passed=passed,
-        pass_score=round(CHECKPOINT_PASS * 100, 1),
+        pass_score=round(rules_for_subject(db, subject.id).checkpoint_pass * 100, 1),
         status=cp.status,
         attempts=attempts,
         leaf_breakdown=[
