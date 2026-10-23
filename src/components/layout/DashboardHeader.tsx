@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { UpscStudentStats } from '@/components/upsc/UpscStudentStats';
 import { SyncStatus } from '@/components/shared/SyncStatus';
 import { TrialStatus } from '@/components/shared/TrialStatus';
+import { EXAM_BRAND, examBrandName, isExamRouteCode } from '@/lib/exams/examRoutes';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -30,7 +31,7 @@ export function DashboardHeader({ onMenuClick }: HeaderProps) {
           <Menu className="h-6 w-6" />
         </Button>
         <div className="min-w-0">
-          <p className="truncate text-base font-black tracking-tight text-[#13251d]">UPSC Command</p>
+          <p className="truncate text-base font-black tracking-tight text-[#13251d]">{examBrandName(pathname)}</p>
           <p className="truncate text-[11px] font-semibold text-muted-foreground">{pageTitle}</p>
         </div>
       </div>
@@ -127,6 +128,21 @@ function buildBreadcrumbs(pathname: string): Crumb[] {
   if (segments.length === 0) return [{ label: 'Today', href: '/upsc' }];
 
   // Top-level standalone student pages.
+  // /neet/* and /jee/*: the same trail, rooted at the exam.
+  if (isExamRouteCode(segments[0])) {
+    const root = `/${segments[0]}`;
+    const crumbs: Crumb[] = [{ label: EXAM_BRAND[segments[0]], href: segments.length > 1 ? root : undefined }];
+    let path = root;
+    segments.slice(1).forEach((segment, index, rest) => {
+      path += `/${segment}`;
+      crumbs.push({
+        label: labelForSegment(segment),
+        href: index < rest.length - 1 ? path : undefined,
+      });
+    });
+    return crumbs;
+  }
+
   if (segments[0] !== 'upsc') {
     const root = segments[0];
     if (root === 'history') return [{ label: 'Progress' }];

@@ -491,7 +491,9 @@ class GsLmsMcqQuestion(Base, InstitutionalAuditMixin):
     question_text = Column(Text, nullable=False)
     # Options: [{label: "A", text: "..."}, ...]
     options = Column(JSON, nullable=False)
-    correct_option = Column(String, nullable=False)  # "A", "B", "C", "D"
+    # "A".."D" for single-correct. MULTI_CORRECT stores the sorted joined labels
+    # ("A,C") and NUMERICAL the number as text, so the column stays NOT NULL.
+    correct_option = Column(String, nullable=False)
     explanation = Column(Text, nullable=True)
     question_type = Column(
         Enum(GsLmsQuestionTypeEnum), nullable=False
@@ -503,6 +505,13 @@ class GsLmsMcqQuestion(Base, InstitutionalAuditMixin):
         nullable=False,
         index=True,
     )
+    # Question formats (app.core.gs_lms.scoring). All null for single-correct.
+    numeric_answer = Column(Float, nullable=True)  # NUMERICAL
+    # null or 0 = exact after rounding to 2 decimals (the scorer never goes below
+    # 0.005). No Python-side default: single-correct rows stay null, so a
+    # re-import of unchanged content compares equal and keeps review approvals.
+    numeric_tolerance = Column(Float, nullable=True)
+    correct_options = Column(JSON, nullable=True)  # MULTI_CORRECT: ["A", "C"]
 
     # Relationships
     syllabus_node = relationship(

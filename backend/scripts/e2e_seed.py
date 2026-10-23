@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import app.main  # noqa: F401,E402  (registers every model on Base.metadata)
+from app.core.gs_lms import exam_admin  # noqa: E402
 from app.core.gs_lms.importer import DEFAULT_ARTIFACT_PATH, import_gs_geography, import_gs_subject  # noqa: E402
 from app.core.gs_lms.models import GsLmsBook, GsLmsRetentionQuestion, GsReviewStatusEnum  # noqa: E402
 from app.core.gs_lms.student_models import GsLmsOnboardingStatus  # noqa: E402
@@ -99,6 +100,10 @@ def main() -> None:
             db, DEFAULT_ARTIFACT_PATH.parent / "templates" / "gs_subject_template.json", review_status="REVIEWED"
         )
         _seed_retention_questions(db)
+        # NEET stays switched off (coming-soon page); JEE is on with closed subjects.
+        exam_admin.seed_subjects(db, "neet")
+        exam_admin.seed_subjects(db, "jee")
+        exam_admin.set_active(db, "jee", True)
         db.flush()
         for uid, days_old in STUDENTS.items():
             user = User(

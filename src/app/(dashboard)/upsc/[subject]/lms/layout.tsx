@@ -5,6 +5,7 @@ import { usePathname, useRouter, useParams } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { SubjectLmsProvider, useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
+import { examFromPathname, subjectLabelFromSlug } from "@/lib/exams/examRoutes";
 
 const ONBOARDING_CACHE_KEY_PREFIX = "lms-onboarding-completed-";
 
@@ -109,6 +110,7 @@ function LmsLayoutInner({ children }: { children: React.ReactNode }) {
 
 export default function LmsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams<{ subject: string }>();
+  const exam = examFromPathname(usePathname());
   const subject = params.subject || "geography";
 
   const labelMap: Record<string, string> = {
@@ -122,7 +124,7 @@ export default function LmsLayout({ children }: { children: React.ReactNode }) {
     "internal-security-society": "Internal Security & Society",
     csat: "CSAT",
   };
-  const label = labelMap[subject] || subject.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const label = labelMap[subject] || subjectLabelFromSlug(subject, exam);
 
   return (
     <SubjectLmsProvider subject={subject} label={label}>

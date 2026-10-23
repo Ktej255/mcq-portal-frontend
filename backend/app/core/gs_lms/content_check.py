@@ -25,10 +25,17 @@ Exam profiles: the file may carry ``"exam": "<code>"`` (default ``upsc``). The
 section labels, PYQ exam types and MCQ question types are checked against that
 exam's profile (``app.core.gs_lms.exam_profiles``). A NEET or JEE topic needs
 no CURRENT_AFFAIRS section; a UPSC file is checked exactly as before.
+
+Question formats: ``MULTI_CORRECT`` (four options A-D plus ``correct_options``,
+a list of 1-4 distinct labels) and ``NUMERICAL`` (``numeric_answer``, optional
+``numeric_tolerance`` >= 0, no options needed) are accepted only for exams whose
+profile lists them (JEE; NEET is single-correct only). All other types are
+single-correct with ``correct_option`` A-D.
 """
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -379,21 +386,59 @@ def _check_mcqs(mcqs: list[Any], path: str, report: ContentReport) -> None:
             report.errors.append(f"{where} repeats an earlier question in this topic.")
         seen.add(text.lower())
 
-        options = mcq.get("options")
-        if isinstance(options, list) and all(isinstance(o, dict) for o in options):
-            labels = [o.get("label") for o in options]
-            texts = [_text(o.get("text")) for o in options]
+        qtype = mcq.get("question_type")
+        if qtype == "NUMERICAL":
+            _check_numerical(mcq, where, report)
         else:
-            labels, texts = [], []
-        if labels != OPTION_LABELS or not all(texts):
-            report.errors.append(f"{where} needs exactly four options labelled A, B, C, D, each with text.")
-        if mcq.get("correct_option") not in OPTION_LABELS:
-            report.errors.append(f"{where}: correct_option {mcq.get('correct_option')!r} must be A, B, C or D.")
-        _check_question_type(mcq.get("question_type"), where, report)
+            _check_options(mcq, where, report)
+            if qtype == "MULTI_CORRECT":
+                _check_correct_options(mcq, where, report)
+            elif mcq.get("correct_option") not in OPTION_LABELS:
+                report.errors.append(f"{where}: correct_option {mcq.get('correct_option')!r} must be A, B, C or D.")
+        _check_question_type(qtype, where, report)
         if not _text(mcq.get("explanation")):
             report.gaps.append(f"{where} has no explanation.")
     if len(mcqs) < MCQS_PER_TOPIC:
         report.gaps.append(f"{path}: {len(mcqs)} MCQs; the MCQ Lab needs {MCQS_PER_TOPIC}.")
+
+
+def _check_options(mcq: dict[str, Any], where: str, report: ContentReport) -> None:
+    options = mcq.get("options")
+    if isinstance(options, list) and all(isinstance(o, dict) for o in options):
+        labels = [o.get("label") for o in options]
+        texts = [_text(o.get("text")) for o in options]
+    else:
+        labels, texts = [], []
+    if labels != OPTION_LABELS or not all(texts):
+        report.errors.append(f"{where} needs exactly four options labelled A, B, C, D, each with text.")
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _check_correct_options(mcq: dict[str, Any], where: str, report: ContentReport) -> None:
+    correct = mcq.get("correct_options")
+    if (
+        not isinstance(correct, list)
+        or not 1 <= len(correct) <= len(OPTION_LABELS)
+        or any(c not in OPTION_LABELS for c in correct)
+        or len(set(correct)) != len(correct)
+    ):
+        report.errors.append(
+            f"{where}: correct_options {correct!r} must be a list of 1 to 4 different labels from A, B, C, D."
+        )
+
+
+def _check_numerical(mcq: dict[str, Any], where: str, report: ContentReport) -> None:
+    if not _is_number(mcq.get("numeric_answer")):
+        report.errors.append(f"{where}: a NUMERICAL question needs a numeric_answer that is a finite number.")
+    tolerance = mcq.get("numeric_tolerance")
+    if tolerance is not None and not (_is_number(tolerance) and tolerance >= 0):
+        report.errors.append(f"{where}: numeric_tolerance {tolerance!r} must be a number of at least 0.")
+    options = mcq.get("options")
+    if options not in (None, []):
+        report.errors.append(f"{where}: a NUMERICAL question has no options (leave options empty).")
 
 
 def _check_question_type(value: Any, where: str, report: ContentReport) -> None:

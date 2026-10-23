@@ -22,6 +22,8 @@ from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user, mcq_quota
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms import scoring
+from app.core.gs_lms.exam_profiles import exam_code_of, profile_for_subject
 from app.core.gs_lms.models import GsLmsMcqQuestion, GsLmsSyllabusNode
 from app.core.gs_lms.progression import (
     CHECKPOINT_DUE,
@@ -34,6 +36,7 @@ from app.core.gs_lms.progression import (
     rules_for_subject,
 )
 from app.core.gs_lms.funnel_models import GsLmsCheckpoint
+from app.api.v1.gs_lms.answer_inputs import AnswerFieldsIn
 from app.api.v1.gs_lms.dependencies import resolve_subject
 
 router = APIRouter()
@@ -76,6 +79,8 @@ class CheckpointOptionOut(BaseModel):
 class CheckpointQuestionOut(BaseModel):
     question_id: int
     question_type: str
+    # "single" | "multi" | "numerical"; numerical questions have options == [].
+    answer_format: str = "single"
     question_text: str
     options: List[CheckpointOptionOut]
     display_order: int
@@ -87,9 +92,8 @@ class CheckpointStartOut(BaseModel):
     questions: List[CheckpointQuestionOut]
 
 
-class CheckpointAnswerIn(BaseModel):
+class CheckpointAnswerIn(AnswerFieldsIn):
     question_id: int
-    chosen_answer: str
 
 
 class CheckpointSubmitIn(BaseModel):
@@ -103,6 +107,9 @@ class CheckpointAttemptOut(BaseModel):
     correct_answer: str
     is_correct: bool
     explanation: str | None = None
+    # Only present for non-UPSC exams or non-single formats (see scoring.include_marks).
+    answer_format: str | None = None
+    marks: float | None = None
 
 
 class CheckpointLeafBreakdownOut(BaseModel):
@@ -123,6 +130,11 @@ class CheckpointResultOut(BaseModel):
     status: str
     attempts: List[CheckpointAttemptOut]
     leaf_breakdown: List[CheckpointLeafBreakdownOut]
+    # Marks in addition to the accuracy score; the pass mark stays accuracy based.
+    # Present only for non-UPSC exams or when a non-single question was served.
+    marks_total: float | None = None
+    marks_max: float | None = None
+    marking_scheme: Dict[str, Dict[str, float]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +252,7 @@ def list_due_checkpoints(
     return [_checkpoint_out(cp, titles) for cp in cps]
 
 
-@router.post("/checkpoints/{checkpoint_id}/start", response_model=CheckpointStartOut)
+@router.post("/checkpoints/{checkpoint_id}/start", response_model=CheckpointStartOut, response_model_exclude_unset=True)
 def start_checkpoint(
     checkpoint_id: int,
     subject: GsSubject = Depends(resolve_subject),
@@ -266,6 +278,7 @@ def start_checkpoint(
             CheckpointQuestionOut(
                 question_id=q.id,
                 question_type=_qtype(q),
+                answer_format=scoring.answer_format_of(q),
                 question_text=q.question_text,
                 options=[CheckpointOptionOut(label=o["label"], text=o["text"]) for o in (q.options or [])],
                 display_order=i + 1,
@@ -278,6 +291,7 @@ def start_checkpoint(
 @router.post(
     "/checkpoints/{checkpoint_id}/submit",
     response_model=CheckpointResultOut,
+    response_model_exclude_unset=True,
     dependencies=[Depends(mcq_quota(CHECKPOINT_QUESTIONS))],
 )
 def submit_checkpoint(
@@ -305,18 +319,27 @@ def submit_checkpoint(
     if set(ids) != set(cp.question_ids) or len(ids) != len(cp.question_ids):
         raise HTTPException(status_code=422, detail="Answers must be for exactly the questions you were given")
 
+    profile = profile_for_subject(subject)
+    graded: List[scoring.Graded] = []
     attempts: List[CheckpointAttemptOut] = []
     stats: Dict[int, List[int]] = {leaf: [0, 0] for leaf in pools}  # leaf -> [total, correct]
     for a in body.answers:
         leaf, q = by_id[a.question_id]
-        ok = a.chosen_answer.strip().upper() == str(q.correct_option).strip().upper()
+        g = scoring.grade(q, a.to_response(), profile)
+        graded.append(g)
         stats[leaf][0] += 1
-        stats[leaf][1] += int(ok)
+        stats[leaf][1] += int(g.correct)
         attempts.append(CheckpointAttemptOut(
-            question_id=q.id, leaf_id=leaf, chosen_answer=a.chosen_answer,
-            correct_answer=q.correct_option, is_correct=ok, explanation=q.explanation,
+            question_id=q.id, leaf_id=leaf, chosen_answer=g.chosen_text,
+            correct_answer=g.correct_text, is_correct=g.correct, explanation=q.explanation,
         ))
     total = len(attempts)
+    show_marks = scoring.include_marks(exam_code_of(subject), (g.answer_format for g in graded))
+    if show_marks:
+        attempts = [
+            at.model_copy(update={"answer_format": g.answer_format, "marks": g.marks})
+            for at, g in zip(attempts, graded)
+        ]
     correct = sum(1 for a in attempts if a.is_correct)
     score = correct / total
     passed = pass_checkpoint(db, cp, score)
@@ -340,4 +363,5 @@ def submit_checkpoint(
             )
             for leaf, (t, c) in stats.items() if t
         ],
+        **(scoring.marks_summary(profile, graded) if show_marks else {}),
     )

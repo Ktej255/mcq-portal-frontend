@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, CheckCircle2, Clock, RefreshCcw, XCircle } from "lucide-react";
 
+import { ExamPicker } from "@/components/gs-lms/ExamPicker";
 import {
   getGateError,
   gsLmsService,
@@ -294,6 +295,8 @@ export default function BooksPage() {
           />
         </div>
       ) : null}
+
+      <ExamPicker />
 
       <section className={CARD} aria-label="Set up your books" data-testid="books-setup">
         <div className="flex items-center justify-between gap-2">

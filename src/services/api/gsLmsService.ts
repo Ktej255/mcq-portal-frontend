@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { AnswerFormat, MarkingSchemeOut, McqAnswerIn } from './funnelService';
 
 /**
  * API client for the GS LMS Platform (multi-subject).
@@ -491,6 +492,8 @@ export interface ProgressionOut {
 export interface CheckpointQuestionOut {
   question_id: number;
   question_type: string;
+  /** Absent on older servers = single. Numerical questions have `options: []`. */
+  answer_format?: AnswerFormat;
   question_text: string;
   options: Array<{ label: string; text: string }>;
   display_order: number;
@@ -509,6 +512,9 @@ export interface CheckpointAttemptOut {
   correct_answer: string;
   is_correct: boolean;
   explanation: string | null;
+  /** Present for non-UPSC exams or non-single questions. */
+  answer_format?: AnswerFormat;
+  marks?: number;
 }
 
 export interface CheckpointLeafBreakdownOut {
@@ -531,6 +537,10 @@ export interface CheckpointResultOut {
   status: string;
   attempts: CheckpointAttemptOut[];
   leaf_breakdown: CheckpointLeafBreakdownOut[];
+  /** Marks in addition to the accuracy score (the pass mark stays accuracy based). */
+  marks_total?: number;
+  marks_max?: number;
+  marking_scheme?: Partial<Record<AnswerFormat, MarkingSchemeOut>>;
 }
 
 export interface TopicConceptOut {
@@ -807,7 +817,7 @@ export const gsLmsService = {
   submitCheckpoint: async (
     subject = "geography",
     checkpointId: number,
-    answers: Array<{ question_id: number; chosen_answer: string }>,
+    answers: McqAnswerIn[],
   ): Promise<CheckpointResultOut> => {
     const response = await apiClient.post(`gs-lms/${subject}/checkpoints/${checkpointId}/submit`, { answers });
     return unwrap<CheckpointResultOut>(response.data);

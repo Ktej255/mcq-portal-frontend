@@ -236,10 +236,13 @@ class GsLmsMcqLabAttempt(Base, InstitutionalAuditMixin):
         Integer, ForeignKey("gs_lms_mcq_questions.id"), nullable=False
     )
     question_type = Column(String(30), nullable=False)
-    chosen_answer = Column(String(10), nullable=False)
-    correct_answer = Column(String(10), nullable=False)
+    # "B", "A,C" (multi-correct) or "12.5" (numerical); "" = unanswered.
+    chosen_answer = Column(String(64), nullable=False)
+    correct_answer = Column(String(64), nullable=False)
     is_correct = Column(Boolean, nullable=False)
     time_taken_seconds = Column(Float, nullable=True)
+    # Marks under the exam's marking scheme; null for rows made before marks existed.
+    marks = Column(Float, nullable=True)
 
     # Relationships
     session = relationship("GsLmsMcqLabSession", back_populates="attempts")

@@ -39,9 +39,36 @@ export interface RecallCheckOut {
   stt_confidence: number | null;
 }
 
+/** How a question is answered: one option, several options, or a number. */
+export type AnswerFormat = 'single' | 'multi' | 'numerical';
+
+/** Marks for one answer format (negative marking etc.). */
+export interface MarkingSchemeOut {
+  correct: number;
+  wrong: number;
+  unattempted: number;
+  /** Multi-correct only: marks per correct option when only correct options were chosen. */
+  partial_per_correct_option?: number;
+}
+
+/**
+ * One answer in an MCQ lab / checkpoint submission: exactly one of
+ * `chosen_answer` (single), `selected_options` (multi) or `numeric_answer`
+ * (numerical). None of them = unanswered.
+ */
+export interface McqAnswerIn {
+  question_id: number;
+  chosen_answer?: string;
+  selected_options?: string[];
+  numeric_answer?: number;
+  time_taken_seconds?: number;
+}
+
 export interface McqLabQuestionOut {
   question_id: number;
   question_type: string;
+  /** Absent on older servers = single. Numerical questions have `options: []`. */
+  answer_format?: AnswerFormat;
   question_text: string;
   statements: string[];
   options: Array<{ label: string; text: string }>;
@@ -55,6 +82,9 @@ export interface McqLabAttemptOut {
   is_correct: boolean;
   question_type: string;
   explanation: string | null;
+  /** Present for non-UPSC exams or non-single questions. */
+  answer_format?: AnswerFormat;
+  marks?: number;
 }
 
 export interface McqLabTypeBreakdownOut {
@@ -70,6 +100,10 @@ export interface McqLabResultOut {
   score: number;                // 0-100 percentage
   attempts: McqLabAttemptOut[];
   type_breakdown: McqLabTypeBreakdownOut[];
+  /** Marks in addition to the accuracy score; absent for plain UPSC results. */
+  marks_total?: number;
+  marks_max?: number;
+  marking_scheme?: Partial<Record<AnswerFormat, MarkingSchemeOut>>;
 }
 
 export interface MainsQuestionOut {
@@ -215,7 +249,7 @@ export const funnelService = {
     return unwrap<McqLabQuestionOut[]>(response.data);
   },
 
-  submitMcqLab: async (subject = "geography", nodeId: number, answers: Array<{ question_id: number; chosen_answer: string; time_taken_seconds?: number }>): Promise<McqLabResultOut> => {
+  submitMcqLab: async (subject = "geography", nodeId: number, answers: McqAnswerIn[]): Promise<McqLabResultOut> => {
     const response = await apiClient.post(`gs-lms/${subject}/funnel/${nodeId}/mcq-lab/submit`, { answers });
     return unwrap<McqLabResultOut>(response.data);
   },

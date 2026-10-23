@@ -8,7 +8,8 @@ and JEE lives here as data, in a code registry keyed by ``GsExam.code``:
 * which of the 14 funnel steps are shown (disabled steps are skipped by the
   server; stored rows are never renumbered),
 * which PYQ exam types and MCQ question types a content file may use,
-* the marking scheme (stored only in this round; the MCQ lab does not use it),
+* the marking scheme per answer format (single / multi / numerical), applied by
+  ``app.core.gs_lms.scoring`` in the MCQ lab and checkpoints,
 * the progression constants (recall pass mark, mastery mark, checkpoints),
 * whether descriptive answer writing is offered.
 
@@ -17,7 +18,8 @@ A subject can override a few of these through ``GsSubject.config``::
     {"exam_overrides": {
         "enabled_funnel_steps": [1, 2, 3, ...],   # list of ints 1..14
         "section_labels": ["BASIC", "ADVANCED"],  # subset of the exam's labels
-        "progression": {"checkpoint_every": 4}    # any ProgressionRules field
+        "progression": {"checkpoint_every": 4},   # any ProgressionRules field
+        "marking_paper": "JEE_ADVANCED"           # a key of the exam's format_marking
     }}
 
 Unknown keys are ignored; invalid values fall back to the exam's own value, so
@@ -38,13 +40,29 @@ ALL_FUNNEL_STEPS: frozenset[int] = frozenset(range(1, 15))
 ALL_SECTION_LABELS = ("BASIC", "ADVANCED", "NCERT_LEVEL", "CURRENT_AFFAIRS", "EXAMINER_TRAPS")
 
 
+ANSWER_FORMATS = ("single", "multi", "numerical")
+
+
 @dataclass(frozen=True)
 class MarkingScheme:
-    """Marks per question. Stored only: the MCQ lab does not apply it yet."""
+    """Marks per question of one answer format.
+
+    ``partial_per_correct_option`` only applies to multi-correct questions: when
+    the student chose only correct options but not all of them, each chosen
+    option earns this many marks (JEE Advanced 2023 style: +1 per correct option
+    chosen). ``None`` = no partial credit (a subset counts as wrong).
+    """
 
     correct: float
     wrong: float
     unattempted: float = 0.0
+    partial_per_correct_option: Optional[float] = None
+
+    def to_public(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"correct": self.correct, "wrong": self.wrong, "unattempted": self.unattempted}
+        if self.partial_per_correct_option is not None:
+            out["partial_per_correct_option"] = self.partial_per_correct_option
+        return out
 
 
 @dataclass(frozen=True)
@@ -75,6 +93,11 @@ class ExamProfile:
     unsupported_question_types: tuple[str, ...] = ()
     # One scheme per PYQ exam type (and "default" for MCQ lab questions).
     marking: Mapping[str, MarkingScheme] = field(default_factory=dict)
+    # Marks per answer format, per paper: {"default": {"single": ...}, "JEE_ADVANCED": {...}}.
+    # "default" is what the MCQ lab and checkpoints use unless a subject picks
+    # another paper with ``config["exam_overrides"]["marking_paper"]``.
+    format_marking: Mapping[str, Mapping[str, MarkingScheme]] = field(default_factory=dict)
+    marking_paper: str = "default"
     progression: ProgressionRules = field(default_factory=ProgressionRules)
     answer_writing_enabled: bool = False
 
@@ -85,6 +108,13 @@ class ExamProfile:
     @property
     def default_marking(self) -> MarkingScheme:
         return self.marking["default"]
+
+    def scheme_for(self, answer_format: str) -> MarkingScheme:
+        """The marking scheme for an answer format in the active paper; a
+        format the paper does not list falls back to its single-answer scheme."""
+        paper = self.format_marking.get(self.marking_paper) or self.format_marking.get("default") or {}
+        scheme = paper.get(answer_format) or paper.get("single")
+        return scheme if scheme is not None else self.default_marking
 
     def supports_question_type(self, question_type: str) -> bool:
         return question_type in self.question_types and question_type not in self.unsupported_question_types
@@ -102,6 +132,8 @@ class ExamProfile:
             "unsupported_question_types": list(self.unsupported_question_types),
             "marking": {k: {"correct": v.correct, "wrong": v.wrong, "unattempted": v.unattempted}
                         for k, v in self.marking.items()},
+            "format_marking": {paper: {fmt: sc.to_public() for fmt, sc in formats.items()}
+                               for paper, formats in self.format_marking.items()},
             "answer_writing_enabled": self.answer_writing_enabled,
         }
 
@@ -110,16 +142,49 @@ _UPSC_QUESTION_TYPES = (
     "STATEMENT_BASED", "MATCH_THE_FOLLOWING", "ASSERTION_REASON", "MAP_BASED",
     "CAUSE_EFFECT", "CHRONOLOGICAL", "FACTUAL",
 )
-_SCIENCE_QUESTION_TYPES = (
-    "FACTUAL", "ASSERTION_REASON", "STATEMENT_BASED", "MATCH_THE_FOLLOWING",
-    "NUMERICAL", "MULTI_CORRECT",
-)
-_SCIENCE_UNSUPPORTED = ("NUMERICAL", "MULTI_CORRECT")  # next round: not yet supported in the MCQ lab
+# NEET is single-correct only. JEE adds multi-correct and numerical-answer questions.
+_NEET_QUESTION_TYPES = ("FACTUAL", "ASSERTION_REASON", "STATEMENT_BASED", "MATCH_THE_FOLLOWING")
+_JEE_QUESTION_TYPES = _NEET_QUESTION_TYPES + ("NUMERICAL", "MULTI_CORRECT")
 _SCIENCE_SECTIONS = ("BASIC", "ADVANCED", "NCERT_LEVEL", "EXAMINER_TRAPS")
 # No current affairs (8, 9) and no mains practice (13).
 _SCIENCE_STEPS = ALL_FUNNEL_STEPS - {8, 9, 13}
 
 _NEET_JEE_MARKING = MarkingScheme(correct=4, wrong=-1, unattempted=0)
+
+# --- Marks per answer format -------------------------------------------------
+# UPSC: +2 / -0.66 (the existing values).
+_UPSC_FORMAT_MARKING = {"default": {"single": MarkingScheme(2, -0.66, 0)}}
+# NEET: single-correct only, +4 / -1 / 0.
+_NEET_FORMAT_MARKING = {"default": {"single": MarkingScheme(4, -1, 0)}}
+# JEE Main: single +4 / -1; numerical +4 / -1.
+# TODO verify against the current NTA information bulletin before launch; NTA
+# has changed numerical negative marking before (it has been 0 in some years).
+_JEE_MAIN_FORMATS = {
+    "single": MarkingScheme(4, -1, 0),
+    "numerical": MarkingScheme(4, -1, 0),
+}
+# JEE Advanced: varies by year: configure per paper. The values below follow the
+# 2023-style paper and must be checked against the paper being modelled.
+#   * multi-correct: +4 all correct options (and nothing else); partial credit
+#     of +1 per correct option when ONLY correct options were chosen (so +3 for
+#     3 of 4, +2 for 2, +1 for 1); -2 if any wrong option is chosen; 0 unanswered.
+#   * single: +3 / -1 (varies by year: configure per paper)
+#   * numerical: +3 / 0 (varies by year: configure per paper)
+_JEE_ADVANCED_FORMATS = {
+    "single": MarkingScheme(3, -1, 0),
+    "multi": MarkingScheme(4, -2, 0, partial_per_correct_option=1),
+    "numerical": MarkingScheme(3, 0, 0),
+}
+_JEE_FORMAT_MARKING = {
+    "default": {
+        **_JEE_MAIN_FORMATS,
+        # JEE Main has no multi-correct; a multi-correct question in a Main-style
+        # subject uses the Advanced scheme so it is never silently unmarked.
+        "multi": _JEE_ADVANCED_FORMATS["multi"],
+    },
+    "JEE_MAIN": _JEE_MAIN_FORMATS,
+    "JEE_ADVANCED": _JEE_ADVANCED_FORMATS,
+}
 
 PROFILES: dict[str, ExamProfile] = {
     "upsc": ExamProfile(
@@ -134,6 +199,7 @@ PROFILES: dict[str, ExamProfile] = {
             "default": MarkingScheme(2, -0.66, 0),
             "PRELIMS": MarkingScheme(2, -0.66, 0),
         },
+        format_marking=_UPSC_FORMAT_MARKING,
         answer_writing_enabled=True,
     ),
     "neet": ExamProfile(
@@ -143,9 +209,9 @@ PROFILES: dict[str, ExamProfile] = {
         section_labels=_SCIENCE_SECTIONS,
         enabled_funnel_steps=_SCIENCE_STEPS,
         pyq_exam_types=("NEET",),
-        question_types=_SCIENCE_QUESTION_TYPES,
-        unsupported_question_types=_SCIENCE_UNSUPPORTED,
+        question_types=_NEET_QUESTION_TYPES,
         marking={"default": _NEET_JEE_MARKING, "NEET": _NEET_JEE_MARKING},
+        format_marking=_NEET_FORMAT_MARKING,
     ),
     "jee": ExamProfile(
         code="jee",
@@ -154,10 +220,9 @@ PROFILES: dict[str, ExamProfile] = {
         section_labels=_SCIENCE_SECTIONS,
         enabled_funnel_steps=_SCIENCE_STEPS,
         pyq_exam_types=("JEE_MAIN", "JEE_ADVANCED"),
-        question_types=_SCIENCE_QUESTION_TYPES,
-        unsupported_question_types=_SCIENCE_UNSUPPORTED,
-        # JEE Advanced marking varies by paper section; set per question format next round.
+        question_types=_JEE_QUESTION_TYPES,
         marking={"default": _NEET_JEE_MARKING, "JEE_MAIN": _NEET_JEE_MARKING},
+        format_marking=_JEE_FORMAT_MARKING,
     ),
 }
 
@@ -216,6 +281,9 @@ def apply_overrides(profile: ExamProfile, config: Optional[Mapping[str, Any]]) -
     labels = overrides.get("section_labels")
     if isinstance(labels, list) and labels and all(l in profile.section_labels for l in labels):
         changes["section_labels"] = tuple(labels)
+    paper = overrides.get("marking_paper")
+    if isinstance(paper, str) and paper in profile.format_marking:
+        changes["marking_paper"] = paper
     progression = _override_progression(profile.progression, overrides.get("progression"))
     if progression is not profile.progression:
         changes["progression"] = progression
@@ -250,7 +318,7 @@ def profile_for_subject(subject: Any) -> ExamProfile:
 
 
 __all__ = [
-    "ALL_FUNNEL_STEPS", "ALL_SECTION_LABELS", "DEFAULT_EXAM_CODE", "ExamProfile",
+    "ALL_FUNNEL_STEPS", "ALL_SECTION_LABELS", "ANSWER_FORMATS", "DEFAULT_EXAM_CODE", "ExamProfile",
     "MarkingScheme", "PROFILES", "ProgressionRules", "UnknownExamError",
     "apply_overrides", "exam_code_of", "get_profile", "is_known_exam", "normalize_exam_code",
     "profile_for_subject",

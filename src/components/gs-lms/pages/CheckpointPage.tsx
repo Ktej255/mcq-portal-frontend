@@ -15,6 +15,15 @@ import {
 import { LmsLoadingSkeleton } from "../LmsLoadingSkeleton";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { useSubjectLms } from "../SubjectLmsContext";
+import {
+  QuestionAnswerInput,
+  describeMarks,
+  isAnswered,
+  showAnswer,
+  signedMarks,
+  toAnswerPayload,
+  type AnswerValue,
+} from "../QuestionAnswerInput";
 
 type Phase = "loading" | "intro" | "question" | "submitting" | "result" | "unavailable";
 
@@ -39,7 +48,7 @@ export function CheckpointPage() {
   const [checkpoint, setCheckpoint] = useState<CheckpointOut | null>(null);
   const [questions, setQuestions] = useState<CheckpointQuestionOut[]>([]);
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [result, setResult] = useState<CheckpointResultOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,7 +99,7 @@ export function CheckpointPage() {
       const res = await gsLmsService.submitCheckpoint(
         subject,
         checkpointId,
-        questions.map((q) => ({ question_id: q.question_id, chosen_answer: answers[q.question_id] })),
+        questions.map((q) => toAnswerPayload(q, answers[q.question_id])),
       );
       setResult(res);
       setPhase("result");
@@ -174,6 +183,11 @@ export function CheckpointPage() {
             <p className="mt-1 text-sm text-[#49675e]">
               {result.correct_count}/{result.total_questions} correct
             </p>
+            {result.marks_total !== undefined && result.marks_max !== undefined && (
+              <p data-testid="checkpoint-marks" className="mt-1 text-sm font-semibold text-[#1f2e26]">
+                {describeMarks(result.marks_total, result.marks_max, result.marking_scheme)}
+              </p>
+            )}
             <p className={`mt-2 text-sm font-black ${result.passed ? "text-[#085041]" : "text-red-700"}`}>
               {result.passed
                 ? "Passed. The next topic is unlocked."
@@ -228,16 +242,19 @@ export function CheckpointPage() {
                     <XCircle className="h-4 w-4 text-red-500" />
                   )}
                   <span className="font-semibold text-[#1f2e26]">Q{i + 1}</span>
+                  {attempt.marks !== undefined && (
+                    <span className="ml-auto font-black text-[#49675e]">{signedMarks(attempt.marks)}</span>
+                  )}
                 </summary>
                 <div className="space-y-1 px-3 pb-3 text-xs text-[#49675e]">
                   {byId.get(attempt.question_id) && (
                     <p className="whitespace-pre-wrap text-[#1f2e26]">{byId.get(attempt.question_id)?.question_text}</p>
                   )}
                   <p>
-                    Your answer: <strong>{attempt.chosen_answer}</strong>
+                    Your answer: <strong>{showAnswer(attempt.answer_format, attempt.chosen_answer)}</strong>
                   </p>
                   <p>
-                    Correct answer: <strong className="text-[#1d9e75]">{attempt.correct_answer}</strong>
+                    Correct answer: <strong className="text-[#1d9e75]">{showAnswer(attempt.answer_format, attempt.correct_answer)}</strong>
                   </p>
                   {attempt.explanation && <p className="text-[#1f2e26]">{attempt.explanation}</p>}
                 </div>
@@ -253,8 +270,8 @@ export function CheckpointPage() {
   const question = questions[index];
   if (!question) return null;
   const isLast = index === questions.length - 1;
-  const chosen = answers[question.question_id];
-  const allAnswered = questions.every((q) => answers[q.question_id]);
+  const chosen = isAnswered(question, answers[question.question_id]);
+  const allAnswered = questions.every((q) => isAnswered(q, answers[q.question_id]));
 
   return (
     <div className="p-6">
@@ -263,7 +280,7 @@ export function CheckpointPage() {
           <span>
             Question {index + 1} of {questions.length}
           </span>
-          <span>{Object.keys(answers).length} answered</span>
+          <span>{questions.filter((q) => isAnswered(q, answers[q.question_id])).length} answered</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-[#dcd5c7]">
           <div
@@ -277,23 +294,11 @@ export function CheckpointPage() {
             {question.question_type.replace(/_/g, " ")}
           </span>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#1f2e26]">{question.question_text}</p>
-          <div className="space-y-2">
-            {question.options.map((opt) => (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => setAnswers((prev) => ({ ...prev, [question.question_id]: opt.label }))}
-                className={`w-full rounded-lg border p-3 text-left text-xs transition-all ${
-                  chosen === opt.label
-                    ? "border-[#1a3a2a] bg-[#e7f5ee] shadow-sm"
-                    : "border-[#dcd5c7] bg-white hover:border-[#b9d9cd]"
-                }`}
-              >
-                <span className="font-black text-[#1a3a2a]">{opt.label}.</span>{" "}
-                <span className="text-[#1f2e26]">{opt.text}</span>
-              </button>
-            ))}
-          </div>
+          <QuestionAnswerInput
+            question={question}
+            value={answers[question.question_id]}
+            onChange={(value) => setAnswers((prev) => ({ ...prev, [question.question_id]: value }))}
+          />
         </div>
 
         {error && <p className="text-xs text-red-600">{error}</p>}

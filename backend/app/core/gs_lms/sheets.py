@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from app.core.gs_lms.content_check import check_subject_content, format_report
+from app.core.gs_lms import scoring
 from app.core.gs_lms.content_tree import TopicIndex, normalise_question, normalise_title
 from app.core.gs_lms.models import (
     GsLmsExamTypeEnum,
@@ -43,7 +44,12 @@ CONCEPT_COLUMNS = (
     + ["book_slug", "chapter", "pages"]
 )
 VERSION_COLUMNS = ["topic_title", "concept_title", "level", "style", "source", "title", "text", "video_url", "duration_minutes"]
-MCQ_COLUMNS = ["topic_title", "question_text", "option_a", "option_b", "option_c", "option_d", "correct_option", "explanation", "question_type"]
+MCQ_COLUMNS = [
+    "topic_title", "question_text", "option_a", "option_b", "option_c", "option_d", "correct_option",
+    "explanation", "question_type",
+    # JEE formats: correct_options for MULTI_CORRECT (e.g. "A;C"), numeric_answer / numeric_tolerance for NUMERICAL.
+    "correct_options", "numeric_answer", "numeric_tolerance",
+]
 PYQ_COLUMNS = ["topic_title", "exam_type", "year", "question_text", "answer_text", "explanation", "marks", "question_type"]
 
 FILES = {
@@ -345,20 +351,47 @@ def _merge_mcqs(name: str, rows, index: TopicIndex, result: BuildResult, books: 
         if not text:
             result.problems.append(f"{name}, row {number}: the question_text is empty.")
             continue
-        options = [row.get(f"option_{c}", "") for c in "abcd"]
-        empty = [c.upper() for c, o in zip("abcd", options) if not o]
-        if empty:
-            result.problems.append(f"{name}, row {number}: option {', '.join(empty)} is empty. Every question needs four options.")
-            continue
-        correct = row.get("correct_option", "").strip().upper()
-        if correct not in ("A", "B", "C", "D"):
-            what = "is empty" if not correct else f'"{row.get("correct_option", "")}" is not A, B, C or D'
-            result.problems.append(f"{name}, row {number}: the correct_option {what}.")
-            continue
         qtype = _choice(row.get("question_type", ""), _QTYPES) if row.get("question_type") else "FACTUAL"
         if qtype is None:
             result.problems.append(f'{name}, row {number}: question_type "{row["question_type"]}" must be one of {", ".join(_QTYPES)} (or left empty).')
             continue
+        extra: dict[str, Any] = {}
+        options = [row.get(f"option_{c}", "") for c in "abcd"]
+        if qtype == "NUMERICAL":
+            answer = scoring.parse_number(row.get("numeric_answer", ""))
+            if answer is None:
+                result.problems.append(f"{name}, row {number}: a NUMERICAL question needs a numeric_answer that is a number.")
+                continue
+            tolerance_text = row.get("numeric_tolerance", "")
+            tolerance = scoring.parse_number(tolerance_text) if tolerance_text else 0.0
+            if tolerance is None or tolerance < 0:
+                result.problems.append(f'{name}, row {number}: numeric_tolerance "{tolerance_text}" must be a number of at least 0 (or left empty).')
+                continue
+            extra = {"numeric_answer": answer, "correct_option": scoring.format_number(answer)}
+            if tolerance:
+                extra["numeric_tolerance"] = tolerance
+            option_list: list[dict[str, str]] = []
+        else:
+            empty = [c.upper() for c, o in zip("abcd", options) if not o]
+            if empty:
+                result.problems.append(f"{name}, row {number}: option {', '.join(empty)} is empty. Every question needs four options.")
+                continue
+            option_list = [{"label": lab, "text": o} for lab, o in zip("ABCD", options)]
+            if qtype == "MULTI_CORRECT":
+                labels = scoring.parse_labels(row.get("correct_options", ""))
+                if not labels or any(lab not in ("A", "B", "C", "D") for lab in labels):
+                    result.problems.append(
+                        f'{name}, row {number}: correct_options "{row.get("correct_options", "")}" must list 1 to 4 of A, B, C, D (for example A;C).'
+                    )
+                    continue
+                extra = {"correct_options": labels, "correct_option": ",".join(labels)}
+            else:
+                correct = row.get("correct_option", "").strip().upper()
+                if correct not in ("A", "B", "C", "D"):
+                    what = "is empty" if not correct else f'"{row.get("correct_option", "")}" is not A, B, C or D'
+                    result.problems.append(f"{name}, row {number}: the correct_option {what}.")
+                    continue
+                extra = {"correct_option": correct}
         mcqs = leaf.setdefault("mcq_questions", [])
         if normalise_question(text) in {normalise_question(m.get("question_text")) for m in mcqs}:
             result.notes.append(f'{name}, row {number}: skipped, the topic "{leaf["title"]}" already has this question.')
@@ -367,8 +400,8 @@ def _merge_mcqs(name: str, rows, index: TopicIndex, result: BuildResult, books: 
         mcqs.append(
             {
                 "question_text": text,
-                "options": [{"label": lab, "text": o} for lab, o in zip("ABCD", options)],
-                "correct_option": correct,
+                "options": option_list,
+                **extra,
                 "explanation": row.get("explanation", ""),
                 "question_type": qtype,
                 "display_order": order,

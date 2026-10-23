@@ -37,6 +37,7 @@ import json
 import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Optional
 
 from sqlalchemy import func
@@ -45,6 +46,7 @@ from sqlalchemy.orm import Session
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.content_check import check_subject_content, format_report
 from app.core.gs_lms.exam_profiles import DEFAULT_EXAM_CODE, exam_code_of
+from app.core.gs_lms import scoring
 from app.core.gs_lms.content_tree import TopicIndex, normalise_question
 from app.core.gs_lms.understanding import tokenize
 from app.core.gs_lms.models import (
@@ -777,6 +779,32 @@ def import_pyqs(
 # ---------------------------------------------------------------------------
 
 
+def _mcq_fields(q_data: dict[str, Any], question_type: GsLmsQuestionTypeEnum) -> dict[str, Any]:
+    """The answer-shape columns of an MCQ (options, correct_option and the
+    multi-correct / numerical fields). Single-correct leaves the new columns
+    null so existing rows compare equal on a re-import."""
+    fmt = scoring.answer_format_of(SimpleNamespace(question_type=question_type))
+    fields: dict[str, Any] = {
+        "options": q_data.get("options") or [],
+        "correct_options": None,
+        "numeric_answer": None,
+        "numeric_tolerance": None,
+    }
+    if fmt == scoring.MULTI:
+        labels = scoring.parse_labels(q_data.get("correct_options"))
+        fields["correct_options"] = labels
+        fields["correct_option"] = scoring.stored_correct_option(fmt, correct_options=labels)
+    elif fmt == scoring.NUMERICAL:
+        number = scoring.parse_number(q_data.get("numeric_answer"))
+        fields["numeric_answer"] = number
+        tolerance = scoring.parse_number(q_data.get("numeric_tolerance"))
+        fields["numeric_tolerance"] = tolerance if tolerance is not None and tolerance >= 0 else 0.0
+        fields["correct_option"] = scoring.stored_correct_option(fmt, numeric_answer=number)
+    else:
+        fields["correct_option"] = q_data["correct_option"]
+    return fields
+
+
 def import_mcq_questions(
     db: Session,
     questions_data: list[dict[str, Any]],
@@ -789,7 +817,10 @@ def import_mcq_questions(
     Each question dict has keys:
       - question_text (str): The question text
       - options (list[dict]): [{label: "A", text: "..."}, ...]
-      - correct_option (str): "A", "B", "C", or "D"
+      - correct_option (str): "A", "B", "C", or "D" (single-correct)
+      - correct_options (list[str]): MULTI_CORRECT, e.g. ["A", "C"]
+      - numeric_answer (float), numeric_tolerance (float, optional): NUMERICAL
+        (options may be empty)
       - explanation (str | None): Explanation
       - question_type (str): Question type classification
       - display_order (int): Order for sequential presentation
@@ -815,13 +846,13 @@ def import_mcq_questions(
         )
 
         question_type = GsLmsQuestionTypeEnum(q_data["question_type"])
+        fields = _mcq_fields(q_data, question_type)
 
         if existing:
             _update_row(
                 existing,
                 dict(
-                    options=q_data["options"],
-                    correct_option=q_data["correct_option"],
+                    **fields,
                     explanation=q_data.get("explanation"),
                     question_type=question_type,
                     display_order=q_data.get("display_order", existing.display_order),
@@ -833,8 +864,7 @@ def import_mcq_questions(
             mcq = GsLmsMcqQuestion(
                 syllabus_node_id=node_id,
                 question_text=question_text,
-                options=q_data["options"],
-                correct_option=q_data["correct_option"],
+                **fields,
                 explanation=q_data.get("explanation"),
                 question_type=question_type,
                 display_order=q_data.get("display_order", 0),

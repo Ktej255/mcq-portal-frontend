@@ -51,6 +51,9 @@ class McqLabAttempt:
     correct_answer: str
     is_correct: bool
     time_taken_seconds: float | None = None
+    # Added with the NEET/JEE question formats (app.core.gs_lms.scoring).
+    marks: float | None = None
+    answer_format: str = "single"
 
 
 @dataclass(frozen=True)

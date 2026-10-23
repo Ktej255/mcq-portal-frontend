@@ -222,7 +222,7 @@ def test_migration_head_is_this_revision():
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["p3d4e5f6a7b8"]
+    assert script.get_heads() == ["q4e5f6a7b8c9"]
     assert script.get_revision("p3d4e5f6a7b8").down_revision == "o2c3d4e5f6a7"
 
 
@@ -269,10 +269,13 @@ def test_neet_and_jee_profiles():
         assert set(p.section_labels) == {"BASIC", "NCERT_LEVEL", "ADVANCED", "EXAMINER_TRAPS"}
         assert p.disabled_funnel_steps == frozenset({8, 9, 13})
         assert p.answer_writing_enabled is False
-        assert set(p.unsupported_question_types) == {"NUMERICAL", "MULTI_CORRECT"}
+        assert p.unsupported_question_types == ()
         assert set(p.question_types) >= {"FACTUAL", "ASSERTION_REASON", "STATEMENT_BASED", "MATCH_THE_FOLLOWING"}
-        assert not p.supports_question_type("NUMERICAL") and p.supports_question_type("FACTUAL")
+        assert p.supports_question_type("FACTUAL")
         assert (p.default_marking.correct, p.default_marking.wrong, p.default_marking.unattempted) == (4, -1, 0)
+    # NEET is single-correct only; JEE also has numerical and multi-correct questions.
+    assert not neet.supports_question_type("NUMERICAL") and not neet.supports_question_type("MULTI_CORRECT")
+    assert jee.supports_question_type("NUMERICAL") and jee.supports_question_type("MULTI_CORRECT")
     assert neet.pyq_exam_types == ("NEET",)
     assert jee.pyq_exam_types == ("JEE_MAIN", "JEE_ADVANCED")
     # every profile value is a real enum value
@@ -343,7 +346,7 @@ def test_checker_validates_per_exam_enums():
     leaf["content_sections"].append({"section_label": "CURRENT_AFFAIRS", "blocks": [{"type": "para"}]})
     errors = check_subject_content(data).errors
     assert any("exam_type 'PRELIMS' must be NEET" in e for e in errors)
-    assert any("NUMERICAL" in e and "not yet supported" in e for e in errors)
+    assert any("NUMERICAL" in e and "must be one of" in e for e in errors)  # NEET is single-correct only
     assert any("MAP_BASED" in e for e in errors)
     assert any("section_label 'CURRENT_AFFAIRS'" in e for e in errors)
 

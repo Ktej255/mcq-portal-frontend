@@ -27,6 +27,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { ExamCode } from "@/lib/exams/examRoutes";
+
 /**
  * Single source of truth for the student section navigation + route gating.
  *
@@ -45,6 +47,8 @@ export type StudentNavItem = {
   name: string;
   href: string;
   icon: LucideIcon;
+  /** Subject slug, for subject entries whose href does not end with it. */
+  slug?: string;
   /** When set, the item is shown but disabled with a "Soon" badge. */
   locked?: boolean;
   /** Matched against the current pathname to drive the active state. */
@@ -131,7 +135,18 @@ const primarySubjectSlugs = new Set(["geography"]);
  */
 export function subjectNavItemsFor(
   subjects: { slug: string; name: string; exam?: string }[] | null,
+  exam: ExamCode = "upsc",
 ): StudentNavItem[] {
+  if (exam !== "upsc") {
+    // NEET / JEE: only the API list, linking into the exam's own routes.
+    return (subjects ?? []).map((s) => ({
+      name: s.name.replace(new RegExp(`^${exam}\\s+`, "i"), ""),
+      slug: s.slug,
+      href: `/${exam}/${s.slug}/lms`,
+      icon: Compass,
+      locked: true,
+    }));
+  }
   if (!subjects || subjects.length === 0) return lockedSubjectNavItems;
   const fromApi: StudentNavItem[] = subjects
     .filter((s) => !primarySubjectSlugs.has(s.slug))
@@ -223,6 +238,42 @@ export const studentNavSections: StudentNavSection[] = [
     ],
   },
 ];
+
+/**
+ * Navigation on /neet and /jee. UPSC-only features (Current Affairs, Optional
+ * subjects, GS, answer upload / Mains, prelims pages, UPSC billing) are left
+ * out; Study, My books and Wellbeing stay, under the exam's own prefix.
+ */
+export function studentNavSectionsFor(exam: ExamCode): StudentNavSection[] {
+  if (exam === "upsc") return studentNavSections;
+  const base = `/${exam}`;
+  return [
+    {
+      label: "Study",
+      items: [
+        { name: "Home", href: base, icon: CalendarCheck, match: (pathname) => pathname === base },
+        {
+          name: "Study",
+          href: `${base}/study`,
+          icon: Search,
+          match: (pathname) => pathname.startsWith(`${base}/study`),
+        },
+        {
+          name: "My books",
+          href: `${base}/books`,
+          icon: BookOpen,
+          match: (pathname) => pathname.startsWith(`${base}/books`),
+        },
+        {
+          name: "Wellbeing",
+          href: `${base}/wellbeing`,
+          icon: Leaf,
+          match: (pathname) => pathname.startsWith(`${base}/wellbeing`),
+        },
+      ],
+    },
+  ];
+}
 
 /** Admin/operator navigation (unchanged behaviour, centralised here). */
 export const adminNavItems: StudentNavItem[] = [

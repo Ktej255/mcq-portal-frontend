@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 
 import { isMasterEmail } from "@/lib/auth/master-access";
+import {
+  ADMIN_ROUTE_PATTERNS,
+  PROTECTED_ROUTE_PATTERNS,
+  PUBLIC_UPSC_ROUTE_PATTERNS,
+} from "@/lib/auth/protected-routes";
 
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
   if (process.env.NEXT_PUBLIC_AUTH_PROVIDER !== "clerk") {
@@ -11,25 +16,11 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
   // Dynamically import Clerk server-side helper to prevent Edge runtime compilation errors when Clerk is not active
   const { clerkClient, clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
 
-  const isProtectedRoute = createRouteMatcher([
-    "/dashboard(.*)",
-    "/reports(.*)",
-    "/revision(.*)",
-    "/history(.*)",
-    "/tests(.*)",
-    "/exam(.*)",
-    "/upsc(.*)",
-    "/admin(.*)",
-    "/api/upsc/teacher(.*)",
-  ]);
-
-  const isPublicUpscRoute = createRouteMatcher([
-    "/upsc",
-    "/upsc/pricing(.*)",
-    "/upsc/prelims-2026-showcase(.*)",
-  ]);
-
-  const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+  // Patterns live in protected-routes.ts (/upsc, /neet and /jee are all
+  // protected; only the listed UPSC pages are public).
+  const isProtectedRoute = createRouteMatcher(PROTECTED_ROUTE_PATTERNS);
+  const isPublicUpscRoute = createRouteMatcher(PUBLIC_UPSC_ROUTE_PATTERNS);
+  const isAdminRoute = createRouteMatcher(ADMIN_ROUTE_PATTERNS);
 
   const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
     if (isProtectedRoute(req) && !isPublicUpscRoute(req)) {

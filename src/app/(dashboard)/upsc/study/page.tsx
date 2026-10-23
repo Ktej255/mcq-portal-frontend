@@ -7,6 +7,7 @@ import { ArrowRight, CheckCircle2, Lock, Search, Sparkles } from "lucide-react";
 
 import { RichBlocks } from "@/components/gs-lms/RichBlockRenderer";
 import { SubjectLmsProvider } from "@/components/gs-lms/SubjectLmsContext";
+import { examBasePath } from "@/lib/exams/examRoutes";
 import { VideoPlayer } from "@/components/gs-lms/VideoPlayer";
 import {
   getGateError,
@@ -317,6 +318,7 @@ function StudyScreen() {
 }
 
 function NoResults() {
+  const base = examBasePath(usePathname());
   const [subjects, setSubjects] = useState<{ slug: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -339,7 +341,7 @@ function NoResults() {
       </p>
       <div className="flex flex-wrap gap-2 pt-1">
         {(subjects.length > 0 ? subjects : [{ slug: "geography", name: "Geography" }]).map((s) => (
-          <Link key={s.slug} href={`/upsc/${s.slug}/lms/syllabus`} className={SECONDARY_BUTTON}>
+          <Link key={s.slug} href={`${base}/${s.slug}/lms/syllabus`} className={SECONDARY_BUTTON}>
             Browse {s.name} syllabus
           </Link>
         ))}
@@ -349,6 +351,7 @@ function NoResults() {
 }
 
 function LockedMessage({ reason, subject }: { reason: string; subject: string | null }) {
+  const base = examBasePath(usePathname());
   return (
     <div
       data-testid="study-locked"
@@ -361,7 +364,7 @@ function LockedMessage({ reason, subject }: { reason: string; subject: string | 
       <p data-testid="study-locked-reason" className="text-sm leading-relaxed text-[#49675e]">
         {reason}
       </p>
-      <Link href={subject ? `/upsc/${subject}/lms/syllabus` : "/upsc"} className="text-xs font-bold text-[#1d9e75] hover:underline">
+      <Link href={subject ? `${base}/${subject}/lms/syllabus` : base} className="text-xs font-bold text-[#1d9e75] hover:underline">
         {subject ? "Back to syllabus" : "Back to today"}
       </Link>
     </div>
@@ -602,6 +605,7 @@ function NextAction({
     ? "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-black text-[#1a3a2a]"
     : PRIMARY_BUTTON;
   const slug = step.subject_slug;
+  const base = examBasePath(usePathname());
 
   if (step.type === "concept" && step.concept_id != null) {
     return (
@@ -612,14 +616,14 @@ function NextAction({
   }
   if (step.type === "mcq_lab" && slug && step.leaf_id != null) {
     return (
-      <Link data-testid="next-action" className={cls} href={`/upsc/${slug}/lms/topic/${step.leaf_id}`}>
+      <Link data-testid="next-action" className={cls} href={`${base}/${slug}/lms/topic/${step.leaf_id}`}>
         {step.label || "Practice with the MCQ lab"} <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
     );
   }
   if (step.type === "checkpoint" && slug && step.checkpoint_id != null) {
     return (
-      <Link data-testid="next-action" className={cls} href={`/upsc/${slug}/lms/checkpoint/${step.checkpoint_id}`}>
+      <Link data-testid="next-action" className={cls} href={`${base}/${slug}/lms/checkpoint/${step.checkpoint_id}`}>
         {step.label || "Take the review test"} <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
     );
