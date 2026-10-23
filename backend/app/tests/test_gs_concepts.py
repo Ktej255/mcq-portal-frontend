@@ -256,9 +256,12 @@ def test_importer_upserts_concepts_idempotently(session_factory):
         assert c.review_status == GsReviewStatusEnum.REVIEWED
         assert [x.display_order for x in db.query(GsLmsConcept).order_by(GsLmsConcept.display_order)] == list(range(1, n + 1))
 
-        # Default import status is UNREVIEWED, like other content.
+        # An UNREVIEWED import keeps the status of unchanged concepts and resets
+        # only the one whose key points differ from what is stored.
         import_gs_subject(db, _template())
-        assert {x.review_status for x in db.query(GsLmsConcept)} == {GsReviewStatusEnum.UNREVIEWED}
+        statuses = {x.display_order: x.review_status for x in db.query(GsLmsConcept)}
+        assert statuses[1] == GsReviewStatusEnum.UNREVIEWED
+        assert {s for o, s in statuses.items() if o != 1} == {GsReviewStatusEnum.REVIEWED}
 
 
 def test_importer_rejects_bad_concepts(session_factory):

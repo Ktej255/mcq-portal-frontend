@@ -221,5 +221,6 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
   { name: "Integrity Logs", href: "/admin/integrity", icon: ShieldAlert },
   { name: "Leads", href: "/admin/leads", icon: Mail },
+  { name: "Content studio", href: "/admin/content", icon: BookOpen },
   { name: "Content requests", href: "/admin/content-requests", icon: Inbox },
 ];

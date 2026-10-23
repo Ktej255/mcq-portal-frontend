@@ -726,6 +726,37 @@ class GsLmsContentRequestStudent(Base):
 
 
 # ---------------------------------------------------------------------------
+# Content studio logs (admin uploads and approvals)
+# ---------------------------------------------------------------------------
+
+class GsLmsContentImport(Base):
+    """One content file uploaded and imported through the admin Content studio."""
+    __tablename__ = "gs_lms_content_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_id = Column(Integer, ForeignKey("gs_subjects.id"), nullable=False, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    filename = Column(String, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    # ContentReport.summary() of the file, and the importer's result counts.
+    summary = Column(JSON, nullable=True)
+    result = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+
+class GsLmsContentReviewLog(Base):
+    """Who approved or un-approved a topic (or a whole sub-/mega-topic), and when."""
+    __tablename__ = "gs_lms_content_review_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    node_id = Column(Integer, ForeignKey("gs_lms_syllabus_nodes.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, nullable=False)  # REVIEWED | UNREVIEWED
+    counts = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+
+# ---------------------------------------------------------------------------
 # Book retention checks ("do I remember this chapter?")
 # ---------------------------------------------------------------------------
 

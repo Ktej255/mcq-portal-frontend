@@ -345,6 +345,94 @@ export interface ContentRequest {
   note: string | null;
 }
 
+// -- Admin Content studio ---------------------------------------------------
+
+export interface ContentSubjectReadiness {
+  slug: string;
+  name: string;
+  topics: number;
+  topics_ready: number;
+  topics_reviewed: number;
+  unfinished: number;
+  mcqs: number;
+  mcqs_reviewed: number;
+  mcqs_unreviewed: number;
+  concepts: number;
+  versions: number;
+  pyqs: number;
+  is_complete: boolean;
+  last_import: { at: string | null; filename: string | null; source: 'content_studio' | 'command_line' } | null;
+}
+
+export interface ContentTopicReadiness {
+  node_id: number;
+  parent_id: number | null;
+  mega_title: string;
+  sub_title: string;
+  title: string;
+  review_status: string;
+  sections_present: string[];
+  sections_missing: string[];
+  sections_reviewed: number;
+  mcqs: number;
+  mcqs_needed: number;
+  mcqs_reviewed: number;
+  mcqs_unreviewed: number;
+  pyqs: number;
+  pyqs_reviewed: number;
+  concepts: number;
+  concepts_reviewed: number;
+  concepts_with_good_key_points: number;
+  concepts_with_version: number;
+  versions: number;
+  versions_reviewed: number;
+  book_refs: number;
+  content_ready: boolean;
+  next_to_write: string[];
+}
+
+export interface ContentSubjectDetail {
+  subject: ContentSubjectReadiness;
+  topics: ContentTopicReadiness[];
+}
+
+export interface ContentCheckResult {
+  subject_slug: string | null;
+  subject_name: string | null;
+  summary: Record<string, number | boolean>;
+  errors: string[];
+  gaps: string[];
+  ok_to_import: boolean;
+  ready: boolean;
+  /** Topics approved right now; importing again puts the ones in the file back to draft. */
+  approved_topics_now: number;
+}
+
+export interface ContentImportResult extends ContentCheckResult {
+  result: Record<string, number | string>;
+}
+
+export interface ContentImportLog {
+  id: number;
+  subject_slug: string;
+  uploaded_by: number | null;
+  uploaded_by_name: string | null;
+  filename: string;
+  sha256: string;
+  summary: Record<string, number | boolean> | null;
+  result: Record<string, number | string> | null;
+  created_at: string | null;
+}
+
+export type ContentReviewPart = 'topic' | 'mcqs' | 'concepts' | 'versions' | 'pyqs';
+
+export interface ContentReviewResult {
+  node_id: number;
+  status: 'REVIEWED' | 'UNREVIEWED';
+  topics: number;
+  skipped_not_ready: { node_id: number; title: string }[];
+}
+
 // -- Onboarding -------------------------------------------------------------
 
 export interface OnboardingStatusOut {
@@ -1095,6 +1183,65 @@ export const gsLmsService = {
   ): Promise<ContentRequest> => {
     const response = await apiClient.patch(`admin/gs-lms/content-requests/${id}`, patch);
     return unwrap<ContentRequest>(response.data);
+  },
+
+  // Admin Content studio: what is live, upload + check, approve.
+  getContentSubjects: async (): Promise<ContentSubjectReadiness[]> => {
+    const response = await apiClient.get('admin/gs-lms/content/subjects');
+    return unwrap<ContentSubjectReadiness[]>(response.data);
+  },
+
+  getContentSubject: async (slug: string): Promise<ContentSubjectDetail> => {
+    const response = await apiClient.get(`admin/gs-lms/content/subjects/${slug}`);
+    return unwrap<ContentSubjectDetail>(response.data);
+  },
+
+  downloadContentWorklist: async (slug: string): Promise<Blob> => {
+    const response = await apiClient.get(`admin/gs-lms/content/subjects/${slug}/worklist.csv`, {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  },
+
+  checkContentFile: async (file: File): Promise<ContentCheckResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post('admin/gs-lms/content/check', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrap<ContentCheckResult>(response.data);
+  },
+
+  importContentFile: async (file: File, deriveConcepts = false): Promise<ContentImportResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('derive_concepts', String(deriveConcepts));
+    const response = await apiClient.post('admin/gs-lms/content/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrap<ContentImportResult>(response.data);
+  },
+
+  listContentImports: async (subject?: string): Promise<ContentImportLog[]> => {
+    const response = await apiClient.get('admin/gs-lms/content/imports', {
+      params: { ...(subject ? { subject } : {}), limit: 20 },
+    });
+    return unwrap<ContentImportLog[]>(response.data);
+  },
+
+  /** Approve or un-approve one topic (`kind: 'topic'`) or every topic under a sub-/mega-topic (`'group'`). */
+  reviewContent: async (
+    nodeId: number,
+    status: 'REVIEWED' | 'UNREVIEWED',
+    kind: 'topic' | 'group' = 'topic',
+    include?: ContentReviewPart[],
+  ): Promise<ContentReviewResult> => {
+    const path = kind === 'topic' ? 'topics' : 'nodes';
+    const response = await apiClient.post(`admin/gs-lms/content/${path}/${nodeId}/review`, {
+      status,
+      ...(include ? { include } : {}),
+    });
+    return unwrap<ContentReviewResult>(response.data);
   },
 
   getBooks: async (subject?: string): Promise<BookOut[]> => {

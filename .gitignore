@@ -64,3 +64,10 @@ next-env.d.ts
 # Converted EduEcosystem question banks (book-derived; regenerate with
 # backend/scripts/eduecosystem_import/convert.py). Kept out of git while the repo is public.
 backend/app/core/gs_lms/data/retention/*.json
+
+# Bank-derived and team-working files for the content tools. They may hold
+# book-derived questions, so they never go in git. Written here by default:
+#   bank_matcher (matches CSV, supplements) and sheets (CSV template folders)
+backend/app/core/gs_lms/data/supplements/
+backend/app/core/gs_lms/data/bank_matches/
+backend/app/core/gs_lms/data/sheets/

@@ -23,13 +23,16 @@ as running once (Design Property 20).
 
 Review gate: all imported content starts as UNREVIEWED by default, satisfying
 Property 19 (review-gate filtering). Pass ``review_status="REVIEWED"`` to
-bypass the gate for pre-approved content.
+bypass the gate for pre-approved content. Re-importing as UNREVIEWED keeps the
+status of every row whose content is unchanged (approvals survive a typo fix);
+rows whose content changed, and new rows, are UNREVIEWED.
 
 Requirements: 10.5, 11.4
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -41,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.content_check import check_subject_content, format_report
+from app.core.gs_lms.content_tree import TopicIndex, normalise_question
 from app.core.gs_lms.understanding import tokenize
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
@@ -68,6 +72,24 @@ DEFAULT_ARTIFACT_PATH = (
 
 # Actor identifier stamped on audit fields.
 _ACTOR = "gs-lms-importer"
+
+
+def _update_row(row: Any, fields: dict[str, Any], review_status: GsReviewStatusEnum) -> bool:
+    """Set ``fields`` on an existing row and decide its review status.
+
+    Importing as REVIEWED always marks the row REVIEWED. Importing as UNREVIEWED
+    keeps the row's current status when none of ``fields`` differ from what is
+    stored (so a re-import after fixing one typo does not undo approvals); a row
+    whose content changed goes back to UNREVIEWED. Returns True if content changed.
+    """
+    changed = any(getattr(row, key) != value for key, value in fields.items())
+    for key, value in fields.items():
+        setattr(row, key, value)
+    if review_status == GsReviewStatusEnum.REVIEWED or changed or row.review_status is None:
+        row.review_status = review_status
+    if changed:
+        row.updated_by = _ACTOR
+    return changed
 
 
 # ---------------------------------------------------------------------------
@@ -205,15 +227,19 @@ def _import_node(
 
     if existing:
         # Update existing node attributes.
-        existing.node_type = node_type
-        existing.weight = node_data.get("weight", 1.0)
-        existing.display_order = node_data.get("display_order", 0)
-        existing.ordering_justification = node_data.get("ordering_justification")
-        existing.day_lesson_id = node_data.get("day_lesson_id")
-        existing.video_url = video_url
-        existing.concept_checklist = concept_checklist
-        existing.review_status = review_status
-        existing.updated_by = _ACTOR
+        _update_row(
+            existing,
+            dict(
+                node_type=node_type,
+                weight=node_data.get("weight", 1.0),
+                display_order=node_data.get("display_order", 0),
+                ordering_justification=node_data.get("ordering_justification"),
+                day_lesson_id=node_data.get("day_lesson_id"),
+                video_url=video_url,
+                concept_checklist=concept_checklist,
+            ),
+            review_status,
+        )
         db.flush()
         node = existing
         counts["nodes_updated"] += 1
@@ -333,12 +359,16 @@ def import_content_sections(
         )
 
         if existing:
-            existing.title = sec_data.get("title", existing.title)
-            existing.blocks = sec_data.get("blocks", existing.blocks)
-            existing.display_order = sec_data.get("display_order", existing.display_order)
-            existing.review_status = rs_enum
-            existing.authored = sec_data.get("authored", existing.authored)
-            existing.updated_by = _ACTOR
+            _update_row(
+                existing,
+                dict(
+                    title=sec_data.get("title", existing.title),
+                    blocks=sec_data.get("blocks", existing.blocks),
+                    display_order=sec_data.get("display_order", existing.display_order),
+                    authored=sec_data.get("authored", existing.authored),
+                ),
+                rs_enum,
+            )
             updated += 1
         else:
             section = GsLmsContentSection(
@@ -403,11 +433,15 @@ def import_concepts(
         display_order = c_data.get("display_order", position)
 
         if existing:
-            existing.key_points = c_data["key_points"]
-            existing.misconceptions = c_data.get("misconceptions")
-            existing.display_order = display_order
-            existing.review_status = rs_enum
-            existing.updated_by = _ACTOR
+            _update_row(
+                existing,
+                dict(
+                    key_points=c_data["key_points"],
+                    misconceptions=c_data.get("misconceptions"),
+                    display_order=display_order,
+                ),
+                rs_enum,
+            )
             concept = existing
             updated += 1
         else:
@@ -456,8 +490,9 @@ def import_concept_versions(
     video_url (optional), duration_minutes (optional), display_order (optional,
     defaults to the position in the list).
 
-    Idempotency: matches by (concept_id + level + style + source). Versions get
-    the same review_status as the rest of the import.
+    Idempotency: matches by (concept_id + level + style + source). New and
+    changed versions get the import's review_status; unchanged ones keep theirs
+    when importing as UNREVIEWED.
     """
     rs_enum = GsReviewStatusEnum(review_status)
     created = updated = 0
@@ -481,18 +516,15 @@ def import_concept_versions(
             video_url=v_data.get("video_url"),
             duration_minutes=v_data.get("duration_minutes"),
             display_order=v_data.get("display_order", position),
-            review_status=rs_enum,
-            updated_by=_ACTOR,
         )
         if row:
-            for key, value in fields.items():
-                setattr(row, key, value)
+            _update_row(row, fields, rs_enum)
             updated += 1
         else:
             db.add(
                 GsLmsConceptVersion(
                     concept_id=concept_id, level=level, style=style, source=source,
-                    created_by=_ACTOR, **fields,
+                    review_status=rs_enum, created_by=_ACTOR, updated_by=_ACTOR, **fields,
                 )
             )
             created += 1
@@ -703,13 +735,17 @@ def import_pyqs(
             question_type = GsLmsQuestionTypeEnum(pyq_data["question_type"])
 
         if existing:
-            existing.exam_type = exam_type
-            existing.answer_text = pyq_data.get("answer_text")
-            existing.explanation = pyq_data.get("explanation")
-            existing.marks = pyq_data.get("marks")
-            existing.question_type = question_type
-            existing.review_status = rs_enum
-            existing.updated_by = _ACTOR
+            _update_row(
+                existing,
+                dict(
+                    exam_type=exam_type,
+                    answer_text=pyq_data.get("answer_text"),
+                    explanation=pyq_data.get("explanation"),
+                    marks=pyq_data.get("marks"),
+                    question_type=question_type,
+                ),
+                rs_enum,
+            )
             updated += 1
         else:
             pyq = GsLmsPyq(
@@ -778,13 +814,17 @@ def import_mcq_questions(
         question_type = GsLmsQuestionTypeEnum(q_data["question_type"])
 
         if existing:
-            existing.options = q_data["options"]
-            existing.correct_option = q_data["correct_option"]
-            existing.explanation = q_data.get("explanation")
-            existing.question_type = question_type
-            existing.display_order = q_data.get("display_order", existing.display_order)
-            existing.review_status = rs_enum
-            existing.updated_by = _ACTOR
+            _update_row(
+                existing,
+                dict(
+                    options=q_data["options"],
+                    correct_option=q_data["correct_option"],
+                    explanation=q_data.get("explanation"),
+                    question_type=question_type,
+                    display_order=q_data.get("display_order", existing.display_order),
+                ),
+                rs_enum,
+            )
             updated += 1
         else:
             mcq = GsLmsMcqQuestion(
@@ -807,6 +847,56 @@ def import_mcq_questions(
 
 
 # ---------------------------------------------------------------------------
+# Supplements (extra MCQs merged into a subject file before check + import)
+# ---------------------------------------------------------------------------
+
+
+def merge_supplement(subject_data: dict[str, Any], supplement: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of ``subject_data`` with a supplement's MCQs added to its topics.
+
+    A supplement is ``{"subject_slug", "kind": "mcq_supplement", "topics": [{"title",
+    "mcq_questions": [...]}]}`` (see ``bank_matcher``). Topics are matched by exact
+    title; titles that match no leaf topic (or more than one) raise ``ValueError``
+    naming all of them, and nothing is merged. A question already in the topic (same
+    text apart from case and punctuation) is skipped, so merging the same supplement
+    twice gives the same result as merging it once. The input is never modified.
+    """
+    if supplement.get("kind") != "mcq_supplement":
+        raise ValueError('This is not an MCQ supplement file (it should say "kind": "mcq_supplement").')
+    file_slug, supp_slug = subject_data.get("subject_slug"), supplement.get("subject_slug")
+    if file_slug and supp_slug and file_slug != supp_slug:
+        raise ValueError(f'The supplement is for subject "{supp_slug}" but the content file is "{file_slug}".')
+
+    merged = copy.deepcopy(subject_data)
+    index = TopicIndex(merged.get("tree") or [])
+    exact = {t: [l for l in index.leaves if l.get("title") == t] for t in {l.get("title") for l in index.leaves}}
+    problems = []
+    for entry in supplement.get("topics") or []:
+        title = entry.get("title")
+        hits = exact.get(title, [])
+        if len(hits) == 0:
+            problems.append(f'"{title}" (no topic has this exact title)')
+        elif len(hits) > 1:
+            problems.append(f'"{title}" (more than one topic has this title)')
+    if problems:
+        raise ValueError("The supplement names topics that are not in the content file: " + "; ".join(problems))
+
+    for entry in supplement.get("topics") or []:
+        leaf = exact[entry["title"]][0]
+        mcqs = leaf.setdefault("mcq_questions", [])
+        seen = {normalise_question(m.get("question_text")) for m in mcqs if isinstance(m, dict)}
+        order = max([m.get("display_order") or 0 for m in mcqs if isinstance(m, dict)] + [len(mcqs)])
+        for mcq in entry.get("mcq_questions") or []:
+            key = normalise_question(mcq.get("question_text"))
+            if key in seen:
+                continue
+            seen.add(key)
+            order += 1
+            mcqs.append({**copy.deepcopy(mcq), "display_order": order})
+    return merged
+
+
+# ---------------------------------------------------------------------------
 # Top-level Import Entry Point
 # ---------------------------------------------------------------------------
 
@@ -817,6 +907,7 @@ def import_gs_subject(
     *,
     subject_slug: Optional[str] = None,
     review_status: str = "UNREVIEWED",
+    supplements: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Import one GS subject's LMS content from a JSON artifact or dict.
 
@@ -867,6 +958,8 @@ def import_gs_subject(
         data = artifact_path_or_data
     else:
         data = load_artifact(artifact_path_or_data)
+    for supplement in supplements or []:
+        data = merge_supplement(data, supplement)
 
     report = check_subject_content(data)
     if not report.ok_to_import:
@@ -939,6 +1032,7 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
 
     python -m app.core.gs_lms.importer --artifact content/polity.json --check-only
     python -m app.core.gs_lms.importer --artifact content/polity.json --subject polity-governance
+    python -m app.core.gs_lms.importer --artifact content/polity.json --supplement data/supplements/polity_mcqs.json
     """
     import argparse
     import sys
@@ -954,6 +1048,13 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
         help="review_status to stamp on imported content (default: UNREVIEWED, hidden from students).",
     )
     parser.add_argument(
+        "--supplement",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="MCQ supplement JSON (from bank_matcher apply) merged in before checking; may be repeated.",
+    )
+    parser.add_argument(
         "--derive-concepts",
         action="store_true",
         help="After importing, create a concept for every concept_checklist sentence of topics that have none.",
@@ -961,6 +1062,14 @@ def main() -> None:  # pragma: no cover - CLI entrypoint
     args = parser.parse_args()
 
     data = load_artifact(args.artifact)
+    for supplement_path in args.supplement:
+        try:
+            with open(supplement_path, "r", encoding="utf-8") as fh:
+                data = merge_supplement(data, json.load(fh))
+        except (OSError, ValueError) as exc:
+            print(f"Supplement {supplement_path}: {exc}")
+            sys.exit(1)
+        print(f"Merged supplement {supplement_path}")
     report = check_subject_content(data)
     print(format_report(report))
     if args.check_only or not report.ok_to_import:
