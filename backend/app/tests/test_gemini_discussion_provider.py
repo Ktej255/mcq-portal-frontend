@@ -58,7 +58,7 @@ class TestBuildPromptWithMissedConcepts:
             transcript=[],
             student_message="Rivers form valleys.",
             concepts_missed=["erosion types"],
-            match_percentage=0.6,
+            match_percentage=60.0,
         )
 
         assert "60%" in prompt
@@ -127,7 +127,7 @@ class TestBuildPromptWithMissedConcepts:
             transcript=transcript,
             student_message="Plates move on the asthenosphere.",
             concepts_missed=["subduction zones"],
-            match_percentage=0.6,
+            match_percentage=60.0,
         )
 
         assert "plate tectonics is important" in prompt.lower()

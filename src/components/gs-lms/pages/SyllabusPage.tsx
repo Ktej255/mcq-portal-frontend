@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { SyllabusNodeOut } from "@/services/api/gsLmsService";
+import { useProgression } from "@/hooks/useProgression";
 import { SyllabusTree } from "../SyllabusTree";
 import { LmsLoadingSkeleton } from "../LmsLoadingSkeleton";
 import { LmsEmptyState } from "../LmsEmptyState";
@@ -18,6 +20,9 @@ export function SyllabusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { progression } = useProgression(subject);
+  const dueCheckpoint = progression?.due_checkpoint ?? null;
+  const reviewTestHref = dueCheckpoint ? `${lmsBase}/checkpoint/${dueCheckpoint.checkpoint_id}` : undefined;
 
   const fetchSyllabus = useCallback(() => {
     setLoading(true);
@@ -117,6 +122,15 @@ export function SyllabusPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-semibold text-[#1a3a2a]">{label} Syllabus</h1>
         <div className="flex items-center gap-2">
+          {progression?.next_leaf && (
+            <Link
+              href={`${lmsBase}/topic/${progression.next_leaf.node_id}`}
+              data-testid="continue-topic"
+              className="inline-flex items-center gap-2 rounded-md bg-[#1a3a2a] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#1d9e75]"
+            >
+              Continue: {progression.next_leaf.title} &rarr;
+            </Link>
+          )}
           <a
             href={`${lmsBase}/planner`}
             className="inline-flex items-center gap-2 rounded-md border border-[#1d9e75] bg-[#e7f5ee] px-3 py-2 text-xs font-bold text-[#085041] transition hover:bg-[#1d9e75] hover:text-white"
@@ -125,6 +139,41 @@ export function SyllabusPage() {
           </a>
         </div>
       </div>
+
+      {progression && (
+        <div className="mb-4" data-testid="progression-summary">
+          <div className="flex items-center justify-between text-xs font-bold text-[#536259]">
+            <span>
+              {progression.mastered_count} / {progression.total_leaves} topics mastered
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-[#dcd5c7]">
+            <div
+              className="h-full rounded-full bg-[#1d9e75] transition-all"
+              style={{
+                width: `${progression.total_leaves ? (progression.mastered_count / progression.total_leaves) * 100 : 0}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {dueCheckpoint && reviewTestHref && (
+        <div
+          data-testid="checkpoint-due"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-amber-900">
+            A review test is due: {dueCheckpoint.sub_topic_title} ({dueCheckpoint.leaves.map((l) => l.title).join(", ")})
+          </p>
+          <Link
+            href={reviewTestHref}
+            className="rounded-md bg-[#1a3a2a] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#1d9e75]"
+          >
+            Take review test
+          </Link>
+        </div>
+      )}
 
       {/* Search filter */}
       <div className="mb-4">
@@ -150,7 +199,7 @@ export function SyllabusPage() {
         </span>
       </div>
 
-      <SyllabusTree tree={filteredTree} onLeafClick={handleLeafClick} />
+      <SyllabusTree tree={filteredTree} onLeafClick={handleLeafClick} reviewTestHref={reviewTestHref} />
     </div>
   );
 }

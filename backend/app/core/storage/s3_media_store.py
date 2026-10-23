@@ -79,5 +79,12 @@ class S3MediaStore:
         except Exception as exc:  # pragma: no cover - network dependent
             raise MediaStoreError(f"object not found or unreadable: {key}") from exc
 
+    def delete(self, key: str) -> None:
+        # S3 delete_object succeeds for a missing key, so this is idempotent.
+        try:
+            self._s3().delete_object(Bucket=self.bucket, Key=key)
+        except Exception as exc:  # pragma: no cover - network dependent
+            raise MediaStoreError(f"failed to delete object: {type(exc).__name__}") from exc
+
 
 __all__ = ["S3MediaStore"]

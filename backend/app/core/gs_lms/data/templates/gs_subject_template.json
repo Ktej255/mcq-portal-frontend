@@ -1,6 +1,23 @@
 {
-  "_readme": "Template for one GS subject. Copy it, set subject_slug, and add mega-topics > sub-topics > leaf topics. Each leaf topic needs the 5 sections, 15 MCQs and at least one PYQ to be 'ready'. See docs/CONTENT_PIPELINE.md.",
+  "_readme": "Template for one GS subject. Copy it, set subject_slug, and add mega-topics > sub-topics > leaf topics. Each leaf topic needs the 5 sections, 2-8 concepts (each with 2-8 key points), 15 MCQs and at least one PYQ to be 'ready'. See docs/CONTENT_PIPELINE.md. Optional: list books under \"books\" and give a concept \"versions\" and \"book_refs\" (see the Preamble example); set \"require_versions\": true to make versions mandatory.",
   "subject_slug": "polity-governance",
+  "books": [
+    {
+      "slug": "laxmikanth-indian-polity-7e",
+      "title": "Indian Polity",
+      "author": "M. Laxmikanth",
+      "edition": "7th",
+      "publisher": "McGraw Hill Education",
+      "exam_tag": "UPSC",
+      "subject_slug": "polity-governance",
+      "chapters": [
+        {
+          "number": 1,
+          "title": "Preamble of the Constitution"
+        }
+      ]
+    }
+  ],
   "tree": [
     {
       "title": "Constitutional Framework",
@@ -26,6 +43,136 @@
                 "42nd Amendment additions",
                 "Berubari vs Kesavananda Bharati",
                 "Sources of the ideals"
+              ],
+              "concepts": [
+                {
+                  "title": "Objectives Resolution as the source of the Preamble",
+                  "key_points": [
+                    "Jawaharlal Nehru moved the Objectives Resolution on 13 December 1946",
+                    "Constituent Assembly adopted it on 22 January 1947",
+                    "it laid down the philosophy that the Preamble later reflected"
+                  ],
+                  "misconceptions": [
+                    "The Preamble was drafted first and the Objectives Resolution came after it"
+                  ]
+                },
+                {
+                  "title": "The five descriptions of the Indian state",
+                  "key_points": [
+                    "India is sovereign, free of external control",
+                    "socialist and secular were added by the 42nd Amendment in 1976",
+                    "democratic means government by the people's elected representatives",
+                    "republic means the head of state is elected, not hereditary"
+                  ],
+                  "misconceptions": [
+                    "Socialist and secular were in the original 1950 Preamble"
+                  ],
+                  "book_refs": [
+                    {
+                      "book": "laxmikanth-indian-polity-7e",
+                      "chapter": 1,
+                      "pages": null
+                    }
+                  ],
+                  "versions": [
+                    {
+                      "level": "BASIC",
+                      "style": "TEXT",
+                      "source": "ORIGINAL",
+                      "title": "The five descriptions, in plain words",
+                      "duration_minutes": 4,
+                      "blocks": [
+                        {
+                          "type": "para",
+                          "text": "The Preamble calls India a **Sovereign, Socialist, Secular, Democratic Republic**. Sovereign means India takes its own decisions, free of outside control. Democratic means the government is chosen by the people. Republic means the head of state is elected, not born into the job."
+                        },
+                        {
+                          "type": "callout",
+                          "tone": "note",
+                          "title": "Remember",
+                          "text": "**Socialist** and **secular** were added by the 42nd Amendment in 1976. The other three words were in the original 1950 text."
+                        }
+                      ]
+                    },
+                    {
+                      "level": "STANDARD",
+                      "style": "VISUAL",
+                      "source": "ORIGINAL",
+                      "title": "The five descriptions at a glance",
+                      "duration_minutes": 3,
+                      "blocks": [
+                        {
+                          "type": "compare",
+                          "title": "Original Preamble (1950) vs 42nd Amendment (1976)",
+                          "left": {
+                            "label": "In the original 1950 text",
+                            "items": [
+                              "Sovereign",
+                              "Democratic",
+                              "Republic"
+                            ]
+                          },
+                          "right": {
+                            "label": "Added in 1976",
+                            "items": [
+                              "Socialist",
+                              "Secular"
+                            ]
+                          }
+                        },
+                        {
+                          "type": "keyterms",
+                          "terms": [
+                            {
+                              "term": "Sovereign",
+                              "definition": "India is free of external control."
+                            },
+                            {
+                              "term": "Democratic",
+                              "definition": "Government is chosen by the people's elected representatives."
+                            },
+                            {
+                              "term": "Republic",
+                              "definition": "The head of state is elected, not hereditary."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "title": "Justice, Liberty, Equality and Fraternity",
+                  "key_points": [
+                    "justice is social, economic and political",
+                    "liberty covers thought, expression, belief, faith and worship",
+                    "equality means equality of status and of opportunity",
+                    "fraternity assures the dignity of the individual and the unity and integrity of the nation"
+                  ],
+                  "misconceptions": [
+                    "Fraternity means only brotherhood between communities, not national unity"
+                  ]
+                },
+                {
+                  "title": "Legal status of the Preamble",
+                  "key_points": [
+                    "Berubari Union case 1960 held the Preamble is not part of the Constitution",
+                    "Kesavananda Bharati case 1973 held it is part of the Constitution",
+                    "the Preamble is not enforceable in a court of law",
+                    "it cannot override the specific provisions of the Constitution"
+                  ],
+                  "misconceptions": [
+                    "Courts can enforce the Preamble directly as a fundamental right"
+                  ]
+                },
+                {
+                  "title": "Authority and adoption of the Constitution",
+                  "key_points": [
+                    "We, the People of India are the source of the Constitution's authority",
+                    "the Constitution was adopted on 26 November 1949",
+                    "it came into force on 26 January 1950"
+                  ]
+                }
               ],
               "content_sections": [
                 {

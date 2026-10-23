@@ -130,7 +130,7 @@ class EvaluationEngine:
         )
         inf_request.max_tokens = config.max_tokens  # token budget per call (R18.3)
 
-        # Vision route: attach the first page image when the model supports it
+        # Vision route: attach the page images (in order, capped) when the model supports it
         # so diagrams/maps are graded directly (R13.1).
         from app.core.evaluation.providers.vision import apply_vision
 

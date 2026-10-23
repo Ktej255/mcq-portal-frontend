@@ -3,7 +3,7 @@ Phase 4 — Frictionless Mobile Mains Answer Upload
 Step 4.3: Backend PDF assembler endpoint
 
 Accepts ordered JPEG/PNG images via multipart form data,
-assembles them into a single PDF using stdlib only (no heavy deps),
+assembles them into a single PDF (PNG pages are converted to JPEG with Pillow),
 and returns the PDF as a downloadable file or stores it.
 """
 
@@ -71,27 +71,27 @@ def _is_png(data: bytes) -> bool:
     return data[:8] == b"\x89PNG\r\n\x1a\n"
 
 
-def _png_to_jpeg_approx(data: bytes) -> bytes:
-    """
-    We cannot do PNG→JPEG without Pillow.
-    Instead we embed the PNG as a raw image XObject using its raw pixels.
-    This function returns a PDF-compatible flate-compressed image stream.
-    For the minimal pure-stdlib case we embed PNG files using the
-    /FlateDecode filter by extracting IDAT chunks and treating them
-    as RGB data. A proper implementation would use Pillow, but we keep
-    this zero-dependency and fall back to a placeholder white page if
-    decompression of PNG pixel data would require a full decoder.
+def _png_to_jpeg(data: bytes) -> bytes:
+    """Convert PNG bytes to RGB JPEG bytes with Pillow (transparency -> white)."""
+    from PIL import Image
 
-    In production the mobile camera virtually always produces JPEG,
-    so this path is rarely exercised.
-    """
-    raise NotImplementedError("Pure-stdlib PNG embed not fully supported; convert to JPEG on the client side.")
+    with Image.open(io.BytesIO(data)) as im:
+        if im.mode in ("RGBA", "LA", "P"):
+            rgba = im.convert("RGBA")
+            background = Image.new("RGB", rgba.size, (255, 255, 255))
+            background.paste(rgba, mask=rgba.split()[-1])
+            rgb = background
+        else:
+            rgb = im.convert("RGB")
+        out = io.BytesIO()
+        rgb.save(out, format="JPEG", quality=85)
+        return out.getvalue()
 
 
 def _assemble_pdf(images: List[bytes]) -> bytes:
     """
     Assemble a multi-page PDF from a list of JPEG byte strings.
-    PNG files will raise a clear error directing the caller to send JPEG.
+    PNG files are converted to JPEG with Pillow first.
     """
     buf = io.BytesIO()
     buf.write(_PDF_HEADER)
@@ -106,23 +106,16 @@ def _assemble_pdf(images: List[bytes]) -> bytes:
     for img_bytes in images:
         if _is_png(img_bytes):
             try:
-                w, h = _png_dimensions(img_bytes)
+                img_bytes = _png_to_jpeg(img_bytes)
             except Exception:
-                w, h = 595, 842
-            # Convert PNG → JPEG requires Pillow; for now raise helpful error.
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "PNG images detected. Please capture images as JPEG (the default on all mobile browsers). "
-                    "PNG support requires an optional server dependency (Pillow). "
-                    "Ask your administrator to install Pillow if PNG support is needed."
-                ),
-            )
-        else:
-            try:
-                w, h = _jpeg_dimensions(img_bytes)
-            except Exception:
-                w, h = 595, 842
+                raise HTTPException(
+                    status_code=422,
+                    detail="A PNG image could not be read. Please retake it or upload a JPEG.",
+                )
+        try:
+            w, h = _jpeg_dimensions(img_bytes)
+        except Exception:
+            w, h = 595, 842
 
         dim_list.append((w, h))
 

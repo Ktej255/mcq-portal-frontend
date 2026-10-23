@@ -7,6 +7,13 @@ backend_dir = str(Path(__file__).resolve().parent)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+import os
+
+# The test suite exercises the deterministic mock OCR/evaluation providers.
+# Production keeps ALLOW_MOCK_AI off (answer endpoints return 503 instead of
+# fake results); tests that check that behaviour switch it off explicitly.
+os.environ.setdefault("ALLOW_MOCK_AI", "true")
+
 import pytest
 
 

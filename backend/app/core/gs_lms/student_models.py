@@ -55,6 +55,13 @@ class GsLmsDiscussionStatusEnum(str, enum.Enum):
     ABANDONED = "ABANDONED"
 
 
+class GsLmsConceptMasteryStatusEnum(str, enum.Enum):
+    """Where a student stands on one concept."""
+    NOT_STARTED = "NOT_STARTED"
+    LEARNING = "LEARNING"
+    PASSED = "PASSED"
+
+
 class GsLmsPracticeSessionStatusEnum(str, enum.Enum):
     """Lifecycle of an MCQ practice session."""
     IN_PROGRESS = "IN_PROGRESS"
@@ -99,6 +106,48 @@ class GsLmsStudentSectionProgress(Base, InstitutionalAuditMixin):
     student = relationship("User")
     section = relationship("GsLmsContentSection")
     syllabus_node = relationship("GsLmsSyllabusNode")
+
+
+# ---------------------------------------------------------------------------
+# Concept Mastery
+# ---------------------------------------------------------------------------
+
+class GsLmsConceptMastery(Base, InstitutionalAuditMixin):
+    """Per-student mastery of one concept.
+
+    ``score`` is the best understanding score so far (0..1); ``last_score`` is
+    the most recent one. A concept is PASSED once the best score reaches
+    ``CONCEPT_PASS_THRESHOLD`` (see ``app.core.gs_lms.mastery``).
+    """
+    __tablename__ = "gs_lms_concept_mastery"
+    __table_args__ = (
+        UniqueConstraint(
+            "student_id", "concept_id", name="uq_gs_lms_concept_mastery"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    concept_id = Column(
+        Integer, ForeignKey("gs_lms_concepts.id"), nullable=False, index=True
+    )
+    # Best score so far (0..1).
+    score = Column(Float, default=0.0, nullable=False)
+    last_score = Column(Float, nullable=True)
+    attempts = Column(Integer, default=0, nullable=False)
+    status = Column(
+        Enum(GsLmsConceptMasteryStatusEnum),
+        default=GsLmsConceptMasteryStatusEnum.NOT_STARTED,
+        nullable=False,
+    )
+    passed_at = Column(DateTime, nullable=True)
+    last_assessed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    student = relationship("User")
+    concept = relationship("GsLmsConcept")
 
 
 # ---------------------------------------------------------------------------
@@ -538,8 +587,10 @@ __all__ = [
     # Enums
     "GsLmsDiscussionStatusEnum",
     "GsLmsPracticeSessionStatusEnum",
+    "GsLmsConceptMasteryStatusEnum",
     # Models
     "GsLmsStudentSectionProgress",
+    "GsLmsConceptMastery",
     "GsLmsDiscussionSession",
     "GsLmsDiscussionTurn",
     "GsLmsPracticeSession",

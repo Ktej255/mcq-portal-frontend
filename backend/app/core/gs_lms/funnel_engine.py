@@ -15,7 +15,7 @@ Requirements: 1.1, 1.2, 1.3, 1.4, 1.6, 14.1
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -25,6 +25,7 @@ from app.core.gs_lms.funnel_models import (
     GsLmsFunnelStepEnum,
     GsLmsFunnelProgress,
 )
+from app.core.gs_lms.progression import StepGateError, check_step_gate, refresh_mastery
 
 
 # ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ from app.core.gs_lms.funnel_models import (
 # ---------------------------------------------------------------------------
 
 TOTAL_STEPS = 14
+ALL_STEPS: frozenset[int] = frozenset(range(1, TOTAL_STEPS + 1))
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +50,11 @@ class StepAlreadyCompletedError(Exception):
     pass
 
 
+class StepDisabledError(StepNotReachableError):
+    """Raised when attempting to complete a step the subject's exam skips."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Data Types
 # ---------------------------------------------------------------------------
@@ -61,13 +68,21 @@ class FunnelState:
     completed_steps: frozenset[int]
     started_at: Optional[datetime]
     last_activity_at: Optional[datetime]
+    # Steps this funnel includes. Steps outside it are skipped (no rows are
+    # stored for them); the full 14 for UPSC.
+    enabled_steps: frozenset[int] = field(default=ALL_STEPS)
 
 
 # ---------------------------------------------------------------------------
 # Core Functions
 # ---------------------------------------------------------------------------
 
-def get_funnel_state(db: Session, student_id: int, node_id: int) -> FunnelState:
+def get_funnel_state(
+    db: Session,
+    student_id: int,
+    node_id: int,
+    enabled_steps: Optional[frozenset[int]] = None,
+) -> FunnelState:
     """Load or initialize funnel progress for a student-topic pair.
 
     If no progress records exist, returns a fresh state with current_step = 1
@@ -77,10 +92,13 @@ def get_funnel_state(db: Session, student_id: int, node_id: int) -> FunnelState:
         db: SQLAlchemy database session.
         student_id: The student's user ID.
         node_id: The syllabus node (topic) ID.
+        enabled_steps: Steps the subject's exam profile includes; ``None`` means
+            all 14. Disabled steps are skipped when computing ``current_step``.
 
     Returns:
         An immutable FunnelState snapshot.
     """
+    enabled = ALL_STEPS if enabled_steps is None else frozenset(enabled_steps)
     rows = (
         db.query(GsLmsFunnelProgress)
         .filter(
@@ -109,7 +127,7 @@ def get_funnel_state(db: Session, student_id: int, node_id: int) -> FunnelState:
             if last_activity_at is None or row_completed_at > last_activity_at:
                 last_activity_at = row_completed_at
 
-    current_step = _compute_current_step(completed_steps)
+    current_step = _compute_current_step(completed_steps, enabled)
 
     return FunnelState(
         student_id=student_id,
@@ -118,6 +136,7 @@ def get_funnel_state(db: Session, student_id: int, node_id: int) -> FunnelState:
         completed_steps=frozenset(completed_steps),
         started_at=started_at,
         last_activity_at=last_activity_at,
+        enabled_steps=enabled,
     )
 
 
@@ -126,6 +145,7 @@ def complete_step(
     student_id: int,
     node_id: int,
     step: int,
+    enabled_steps: Optional[frozenset[int]] = None,
 ) -> FunnelState:
     """Mark a step complete and advance current_step to the next unlocked step.
 
@@ -141,19 +161,25 @@ def complete_step(
         student_id: The student's user ID.
         node_id: The syllabus node (topic) ID.
         step: The step number to mark as complete (1–14).
+        enabled_steps: Steps the subject's exam includes (``None`` = all 14).
 
     Returns:
         Updated FunnelState with the new completed set and advanced current_step.
 
     Raises:
-        StepNotReachableError: If step != current_step.
+        StepNotReachableError: If step != current_step (StepDisabledError if
+            the exam skips the step).
         StepAlreadyCompletedError: If step is already in completed_steps.
+        StepGateError: If the step's gate (discussion / recall / MCQ lab) is not met.
         ValueError: If step is outside [1, 14].
     """
     if step < 1 or step > TOTAL_STEPS:
         raise ValueError(f"Step must be between 1 and {TOTAL_STEPS}, got {step}")
 
-    state = get_funnel_state(db, student_id, node_id)
+    state = get_funnel_state(db, student_id, node_id, enabled_steps)
+
+    if step not in state.enabled_steps:
+        raise StepDisabledError(f"Step {step} is not part of this subject's learning funnel.")
 
     if step in state.completed_steps:
         raise StepAlreadyCompletedError(
@@ -165,6 +191,9 @@ def complete_step(
             f"Cannot complete step {step}: current step is {state.current_step}. "
             f"Steps must be completed in order."
         )
+
+    # Server-side gates: discussion (1), recall (3,5,7,9,11), MCQ lab (12).
+    check_step_gate(db, student_id, node_id, step)
 
     # Persist completion
     now = datetime.now(timezone.utc)
@@ -197,9 +226,13 @@ def complete_step(
 
     # --- Side effects for specific steps ---
     _trigger_step_side_effects(db, student_id, node_id, step)
+    if step == TOTAL_STEPS:
+        # Completed; if the MCQ lab score also masters the topic, a review
+        # checkpoint may now be due.
+        refresh_mastery(db, student_id, node_id)
 
     # Return updated state
-    return get_funnel_state(db, student_id, node_id)
+    return get_funnel_state(db, student_id, node_id, enabled_steps)
 
 
 def is_step_complete(state: FunnelState, step: int) -> bool:
@@ -224,8 +257,8 @@ def can_access_step(state: FunnelState, step: int) -> bool:
 
 
 def is_funnel_complete(state: FunnelState) -> bool:
-    """True if all 14 steps have been completed."""
-    return len(state.completed_steps) >= TOTAL_STEPS
+    """True if every enabled step (all 14 for UPSC) has been completed."""
+    return state.enabled_steps <= state.completed_steps
 
 
 # ---------------------------------------------------------------------------
@@ -307,14 +340,14 @@ def _on_funnel_complete(db: Session, student_id: int, node_id: int) -> None:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _compute_current_step(completed_steps: set[int]) -> int:
+def _compute_current_step(completed_steps: set[int], enabled: frozenset[int] = ALL_STEPS) -> int:
     """Compute the current step from the set of completed steps.
 
-    The current step is the minimum step number not in the completed set.
-    If all steps are complete, returns TOTAL_STEPS + 1.
+    The current step is the minimum enabled step number not in the completed
+    set. If all enabled steps are complete, returns TOTAL_STEPS + 1.
     """
     for step_num in range(1, TOTAL_STEPS + 1):
-        if step_num not in completed_steps:
+        if step_num in enabled and step_num not in completed_steps:
             return step_num
     return TOTAL_STEPS + 1
 
@@ -327,6 +360,8 @@ __all__ = [
     "TOTAL_STEPS",
     "StepNotReachableError",
     "StepAlreadyCompletedError",
+    "StepDisabledError",
+    "StepGateError",
     "FunnelState",
     "get_funnel_state",
     "complete_step",

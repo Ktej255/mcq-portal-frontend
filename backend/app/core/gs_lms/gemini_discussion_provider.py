@@ -16,6 +16,7 @@ import google.generativeai as genai
 
 from app.core.gs_lms.discussion import (
     AIResponseProvider,
+    CONCEPT_GATE_THRESHOLD,
     MockAIResponseProvider,
     set_default_provider,
 )
@@ -37,9 +38,14 @@ class GeminiAIResponseProvider:
     MockAIResponseProvider and logs the error.
     """
 
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str | None = None):
         from app.core.config import settings
-        api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
+        model_name = model_name or settings.GEMINI_MODEL_ID
+        api_key = (
+            os.environ.get("GOOGLE_API_KEY", "")
+            or (settings.GOOGLE_API_KEY or "")
+            or (settings.GEMINI_API_KEY or "")
+        )
         if not api_key:
             raise ValueError("GOOGLE_API_KEY is required for GeminiAIResponseProvider")
         genai.configure(api_key=api_key)
@@ -109,9 +115,10 @@ class GeminiAIResponseProvider:
                 "to guide the student toward explaining it."
             )
             if match_percentage is not None:
+                # match_percentage is on the engine's 0-100 scale.
                 lines.append(
-                    f"(Current concept coverage: {match_percentage:.0%}. "
-                    "The gate opens at 80%.)"
+                    f"(Current concept coverage: {match_percentage:.0f}%. "
+                    f"The gate opens at {CONCEPT_GATE_THRESHOLD:.0f}%.)"
                 )
         else:
             lines.append("\nRespond with a Socratic counter-question:")
@@ -126,7 +133,11 @@ def register_discussion_provider() -> None:
     instantiation fails, the Discussion_Engine retains the MockAIResponseProvider.
     """
     from app.core.config import settings
-    api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
+    api_key = (
+        os.environ.get("GOOGLE_API_KEY", "")
+        or (settings.GOOGLE_API_KEY or "")
+        or (settings.GEMINI_API_KEY or "")
+    )
     if not api_key:
         logger.warning(
             "GOOGLE_API_KEY not set — Discussion_Engine retaining MockAIResponseProvider"

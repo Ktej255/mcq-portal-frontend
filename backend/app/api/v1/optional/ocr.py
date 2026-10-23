@@ -43,7 +43,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from app.models.domain import User
-from app.api.dependencies import ai_rate_limit, get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user, require_ocr_available
 from app.schemas.common import StandardResponse
 from app.core.optional.providers import (
     OcrProvider,
@@ -90,6 +90,9 @@ async def extract_handwriting(
     contract (R9.3 / R20.1). The extracted text is what feeds the evaluated draft
     once accepted (R9.1); evaluation is Task 9.4.
     """
+    # Never return fake mock OCR text unless mocks are explicitly allowed.
+    require_ocr_available(getattr(provider, "name", None))
+
     raw = await image.read()
     if not raw:
         raise HTTPException(

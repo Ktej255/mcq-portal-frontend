@@ -1,6 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+
+import { examFromPathname, type ExamCode } from "@/lib/exams/examRoutes";
 
 /**
  * Shared subject context for the GS LMS.
@@ -12,7 +15,10 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
  *
  * `lmsBase` is derived from the subject slug so the route helpers stay in
  * sync with the Next.js route segments under
- * `app/(dashboard)/upsc/<slug>/lms/...`.
+ * `app/(dashboard)/upsc/<slug>/lms/...`. NEET and JEE reuse the same pages under
+ * `app/(dashboard)/[exam]/<slug>/lms/...`; the exam prefix is read from the
+ * current pathname so links stay inside `/neet/...` or `/jee/...` (UPSC stays
+ * `/upsc/...`).
  */
 
 export type SubjectLmsContextValue = {
@@ -32,9 +38,9 @@ const DEFAULT_VALUE: SubjectLmsContextValue = {
 
 const SubjectLmsContext = createContext<SubjectLmsContextValue>(DEFAULT_VALUE);
 
-/** Derive the LMS route base for a subject slug. */
-export function lmsBaseForSlug(slug: string): string {
-  return `/upsc/${slug}/lms`;
+/** Derive the LMS route base for a subject slug (and exam; default UPSC). */
+export function lmsBaseForSlug(slug: string, exam: ExamCode = "upsc"): string {
+  return `/${exam}/${slug}/lms`;
 }
 
 export function SubjectLmsProvider({
@@ -46,9 +52,10 @@ export function SubjectLmsProvider({
   label: string;
   children: ReactNode;
 }) {
+  const exam = examFromPathname(usePathname());
   const value = useMemo<SubjectLmsContextValue>(
-    () => ({ subject, label, lmsBase: lmsBaseForSlug(subject) }),
-    [subject, label],
+    () => ({ subject, label, lmsBase: lmsBaseForSlug(subject, exam) }),
+    [subject, label, exam],
   );
   return (
     <SubjectLmsContext.Provider value={value}>

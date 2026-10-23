@@ -1,6 +1,7 @@
 import {
   Activity,
   BadgeIndianRupee,
+  BookOpen,
   BarChart3,
   CalendarCheck,
   ClipboardCheck,
@@ -11,17 +12,22 @@ import {
   FolderTree,
   GitBranch,
   GraduationCap,
+  Inbox,
   LayoutDashboard,
+  Leaf,
   LibraryBig,
   ListChecks,
   Mail,
   Newspaper,
   RefreshCcw,
   Route,
+  Search,
   ShieldAlert,
   UploadCloud,
   type LucideIcon,
 } from "lucide-react";
+
+import type { ExamCode } from "@/lib/exams/examRoutes";
 
 /**
  * Single source of truth for the student section navigation + route gating.
@@ -41,6 +47,8 @@ export type StudentNavItem = {
   name: string;
   href: string;
   icon: LucideIcon;
+  /** Subject slug, for subject entries whose href does not end with it. */
+  slug?: string;
   /** When set, the item is shown but disabled with a "Soon" badge. */
   locked?: boolean;
   /** Matched against the current pathname to drive the active state. */
@@ -116,11 +124,62 @@ export const lockedSubjectNavItems: StudentNavItem[] = [
   { name: "Internal Security & Society", href: "/upsc/internal-security-society", icon: Compass, locked: true },
 ];
 
+/** Subjects that already have their own nav entry (not part of "More subjects"). */
+const primarySubjectSlugs = new Set(["geography"]);
+
+/**
+ * "More subjects" entries for the sidebar. `subjects` is the API subject list
+ * for the student's exam. For UPSC the static list above stays as it is (so
+ * nothing disappears) and only subjects the API adds are appended; for any
+ * other exam the API list is used as is. With no API list, the static list.
+ */
+export function subjectNavItemsFor(
+  subjects: { slug: string; name: string; exam?: string }[] | null,
+  exam: ExamCode = "upsc",
+): StudentNavItem[] {
+  if (exam !== "upsc") {
+    // NEET / JEE: only the API list, linking into the exam's own routes.
+    return (subjects ?? []).map((s) => ({
+      name: s.name.replace(new RegExp(`^${exam}\\s+`, "i"), ""),
+      slug: s.slug,
+      href: `/${exam}/${s.slug}/lms`,
+      icon: Compass,
+      locked: true,
+    }));
+  }
+  if (!subjects || subjects.length === 0) return lockedSubjectNavItems;
+  const fromApi: StudentNavItem[] = subjects
+    .filter((s) => !primarySubjectSlugs.has(s.slug))
+    .map((s) => ({ name: s.name, href: `/upsc/${s.slug}`, icon: Compass, locked: true }));
+  const isUpsc = subjects.every((s) => !s.exam || s.exam === "upsc");
+  if (!isUpsc) return fromApi;
+  const known = new Set(lockedSubjectNavItems.map((item) => item.href));
+  return [...lockedSubjectNavItems, ...fromApi.filter((item) => !known.has(item.href))];
+}
+
 /** Navigation shown to students. */
 export const studentNavSections: StudentNavSection[] = [
   {
     label: "Study",
     items: [
+      {
+        name: "Study",
+        href: "/upsc/study",
+        icon: Search,
+        match: (pathname) => pathname.startsWith("/upsc/study"),
+      },
+      {
+        name: "My books",
+        href: "/upsc/books",
+        icon: BookOpen,
+        match: (pathname) => pathname.startsWith("/upsc/books"),
+      },
+      {
+        name: "Wellbeing",
+        href: "/upsc/wellbeing",
+        icon: Leaf,
+        match: (pathname) => pathname.startsWith("/upsc/wellbeing"),
+      },
       {
         name: "Today",
         href: "/upsc",
@@ -180,6 +239,42 @@ export const studentNavSections: StudentNavSection[] = [
   },
 ];
 
+/**
+ * Navigation on /neet and /jee. UPSC-only features (Current Affairs, Optional
+ * subjects, GS, answer upload / Mains, prelims pages, UPSC billing) are left
+ * out; Study, My books and Wellbeing stay, under the exam's own prefix.
+ */
+export function studentNavSectionsFor(exam: ExamCode): StudentNavSection[] {
+  if (exam === "upsc") return studentNavSections;
+  const base = `/${exam}`;
+  return [
+    {
+      label: "Study",
+      items: [
+        { name: "Home", href: base, icon: CalendarCheck, match: (pathname) => pathname === base },
+        {
+          name: "Study",
+          href: `${base}/study`,
+          icon: Search,
+          match: (pathname) => pathname.startsWith(`${base}/study`),
+        },
+        {
+          name: "My books",
+          href: `${base}/books`,
+          icon: BookOpen,
+          match: (pathname) => pathname.startsWith(`${base}/books`),
+        },
+        {
+          name: "Wellbeing",
+          href: `${base}/wellbeing`,
+          icon: Leaf,
+          match: (pathname) => pathname.startsWith(`${base}/wellbeing`),
+        },
+      ],
+    },
+  ];
+}
+
 /** Admin/operator navigation (unchanged behaviour, centralised here). */
 export const adminNavItems: StudentNavItem[] = [
   { name: "Admin Console", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -199,4 +294,6 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
   { name: "Integrity Logs", href: "/admin/integrity", icon: ShieldAlert },
   { name: "Leads", href: "/admin/leads", icon: Mail },
+  { name: "Content studio", href: "/admin/content", icon: BookOpen },
+  { name: "Content requests", href: "/admin/content-requests", icon: Inbox },
 ];

@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User, RoleEnum
@@ -64,15 +65,13 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
             # Default fallback for legacy MOCK_TOKEN
             user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
             if not user:
-                user = User(
+                user = _create_user_once(
+                    db,
                     google_uid="dev-validator-id",
                     email="validator@upsc.local",
                     full_name="Institutional Validator",
-                    role=RoleEnum.ADMIN
+                    role=RoleEnum.ADMIN,
                 )
-                db.add(user)
-                db.commit()
-                db.refresh(user)
             return user
         decoded_token = verify_token(auth.credentials)
     except Exception as e:
@@ -98,16 +97,14 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
     # Auto-create user on first login
     if not user:
         logger.info(f"FORENSIC | User not found in DB, auto-creating account for {email}")
-        user = User(
+        user = _create_user_once(
+            db,
             google_uid=google_uid,
             email=email,
             full_name=name,
             profile_picture=picture,
-            role=RoleEnum.ADMIN if is_bootstrap_admin else RoleEnum.STUDENT
+            role=RoleEnum.ADMIN if is_bootstrap_admin else RoleEnum.STUDENT,
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
     elif is_bootstrap_admin and user.role != RoleEnum.ADMIN:
         logger.info(f"FORENSIC | Elevating user {email} to ADMIN based on allowlist")
         user.role = RoleEnum.ADMIN
@@ -117,6 +114,23 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
         logger.info(f"FORENSIC | User found in DB | Role: {user.role}")
         
     return user
+
+def _create_user_once(db: Session, **fields) -> User:
+    """Create a user on first sign-in. Two first requests can race; the loser
+    rolls back and reads the row the winner created instead of failing."""
+    user = User(**fields)
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(User).filter(User.google_uid == fields["google_uid"]).first()
+        if existing is None:
+            raise
+        return existing
+    db.refresh(user)
+    return user
+
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     logger.debug("FORENSIC | get_current_admin check | User id: %s | Role: %s", current_user.id, current_user.role)
@@ -172,6 +186,43 @@ def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
             )
 
         hits.append(now)
+
+
+# ---------------------------------------------------------------------------
+# AI readiness guards. The OCR / evaluation providers default to a mock that
+# returns fake text and scores, so endpoints that need them answer 503 instead
+# unless a real provider is configured (or settings.ALLOW_MOCK_AI is on).
+# ---------------------------------------------------------------------------
+
+def _ai_not_set_up() -> HTTPException:
+    from app.core.evaluation.providers import readiness
+
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=readiness.NOT_SET_UP_DETAIL,
+    )
+
+
+def require_ocr_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.ocr_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_gs_evaluation_available() -> None:
+    from app.core.evaluation.providers import readiness
+    from app.core.evaluation.providers.config import active_provider_key
+
+    if not readiness.is_available(active_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_optional_evaluation_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.optional_evaluation_provider_key()):
+        raise _ai_not_set_up()
 
 
 # ---------------------------------------------------------------------------

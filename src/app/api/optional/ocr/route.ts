@@ -14,13 +14,16 @@ export async function POST(req: NextRequest) {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) return NextResponse.json({ ok: false, reason: "no-key" });
 
-  let body: { imageBase64?: string; mimeType?: string };
+  let body: { imageBase64?: unknown; mimeType?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, reason: "bad-request" });
   }
   const { imageBase64 = "", mimeType = "image/jpeg" } = body ?? {};
+  if (typeof imageBase64 !== "string" || typeof mimeType !== "string" || !mimeType.startsWith("image/")) {
+    return NextResponse.json({ ok: false, reason: "bad-request" }, { status: 400 });
+  }
   if (!imageBase64) return NextResponse.json({ ok: false, reason: "no-image" });
   if (imageBase64.length > OPTIONAL_AI_MAX_IMAGE_BASE64_CHARS) {
     return NextResponse.json({ ok: false, reason: "too-large" }, { status: 413 });
@@ -28,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL_ID || "gemini-2.5-flash"}:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

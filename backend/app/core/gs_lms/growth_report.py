@@ -180,7 +180,9 @@ def generate_growth_report(
         duration = reading_time.duration_seconds if reading_time else 0
         estimated = reading_time.estimated_duration_seconds if reading_time and reading_time.estimated_duration_seconds else 300
 
-        # Get latest recall attempt
+        # Use the best recall attempt: that is what the funnel gate judges, so
+        # a section still below the pass score here was only passed through
+        # the max-attempts allowance and is flagged as low recall (weak).
         recall = (
             db.query(GsLmsRecallAttempt)
             .filter(
@@ -188,7 +190,7 @@ def generate_growth_report(
                 GsLmsRecallAttempt.syllabus_node_id == node_id,
                 GsLmsRecallAttempt.section_label == section_label,
             )
-            .order_by(GsLmsRecallAttempt.attempt_number.desc())
+            .order_by(GsLmsRecallAttempt.recall_score.desc(), GsLmsRecallAttempt.attempt_number.desc())
             .first()
         )
 

@@ -34,6 +34,11 @@ class GsLmsSyllabusNodeOut(BaseModel):
     # Per-student completion percentage (0.0–100.0 for non-leaf, bool for leaf)
     completion_percent: Optional[float] = None
     completed: Optional[bool] = None
+    # Learning-loop state (leaf topics): mastered = funnel done and best MCQ lab
+    # score >= TOPIC_MCQ_PASS; locked = previous topic not mastered / review due.
+    mastered: Optional[bool] = None
+    locked: bool = False
+    lock_reason: Optional[str] = None
     # Bridge to existing day-lesson system
     day_lesson_id: Optional[int] = None
     ordering_justification: Optional[str] = None
@@ -87,6 +92,57 @@ class GsLmsTopicSectionsOut(BaseModel):
     video_watched: bool = False
     learner_level: Optional[str] = None
     sections: list[GsLmsContentSectionOut] = []
+
+
+# ---------------------------------------------------------------------------
+# Concept responses (learning units under a leaf topic + student mastery)
+# ---------------------------------------------------------------------------
+
+class GsLmsConceptMasteryOut(BaseModel):
+    """The current student's mastery of one concept."""
+    status: str  # NOT_STARTED | LEARNING | PASSED
+    score: float = 0.0  # best score so far, 0..1
+    last_score: Optional[float] = None
+    attempts: int = 0
+    passed_at: Optional[str] = None
+    last_assessed_at: Optional[str] = None
+
+
+class GsLmsBookRefOut(BaseModel):
+    """Where a concept is covered in a book edition."""
+    book_slug: str
+    book_title: str
+    edition: str
+    chapter_number: int
+    chapter_title: str
+    pages: Optional[str] = None
+
+
+class GsLmsConceptOut(BaseModel):
+    concept_id: int
+    title: str
+    display_order: int
+    key_points: list[str]
+    misconceptions: list[str] = []
+    mastery: GsLmsConceptMasteryOut
+    # Number of REVIEWED ready-made versions students can be shown.
+    versions_count: int = 0
+    book_refs: list[GsLmsBookRefOut] = []
+
+
+class GsLmsTopicMasteryOut(BaseModel):
+    """Roll-up across a topic's reviewed concepts."""
+    concepts: int
+    passed: int
+    average_score: float
+    mastered: bool
+
+
+class GsLmsTopicConceptsOut(BaseModel):
+    node_id: int
+    title: str
+    concepts: list[GsLmsConceptOut] = []
+    topic_mastery: GsLmsTopicMasteryOut
 
 
 # ---------------------------------------------------------------------------

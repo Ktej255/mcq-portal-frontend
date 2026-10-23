@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { AnswerFormat, MarkingSchemeOut, McqAnswerIn } from './funnelService';
 
 /**
  * API client for the GS LMS Platform (multi-subject).
@@ -30,6 +31,12 @@ export interface SyllabusNodeOut {
   review_status: string;
   completion_percent: number | null;
   completed: boolean | null;
+  /** Leaf topics only: funnel done and best MCQ lab score >= 60%. */
+  mastered?: boolean | null;
+  /** Leaf topics only: previous topic not mastered / review test due. */
+  locked?: boolean;
+  /** Why the topic is locked (names the topic or test to finish). */
+  lock_reason?: string | null;
   day_lesson_id: number | null;
   ordering_justification: string | null;
   children: SyllabusNodeOut[];
@@ -248,6 +255,199 @@ export interface ReplanOut {
   triggered_at: string;
 }
 
+// -- Study flow (search -> card -> explain -> next) -------------------------
+
+export interface StudyHit {
+  kind: 'concept' | 'topic';
+  subject_slug: string;
+  subject_name: string;
+  leaf_id: number;
+  leaf_title: string;
+  concept_id: number | null;
+  concept_title: string | null;
+  start_concept_id: number | null;
+  breadcrumb: string[];
+  score: number;
+  matched_terms: string[];
+}
+
+export interface StudyNext {
+  type: 'concept' | 'mcq_lab' | 'checkpoint' | 'done';
+  subject_slug: string | null;
+  leaf_id: number | null;
+  concept_id: number | null;
+  checkpoint_id: number | null;
+  label: string;
+}
+
+export interface ConceptVersionBrief {
+  id: number;
+  level: string;
+  style: string;
+  source: string;
+  title: string;
+}
+
+export interface ConceptVersion extends ConceptVersionBrief {
+  concept_id: number;
+  blocks: ContentBlock[];
+  video_url: string | null;
+  duration_minutes: number | null;
+}
+
+export interface StudyMastery {
+  status: string;
+  best_score: number;
+  last_score: number | null;
+  attempts: number;
+  passed: boolean;
+}
+
+export interface StudyCard {
+  subject_slug: string;
+  subject_name: string;
+  leaf_id: number;
+  leaf_title: string;
+  breadcrumb: string[];
+  concept_id: number;
+  concept_title: string;
+  position: number;
+  total_concepts: number;
+  version: ConceptVersion | null;
+  alternatives: ConceptVersionBrief[];
+  key_points_count: number;
+  mastery: StudyMastery;
+  next: StudyNext | null;
+}
+
+export interface ExplainResult {
+  score: number;
+  passed: boolean;
+  covered_points: string[];
+  missed_points: string[];
+  attempts: number;
+  status: string;
+  suggested_version: number | null;
+  next: StudyNext | null;
+}
+
+export type ContentRequestStatus = 'OPEN' | 'PLANNED' | 'ADDRESSED';
+
+export interface ContentRequest {
+  id: number;
+  normalized_query: string;
+  sample_query: string;
+  subject_slug: string | null;
+  request_count: number;
+  distinct_students: number;
+  first_requested_at: string | null;
+  last_requested_at: string | null;
+  status: ContentRequestStatus;
+  note: string | null;
+}
+
+// -- Admin Content studio ---------------------------------------------------
+
+/** What "ready" means for a subject, from its exam profile. */
+export interface ContentExamRules {
+  required_sections: string[];
+  pyq_exam_types: string[];
+  question_types: string[];
+  unsupported_question_types: string[];
+  mcqs_per_topic: number;
+  skipped_funnel_steps: number[];
+}
+
+export interface ContentSubjectReadiness {
+  slug: string;
+  name: string;
+  /** Exam code (upsc / neet / jee). */
+  exam?: string;
+  exam_name?: string;
+  rules?: ContentExamRules;
+  topics: number;
+  topics_ready: number;
+  topics_reviewed: number;
+  unfinished: number;
+  mcqs: number;
+  mcqs_reviewed: number;
+  mcqs_unreviewed: number;
+  concepts: number;
+  versions: number;
+  pyqs: number;
+  is_complete: boolean;
+  last_import: { at: string | null; filename: string | null; source: 'content_studio' | 'command_line' } | null;
+}
+
+export interface ContentTopicReadiness {
+  node_id: number;
+  parent_id: number | null;
+  mega_title: string;
+  sub_title: string;
+  title: string;
+  review_status: string;
+  sections_present: string[];
+  sections_missing: string[];
+  sections_reviewed: number;
+  mcqs: number;
+  mcqs_needed: number;
+  mcqs_reviewed: number;
+  mcqs_unreviewed: number;
+  pyqs: number;
+  pyqs_reviewed: number;
+  concepts: number;
+  concepts_reviewed: number;
+  concepts_with_good_key_points: number;
+  concepts_with_version: number;
+  versions: number;
+  versions_reviewed: number;
+  book_refs: number;
+  content_ready: boolean;
+  next_to_write: string[];
+}
+
+export interface ContentSubjectDetail {
+  subject: ContentSubjectReadiness;
+  topics: ContentTopicReadiness[];
+}
+
+export interface ContentCheckResult {
+  subject_slug: string | null;
+  subject_name: string | null;
+  summary: Record<string, number | boolean>;
+  errors: string[];
+  gaps: string[];
+  ok_to_import: boolean;
+  ready: boolean;
+  /** Topics approved right now; importing again puts the ones in the file back to draft. */
+  approved_topics_now: number;
+}
+
+export interface ContentImportResult extends ContentCheckResult {
+  result: Record<string, number | string>;
+}
+
+export interface ContentImportLog {
+  id: number;
+  subject_slug: string;
+  uploaded_by: number | null;
+  uploaded_by_name: string | null;
+  filename: string;
+  sha256: string;
+  summary: Record<string, number | boolean> | null;
+  result: Record<string, number | string> | null;
+  created_at: string | null;
+}
+
+export type ContentReviewPart = 'topic' | 'mcqs' | 'concepts' | 'versions' | 'pyqs';
+
+export interface ContentReviewResult {
+  node_id: number;
+  status: 'REVIEWED' | 'UNREVIEWED';
+  topics: number;
+  skipped_not_ready: { node_id: number; title: string }[];
+}
+
 // -- Onboarding -------------------------------------------------------------
 
 export interface OnboardingStatusOut {
@@ -260,20 +460,291 @@ export interface OnboardingStatusOut {
   study_window_minutes: number | null;
 }
 
+// -- Progression / Checkpoints / Concepts -----------------------------------
+
+export interface LeafRefOut {
+  node_id: number;
+  title: string;
+}
+
+export interface CheckpointOut {
+  checkpoint_id: number;
+  sub_topic_id: number;
+  sub_topic_title: string;
+  status: string;
+  leaves: LeafRefOut[];
+  attempts: number;
+  /** 0-100, null until attempted. */
+  best_score: number | null;
+  pass_score: number;
+}
+
+export interface ProgressionOut {
+  next_leaf: LeafRefOut | null;
+  mastered_count: number;
+  total_leaves: number;
+  due_checkpoint: CheckpointOut | null;
+  due_checkpoints: CheckpointOut[];
+  /** True when topic order / step gates are enforced for this student. */
+  order_enforced: boolean;
+}
+
+export interface CheckpointQuestionOut {
+  question_id: number;
+  question_type: string;
+  /** Absent on older servers = single. Numerical questions have `options: []`. */
+  answer_format?: AnswerFormat;
+  question_text: string;
+  options: Array<{ label: string; text: string }>;
+  display_order: number;
+}
+
+export interface CheckpointStartOut {
+  checkpoint_id: number;
+  total_questions: number;
+  questions: CheckpointQuestionOut[];
+}
+
+export interface CheckpointAttemptOut {
+  question_id: number;
+  leaf_id: number;
+  chosen_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  explanation: string | null;
+  /** Present for non-UPSC exams or non-single questions. */
+  answer_format?: AnswerFormat;
+  marks?: number;
+}
+
+export interface CheckpointLeafBreakdownOut {
+  leaf_id: number;
+  title: string;
+  total: number;
+  correct: number;
+  /** 0-100 */
+  accuracy: number;
+}
+
+export interface CheckpointResultOut {
+  checkpoint_id: number;
+  total_questions: number;
+  correct_count: number;
+  /** 0-100 */
+  score: number;
+  passed: boolean;
+  pass_score: number;
+  status: string;
+  attempts: CheckpointAttemptOut[];
+  leaf_breakdown: CheckpointLeafBreakdownOut[];
+  /** Marks in addition to the accuracy score (the pass mark stays accuracy based). */
+  marks_total?: number;
+  marks_max?: number;
+  marking_scheme?: Partial<Record<AnswerFormat, MarkingSchemeOut>>;
+}
+
+export interface TopicConceptOut {
+  concept_id: number;
+  title: string;
+  display_order: number;
+  key_points: string[];
+  misconceptions: string[];
+  mastery: {
+    status: 'NOT_STARTED' | 'LEARNING' | 'PASSED';
+    score: number;
+    last_score: number | null;
+    attempts: number;
+    passed_at: string | null;
+    last_assessed_at: string | null;
+  };
+}
+
+export interface TopicConceptsOut {
+  node_id: number;
+  title: string;
+  concepts: TopicConceptOut[];
+  topic_mastery: {
+    concepts: number;
+    passed: number;
+    average_score: number;
+    mastered: boolean;
+  };
+}
+
 // -- Subjects ---------------------------------------------------------------
+
+export interface GsExamOut {
+  code: string;
+  name: string;
+  display_order: number;
+  /** Student-facing name of the content levels for this exam. */
+  content_level_label?: string | null;
+}
 
 export interface GsSubjectAvailabilityOut {
   slug: string;
   name: string;
+  /** Exam code; absent for UPSC subjects (absent = "upsc"). */
+  exam?: string;
   /** True once the subject has reviewed topics with reviewed MCQs. */
   available: boolean;
   topics: number;
   topics_with_mcqs: number;
 }
 
+// -- Books, learner profile, retention checks --------------------------------
+
+export type StudyPath = 'NCERT_ONLY' | 'REFERENCE_BOOKS' | 'COACHING' | 'MIXED';
+export type ChapterStatus = 'NOT_STARTED' | 'READING' | 'COMPLETED';
+
+// --- Wellbeing: opt-in handwriting trend (student-only) ---
+export type HandwritingStatus = 'off' | 'not_enough_data' | 'steady' | 'changed';
+
+export interface HandwritingChange {
+  feature: string;
+  z: number;
+  direction: 'up' | 'down';
+  /** Plain words, e.g. "smaller letters". */
+  phrase: string;
+}
+
+export interface HandwritingPoint {
+  captured_at: string;
+  value: number;
+}
+
+export interface HandwritingInsights {
+  consent: boolean;
+  consented_at: string | null;
+  status: HandwritingStatus;
+  message: string;
+  needs_more_samples: number;
+  days_needed: number;
+  changed_features: HandwritingChange[];
+  /** How many of the newest points in each series are the "recent" window. */
+  recent_count: number;
+  series: Record<string, HandwritingPoint[]>;
+  samples_total: number;
+  samples_usable: number;
+  disclaimer: string;
+  limitations: string;
+  /** Only on the delete response. */
+  deleted_samples?: number;
+}
+
+export interface LearnerProfile {
+  preferred_style: string | null;
+  preferred_level: string | null;
+  study_path: StudyPath | null;
+  book_ids: number[];
+  updated_at?: string | null;
+  /** Exam the student prepares for (upsc / neet / jee); absent until set = "upsc". */
+  exam_code?: string | null;
+}
+
+export interface BookOut {
+  id: number;
+  slug: string;
+  title: string;
+  author: string;
+  edition: string;
+  publisher: string | null;
+  exam_tag: string;
+  subject_slug: string | null;
+  chapters: { number: number; title: string }[];
+}
+
+export interface ChapterProgress {
+  chapter_id: number;
+  number: number;
+  title: string;
+  status: ChapterStatus;
+  best_score: number | null;
+  last_score: number | null;
+  checks_taken: number;
+  next_review_at: string | null;
+  question_count: number;
+}
+
+export interface BookProgress {
+  book_id: number;
+  slug: string;
+  title: string;
+  author: string;
+  edition: string;
+  chapters: ChapterProgress[];
+}
+
+export interface RetentionQuestion {
+  question_id: number;
+  question_type: string;
+  question_text: string;
+  options: { label: string; text: string }[];
+  display_order: number;
+}
+
+export interface RetentionStart {
+  chapter_id: number;
+  total_questions: number;
+  pass_score: number;
+  questions: RetentionQuestion[];
+}
+
+export interface RetentionAttempt {
+  question_id: number;
+  selected_option: string;
+  correct_option: string;
+  is_correct: boolean;
+  explanation: string | null;
+}
+
+export interface RetentionResult {
+  chapter_id: number;
+  total_questions: number;
+  correct_count: number;
+  score: number;
+  passed: boolean;
+  pass_score: number;
+  best_score: number;
+  checks_taken: number;
+  status: ChapterStatus;
+  next_review_at: string;
+  next_review_in_days: number;
+  attempts: RetentionAttempt[];
+}
+
+export interface DueReview {
+  chapter_id: number;
+  number: number;
+  title: string;
+  book_id: number;
+  book_title: string;
+  book_edition: string;
+  last_score: number | null;
+  next_review_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
+
+/**
+ * A progression rule blocked the request: 409 (a funnel step's gate isn't met)
+ * or 423 (the topic is locked). `detail` is the server's human-readable reason.
+ * Neither is a paywall error, so the upgrade prompt is never involved.
+ */
+export interface GateError {
+  status: 409 | 423;
+  detail: string;
+}
+
+export const getGateError = (err: unknown): GateError | null => {
+  const response = (err as { response?: { status?: number; data?: { detail?: unknown } } } | null)?.response;
+  if (response && (response.status === 409 || response.status === 423) && typeof response.data?.detail === 'string') {
+    return { status: response.status, detail: response.data.detail };
+  }
+  return null;
+};
 
 const unwrap = <T>(data: unknown): T => {
   const record = (data && typeof data === 'object' ? (data as Record<string, unknown>) : {});
@@ -282,10 +753,20 @@ const unwrap = <T>(data: unknown): T => {
 
 export const gsLmsService = {
   /** Which GS subjects students can open (drives the sidebar's locks). */
-  getSubjects: async (): Promise<GsSubjectAvailabilityOut[]> => {
+  getSubjects: async (exam?: string): Promise<GsSubjectAvailabilityOut[]> => {
     // Read on every page load, so an ended trial must not pop the dialog here.
-    const response = await apiClient.get('gs-lms/subjects', { skipUpgradePrompt: true });
+    // Without `exam`, the server lists the student's own exam (default UPSC).
+    const response = await apiClient.get('gs-lms/subjects', {
+      skipUpgradePrompt: true,
+      params: exam ? { exam } : undefined,
+    });
     return unwrap<GsSubjectAvailabilityOut[]>(response.data);
+  },
+
+  /** Active exams a student can choose from. */
+  getExams: async (): Promise<GsExamOut[]> => {
+    const response = await apiClient.get('gs-lms/exams', { skipUpgradePrompt: true });
+    return unwrap<GsExamOut[]>(response.data);
   },
 
   // -------------------------------------------------------------------------
@@ -308,6 +789,44 @@ export const gsLmsService = {
   getSyllabusNode: async (subject = "geography", nodeId: number): Promise<SyllabusNodeOut> => {
     const response = await apiClient.get(`gs-lms/${subject}/syllabus/${nodeId}`);
     return unwrap<SyllabusNodeOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Progression, review checkpoints, concepts
+  // -------------------------------------------------------------------------
+
+  /** Next unlocked topic, mastered count and due review test. */
+  getProgression: async (subject = "geography"): Promise<ProgressionOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/progression`, { skipUpgradePrompt: true });
+    return unwrap<ProgressionOut>(response.data);
+  },
+
+  /** Review checkpoints currently due. */
+  getDueCheckpoints: async (subject = "geography"): Promise<CheckpointOut[]> => {
+    const response = await apiClient.get(`gs-lms/${subject}/checkpoints`, { skipUpgradePrompt: true });
+    return unwrap<CheckpointOut[]>(response.data);
+  },
+
+  /** Draw the checkpoint's questions (no answers). Calling again redraws. */
+  startCheckpoint: async (subject = "geography", checkpointId: number): Promise<CheckpointStartOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/checkpoints/${checkpointId}/start`);
+    return unwrap<CheckpointStartOut>(response.data);
+  },
+
+  /** Score a checkpoint attempt (one submission per start). */
+  submitCheckpoint: async (
+    subject = "geography",
+    checkpointId: number,
+    answers: McqAnswerIn[],
+  ): Promise<CheckpointResultOut> => {
+    const response = await apiClient.post(`gs-lms/${subject}/checkpoints/${checkpointId}/submit`, { answers });
+    return unwrap<CheckpointResultOut>(response.data);
+  },
+
+  /** A leaf topic's concepts with the student's mastery of each. */
+  getTopicConcepts: async (subject = "geography", nodeId: number): Promise<TopicConceptsOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/topics/${nodeId}/concepts`, { skipUpgradePrompt: true });
+    return unwrap<TopicConceptsOut>(response.data);
   },
 
   // -------------------------------------------------------------------------
@@ -654,5 +1173,181 @@ export const gsLmsService = {
       learner_level: learnerLevel,
     });
     return unwrap<OnboardingStatusOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Study flow
+  // -------------------------------------------------------------------------
+
+  studySearch: async (q: string, subject?: string): Promise<StudyHit[]> => {
+    const response = await apiClient.get('gs-lms/study/search', {
+      params: { q, ...(subject ? { subject } : {}) },
+    });
+    return unwrap<StudyHit[]>(response.data);
+  },
+
+  /** 423 (locked topic) rejects; read the reason with `getGateError`. */
+  getStudyCard: async (conceptId: number): Promise<StudyCard> => {
+    const response = await apiClient.get(`gs-lms/study/concepts/${conceptId}`);
+    return unwrap<StudyCard>(response.data);
+  },
+
+  explainConcept: async (conceptId: number, text: string): Promise<ExplainResult> => {
+    const response = await apiClient.post(`gs-lms/study/concepts/${conceptId}/explain`, { text });
+    return unwrap<ExplainResult>(response.data);
+  },
+
+  getStudyNext: async (subject?: string): Promise<StudyNext> => {
+    const response = await apiClient.get('gs-lms/study/next', {
+      params: subject ? { subject } : undefined,
+    });
+    return unwrap<StudyNext>(response.data);
+  },
+
+  getConceptVersion: async (
+    subject: string,
+    conceptId: number,
+    versionId: number,
+  ): Promise<ConceptVersion> => {
+    const response = await apiClient.get(
+      `gs-lms/${subject}/concepts/${conceptId}/versions/${versionId}`,
+    );
+    return unwrap<ConceptVersion>(response.data);
+  },
+
+  // Admin: what students searched for that the LMS could not answer.
+  listContentRequests: async (status?: ContentRequestStatus): Promise<ContentRequest[]> => {
+    const response = await apiClient.get('admin/gs-lms/content-requests', {
+      params: { ...(status ? { status } : {}), limit: 500 },
+    });
+    return unwrap<ContentRequest[]>(response.data);
+  },
+
+  updateContentRequest: async (
+    id: number,
+    patch: { status?: ContentRequestStatus; note?: string | null },
+  ): Promise<ContentRequest> => {
+    const response = await apiClient.patch(`admin/gs-lms/content-requests/${id}`, patch);
+    return unwrap<ContentRequest>(response.data);
+  },
+
+  // Admin Content studio: what is live, upload + check, approve.
+  getContentSubjects: async (): Promise<ContentSubjectReadiness[]> => {
+    const response = await apiClient.get('admin/gs-lms/content/subjects');
+    return unwrap<ContentSubjectReadiness[]>(response.data);
+  },
+
+  getContentSubject: async (slug: string): Promise<ContentSubjectDetail> => {
+    const response = await apiClient.get(`admin/gs-lms/content/subjects/${slug}`);
+    return unwrap<ContentSubjectDetail>(response.data);
+  },
+
+  downloadContentWorklist: async (slug: string): Promise<Blob> => {
+    const response = await apiClient.get(`admin/gs-lms/content/subjects/${slug}/worklist.csv`, {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  },
+
+  checkContentFile: async (file: File): Promise<ContentCheckResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await apiClient.post('admin/gs-lms/content/check', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrap<ContentCheckResult>(response.data);
+  },
+
+  importContentFile: async (file: File, deriveConcepts = false): Promise<ContentImportResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('derive_concepts', String(deriveConcepts));
+    const response = await apiClient.post('admin/gs-lms/content/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrap<ContentImportResult>(response.data);
+  },
+
+  listContentImports: async (subject?: string): Promise<ContentImportLog[]> => {
+    const response = await apiClient.get('admin/gs-lms/content/imports', {
+      params: { ...(subject ? { subject } : {}), limit: 20 },
+    });
+    return unwrap<ContentImportLog[]>(response.data);
+  },
+
+  /** Approve or un-approve one topic (`kind: 'topic'`) or every topic under a sub-/mega-topic (`'group'`). */
+  reviewContent: async (
+    nodeId: number,
+    status: 'REVIEWED' | 'UNREVIEWED',
+    kind: 'topic' | 'group' = 'topic',
+    include?: ContentReviewPart[],
+  ): Promise<ContentReviewResult> => {
+    const path = kind === 'topic' ? 'topics' : 'nodes';
+    const response = await apiClient.post(`admin/gs-lms/content/${path}/${nodeId}/review`, {
+      status,
+      ...(include ? { include } : {}),
+    });
+    return unwrap<ContentReviewResult>(response.data);
+  },
+
+  getBooks: async (subject?: string): Promise<BookOut[]> => {
+    const response = await apiClient.get('gs-lms/books', { params: subject ? { subject } : undefined });
+    return unwrap<BookOut[]>(response.data);
+  },
+
+  getLearnerProfile: async (): Promise<LearnerProfile> => {
+    const response = await apiClient.get('gs-lms/profile');
+    return unwrap<LearnerProfile>(response.data);
+  },
+
+  /** Replaces the profile: send every field. `exam_code` is kept when omitted. */
+  saveLearnerProfile: async (profile: Omit<LearnerProfile, 'updated_at'>): Promise<LearnerProfile> => {
+    const response = await apiClient.put('gs-lms/profile', profile);
+    return unwrap<LearnerProfile>(response.data);
+  },
+
+  getBookProgress: async (bookId: number): Promise<BookProgress> => {
+    const response = await apiClient.get(`gs-lms/books/${bookId}/progress`);
+    return unwrap<BookProgress>(response.data);
+  },
+
+  setChapterStatus: async (chapterId: number, status: ChapterStatus): Promise<void> => {
+    await apiClient.put(`gs-lms/books/chapters/${chapterId}/status`, { status });
+  },
+
+  /** 409 = fewer than 3 usable questions (read with `getGateError`). */
+  startRetention: async (chapterId: number): Promise<RetentionStart> => {
+    const response = await apiClient.post(`gs-lms/books/chapters/${chapterId}/retention/start`);
+    return unwrap<RetentionStart>(response.data);
+  },
+
+  /** 409 = not started or stale: start again. 402 is handled by the apiClient. */
+  submitRetention: async (
+    chapterId: number,
+    answers: { question_id: number; selected_option: string }[],
+  ): Promise<RetentionResult> => {
+    const response = await apiClient.post(`gs-lms/books/chapters/${chapterId}/retention/submit`, { answers });
+    return unwrap<RetentionResult>(response.data);
+  },
+
+  getDueReviews: async (): Promise<DueReview[]> => {
+    const response = await apiClient.get('gs-lms/books/reviews/due');
+    return unwrap<DueReview[]>(response.data);
+  },
+
+  // Wellbeing (opt-in handwriting trend)
+  getHandwritingInsights: async (): Promise<HandwritingInsights> => {
+    const response = await apiClient.get('gs-lms/wellbeing/handwriting', { skipUpgradePrompt: true });
+    return unwrap<HandwritingInsights>(response.data);
+  },
+
+  setHandwritingConsent: async (consent: boolean): Promise<HandwritingInsights> => {
+    const response = await apiClient.put('gs-lms/wellbeing/handwriting/consent', { consent });
+    return unwrap<HandwritingInsights>(response.data);
+  },
+
+  deleteHandwritingData: async (): Promise<HandwritingInsights> => {
+    const response = await apiClient.delete('gs-lms/wellbeing/handwriting/data');
+    return unwrap<HandwritingInsights>(response.data);
   },
 };

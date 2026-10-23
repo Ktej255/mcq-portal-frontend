@@ -41,6 +41,30 @@
           "value": "7"
         },
         {
+          "name": "ALLOW_MOCK_AI",
+          "value": "false"
+        },
+        {
+          "name": "OPTIONAL_OCR_PROVIDER",
+          "value": "gemini-vision"
+        },
+        {
+          "name": "EVALUATION_PROVIDER",
+          "value": "gemini"
+        },
+        {
+          "name": "OPTIONAL_EVAL_PROVIDER",
+          "value": "gemini"
+        },
+        {
+          "name": "GEMINI_MODEL_ID",
+          "value": "gemini-2.5-flash"
+        },
+        {
+          "name": "ANSWER_IMAGE_RETENTION_DAYS",
+          "value": "180"
+        },
+        {
           "name": "MEDIA_STORE_BACKEND",
           "value": "s3"
         },

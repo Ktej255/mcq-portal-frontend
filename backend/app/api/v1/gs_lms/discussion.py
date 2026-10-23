@@ -47,7 +47,7 @@ from app.core.gs_lms.discussion import (
     process_turn_concepts,
 )
 from app.core.gs_lms.coverage import create_gap_snapshot
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsDiscussionStartIn,
     GsLmsDiscussionTurnIn,
@@ -152,6 +152,9 @@ def start_discussion(
     Validates: Requirements 5.1, 5.6
     """
     node_id = body.syllabus_node_id
+
+    # Locked topics cannot be started until the previous one is mastered.
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Check if already completed — skip directly to content on subsequent visits
     if has_completed_discussion(db, current_user.id, node_id):

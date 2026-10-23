@@ -32,6 +32,7 @@ from app.core.gs_lms.models import (
     GsLmsSectionLabelEnum,
 )
 from app.core.gs_lms.student_models import GsLmsStudentSectionProgress
+from app.core.gs_lms.progression import LeafState, compute_progression, is_order_exempt
 from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsSyllabusNodeOut,
@@ -119,6 +120,8 @@ def _node_type_value(node: GsLmsSyllabusNode) -> str:
 def _build_node_out(
     node: GsLmsSyllabusNode,
     completion_map: dict[int, int],
+    leaf_states: dict[int, LeafState] | None = None,
+    exempt: bool = True,
 ) -> GsLmsSyllabusNodeOut:
     """Recursively build a GsLmsSyllabusNodeOut from a reviewed node.
 
@@ -129,12 +132,13 @@ def _build_node_out(
         [c for c in node.children if c.review_status == GsReviewStatusEnum.REVIEWED],
         key=lambda n: (n.display_order, n.id),
     )
-    children_out = [_build_node_out(c, completion_map) for c in reviewed_children]
+    children_out = [_build_node_out(c, completion_map, leaf_states, exempt) for c in reviewed_children]
 
     completion_percent, completed = _compute_completion(
         node, children_out, completion_map
     )
 
+    leaf = (leaf_states or {}).get(node.id)
     return GsLmsSyllabusNodeOut(
         node_id=node.id,
         title=node.title,
@@ -144,6 +148,9 @@ def _build_node_out(
         review_status=_review_status_value(node),
         completion_percent=completion_percent,
         completed=completed,
+        mastered=leaf.mastered if leaf is not None else None,
+        locked=bool(leaf is not None and leaf.locked and not exempt),
+        lock_reason=leaf.lock_reason if leaf is not None and leaf.locked and not exempt else None,
         day_lesson_id=node.day_lesson_id,
         ordering_justification=node.ordering_justification,
         children=children_out,
@@ -189,7 +196,9 @@ def get_syllabus_tree(
     # Build completion map for this student in one query.
     completion_map = _build_completion_map(db, current_user.id)
 
-    tree = [_build_node_out(node, completion_map) for node in root_nodes]
+    leaf_states = compute_progression(db, current_user.id, subject.id).by_id
+    exempt = is_order_exempt(current_user)
+    tree = [_build_node_out(node, completion_map, leaf_states, exempt) for node in root_nodes]
     total_nodes = _count_nodes(tree)
 
     data = GsLmsSyllabusTreeOut(
@@ -232,7 +241,8 @@ def get_syllabus_node(
         )
 
     completion_map = _build_completion_map(db, current_user.id)
-    data = _build_node_out(node, completion_map)
+    leaf_states = compute_progression(db, current_user.id, subject.id).by_id
+    data = _build_node_out(node, completion_map, leaf_states, is_order_exempt(current_user))
 
     return StandardResponse(
         success=True,

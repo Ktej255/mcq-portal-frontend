@@ -10,8 +10,8 @@ that a single Alembic ``target_metadata`` continues to cover the whole schema.
 Table names are namespaced with a ``gs_lms_`` prefix. The syllabus tree mirrors
 the Optional ``SyllabusNode`` pattern: self-referencing, weighted, review-gated.
 
-Covers entities: GsLmsSyllabusNode, GsLmsContentSection, GsLmsPyq,
-GsLmsMcqQuestion, and supporting enums.
+Covers entities: GsLmsSyllabusNode, GsLmsContentSection, GsLmsConcept,
+GsLmsPyq, GsLmsMcqQuestion, and supporting enums.
 
 Requirements: 1.4, 10.1, 10.4, 11.4
 """
@@ -32,6 +32,7 @@ from sqlalchemy import (
     Enum,
     JSON,
     DateTime,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -55,6 +56,10 @@ class GsLmsExamTypeEnum(str, enum.Enum):
     """Exam type for Previous Year Questions."""
     PRELIMS = "PRELIMS"
     MAINS = "MAINS"
+    # Non-UPSC exams (see app.core.gs_lms.exam_profiles).
+    NEET = "NEET"
+    JEE_MAIN = "JEE_MAIN"
+    JEE_ADVANCED = "JEE_ADVANCED"
 
 
 class GsLmsQuestionTypeEnum(str, enum.Enum):
@@ -66,6 +71,10 @@ class GsLmsQuestionTypeEnum(str, enum.Enum):
     CAUSE_EFFECT = "CAUSE_EFFECT"
     CHRONOLOGICAL = "CHRONOLOGICAL"
     FACTUAL = "FACTUAL"
+    # Reserved for the next round (numerical / multi-correct formats); the
+    # MCQ lab does not serve them yet (see exam_profiles).
+    NUMERICAL = "NUMERICAL"
+    MULTI_CORRECT = "MULTI_CORRECT"
 
 
 class GsLmsSectionLabelEnum(str, enum.Enum):
@@ -97,6 +106,44 @@ class GsLmsAnswerAttemptStatusEnum(str, enum.Enum):
     SUBMITTED = "SUBMITTED"
     EVALUATED = "EVALUATED"
     FAILED = "FAILED"
+
+
+class GsLmsVersionLevelEnum(str, enum.Enum):
+    """How deep a concept version goes."""
+    BASIC = "BASIC"
+    STANDARD = "STANDARD"
+    ADVANCED = "ADVANCED"
+
+
+class GsLmsVersionStyleEnum(str, enum.Enum):
+    """How a concept version teaches."""
+    TEXT = "TEXT"
+    VISUAL = "VISUAL"
+    VIDEO = "VIDEO"
+    STORY = "STORY"
+
+
+class GsLmsVersionSourceEnum(str, enum.Enum):
+    """Where a concept version's material comes from."""
+    NCERT = "NCERT"
+    COACHING = "COACHING"
+    REFERENCE_BOOK = "REFERENCE_BOOK"
+    ORIGINAL = "ORIGINAL"
+
+
+class GsLmsStudyPathEnum(str, enum.Enum):
+    """What a student mainly studies from."""
+    COACHING = "COACHING"
+    REFERENCE_BOOKS = "REFERENCE_BOOKS"
+    NCERT_ONLY = "NCERT_ONLY"
+    MIXED = "MIXED"
+
+
+class GsLmsContentRequestStatusEnum(str, enum.Enum):
+    """Where the content team stands on a study request nobody could answer."""
+    OPEN = "OPEN"
+    PLANNED = "PLANNED"
+    ADDRESSED = "ADDRESSED"
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +217,13 @@ class GsLmsSyllabusNode(Base, InstitutionalAuditMixin):
         cascade="all, delete-orphan",
         order_by="GsLmsMcqQuestion.display_order",
     )
+    # Smallest learning units under a leaf topic (see GsLmsConcept).
+    concepts = relationship(
+        "GsLmsConcept",
+        back_populates="syllabus_node",
+        cascade="all, delete-orphan",
+        order_by="GsLmsConcept.display_order",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +262,172 @@ class GsLmsContentSection(Base, InstitutionalAuditMixin):
     syllabus_node = relationship(
         "GsLmsSyllabusNode", back_populates="content_sections"
     )
+
+
+# ---------------------------------------------------------------------------
+# Concepts (smallest learning unit under a leaf topic)
+# ---------------------------------------------------------------------------
+
+class GsLmsConcept(Base, InstitutionalAuditMixin):
+    """The smallest thing a student must understand within a leaf topic.
+
+    Each concept carries 2-8 ``key_points``: short phrases a student has to
+    convey when explaining it. The understanding grader
+    (``app.core.gs_lms.understanding``) scores an explanation against them, and
+    per-student results are kept in ``GsLmsConceptMastery``. ``misconceptions``
+    lists common wrong beliefs, for tutors and later AI prompts.
+    """
+    __tablename__ = "gs_lms_concepts"
+    __table_args__ = (
+        UniqueConstraint(
+            "syllabus_node_id", "title", name="uq_gs_lms_concepts_node_title"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    syllabus_node_id = Column(
+        Integer, ForeignKey("gs_lms_syllabus_nodes.id"), nullable=False, index=True
+    )
+    display_order = Column(Integer, default=0, nullable=False)
+    title = Column(String, nullable=False)
+    # JSON list of short phrases (2-8), each one a point the student must convey.
+    key_points = Column(JSON, nullable=False)
+    # Optional JSON list of common wrong beliefs about this concept.
+    misconceptions = Column(JSON, nullable=True)
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    # Relationships
+    syllabus_node = relationship("GsLmsSyllabusNode", back_populates="concepts")
+    versions = relationship(
+        "GsLmsConceptVersion",
+        back_populates="concept",
+        cascade="all, delete-orphan",
+        order_by="GsLmsConceptVersion.display_order",
+    )
+    book_refs = relationship(
+        "GsLmsConceptBookRef",
+        back_populates="concept",
+        cascade="all, delete-orphan",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Concept versions, books and learner profile
+# ---------------------------------------------------------------------------
+
+class GsLmsConceptVersion(Base, InstitutionalAuditMixin):
+    """One ready-made way of teaching a concept (level x style x source).
+
+    ``blocks`` use the same block format as ``GsLmsContentSection.blocks``.
+    ``app.core.gs_lms.versions`` picks the most suitable REVIEWED version for
+    each student.
+    """
+    __tablename__ = "gs_lms_concept_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "concept_id", "level", "style", "source",
+            name="uq_gs_lms_concept_versions_combo",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    concept_id = Column(
+        Integer, ForeignKey("gs_lms_concepts.id"), nullable=False, index=True
+    )
+    level = Column(Enum(GsLmsVersionLevelEnum), nullable=False)
+    style = Column(Enum(GsLmsVersionStyleEnum), nullable=False)
+    source = Column(Enum(GsLmsVersionSourceEnum), nullable=False)
+    title = Column(String, nullable=False)
+    blocks = Column(JSON, nullable=True)
+    video_url = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    display_order = Column(Integer, default=0, nullable=False)
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    concept = relationship("GsLmsConcept", back_populates="versions")
+
+
+class GsLmsBook(Base, InstitutionalAuditMixin):
+    """A book (and edition) students study from, e.g. Laxmikanth 7th edition."""
+    __tablename__ = "gs_lms_books"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String, nullable=False, unique=True, index=True)
+    title = Column(String, nullable=False)
+    author = Column(String, nullable=False)
+    edition = Column(String, nullable=False)
+    publisher = Column(String, nullable=True)
+    exam_tag = Column(String, default="UPSC", nullable=False)
+    subject_slug = Column(String, nullable=True, index=True)
+
+    chapters = relationship(
+        "GsLmsBookChapter",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        order_by="GsLmsBookChapter.number",
+    )
+
+
+class GsLmsBookChapter(Base):
+    """A numbered chapter of a book."""
+    __tablename__ = "gs_lms_book_chapters"
+    __table_args__ = (
+        UniqueConstraint("book_id", "number", name="uq_gs_lms_book_chapters_number"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    book_id = Column(
+        Integer, ForeignKey("gs_lms_books.id"), nullable=False, index=True
+    )
+    number = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+
+    book = relationship("GsLmsBook", back_populates="chapters")
+
+
+class GsLmsConceptBookRef(Base):
+    """Where a concept is covered in a book: a chapter and optional pages."""
+    __tablename__ = "gs_lms_concept_book_refs"
+
+    concept_id = Column(
+        Integer, ForeignKey("gs_lms_concepts.id"), primary_key=True
+    )
+    chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), primary_key=True, index=True
+    )
+    pages = Column(String, nullable=True)
+
+    concept = relationship("GsLmsConcept", back_populates="book_refs")
+    chapter = relationship("GsLmsBookChapter")
+
+
+class GsLmsLearnerProfile(Base, InstitutionalAuditMixin):
+    """A student's learning preferences, used to pick concept versions."""
+    __tablename__ = "gs_lms_learner_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True
+    )
+    preferred_style = Column(Enum(GsLmsVersionStyleEnum), nullable=True)
+    preferred_level = Column(Enum(GsLmsVersionLevelEnum), nullable=True)
+    study_path = Column(Enum(GsLmsStudyPathEnum), nullable=True)
+    # JSON list of GsLmsBook ids the student studies from.
+    book_ids = Column(JSON, nullable=True)
+    # Code of the exam the student prepares for (gs_exams.code); null = "upsc".
+    exam_code = Column(String, nullable=True)
+
+    student = relationship("User")
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +491,9 @@ class GsLmsMcqQuestion(Base, InstitutionalAuditMixin):
     question_text = Column(Text, nullable=False)
     # Options: [{label: "A", text: "..."}, ...]
     options = Column(JSON, nullable=False)
-    correct_option = Column(String, nullable=False)  # "A", "B", "C", "D"
+    # "A".."D" for single-correct. MULTI_CORRECT stores the sorted joined labels
+    # ("A,C") and NUMERICAL the number as text, so the column stays NOT NULL.
+    correct_option = Column(String, nullable=False)
     explanation = Column(Text, nullable=True)
     question_type = Column(
         Enum(GsLmsQuestionTypeEnum), nullable=False
@@ -283,6 +505,13 @@ class GsLmsMcqQuestion(Base, InstitutionalAuditMixin):
         nullable=False,
         index=True,
     )
+    # Question formats (app.core.gs_lms.scoring). All null for single-correct.
+    numeric_answer = Column(Float, nullable=True)  # NUMERICAL
+    # null or 0 = exact after rounding to 2 decimals (the scorer never goes below
+    # 0.005). No Python-side default: single-correct rows stay null, so a
+    # re-import of unchanged content compares equal and keeps review approvals.
+    numeric_tolerance = Column(Float, nullable=True)
+    correct_options = Column(JSON, nullable=True)  # MULTI_CORRECT: ["A", "C"]
 
     # Relationships
     syllabus_node = relationship(
@@ -371,14 +600,23 @@ class GsLmsAnswerSheetImage(Base, InstitutionalAuditMixin):
         Integer, ForeignKey("gs_lms_answer_attempts.id"), nullable=False, index=True
     )
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    # Server-authored MediaStore key (R11.2).
-    media_ref = Column(String, nullable=False)
+    # Server-authored MediaStore key (R11.2). NULL once the image was deleted
+    # (student request or retention); the extracted text below is kept.
+    media_ref = Column(String, nullable=True)
     # Ascending assembly order (R12.1/R12.2).
     page_order = Column(Integer, nullable=False)
     content_type = Column(String, nullable=True)
     uploaded_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+    # Per-page OCR result. ``ocr_status``: "ok" (read by the OCR provider),
+    # "failed" (provider error; retry possible), "skipped" (text supplied by
+    # the client). NULL on rows uploaded before this column existed.
+    ocr_text = Column(Text, nullable=True)
+    ocr_confidence = Column(Float, nullable=True)
+    ocr_status = Column(String(16), nullable=True)
+    # When the stored image was removed from the MediaStore.
+    deleted_at = Column(DateTime, nullable=True)
 
     attempt = relationship("GsLmsAnswerAttempt", back_populates="images")
     student = relationship("User")
@@ -435,12 +673,188 @@ __all__ = [
     "GsLmsPaperEnum",
     "GsLmsAnswerModeEnum",
     "GsLmsAnswerAttemptStatusEnum",
+    "GsLmsVersionLevelEnum",
+    "GsLmsVersionStyleEnum",
+    "GsLmsVersionSourceEnum",
+    "GsLmsStudyPathEnum",
     # Models
     "GsLmsSyllabusNode",
     "GsLmsContentSection",
+    "GsLmsConcept",
+    "GsLmsConceptVersion",
+    "GsLmsBook",
+    "GsLmsBookChapter",
+    "GsLmsConceptBookRef",
+    "GsLmsLearnerProfile",
+    "GsLmsChapterStatusEnum",
+    "GsLmsRetentionQuestion",
+    "GsLmsChapterProgress",
     "GsLmsPyq",
     "GsLmsMcqQuestion",
     "GsLmsAnswerAttempt",
     "GsLmsAnswerSheetImage",
     "GsLmsEvaluationReport",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Content requests (what students searched for and we had nothing good for)
+# ---------------------------------------------------------------------------
+
+class GsLmsContentRequest(Base):
+    """A study search that found no (or only a weak) match, counted per query.
+
+    ``normalized_query`` (sorted unique stemmed words, see
+    ``app.core.gs_lms.content_requests``) makes "Plassey battle" and "battle of
+    Plassey" one row. ``distinct_students`` is kept in step with
+    ``GsLmsContentRequestStudent`` so the raw text is never stored per student.
+    """
+    __tablename__ = "gs_lms_content_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    normalized_query = Column(String(200), nullable=False, unique=True, index=True)
+    sample_query = Column(String(200), nullable=False)
+    subject_slug = Column(String, nullable=True, index=True)
+    request_count = Column(Integer, default=1, nullable=False)
+    distinct_students = Column(Integer, default=1, nullable=False)
+    first_requested_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    last_requested_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    status = Column(
+        Enum(GsLmsContentRequestStatusEnum),
+        default=GsLmsContentRequestStatusEnum.OPEN,
+        nullable=False,
+        index=True,
+    )
+    note = Column(Text, nullable=True)
+
+
+class GsLmsContentRequestStudent(Base):
+    """Which students asked for a content request (ids only, no query text)."""
+    __tablename__ = "gs_lms_content_request_students"
+
+    request_id = Column(
+        Integer, ForeignKey("gs_lms_content_requests.id"), primary_key=True
+    )
+    student_id = Column(
+        Integer, ForeignKey("users.id"), primary_key=True, index=True
+    )
+
+
+# ---------------------------------------------------------------------------
+# Content studio logs (admin uploads and approvals)
+# ---------------------------------------------------------------------------
+
+class GsLmsContentImport(Base):
+    """One content file uploaded and imported through the admin Content studio."""
+    __tablename__ = "gs_lms_content_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_id = Column(Integer, ForeignKey("gs_subjects.id"), nullable=False, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    filename = Column(String, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    # ContentReport.summary() of the file, and the importer's result counts.
+    summary = Column(JSON, nullable=True)
+    result = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+
+class GsLmsContentReviewLog(Base):
+    """Who approved or un-approved a topic (or a whole sub-/mega-topic), and when."""
+    __tablename__ = "gs_lms_content_review_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    node_id = Column(Integer, ForeignKey("gs_lms_syllabus_nodes.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, nullable=False)  # REVIEWED | UNREVIEWED
+    counts = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Book retention checks ("do I remember this chapter?")
+# ---------------------------------------------------------------------------
+
+class GsLmsChapterStatusEnum(str, enum.Enum):
+    """Where a student is with one book chapter."""
+    NOT_STARTED = "NOT_STARTED"
+    READING = "READING"
+    COMPLETED = "COMPLETED"
+
+
+class GsLmsRetentionQuestion(Base, InstitutionalAuditMixin):
+    """A question from a retention bank, optionally tied to a book chapter.
+
+    ``external_id`` is the converter's stable id, so re-importing updates the
+    same row. Students only see REVIEWED questions that have a correct option.
+    """
+    __tablename__ = "gs_lms_retention_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String, nullable=False, unique=True, index=True)
+    subject_slug = Column(String, nullable=False, index=True)
+    question_text = Column(Text, nullable=False)
+    options = Column(JSON, nullable=False)  # [{"label": "A", "text": "..."}]
+    correct_option = Column(String, nullable=True)
+    explanation = Column(Text, nullable=True)
+    explanation_quality = Column(String, default="missing", nullable=False)  # ok | short | missing
+    answer_status = Column(String, default="ok", nullable=False)  # ok | unverified
+    question_type = Column(String, default="FACTUAL", nullable=False)
+    difficulty = Column(String, nullable=True)
+    is_pyq = Column(Boolean, default=False, nullable=False)
+    pyq_year = Column(Integer, nullable=True)
+    source_book = Column(String, nullable=True)
+    source_chapter = Column(Integer, nullable=True)
+    book_chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), nullable=True, index=True
+    )
+    review_status = Column(
+        Enum(GsReviewStatusEnum),
+        default=GsReviewStatusEnum.UNREVIEWED,
+        nullable=False,
+        index=True,
+    )
+
+    chapter = relationship("GsLmsBookChapter")
+
+
+class GsLmsChapterProgress(Base):
+    """One student's progress and retention checks for one book chapter."""
+    __tablename__ = "gs_lms_chapter_progress"
+    __table_args__ = (
+        UniqueConstraint("student_id", "chapter_id", name="uq_gs_lms_chapter_progress"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    chapter_id = Column(
+        Integer, ForeignKey("gs_lms_book_chapters.id"), nullable=False, index=True
+    )
+    status = Column(
+        Enum(GsLmsChapterStatusEnum),
+        default=GsLmsChapterStatusEnum.NOT_STARTED,
+        nullable=False,
+    )
+    completed_at = Column(DateTime, nullable=True)
+    best_score = Column(Float, nullable=True)  # 0.0-1.0
+    last_score = Column(Float, nullable=True)
+    checks_taken = Column(Integer, default=0, nullable=False)
+    last_check_at = Column(DateTime, nullable=True)
+    next_review_at = Column(DateTime, nullable=True, index=True)
+    # Ordered question ids of the check in progress; submit must answer exactly these.
+    question_ids = Column(JSON, nullable=True)
+    # Ids of the last submitted check, so the next draw can avoid repeating them.
+    previous_question_ids = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    chapter = relationship("GsLmsBookChapter")

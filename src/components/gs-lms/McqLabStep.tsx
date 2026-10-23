@@ -4,6 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Target, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/api/funnelService';
+import { getGateError } from '@/services/api/gsLmsService';
+import {
+  QuestionAnswerInput,
+  describeMarks,
+  isAnswered,
+  showAnswer,
+  signedMarks,
+  toAnswerPayload,
+  type AnswerValue,
+} from './QuestionAnswerInput';
 
 /**
  * McqLabStep — 15-question simultaneous display with submit-all flow.
@@ -15,15 +25,17 @@ import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/ap
 interface McqLabStepProps {
   nodeId: number;
   subject?: string;
+  /** Label of the button shown under the result (default: continue to Mains). */
+  completeLabel?: string;
   onComplete: () => void;
 }
 
 type McqLabMode = 'loading' | 'answering' | 'submitting' | 'result';
 
-export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLabStepProps) {
+export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Continue to Mains Practice →', onComplete }: McqLabStepProps) {
   const [mode, setMode] = useState<McqLabMode>('loading');
   const [questions, setQuestions] = useState<McqLabQuestionOut[]>([]);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [result, setResult] = useState<McqLabResultOut | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,14 +46,14 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
         setQuestions(qs);
         setMode('answering');
       })
-      .catch(() => setError('Failed to load MCQ Lab questions'));
+      .catch((err: unknown) => setError(getGateError(err)?.detail ?? 'Failed to load MCQ Lab questions'));
   }, [nodeId, subject]);
 
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = questions.filter((q) => isAnswered(q, answers[q.question_id])).length;
   const allAnswered = questions.length > 0 && answeredCount === questions.length;
 
-  const handleSelectAnswer = useCallback((questionId: number, option: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: option }));
+  const handleAnswer = useCallback((questionId: number, value: AnswerValue) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -50,11 +62,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
     setError(null);
 
     try {
-      const payload = questions.map((q) => ({
-        question_id: q.question_id,
-        chosen_answer: answers[q.question_id],
-        time_taken_seconds: undefined,
-      }));
+      const payload = questions.map((q) => toAnswerPayload(q, answers[q.question_id]));
       const res = await funnelService.submitMcqLab(subject, nodeId, payload);
       setResult(res);
       setMode('result');
@@ -92,6 +100,11 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
           <p className="text-sm text-[#49675e] mt-1">
             {result.correct_count}/{result.total_questions} correct
           </p>
+          {result.marks_total !== undefined && result.marks_max !== undefined && (
+            <p data-testid="mcq-lab-marks" className="text-sm font-semibold text-[#1f2e26] mt-2">
+              {describeMarks(result.marks_total, result.marks_max, result.marking_scheme)}
+            </p>
+          )}
         </div>
 
         {/* Type Breakdown */}
@@ -122,10 +135,13 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
                 <span className="rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-2 py-0.5 text-[8px] font-black text-white">
                   {attempt.question_type.replace(/_/g, ' ')}
                 </span>
+                {attempt.marks !== undefined && (
+                  <span className="ml-auto font-black text-[#49675e]">{signedMarks(attempt.marks)}</span>
+                )}
               </summary>
               <div className="px-3 pb-3 text-xs text-[#49675e]">
-                <p>Your answer: <strong>{attempt.chosen_answer}</strong></p>
-                <p>Correct answer: <strong className="text-[#1d9e75]">{attempt.correct_answer}</strong></p>
+                <p>Your answer: <strong>{showAnswer(attempt.answer_format, attempt.chosen_answer)}</strong></p>
+                <p>Correct answer: <strong className="text-[#1d9e75]">{showAnswer(attempt.answer_format, attempt.correct_answer)}</strong></p>
                 {attempt.explanation && (
                   <p className="mt-1 text-[#1f2e26]">{attempt.explanation}</p>
                 )}
@@ -138,7 +154,7 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
           onClick={onComplete}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
         >
-          Continue to Mains Practice →
+          {completeLabel}
         </button>
       </div>
     );
@@ -163,28 +179,12 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
             {q.question_text}
           </p>
 
-          {/* Options */}
-          <div className="space-y-2">
-            {q.options.map((opt) => {
-              const isSelected = answers[q.question_id] === opt.label;
-              return (
-                <button
-                  key={opt.label}
-                  onClick={() => handleSelectAnswer(q.question_id, opt.label)}
-                  className={`
-                    w-full text-left rounded-lg border p-3 text-xs transition-all
-                    ${isSelected
-                      ? 'border-[#1a3a2a] bg-[#e7f5ee] shadow-sm'
-                      : 'border-[#dcd5c7] bg-white hover:border-[#b9d9cd]'
-                    }
-                  `}
-                >
-                  <span className="font-black text-[#1a3a2a]">{opt.label}.</span>{' '}
-                  <span className="text-[#1f2e26]">{opt.text}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Options / answer input */}
+          <QuestionAnswerInput
+            question={q}
+            value={answers[q.question_id]}
+            onChange={(value) => handleAnswer(q.question_id, value)}
+          />
         </div>
       ))}
 

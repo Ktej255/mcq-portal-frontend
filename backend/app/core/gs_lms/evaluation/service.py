@@ -110,6 +110,8 @@ def _load_images(db: Session, attempt: GsLmsAnswerAttempt) -> List[bytes]:
     )
     images: List[bytes] = []
     for row in rows:
+        if not row.media_ref:
+            continue  # image already deleted (student request / retention)
         try:
             images.append(
                 store.open(

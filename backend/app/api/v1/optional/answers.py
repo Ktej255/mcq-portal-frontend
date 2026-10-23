@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import ai_rate_limit, get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user, require_optional_evaluation_available
 from app.schemas.common import StandardResponse
 from app.core.optional.models import (
     OptionalSubject,
@@ -252,6 +252,9 @@ def submit_answer(
     (Property 7): a shaky, unreviewed spoken/handwritten draft is retained but
     not auto-graded — the response asks for a review/correct step.
     """
+    # Never return fake mock scores unless mocks are explicitly allowed.
+    require_optional_evaluation_available(getattr(provider, "name", None))
+
     subject = _get_subject_or_404(db, slug)
 
     # Validate the composition mode.

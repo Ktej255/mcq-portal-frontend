@@ -38,9 +38,13 @@ function pruneStore(store: RateLimitStore, now: number) {
   }
 }
 
-export function consumeAdaptiveTeacherRateLimit(request: NextRequest, now = Date.now()) {
+/**
+ * Pass `userId` when the caller is signed in: the limit then follows the
+ * account, so a new token or a new IP address does not reset it.
+ */
+export function consumeAdaptiveTeacherRateLimit(request: NextRequest, now = Date.now(), userId?: string | null) {
   const store = getStore();
-  const key = getRequestKey(request);
+  const key = userId ? `user:${userId}` : getRequestKey(request);
   const bucket = store.get(key) ?? { hits: [] };
   const recentHits = bucket.hits.filter((timestamp) => timestamp > now - RATE_LIMIT_WINDOW_MS);
 

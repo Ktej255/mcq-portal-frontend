@@ -16,6 +16,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, Literal, Optional
 
+from app.core.config import settings
+
 StructuredOutputMode = Literal["native", "prompt"]
 
 
@@ -61,10 +63,14 @@ class ProviderConfig:
 # Built-in defaults always available without any env configuration.
 _BUILTIN_CONFIGS: Dict[str, ProviderConfig] = {
     "mock": ProviderConfig(key="mock", model_id="mock", structured_output_mode="prompt"),
+    # Model id / timeout come from settings (GEMINI_MODEL_ID, GEMINI_TIMEOUT_SECONDS)
+    # and the key is read by GeminiProvider from GOOGLE_API_KEY (fallback
+    # GEMINI_API_KEY); the env var NAME is recorded here, never the value.
     "gemini": ProviderConfig(
         key="gemini",
-        model_id=os.environ.get("GEMINI_MODEL_ID", "gemini-1.5-flash"),
-        api_key_ref="GEMINI_API_KEY",
+        model_id=settings.GEMINI_MODEL_ID,
+        api_key_ref="GOOGLE_API_KEY",
+        timeout_seconds=settings.GEMINI_TIMEOUT_SECONDS,
         structured_output_mode="native",
         supports_vision=True,
     ),

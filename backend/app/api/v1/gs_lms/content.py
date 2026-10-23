@@ -42,7 +42,7 @@ from app.core.gs_lms.student_models import (
     GsLmsVideoWatch,
     GsLmsOnboardingStatus,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsTopicSectionsOut,
     GsLmsContentSectionOut,
@@ -264,6 +264,7 @@ def get_topic_sections(
     Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.6, 5.1
     """
     node = _get_node_or_404(db, node_id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Fetch reviewed sections only (review-gate: R10.3)
     sections = _get_reviewed_sections(db, node_id)
@@ -359,6 +360,7 @@ def complete_section(
     Validates: Requirements 2.2, 2.5, 2.6, 5.1
     """
     node = _get_node_or_404(db, node_id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Verify the section exists and belongs to this node
     section = (

@@ -31,12 +31,16 @@ from app.core.gs_lms.funnel_models import (
 from app.core.gs_lms.mcq_lab_scoring import (
     REQUIRED_TYPE_DISTRIBUTION,
     TOTAL_MCQ_LAB_QUESTIONS,
-    create_attempt,
+    McqLabAttempt,
     score_mcq_lab,
     WEAKNESS_THRESHOLD,
     WEAKNESS_MIN_ATTEMPTS,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.core.gs_lms import scoring
+from app.core.gs_lms.exam_profiles import exam_code_of, profile_for_subject
+from app.core.gs_lms.progression import refresh_mastery
+from app.api.v1.gs_lms.answer_inputs import AnswerFieldsIn
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
 
 router = APIRouter()
@@ -54,15 +58,16 @@ class McqLabOptionOut(BaseModel):
 class McqLabQuestionOut(BaseModel):
     question_id: int
     question_type: str
+    # "single" | "multi" | "numerical"; numerical questions have options == [].
+    answer_format: str = "single"
     question_text: str
     statements: List[str] = []
     options: List[McqLabOptionOut]
     display_order: int
 
 
-class McqLabAnswerIn(BaseModel):
+class McqLabAnswerIn(AnswerFieldsIn):
     question_id: int
-    chosen_answer: str
     time_taken_seconds: float | None = None
 
 
@@ -77,6 +82,9 @@ class McqLabAttemptOut(BaseModel):
     is_correct: bool
     question_type: str
     explanation: str | None = None
+    # Only present for non-UPSC exams or non-single formats (see scoring.include_marks).
+    answer_format: str | None = None
+    marks: float | None = None
 
 
 class McqLabTypeBreakdownOut(BaseModel):
@@ -92,13 +100,19 @@ class McqLabResultOut(BaseModel):
     score: float  # 0-100 percentage
     attempts: List[McqLabAttemptOut]
     type_breakdown: List[McqLabTypeBreakdownOut]
+    # Marks under the exam's marking scheme, shown in addition to the accuracy
+    # score (pass/fail stays accuracy based). Present only for non-UPSC exams or
+    # when a non-single question was served, so UPSC results are unchanged.
+    marks_total: float | None = None
+    marks_max: float | None = None
+    marking_scheme: Dict[str, Dict[str, float]] | None = None
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/funnel/{node_id}/mcq-lab/questions", response_model=List[McqLabQuestionOut])
+@router.get("/funnel/{node_id}/mcq-lab/questions", response_model=List[McqLabQuestionOut], response_model_exclude_unset=True)
 def get_mcq_lab_questions(
     node_id: int,
     subject: GsSubject = Depends(resolve_subject),
@@ -116,6 +130,7 @@ def get_mcq_lab_questions(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Get all reviewed questions for this topic
     all_questions = (
@@ -185,6 +200,7 @@ def get_mcq_lab_questions(
         McqLabQuestionOut(
             question_id=q.id,
             question_type=q.question_type.value if hasattr(q.question_type, 'value') else str(q.question_type),
+            answer_format=scoring.answer_format_of(q),
             question_text=q.question_text,
             statements=[],  # Statements extracted from question_text if needed
             options=[McqLabOptionOut(label=opt["label"], text=opt["text"]) for opt in (q.options or [])],
@@ -194,7 +210,7 @@ def get_mcq_lab_questions(
     ]
 
 
-@router.post("/funnel/{node_id}/mcq-lab/submit", response_model=McqLabResultOut, dependencies=[Depends(mcq_quota(15))])
+@router.post("/funnel/{node_id}/mcq-lab/submit", response_model=McqLabResultOut, response_model_exclude_unset=True, dependencies=[Depends(mcq_quota(15))])
 def submit_mcq_lab(
     node_id: int,
     body: McqLabSubmitIn,
@@ -213,6 +229,7 @@ def submit_mcq_lab(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     if len(body.answers) != TOTAL_MCQ_LAB_QUESTIONS:
         raise HTTPException(
@@ -230,19 +247,25 @@ def submit_mcq_lab(
     if len(question_map) != len(question_ids):
         raise HTTPException(status_code=422, detail="Some question IDs are invalid")
 
-    # Create attempts with all-or-nothing scoring
+    # Grade every answer (all-or-nothing correctness plus the exam's marks)
+    profile = profile_for_subject(subject)
     attempts = []
+    graded = []
     for answer in body.answers:
         question = question_map[answer.question_id]
         qtype = question.question_type.value if hasattr(question.question_type, 'value') else str(question.question_type)
-        attempt = create_attempt(
+        g = scoring.grade(question, answer.to_response(), profile)
+        graded.append(g)
+        attempts.append(McqLabAttempt(
             question_id=answer.question_id,
             question_type=qtype,
-            chosen_answer=answer.chosen_answer,
-            correct_answer=question.correct_option,
+            chosen_answer=g.chosen_text,
+            correct_answer=g.correct_text,
+            is_correct=g.correct,
             time_taken_seconds=answer.time_taken_seconds,
-        )
-        attempts.append(attempt)
+            marks=g.marks,
+            answer_format=g.answer_format,
+        ))
 
     # Score the session
     result = score_mcq_lab(attempts)
@@ -270,6 +293,7 @@ def submit_mcq_lab(
             correct_answer=attempt.correct_answer,
             is_correct=attempt.is_correct,
             time_taken_seconds=attempt.time_taken_seconds,
+            marks=attempt.marks,
         )
         db.add(db_attempt)
 
@@ -302,9 +326,14 @@ def submit_mcq_lab(
             )
             db.add(pattern)
 
+    # A retake can lift the best score to the mastery bar: this may make a
+    # review checkpoint due.
+    refresh_mastery(db, current_user.id, node_id)
+
     db.commit()
 
     # Build response
+    show_marks = scoring.include_marks(exam_code_of(subject), (g.answer_format for g in graded))
     return McqLabResultOut(
         total_questions=result.total_questions,
         correct_count=result.correct_count,
@@ -317,6 +346,7 @@ def submit_mcq_lab(
                 is_correct=a.is_correct,
                 question_type=a.question_type,
                 explanation=question_map.get(a.question_id, None) and question_map[a.question_id].explanation,
+                **({"answer_format": a.answer_format, "marks": a.marks} if show_marks else {}),
             )
             for a in result.attempts
         ],
@@ -329,10 +359,11 @@ def submit_mcq_lab(
             )
             for tb in result.type_breakdown
         ],
+        **(scoring.marks_summary(profile, graded) if show_marks else {}),
     )
 
 
-@router.get("/funnel/{node_id}/mcq-lab/result", response_model=McqLabResultOut | None)
+@router.get("/funnel/{node_id}/mcq-lab/result", response_model=McqLabResultOut | None, response_model_exclude_unset=True)
 def get_mcq_lab_result(
     node_id: int,
     subject: GsSubject = Depends(resolve_subject),
@@ -340,6 +371,7 @@ def get_mcq_lab_result(
     db: Session = Depends(get_db),
 ):
     """Get the latest MCQ Lab result for a topic."""
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     session = (
         db.query(GsLmsMcqLabSession)
         .filter(
@@ -377,6 +409,26 @@ def get_mcq_lab_result(
             correct += 1
         type_stats[a.question_type] = (correct, total)
 
+    # Marks: stored on the attempt; rows made before marks existed are re-graded
+    # from the stored answer text.
+    profile = profile_for_subject(subject)
+    formats = [
+        scoring.answer_format_of(question_map[a.question_id]) if a.question_id in question_map else scoring.SINGLE
+        for a in attempts
+    ]
+    show_marks = scoring.include_marks(exam_code_of(subject), formats)
+    attempt_marks: List[float] = []
+    for a, fmt in zip(attempts, formats):
+        q = question_map.get(a.question_id)
+        if a.marks is not None or q is None:
+            attempt_marks.append(a.marks if a.marks is not None else 0.0)
+        else:
+            attempt_marks.append(scoring.marks_for(q, scoring.response_from_text(q, a.chosen_answer), profile.scheme_for(fmt)))
+    graded = [
+        scoring.Graded(fmt, a.is_correct, m, scoring.max_marks(profile.scheme_for(fmt)), a.chosen_answer, a.correct_answer)
+        for a, fmt, m in zip(attempts, formats, attempt_marks)
+    ]
+
     return McqLabResultOut(
         total_questions=session.total_questions,
         correct_count=session.correct_count or 0,
@@ -389,8 +441,9 @@ def get_mcq_lab_result(
                 is_correct=a.is_correct,
                 question_type=a.question_type,
                 explanation=question_map.get(a.question_id) and question_map[a.question_id].explanation,
+                **({"answer_format": fmt, "marks": m} if show_marks else {}),
             )
-            for a in attempts
+            for a, fmt, m in zip(attempts, formats, attempt_marks)
         ],
         type_breakdown=[
             McqLabTypeBreakdownOut(
@@ -401,4 +454,5 @@ def get_mcq_lab_result(
             )
             for qtype, (correct, total) in sorted(type_stats.items())
         ],
+        **(scoring.marks_summary(profile, graded) if show_marks else {}),
     )

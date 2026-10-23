@@ -31,8 +31,11 @@ from __future__ import annotations
 
 import enum
 
+from datetime import datetime, timezone
+
 from sqlalchemy import (
     Column,
+    DateTime,
     Integer,
     String,
     Text,
@@ -59,6 +62,58 @@ class GsReviewStatusEnum(str, enum.Enum):
     REVIEWED = "REVIEWED"
 
 
+class GsExam(Base):
+    """An exam a GS-LMS subject belongs to (``upsc``, ``neet``, ``jee``).
+
+    Rows are catalogue data; the *behaviour* of each exam (section labels,
+    funnel steps, PYQ and question types, marking scheme, progression
+    constants) lives in the code registry ``app.core.gs_lms.exam_profiles``,
+    keyed by ``code``.
+    """
+    __tablename__ = "gs_exams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False
+    )
+
+
+DEFAULT_EXAM_CODE = "upsc"
+
+
+def _default_exam_id(context) -> int:
+    """Column default for ``GsSubject.exam_id``: the UPSC exam (created on
+    demand), so code that creates a subject without naming an exam keeps
+    producing UPSC subjects exactly as before the exam concept existed."""
+    from sqlalchemy import select
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    table = GsExam.__table__
+    conn = context.connection
+    try:
+        found = conn.execute(select(table.c.id).where(table.c.code == DEFAULT_EXAM_CODE)).scalar()
+        if found is not None:
+            return found
+        result = conn.execute(
+            table.insert().values(
+                code=DEFAULT_EXAM_CODE,
+                name="UPSC",
+                display_order=0,
+                is_active=True,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        )
+        return result.inserted_primary_key[0]
+    except (OperationalError, ProgrammingError):
+        # Partial test schemas create gs_subjects without gs_exams (and SQLite
+        # does not enforce the FK). The migration inserts UPSC first, so id 1.
+        return 1
+
+
 class GsSubject(Base, InstitutionalAuditMixin):
     """A GS subject (Geography, Environment, Polity, ...). Canonical entity.
 
@@ -69,15 +124,27 @@ class GsSubject(Base, InstitutionalAuditMixin):
     __tablename__ = "gs_subjects"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Slugs stay GLOBALLY unique (routing is /{subject_slug}); subjects of
+    # non-UPSC exams use a prefixed slug such as "neet-physics" (docs/EXAMS.md).
     slug = Column(String, unique=True, index=True, nullable=False)
+    exam_id = Column(
+        Integer,
+        ForeignKey("gs_exams.id", name="fk_gs_subjects_exam_id"),
+        nullable=False,
+        index=True,
+        default=_default_exam_id,
+    )
     name = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
     display_order = Column(Integer, default=0, nullable=False)
     # Free-form per-subject framework config (weeks, labs, feature flags).
+    # Exam-profile overrides ("exam_overrides" key) are documented in
+    # app.core.gs_lms.exam_profiles.
     config = Column(JSON, nullable=True)
     is_complete = Column(Boolean, default=False, nullable=False)
     completeness_status = Column(JSON, nullable=True)
 
+    exam = relationship("GsExam")
     day_lessons = relationship(
         "GsDayLesson", back_populates="subject", cascade="all, delete-orphan"
     )

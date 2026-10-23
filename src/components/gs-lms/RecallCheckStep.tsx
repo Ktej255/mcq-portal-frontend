@@ -17,6 +17,8 @@ interface RecallCheckStepProps {
   nodeId: number;
   sectionLabel: string;
   subject?: string;
+  /** Hide "Continue without recall" (the server rejects it when progression is enforced). */
+  hideSkip?: boolean;
   onComplete: () => void;
 }
 
@@ -26,6 +28,7 @@ export function RecallCheckStep({
   nodeId,
   sectionLabel,
   subject = "geography",
+  hideSkip = false,
   onComplete,
 }: RecallCheckStepProps) {
   const [mode, setMode] = useState<RecallMode>('prompt');
@@ -227,13 +230,15 @@ export function RecallCheckStep({
             Type instead
           </button>
 
-          <button
-            onClick={handleContinueWithoutRecall}
-            className="flex items-center gap-1.5 rounded-lg border border-[#b9d9cd] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] hover:border-[#1d9e75] hover:text-[#1d9e75]"
-          >
-            Continue without recall
-            <ArrowRight className="h-3 w-3" />
-          </button>
+          {!hideSkip && (
+            <button
+              onClick={handleContinueWithoutRecall}
+              className="flex items-center gap-1.5 rounded-lg border border-[#b9d9cd] bg-white px-3 py-2 text-xs font-black text-[#1a3a2a] hover:border-[#1d9e75] hover:text-[#1d9e75]"
+            >
+              Continue without recall
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          )}
         </div>
       )}
 

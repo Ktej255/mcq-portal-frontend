@@ -33,6 +33,7 @@ from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsMcqQuestion,
+    GsLmsQuestionTypeEnum,
 )
 from app.core.gs_lms.student_models import (
     GsLmsPracticeSession,
@@ -93,6 +94,12 @@ def _get_questions_for_session(
         .filter(
             GsLmsMcqQuestion.syllabus_node_id == syllabus_node_id,
             GsLmsMcqQuestion.review_status == GsReviewStatusEnum.REVIEWED,
+            # Sequential practice only serves single-correct questions; the
+            # multi-correct and numerical formats are served by the MCQ lab
+            # and checkpoints (app.core.gs_lms.scoring).
+            GsLmsMcqQuestion.question_type.notin_(
+                [GsLmsQuestionTypeEnum.NUMERICAL, GsLmsQuestionTypeEnum.MULTI_CORRECT]
+            ),
         )
         .order_by(GsLmsMcqQuestion.display_order)
         .all()

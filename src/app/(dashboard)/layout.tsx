@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
 import { UpgradePrompt } from "@/components/shared/UpgradePrompt";
 import { isOperatorRoute } from "@/lib/navigation/studentNav";
+import { examBrandName } from "@/lib/exams/examRoutes";
 
 export default function DashboardLayout({
   children,
@@ -22,7 +23,7 @@ export default function DashboardLayout({
 
   if (!isLoaded) return (
     <div className="flex h-screen items-center justify-center bg-[#f7f4ee]">
-      <UpscLoader message="Initializing UPSC Command..." />
+      <UpscLoader message={`Initializing ${examBrandName(pathname)}...`} />
     </div>
   );
 

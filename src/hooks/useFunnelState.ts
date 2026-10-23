@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { funnelService, FunnelStateOut } from '@/services/api/funnelService';
+import { getGateError } from '@/services/api/gsLmsService';
 
 /**
  * Hook for managing funnel progression state.
@@ -37,17 +38,24 @@ export interface UseFunnelStateReturn {
   error: string | null;
   currentStep: number;
   completedSteps: number[];
+  /** Steps shown for this subject's exam (all 14 when the server sends none). */
+  enabledSteps: number[];
   activeTab: TabId;
   completeStep: (step: number) => Promise<void>;
+  /** Server's reason the last completeStep was refused (409/423), else null. */
+  gateMessage: string | null;
   canAccessStep: (step: number) => boolean;
   isStepComplete: (step: number) => boolean;
   refreshState: () => Promise<void>;
 }
 
+const ALL_STEPS = Array.from({ length: 14 }, (_, i) => i + 1);
+
 export function useFunnelState(nodeId: number, subject = "geography"): UseFunnelStateReturn {
   const [state, setState] = useState<FunnelStateOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gate, setGate] = useState<{ step: number; message: string } | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -69,9 +77,11 @@ export function useFunnelState(nodeId: number, subject = "geography"): UseFunnel
 
   const currentStep = state?.current_step ?? 1;
   const completedSteps = state?.completed_steps ?? [];
+  const enabledSteps = state?.enabled_steps?.length ? state.enabled_steps : ALL_STEPS;
   const activeTab = STEP_TAB_MAP[currentStep] ?? 'learn';
 
   const completeStep = useCallback(async (step: number) => {
+    setGate(null);
     try {
       const newState = await funnelService.completeStep(subject, nodeId, step);
       setState((previousState) => {
@@ -91,11 +101,21 @@ export function useFunnelState(nodeId: number, subject = "geography"): UseFunnel
         };
       });
     } catch (err: unknown) {
+      // A gate the student hasn't met yet (e.g. recall score too low): keep
+      // them on the step and show the reason inline instead of failing the page.
+      const gateError = getGateError(err);
+      if (gateError) {
+        setGate({ step, message: gateError.detail });
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to complete step';
       setError(message);
       throw err;
     }
   }, [nodeId, subject]);
+
+  // The reason only applies to the step it was raised on.
+  const gateMessage = gate && gate.step === currentStep ? gate.message : null;
 
   const canAccessStep = useCallback((step: number): boolean => {
     return step <= currentStep;
@@ -111,8 +131,10 @@ export function useFunnelState(nodeId: number, subject = "geography"): UseFunnel
     error,
     currentStep,
     completedSteps,
+    enabledSteps,
     activeTab,
     completeStep,
+    gateMessage,
     canAccessStep,
     isStepComplete,
     refreshState: loadState,
