@@ -17,7 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { resolveToken } from "@/lib/auth/token-strategy";
+import { buildInternalApiHeaders } from "@/lib/auth/internal-api-headers";
 import {
   appendLocalPyqImportRecords,
   buildExactPyqImportReadiness,
@@ -79,15 +79,6 @@ function parseCsv(input: string): PyqImportCsvRow[] {
   });
 
   return parsed.data.filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
-}
-
-async function buildInternalApiHeaders() {
-  const headers: Record<string, string> = {};
-  const token = await resolveToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  return headers;
 }
 
 async function requestPyqPersistence(records?: PyqImportRecord[]): Promise<PyqPersistencePayload> {

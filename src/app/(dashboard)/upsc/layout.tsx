@@ -15,7 +15,15 @@ export default function UpscLayout({ children }: { children: React.ReactNode }) 
 
   // Operator-only routes require ADMIN role (e.g. audit, command, strategy pages)
   if (isOperatorRoute(pathname)) {
-    return <ProtectedRoute requiredRole="ADMIN">{children}</ProtectedRoute>;
+    // Student pages (reports, the daily plan) still link to the operator
+    // question bank. A student who follows one goes to practice, where MCQs
+    // are, rather than being dropped on the dashboard with no explanation.
+    const fallbackHref = pathname.startsWith("/upsc/question-bank") ? "/practice" : "/dashboard";
+    return (
+      <ProtectedRoute requiredRole="ADMIN" fallbackHref={fallbackHref}>
+        {children}
+      </ProtectedRoute>
+    );
   }
 
   // The UPSC root and every subject's setup page are open without the profile

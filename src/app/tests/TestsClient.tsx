@@ -194,14 +194,6 @@ function StudentTestsView() {
               Open LMS Practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
             </Link>
           </div>
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <ClipboardCheck className="h-5 w-5 text-[#085041]" />
-            <h2 className="mt-4 text-xl font-black tracking-tight">Question Bank</h2>
-            <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">Build custom MCQ practice sets from your accumulated learning evidence.</p>
-            <Link href="/upsc/question-bank" className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]">
-              Open Question Bank <ArrowRight className="ml-2 h-3.5 w-3.5" />
-            </Link>
-          </div>
         </section>
       </div>
     </main>

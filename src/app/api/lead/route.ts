@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +50,7 @@ function backendLeadsUrl() {
  * Marketing lead capture (lead magnet).
  * Saves the lead in the backend database first, so no lead is lost, then emails
  * the team via Resend when RESEND_API_KEY + LEADS_NOTIFY_EMAIL are configured.
- * Delivery problems never break the visitor's flow.
+ * Succeeds when either worked; fails only when the lead reached nobody.
  */
 export async function POST(request: Request) {
   let data: LeadPayload;
@@ -101,35 +100,43 @@ export async function POST(request: Request) {
     console.error("[lead] could not reach backend", error);
   }
 
+  // Tell the team by email when that is configured. The lead is already in the
+  // database, so a missing or failing email is not a failure for the visitor.
+  let notified = false;
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const notify = process.env.LEADS_NOTIFY_EMAIL?.trim();
-  if (!apiKey || !notify) return noStoreJson(UNAVAILABLE, { status: 503 });
+  if (apiKey && notify) {
+    try {
+      const { Resend } = await import("resend");
+      const resend = new Resend(apiKey);
+      const summary = [
+        `Name: ${data.name?.trim() || "-"}`,
+        `Email: ${email}`,
+        `WhatsApp: ${data.phone?.trim() || "-"}`,
+        `Attempt: ${data.year?.trim() || "-"}`,
+        `Stage: ${data.stage?.trim() || "-"}`,
+        `Hours/day: ${data.hours?.trim() || "-"}`,
+        `Optional: ${data.optional?.trim() || "-"}`,
+        `Focus areas: ${(data.subjects ?? []).join(", ") || "-"}`,
+        `Source: ${data.source?.trim() || "diagnostic"}`,
+      ].join("\n");
 
-  try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(apiKey);
-    const summary = [
-      `Name: ${data.name?.trim() || "-"}`,
-      `Email: ${email}`,
-      `WhatsApp: ${data.phone?.trim() || "-"}`,
-      `Attempt: ${data.year?.trim() || "-"}`,
-      `Stage: ${data.stage?.trim() || "-"}`,
-      `Hours/day: ${data.hours?.trim() || "-"}`,
-      `Optional: ${data.optional?.trim() || "-"}`,
-      `Focus areas: ${(data.subjects ?? []).join(", ") || "-"}`,
-      `Source: ${data.source?.trim() || "diagnostic"}`,
-    ].join("\n");
-
-    const { error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || "Sarit Classes <leads@upsccommand.com>",
-      to: [notify],
-      subject: `New UPSC lead: ${data.name?.trim() || email}`,
-      text: summary,
-    });
-    if (error) throw new Error("Lead delivery failed");
-  } catch {
-    return noStoreJson(UNAVAILABLE, { status: 503 });
+      const { error } = await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL || "Sarit Classes <leads@upsccommand.com>",
+        to: [notify],
+        subject: `New UPSC lead: ${data.name?.trim() || email}`,
+        text: summary,
+      });
+      if (error) throw new Error("Lead notification failed");
+      notified = true;
+    } catch (error) {
+      console.error("[lead] could not notify the team", error);
+    }
   }
 
-  return NextResponse.json({ ok: true, stored });
+  // The lead was received if it is stored or the team was told. Nothing is
+  // emailed to the visitor, so `delivered` stays false: the page must not say
+  // a copy was sent.
+  if (!stored && !notified) return noStoreJson(UNAVAILABLE, { status: 503 });
+  return noStoreJson({ ok: true, received: true, stored, notified, delivered: false });
 }
