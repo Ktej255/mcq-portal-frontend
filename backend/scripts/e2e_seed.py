@@ -4,7 +4,7 @@
 Creates every table, loads the GS Geography content with the real importer,
 and adds three students the tests sign in as (local mock auth maps the browser
 token ``MOCK_TOKEN_local_<id>`` to the user whose google_uid is
-``TOKEN_local_<id>``):
+``local_<id>``):
 
 * e2e-new        — signed up today, no profile yet (first-time setup flow)
 * e2e-student    — signed up today, so inside the free trial
@@ -57,7 +57,7 @@ def main() -> None:
         )
         for uid, days_old in STUDENTS.items():
             user = User(
-                google_uid=f"TOKEN_local_{uid}",
+                google_uid=f"local_{uid}",
                 email=f"{uid}@example.com",
                 full_name=uid,
                 role=RoleEnum.STUDENT,
@@ -80,11 +80,11 @@ def main() -> None:
                     "inductionCompleted": True,
                 }))
         db.add(PaymentOrder(
-            order_id="e2e-order-foundation", user_id="TOKEN_local_e2e-foundation",
+            order_id="e2e-order-foundation", user_id="local_e2e-foundation",
             plan_tier="foundation", billing_cycle="monthly", amount=399, status="paid",
         ))
         db.add(Subscription(
-            user_id="TOKEN_local_e2e-foundation", plan_tier="foundation", billing_cycle="monthly",
+            user_id="local_e2e-foundation", plan_tier="foundation", billing_cycle="monthly",
             order_id="e2e-order-foundation", start_date=now - timedelta(days=1),
             end_date=now + timedelta(days=29), status="active",
         ))

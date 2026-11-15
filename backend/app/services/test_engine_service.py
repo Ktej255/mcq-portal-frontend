@@ -5,6 +5,18 @@ from app.models.domain import Test, Attempt, AttemptStatusEnum, Question, Attemp
 from app.schemas.test_engine import StartAttemptRequest, SaveAnswerRequest
 from app.services.domain_contracts import normalize_option_id
 
+def variation_enabled() -> bool:
+    """Whether per-attempt MCQ variation (option shuffle, wording inversion) is on.
+
+    One switch for both sides of the exam: the questions served for an attempt
+    and the remapping of the option a student saves. They must always agree,
+    otherwise the stored answer is not the option the student clicked.
+    """
+    from app.core.config import settings
+
+    return bool(settings.MCQ_VARIATION_ENABLED)
+
+
 def published_question_query(db: Session, test_id: int):
     return db.query(Question).filter(
         Question.test_id == test_id,
@@ -73,11 +85,7 @@ def get_attempt_questions(db: Session, attempt_id: int, user_id: int):
             },
         )
         
-    import os
-    pytest_test = os.getenv("PYTEST_CURRENT_TEST")
-    apply_variation = True
-    if pytest_test and "test_mcq_variation_engine" not in pytest_test:
-        apply_variation = False
+    apply_variation = variation_enabled()
 
     from app.services.mcq_variation_engine import MCQVariationEngine
 
@@ -144,11 +152,7 @@ def save_answer(db: Session, attempt_id: int, user_id: int, request: SaveAnswerR
     
     selected_option = normalize_option_id(request.selected_option)
 
-    import os
-    pytest_test = os.getenv("PYTEST_CURRENT_TEST")
-    apply_variation = True
-    if pytest_test and "test_mcq_variation_engine" not in pytest_test:
-        apply_variation = False
+    apply_variation = variation_enabled()
 
     if selected_option is not None and apply_variation:
         q = question

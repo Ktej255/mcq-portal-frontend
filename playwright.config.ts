@@ -43,7 +43,9 @@ export default defineConfig({
       url: `${FRONTEND_URL}/login`,
       reuseExistingServer: !process.env.CI,
       timeout: 600_000,
-      env: { NEXT_PUBLIC_API_BASE_URL: BACKEND_URL },
+      // No Clerk keys in the test run: the app uses its local sign-in, which the
+      // throwaway backend accepts because it runs with APP_ENVIRONMENT=test.
+      env: { NEXT_PUBLIC_API_BASE_URL: BACKEND_URL, NEXT_PUBLIC_USE_MOCK_AUTH: "true" },
     },
   ],
 });

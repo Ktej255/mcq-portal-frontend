@@ -18,6 +18,9 @@ export DATABASE_URL="sqlite:///$DB_FILE"
 export ALLOW_MOCK_AUTH=true
 export PAYWALL_ENABLED=true
 export TRIAL_DAYS=7
+# Mock sign-in is only honoured outside production, and production refuses to
+# start without the cohort access switches, so run the throwaway backend as "test".
+export APP_ENVIRONMENT="${APP_ENVIRONMENT:-test}"
 
 "$PYTHON" scripts/e2e_seed.py
 exec "$PYTHON" -m uvicorn app.main:app --host 127.0.0.1 --port "${E2E_BACKEND_PORT:-8099}"

@@ -248,6 +248,14 @@ class Settings(BaseSettings):
     # startup refuses to boot unless this is `true`.
     GS_LMS_BETA_SCOPE: bool = False
 
+    # Per-attempt MCQ variation: shuffles options and may invert "correct /
+    # incorrect" wording for each attempt. Off by default because the exam
+    # screen loads the original question from `tests/{id}/questions`; with
+    # variation on, the saved answer would be remapped away from the option the
+    # student actually clicked. Turn on only once the exam screen reads
+    # `attempts/{id}/questions` and the review screens show the varied form.
+    MCQ_VARIATION_ENABLED: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()
