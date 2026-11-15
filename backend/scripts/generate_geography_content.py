@@ -2,16 +2,16 @@ import os
 import sys
 import json
 from pathlib import Path
-import google.generativeai as genai
+from google import genai
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # API Key config
-api_key = os.environ.get("GOOGLE_API_KEY")
+api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if not api_key:
-    raise RuntimeError("GOOGLE_API_KEY is required")
-genai.configure(api_key=api_key)
+    raise RuntimeError("GEMINI_API_KEY is required")
+client = genai.Client(api_key=api_key)
 
 # File paths
 KB_PATH = Path(__file__).resolve().parent.parent / "app" / "core" / "optional" / "data" / "geography_reference_kb.json"
@@ -379,9 +379,10 @@ def generate_lecture_content(lecture_id):
     """
     
     # Use gemini-flash-latest
-    model = genai.GenerativeModel("gemini-3.1-flash-lite")
     print(f"Calling Gemini to generate Lecture {lecture_id}...")
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model=os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"), contents=prompt
+    )
     
     raw_text = response.text.strip()
     

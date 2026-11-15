@@ -22,10 +22,9 @@ from app.core.gs_lms.gemini_discussion_provider import GeminiAIResponseProvider
 @pytest.fixture()
 def provider():
     """Create a GeminiAIResponseProvider with a mocked API key."""
-    with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}):
-        with patch("google.generativeai.configure"):
-            with patch("google.generativeai.GenerativeModel"):
-                return GeminiAIResponseProvider()
+    with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}):
+        # Building the client makes no network call.
+        return GeminiAIResponseProvider()
 
 
 # ---------------------------------------------------------------------------

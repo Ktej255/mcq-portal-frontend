@@ -48,3 +48,19 @@ test("an operator sees the Geography content status and can load it again", asyn
   await card.getByRole("button", { name: "Load again" }).click();
   await expect(card.getByRole("status")).toHaveText(/already loaded and has been refreshed/, { timeout: 60_000 });
 });
+
+test("the web app's AI routes need a signed-in learner and count against their allowance", async ({ request }) => {
+  const body = { subject: "Geography", context: "Monsoon", message: "Why does the monsoon break?" };
+
+  const anonymous = await request.post("/api/optional/discuss", { data: body });
+  expect(anonymous.status()).toBe(401);
+
+  // Signed in, the request passes the allowance check on the backend and gets
+  // as far as the AI provider, which has no key in this test setup.
+  const student = await request.post("/api/optional/discuss", {
+    data: body,
+    headers: { Authorization: "Bearer MOCK_TOKEN_local_e2e-student" },
+  });
+  expect(student.status()).toBe(503);
+  expect((await student.json()).reason).toBe("provider-unavailable");
+});

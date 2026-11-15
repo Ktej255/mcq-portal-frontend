@@ -8,7 +8,7 @@ function readBearerToken(request: NextRequest) {
   return authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
 }
 
-function backendBaseUrl() {
+export function backendBaseUrl() {
   const configured = (process.env.BACKEND_API_URL || env.NEXT_PUBLIC_API_BASE_URL || "")
     .trim()
     .replace(/\/+$/, "");

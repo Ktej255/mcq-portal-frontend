@@ -187,6 +187,9 @@ def seeded_engine():
         )
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
+    # AI endpoints count each request against the learner's daily allowance.
+    from app.core.usage.models import DailyUsage
+    DailyUsage.__table__.create(engine, checkfirst=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
     session = SessionLocal()

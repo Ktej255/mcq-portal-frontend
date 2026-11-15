@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User
 from app.schemas.user import UserResponse
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 
 router = APIRouter()
@@ -16,3 +16,14 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """
     return StandardResponse(success=True, message="User profile retrieved successfully", data=current_user)
 
+
+
+@router.post("/ai-usage", dependencies=[Depends(ai_rate_limit)])
+def count_ai_request():
+    """Count one AI request against the signed-in learner's allowance.
+
+    The web app's own AI routes call this before they spend anything, so every
+    AI feature draws on the same per-learner allowance. Answers 429 with a
+    Retry-After header once the allowance is used up.
+    """
+    return {"allowed": True}

@@ -52,7 +52,11 @@ class ProviderConfig:
         """Resolve the actual API key from the referenced env var (if any)."""
         if not self.api_key_ref:
             return None
-        return os.environ.get(self.api_key_ref)
+        value = os.environ.get(self.api_key_ref)
+        if not value and self.api_key_ref == "GEMINI_API_KEY":
+            # Older setups named the same key GOOGLE_API_KEY.
+            value = os.environ.get("GOOGLE_API_KEY")
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +67,9 @@ _BUILTIN_CONFIGS: Dict[str, ProviderConfig] = {
     "mock": ProviderConfig(key="mock", model_id="mock", structured_output_mode="prompt"),
     "gemini": ProviderConfig(
         key="gemini",
-        model_id=os.environ.get("GEMINI_MODEL_ID", "gemini-1.5-flash"),
+        model_id=os.environ.get("GEMINI_MODEL_ID")
+        or os.environ.get("GEMINI_MODEL")
+        or "gemini-3.8-flash",
         api_key_ref="GEMINI_API_KEY",
         structured_output_mode="native",
         supports_vision=True,

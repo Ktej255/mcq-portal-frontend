@@ -7,7 +7,7 @@ class NarrativeEvaluator:
     def evaluate(self, narrative: str, report_data: Dict[str, Any], behavioral_data: Dict[str, Any]) -> NarrativeEvaluation:
         reliability = behavioral_data.get("inference_reliability", {})
         narrative_safety = reliability.get("narrative_safety", {})
-        if not settings.GOOGLE_API_KEY:
+        if not settings.gemini_api_key:
             return NarrativeEvaluation(
                 narrative_id="N/A",
                 hallucination_score=0.0,

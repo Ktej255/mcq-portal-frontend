@@ -208,48 +208,89 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 # ---------------------------------------------------------------------------
-# Per-user rate limit for AI-backed endpoints (Gemini discussion, OCR,
+# Per-user limits for AI-backed endpoints (Gemini discussion, OCR,
 # transcription, evaluation). Attach with
-# ``dependencies=[Depends(ai_rate_limit)]``. Counts live in process memory (a
-# sliding window per user for the last minute and the last day), which suits
-# the single ECS task this service runs as; move the store to Redis or
-# Postgres before running several tasks.
+# ``dependencies=[Depends(ai_rate_limit)]``.
+#
+# The daily cap is what protects the AI bill, so it is counted in the database
+# (``daily_usage``, metric ``ai_requests``, India calendar day) and holds no
+# matter how many server instances are running. The per-minute cap only smooths
+# bursts and is kept in process memory: on serverless hosting each instance
+# counts its own, which is acceptable because the daily cap is the hard stop.
 # ---------------------------------------------------------------------------
 
 _AI_MINUTE = 60
-_AI_DAY = 24 * 60 * 60
+_AI_USAGE_METRIC = "ai_requests"
 _ai_lock = threading.Lock()
 _ai_hits: "defaultdict[int, deque[float]]" = defaultdict(deque)
 
 
 def reset_ai_rate_limits() -> None:
-    """Clear all AI rate-limit counters (used by tests)."""
+    """Clear the in-memory burst counters (used by tests)."""
     with _ai_lock:
         _ai_hits.clear()
 
 
-def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
+def _seconds_until_india_midnight() -> int:
+    now = datetime.now(_INDIA)
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, int((tomorrow - now).total_seconds()))
+
+
+def _count_ai_request_today(db: Session, user_id: int) -> int:
+    """Add one to today's count in a single statement and return the new total.
+
+    The increment happens inside the database, so two requests landing on two
+    instances at the same moment cannot both read the old number.
+    """
+    today = datetime.now(_INDIA).date()
+    match = (
+        DailyUsage.user_id == user_id,
+        DailyUsage.usage_date == today,
+        DailyUsage.metric == _AI_USAGE_METRIC,
+    )
+    for _ in range(2):
+        updated = (
+            db.query(DailyUsage)
+            .filter(*match)
+            .update({DailyUsage.count: DailyUsage.count + 1}, synchronize_session=False)
+        )
+        if updated:
+            db.commit()
+            break
+        try:
+            db.add(DailyUsage(user_id=user_id, usage_date=today, metric=_AI_USAGE_METRIC, count=1))
+            db.commit()
+            break
+        except IntegrityError:
+            # Another request created today's row first; count on that one.
+            db.rollback()
+    return db.query(DailyUsage.count).filter(*match).scalar() or 0
+
+
+def ai_rate_limit(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
     now = time.time()
     with _ai_lock:
         hits = _ai_hits[current_user.id]
-        while hits and hits[0] <= now - _AI_DAY:
+        while hits and hits[0] <= now - _AI_MINUTE:
             hits.popleft()
-
-        recent = [t for t in hits if t > now - _AI_MINUTE]
-        if len(recent) >= settings.AI_RATE_LIMIT_PER_MINUTE:
+        if len(hits) >= settings.AI_RATE_LIMIT_PER_MINUTE:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many AI requests. Please wait a minute and try again.",
-                headers={"Retry-After": str(max(1, int(recent[0] + _AI_MINUTE - now) + 1))},
+                headers={"Retry-After": str(max(1, int(hits[0] + _AI_MINUTE - now) + 1))},
             )
-        if len(hits) >= settings.AI_RATE_LIMIT_PER_DAY:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Daily AI limit reached. It resets within 24 hours.",
-                headers={"Retry-After": str(max(1, int(hits[0] + _AI_DAY - now) + 1))},
-            )
-
         hits.append(now)
+
+    if _count_ai_request_today(db, current_user.id) > settings.AI_RATE_LIMIT_PER_DAY:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Daily AI limit reached. It resets at midnight India time.",
+            headers={"Retry-After": str(_seconds_until_india_midnight())},
+        )
 
 
 # ---------------------------------------------------------------------------

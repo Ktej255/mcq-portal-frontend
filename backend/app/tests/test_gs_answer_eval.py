@@ -56,6 +56,9 @@ def test_engine():
         if any(name.startswith(p) for p in prefixes)
     ]
     Base.metadata.create_all(engine, tables=tables)
+    # AI endpoints count each request against the learner's daily allowance.
+    from app.core.usage.models import DailyUsage
+    DailyUsage.__table__.create(engine, checkfirst=True)
     yield engine
     engine.dispose()
 

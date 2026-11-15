@@ -118,7 +118,20 @@ class Settings(BaseSettings):
     # Clerk Auth Settings
     CLERK_JWT_KEY: Optional[str] = None
     CLERK_JWKS_URL: Optional[str] = None
+    # Gemini key. GEMINI_API_KEY is the one name used across the backend and
+    # the web app; GOOGLE_API_KEY is still read so older setups keep working.
+    GEMINI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
+    # A current stable model. Old model names are retired by Google on a
+    # schedule, so this is a setting rather than a constant in the code.
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+    # Longest a single Gemini call may take before it is abandoned.
+    AI_REQUEST_TIMEOUT_SECONDS: float = 30.0
+
+    @property
+    def gemini_api_key(self) -> Optional[str]:
+        key = (self.GEMINI_API_KEY or "").strip() or (self.GOOGLE_API_KEY or "").strip()
+        return key or None
 
     # GS LMS discussion runtime. Gemini is the non-fabricating default; the
     # deterministic provider requires both explicit selection and enablement.
