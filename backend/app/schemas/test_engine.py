@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 from app.models.domain import ConfidenceEnum, AttemptStatusEnum
@@ -77,6 +77,9 @@ class SaveAnswerRequest(BaseModel):
         if value < 0:
             raise ValueError("time_taken_seconds must be non-negative")
         return value
+
+class SaveAnswersRequest(BaseModel):
+    answers: List[SaveAnswerRequest] = Field(..., min_length=1, max_length=500)
 
 class SaveAnswerResponse(BaseModel):
     success: bool

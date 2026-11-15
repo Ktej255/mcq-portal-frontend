@@ -8,20 +8,20 @@ import { Button } from '@/components/ui/button';
 import { ShieldAlert, Maximize2 } from 'lucide-react';
 
 interface ExamHeaderProps {
-  testId: string;
+  timerKey: string;
   testName: string;
   totalQuestions: number;
-  durationSeconds: number;
   onSubmit: () => void;
+  onTimeUp: () => void;
   onRequestFullscreen?: () => void;
 }
 
 export function ExamHeader({ 
-  testId, 
-  testName, 
-  totalQuestions, 
-  durationSeconds, 
+  timerKey,
+  testName,
+  totalQuestions,
   onSubmit,
+  onTimeUp,
   onRequestFullscreen
 }: ExamHeaderProps) {
   const { answers } = useExamStore();
@@ -100,7 +100,7 @@ export function ExamHeader({
           <div className="h-12 w-[1px] bg-zinc-200 dark:border-zinc-800 hidden md:block" />
           
           <div className="flex items-center gap-4">
-            <ExamTimer testId={testId} initialTimeSeconds={durationSeconds} onTimeUp={onSubmit} />
+            <ExamTimer timerKey={timerKey} onTimeUp={onTimeUp} />
             <Button 
               variant="default" 
               onClick={onSubmit} 

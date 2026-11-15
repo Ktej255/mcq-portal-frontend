@@ -52,6 +52,33 @@ export interface SaveAnswerPayload {
   lastAction?: 'VISITED' | 'ANSWER_SELECTED' | 'CLEARED' | 'MARKED_FOR_REVIEW';
 }
 
+export interface ServerAnswer {
+  questionId: string;
+  /** Canonical option letter as stored by the server, e.g. "B". */
+  selectedOption: string | null;
+  confidence: ConfidenceLevel | null;
+  markedForReview: boolean;
+  timeSpentSeconds: number;
+}
+
+export interface AttemptState {
+  attemptId: string;
+  /** CLOSED covers every state in which answers can no longer change. */
+  status: 'IN_PROGRESS' | 'CLOSED';
+  /** Seconds left on the server's clock. null when the test has no limit. */
+  remainingSeconds: number | null;
+  answers: ServerAnswer[];
+}
+
+/**
+ * True when the server refused a write because the attempt is over: time ran
+ * out or it was already submitted. Not a connection problem, so not retried.
+ */
+export function isAttemptClosedError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('response' in error)) return false;
+  return (error as { response?: { status?: number } }).response?.status === 409;
+}
+
 export type ExamQuestionResponseErrorKind = 'INVALID_RESPONSE' | 'EMPTY_QUESTION_BANK';
 
 export class ExamQuestionResponseError extends Error {
@@ -163,8 +190,32 @@ export const examService = {
     return payload;
   },
 
+  /**
+   * Server view of an attempt: its status, the time left on the server's
+   * clock, and the answers already saved. The exam screen opens from this, so
+   * a reload or another device continues the same exam.
+   */
+  getAttemptState: async (attemptId: string): Promise<AttemptState> => {
+    const response = await apiClient.get(`attempts/${attemptId}/state`);
+    const payload = response.data?.data ?? response.data;
+    const remaining = payload?.remaining_seconds;
+    return {
+      attemptId: String(payload?.attempt_id ?? attemptId),
+      status: payload?.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'CLOSED',
+      remainingSeconds: typeof remaining === 'number' && Number.isFinite(remaining) ? Math.max(0, remaining) : null,
+      answers: Array.isArray(payload?.answers)
+        ? payload.answers.map((answer: Record<string, unknown>) => ({
+            questionId: String(answer.question_id),
+            selectedOption: typeof answer.selected_option === 'string' ? answer.selected_option : null,
+            confidence: typeof answer.confidence_level === 'string' ? answer.confidence_level as ConfidenceLevel : null,
+            markedForReview: Boolean(answer.marked_for_review),
+            timeSpentSeconds: Number(answer.time_taken_seconds) || 0,
+          }))
+        : [],
+    };
+  },
+
   saveAnswers: async (attemptId: string, answers: SaveAnswerPayload[]) => {
-    // Backend expects a single answer per request — send the last answer
     const saveableAnswers = answers.filter(answer => {
       if (answer.status === 'NOT_VISITED') return false;
       if (answer.lastAction === 'VISITED') return false;
@@ -172,9 +223,10 @@ export const examService = {
     });
     if (saveableAnswers.length === 0) return;
 
-    const responses = [];
-    for (const answer of saveableAnswers) {
-      const response = await apiClient.put(`attempts/${attemptId}/answers`, {
+    // One request for the whole batch: the final sync of a long paper has to
+    // finish inside the short grace period after time is up.
+    const response = await apiClient.put(`attempts/${attemptId}/answers/bulk`, {
+      answers: saveableAnswers.map(answer => ({
         question_id: parseInt(answer.questionId),
         selected_option: normalizeOptionId(answer.selectedOptionId),
         time_taken_seconds: answer.timeSpentSeconds,
@@ -182,10 +234,9 @@ export const examService = {
         is_skipped: answer.status === 'UNANSWERED',
         marked_for_review: answer.status === 'MARKED_FOR_REVIEW' || answer.status === 'ANSWERED_AND_MARKED',
         clear_response: answer.lastAction === 'CLEARED',
-      });
-      responses.push(response.data?.data ?? response.data);
-    }
-    return responses;
+      })),
+    });
+    return response.data?.data ?? response.data;
   },
 
   submitTest: async (attemptId: string) => {

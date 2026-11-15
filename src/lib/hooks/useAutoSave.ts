@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useExamStore } from '../store/useExamStore';
-import { examService, SaveAnswerPayload } from '@/services/api/examService';
+import { examService, isAttemptClosedError, SaveAnswerPayload } from '@/services/api/examService';
 import { toast } from 'sonner';
 
 export const useAutoSave = (attemptId: string | null, disabled = false) => {
@@ -66,7 +66,14 @@ export const useAutoSave = (attemptId: string | null, disabled = false) => {
       }
     } catch (error) {
       console.error('Auto-save failed', error);
-      
+
+      if (isAttemptClosedError(error)) {
+        // Time is up or the attempt was submitted: the server will not take
+        // more answers, so retrying or reporting "offline" would be wrong.
+        setSaveError('This attempt is closed.');
+        return;
+      }
+
       // Retry logic (up to 3 times)
       if (retryCount.current < 3) {
         retryCount.current += 1;

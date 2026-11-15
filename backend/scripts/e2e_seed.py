@@ -11,6 +11,9 @@ token ``MOCK_TOKEN_local_<id>`` to the user whose google_uid is
 * e2e-expired    — signed up 30 days ago, trial over, no plan
 * e2e-foundation — trial over, active Foundation plan
 
+It also adds a one-minute, three-question test to the MCQ engine for the
+timed-exam flow.
+
 Usage (from backend/):
     DATABASE_URL=sqlite:///./e2e.db python scripts/e2e_seed.py
 """
@@ -27,7 +30,9 @@ from app.core.gs_lms.importer import DEFAULT_ARTIFACT_PATH, import_gs_geography,
 from app.core.gs_lms.student_models import GsLmsOnboardingStatus  # noqa: E402
 from app.core.payments.models import PaymentOrder, Subscription  # noqa: E402
 from app.db.session import Base, SessionLocal, engine  # noqa: E402
-from app.models.domain import RoleEnum, StudentProfile, User  # noqa: E402
+from app.models.domain import (  # noqa: E402
+    Question, RoleEnum, StudentProfile, Subject, Test, Topic, User, WorkflowStatusEnum,
+)
 from scripts.seed_production import _ensure_subjects  # noqa: E402
 
 STUDENTS = {
@@ -79,6 +84,24 @@ def main() -> None:
                     "welcomeVideoCompleted": True,
                     "inductionCompleted": True,
                 }))
+        # A one-minute test in the MCQ engine, for the timed-exam flow
+        # (server clock, resume, automatic submit when time runs out).
+        subject = Subject(name="E2E Geography")
+        db.add(subject)
+        db.flush()
+        topic = Topic(name="E2E Geomorphology", subject_id=subject.id)
+        db.add(topic)
+        db.flush()
+        timed = Test(title="E2E one-minute paper", subject_id=subject.id, duration_minutes=1)
+        db.add(timed)
+        db.flush()
+        for number in range(1, 4):
+            db.add(Question(
+                test_id=timed.id, topic_id=topic.id, question_number=number,
+                text_en=f"E2E question {number}: which option is correct?",
+                options_en={"A": "Alpha", "B": "Bravo", "C": "Charlie", "D": "Delta"},
+                correct_option="B", status=WorkflowStatusEnum.PUBLISHED,
+            ))
         db.add(PaymentOrder(
             order_id="e2e-order-foundation", user_id="local_e2e-foundation",
             plan_tier="foundation", billing_cycle="monthly", amount=399, status="paid",

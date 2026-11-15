@@ -23,6 +23,9 @@ from fastapi import HTTPException
 from app.models.domain import Attempt, AttemptStatusEnum, Test
 
 
+SAVE_GRACE_SECONDS = 60
+
+
 class AttemptLockError(Exception):
     """Raised when an attempt lock rule is violated."""
     def __init__(self, code: str, detail: str):
@@ -84,6 +87,18 @@ class AttemptLockManager:
         return max(0, int((now - start).total_seconds()))
 
     @staticmethod
+    def get_remaining_seconds(attempt: Attempt, db: Session) -> Optional[int]:
+        """
+        RULE 4 — the clock the student sees comes from the server.
+        Seconds left on the attempt, never below zero. None if the test has no limit.
+        """
+        test: Optional[Test] = db.query(Test).filter(Test.id == attempt.test_id).first()
+        if not test or not test.duration_minutes:
+            return None
+        elapsed = AttemptLockManager.get_server_elapsed_seconds(attempt)
+        return max(0, test.duration_minutes * 60 - elapsed)
+
+    @staticmethod
     def is_timer_expired(attempt: Attempt, db: Session) -> bool:
         """
         RULE 4 — Timer drift protection.
@@ -94,8 +109,8 @@ class AttemptLockManager:
             return False
         elapsed = AttemptLockManager.get_server_elapsed_seconds(attempt)
         allowed_seconds = test.duration_minutes * 60
-        # Allow 60s grace period for network latency
-        return elapsed > (allowed_seconds + 60)
+        # Grace period so the final sync at time-up is not refused for network latency
+        return elapsed > (allowed_seconds + SAVE_GRACE_SECONDS)
 
     @staticmethod
     def check_idempotent_submit(db: Session, attempt_id: int, user_id: int) -> Optional[Attempt]:
