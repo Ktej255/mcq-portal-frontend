@@ -32,3 +32,19 @@ test("a student cannot open operator screens", async ({ page }) => {
   await page.goto("/upsc/question-bank");
   await expect(page).toHaveURL(/\/practice/);
 });
+
+test("an operator sees the Geography content status and can load it again", async ({ page }) => {
+  await page.addInitScript((token) => {
+    window.localStorage.setItem("MOCK_TOKEN", token);
+    window.localStorage.setItem("MOCK_USER_EMAIL", "operator@example.com");
+    window.localStorage.setItem("MOCK_USER_UID", "operator");
+  }, ADMIN_TOKEN);
+  await page.goto("/admin/dashboard");
+
+  const card = page.getByTestId("admin-geography-content-loader");
+  await expect(card.getByText("The reviewed Geography content is in the database.", { exact: false })).toBeVisible();
+  await expect(card.getByText("Practice MCQs")).toBeVisible();
+
+  await card.getByRole("button", { name: "Load again" }).click();
+  await expect(card.getByRole("status")).toHaveText(/already loaded and has been refreshed/, { timeout: 60_000 });
+});

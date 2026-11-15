@@ -56,6 +56,7 @@ import app.core.gs_lms.student_models  # noqa: F401
 
 from app.core.gs.models import GsSubject, GsReviewStatusEnum
 from app.core.gs_lms.importer import import_gs_geography
+from app.core.gs_lms.content_loader import ensure_gs_subjects, retire_orphan_nodes
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
@@ -96,47 +97,7 @@ def _ensure_gs_paper_column(connection) -> None:
 
 def _ensure_subjects(session) -> dict[str, int]:
     """Ensure core GS subjects exist and return IDs resolved by stable slug."""
-    now = datetime.now(timezone.utc)
-    subjects_to_seed = [
-        {"slug": "geography", "name": "Geography", "desc": "GS Paper 1 - Geography (Physical, Human, Indian)", "order": 1},
-        {"slug": "polity-governance", "name": "Polity & Governance", "desc": "GS Paper 2 - Indian Constitution, Polity, Governance", "order": 2},
-        {"slug": "economy", "name": "Economy", "desc": "GS Paper 3 - Economic Development, Budgeting, Planning", "order": 3},
-        {"slug": "history", "name": "History", "desc": "GS Paper 1 - Ancient, Medieval, Modern History and Art & Culture", "order": 4},
-        {"slug": "science-tech", "name": "Science & Tech", "desc": "GS Paper 3 - Science & Technology developments", "order": 5},
-        {"slug": "environment", "name": "Environment", "desc": "GS Paper 3 - Environment, Ecology, Biodiversity", "order": 6},
-        {"slug": "disaster-management", "name": "Disaster Management", "desc": "GS Paper 3 - Disaster Management framework", "order": 7},
-        {"slug": "internal-security-society", "name": "Internal Security & Society", "desc": "GS Paper 3 Internal Security + GS Paper 1 Indian Society", "order": 8},
-        {"slug": "csat", "name": "CSAT", "desc": "Civil Services Aptitude Test - Paper 2 (Qualifying)", "order": 9},
-    ]
-
-    subject_ids: dict[str, int] = {}
-    for s_info in subjects_to_seed:
-        existing = (
-            session.query(GsSubject)
-            .filter(GsSubject.slug == s_info["slug"])
-            .one_or_none()
-        )
-        if existing is None:
-            subject = GsSubject(
-                slug=s_info["slug"],
-                name=s_info["name"],
-                description=s_info["desc"],
-                display_order=s_info["order"],
-                is_complete=False,
-                created_at=now,
-                updated_at=now,
-            )
-            session.add(subject)
-            session.flush()
-            existing = subject
-            print(f"  [created] gs_subjects '{s_info['slug']}' (id={existing.id})")
-        else:
-            existing.name = s_info["name"]
-            existing.description = s_info["desc"]
-            existing.display_order = s_info["order"]
-            print(f"  [ok] gs_subjects '{s_info['slug']}' exists (id={existing.id})")
-        subject_ids[s_info["slug"]] = existing.id
-    return subject_ids
+    return ensure_gs_subjects(session, log=print)
 
 
 def _ensure_csat_syllabus(session, csat_subject_id: int) -> dict[str, int]:
@@ -307,33 +268,8 @@ def _ensure_csat_syllabus(session, csat_subject_id: int) -> dict[str, int]:
 
 
 def _retire_orphan_nodes(session, subject_id: int) -> int:
-    """Hide (but never delete) LEAF_TOPIC nodes with no content sections.
-
-    After renaming/restructuring, the importer creates new nodes (matched by
-    title+parent) and leaves old ones without sections. Those old nodes may
-    still be referenced by learner rows (progress, recall attempts, lab
-    sessions, growth reports). Deleting them would silently destroy learner
-    history, so they are marked UNREVIEWED — invisible to students while
-    keeping every reference resolvable.
-    """
-    orphan_ids = [r[0] for r in session.execute(text(
-        "SELECT n.id FROM gs_lms_syllabus_nodes n "
-        "WHERE n.subject_id = :sid AND n.node_type = 'LEAF_TOPIC' "
-        "AND NOT EXISTS (SELECT 1 FROM gs_lms_content_sections s "
-        "WHERE s.syllabus_node_id = n.id)"
-    ), {"sid": subject_id})]
-    if not orphan_ids:
-        return 0
-    session.execute(
-        text(
-            "UPDATE gs_lms_syllabus_nodes "
-            "SET review_status = 'UNREVIEWED' "
-            "WHERE id IN :ids AND review_status != 'UNREVIEWED'"
-        ).bindparams(bindparam("ids", expanding=True)),
-        {"ids": orphan_ids},
-    )
-    session.flush()
-    return len(orphan_ids)
+    """Hide (but never delete) LEAF_TOPIC nodes with no content sections."""
+    return retire_orphan_nodes(session, subject_id)
 
 
 def main() -> None:

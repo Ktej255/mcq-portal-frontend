@@ -101,6 +101,7 @@ from app.api.v1 import optional
 from app.api.v1 import gs_lms
 from app.api.v1.gs_lms import access_admin as gs_lms_access_admin
 from app.api.v1.gs_lms import content_coverage_admin as gs_lms_content_coverage
+from app.api.v1.gs_lms import content_load_admin as gs_lms_content_load
 from app.api.v1 import profile
 from app.api.v1 import payments
 from app.api.v1 import engagement
@@ -134,6 +135,14 @@ app.include_router(
 app.include_router(
     gs_lms_content_coverage.router,
     prefix="/api/v1/admin/gs-lms/content-coverage",
+    tags=["gs-lms-admin"],
+)
+
+# Operator action: load the reviewed Geography content into an empty (or
+# older) database, in place and repeatable.
+app.include_router(
+    gs_lms_content_load.router,
+    prefix="/api/v1/admin/gs-lms/content-load",
     tags=["gs-lms-admin"],
 )
 

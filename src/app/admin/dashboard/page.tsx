@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GeographyContentLoader } from "@/components/admin/GeographyContentLoader";
 import {
   countInventoryStatuses,
   morningBatchCorpusSummary,
@@ -104,6 +105,8 @@ export default function AdminDashboard() {
           Open Launch Plan <ArrowRight className="h-4 w-4" />
         </Link>
       </header>
+
+      <GeographyContentLoader />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Readiness summary">
         {launchReadinessMetrics.map((metric) => (
