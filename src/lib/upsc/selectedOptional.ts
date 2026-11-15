@@ -6,6 +6,8 @@
  * {@link OPTIONAL_CATALOG_ROUTE} is the single place a subject is chosen.
  */
 
+import { OPTIONAL_SUBJECTS } from "./optionalSubjectsCatalog";
+
 export const SELECTED_OPTIONAL_STORAGE_KEY = "sarit-upsc-selected-optional-v1";
 
 /** Route to the optional-subjects catalog (all 25 subjects). */
@@ -18,10 +20,26 @@ export type SelectedOptional = {
   name: string;
 };
 
-/** Route to a specific optional subject's shell. */
+function canonicalOptional(slug: string) {
+  return OPTIONAL_SUBJECTS.find((subject) => subject.slug === slug);
+}
+
+/** Normalize an untrusted local/backend value to canonical slug and name. */
+function normalizeSelectedOptional(value: unknown): SelectedOptional | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SelectedOptional>;
+  if (typeof candidate.slug !== "string") return null;
+
+  const subject = canonicalOptional(candidate.slug);
+  return subject ? { slug: subject.slug, name: subject.name } : null;
+}
+
+/** Route to a specific subject only when its slug belongs to the catalog. */
 export function optionalSubjectRoute(slug: string): string {
-  if (slug === "geography") return `${OPTIONAL_CATALOG_ROUTE}/geography-optional`;
-  return `${OPTIONAL_CATALOG_ROUTE}/${slug}`;
+  const subject = canonicalOptional(slug);
+  return subject
+    ? `${OPTIONAL_CATALOG_ROUTE}/${subject.slug}`
+    : OPTIONAL_CATALOG_ROUTE;
 }
 
 /** Read the student's selected optional, or null when none is chosen. */
@@ -32,16 +50,17 @@ export function readSelectedOptional(): SelectedOptional | null {
     const raw = window.localStorage.getItem(SELECTED_OPTIONAL_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      typeof (parsed as SelectedOptional).slug === "string" &&
-      typeof (parsed as SelectedOptional).name === "string"
-    ) {
-      const { slug, name } = parsed as SelectedOptional;
-      return { slug, name };
+    const normalized = normalizeSelectedOptional(parsed);
+    if (!normalized) {
+      window.localStorage.removeItem(SELECTED_OPTIONAL_STORAGE_KEY);
+      return null;
     }
-    return null;
+
+    const normalizedRaw = JSON.stringify(normalized);
+    if (normalizedRaw !== raw) {
+      window.localStorage.setItem(SELECTED_OPTIONAL_STORAGE_KEY, normalizedRaw);
+    }
+    return normalized;
   } catch {
     return null;
   }
@@ -50,5 +69,13 @@ export function readSelectedOptional(): SelectedOptional | null {
 /** Persist the student's selected optional subject. */
 export function writeSelectedOptional(value: SelectedOptional): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(SELECTED_OPTIONAL_STORAGE_KEY, JSON.stringify(value));
+  const normalized = normalizeSelectedOptional(value);
+  if (!normalized) return;
+  window.localStorage.setItem(SELECTED_OPTIONAL_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+/** Clear the browser cache when the canonical backend reports no selection. */
+export function clearSelectedOptional(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SELECTED_OPTIONAL_STORAGE_KEY);
 }

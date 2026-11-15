@@ -1,7 +1,7 @@
 import { resolveToken } from "@/lib/auth/token-strategy";
 
-// Discussion mentor client service. Tries the live AI route; falls back to a
-// structured, useful message when no AI key is configured yet.
+// Discussion mentor client service. Returns a live response only when the
+// discussion route/provider succeeds; unavailable states must remain explicit.
 export async function askOptionalDoubt(input: { subject: string; context: string; message: string }): Promise<{ reply: string; live: boolean }> {
   try {
     const token = await resolveToken();
@@ -10,14 +10,15 @@ export async function askOptionalDoubt(input: { subject: string; context: string
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(input),
     });
-    const data = await res.json();
-    if (data?.ok && data.reply) return { reply: String(data.reply), live: true };
+    const data = await res.json().catch(() => null) as { ok?: unknown; reply?: unknown } | null;
+    if (res.ok && data?.ok === true && typeof data.reply === "string" && data.reply.trim()) {
+      return { reply: data.reply.trim(), live: true };
+    }
   } catch {
-    /* fall through to offline guidance */
+    /* return an explicit unavailable state below */
   }
   return {
-    reply:
-      "Structure it as: (1) define the core term and set context, (2) give the mechanism/cause-effect, (3) add an example plus a labelled diagram or map, (4) close with a balanced way-forward. Tie at least one point to a recent development. — Live AI discussion turns on once the Gemini key is configured.",
+    reply: "Live optional-subject discussion is temporarily unavailable. Please try again shortly.",
     live: false,
   };
 }

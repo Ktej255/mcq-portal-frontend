@@ -3983,7 +3983,7 @@ export function UpscPrelimsShowcase({
               </h1>
               <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-[#53645b]">
                 We analyzed all 100 questions from UPSC Prelims 2026 and compared them to our course materials. 
-                See the complete breakdown: what we covered, where we fell short, and how we're improving for 2027.
+                See the complete breakdown: what we covered, where we fell short, and how we&apos;re improving for 2027.
               </p>
             </motion.div>
 

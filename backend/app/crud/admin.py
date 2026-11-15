@@ -139,11 +139,18 @@ def bulk_create_questions(db: Session, obj_in: BulkQuestionCreate) -> list[Quest
             test_batches[t_id] = []
         test_batches[t_id].append(q)
         
-    for t_id, batch in test_batches.items():
-        batch_results = MCQIngestionEngine.ingest_batch(db, t_id, batch)
-        created_questions.extend(batch_results)
-        
-    return created_questions
+    try:
+        for t_id, batch in test_batches.items():
+            batch_results = MCQIngestionEngine.ingest_batch(db, t_id, batch)
+            created_questions.extend(batch_results)
+
+        # The bulk operation owns one transaction across every test batch.
+        db.commit()
+        return created_questions
+    except Exception:
+        # Never expose or retain a partial-success result when any batch fails.
+        db.rollback()
+        raise
 
 # --- Test CRUD ---
 def create_test(db: Session, obj_in: TestCreate) -> Test:

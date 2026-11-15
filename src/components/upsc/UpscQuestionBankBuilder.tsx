@@ -73,6 +73,23 @@ export function UpscQuestionBankBuilder() {
   const searchParams = useSearchParams();
   const requestedSubject = searchParams.get("subject") ?? "geography";
   const requestedStrategyBlueprint = searchParams.get("strategyBlueprint");
+
+  return (
+    <UpscQuestionBankBuilderContent
+      key={requestedSubject}
+      requestedSubject={requestedSubject}
+      requestedStrategyBlueprint={requestedStrategyBlueprint}
+    />
+  );
+}
+
+function UpscQuestionBankBuilderContent({
+  requestedSubject,
+  requestedStrategyBlueprint,
+}: {
+  requestedSubject: string;
+  requestedStrategyBlueprint: string | null;
+}) {
   const [subjectSlug, setSubjectSlug] = useState(() => getQuestionBankSubject(requestedSubject).slug);
   const [progress, setProgress] = useState<QuestionBankProgressInput>({});
   const [profile, setProfile] = useState<StudentProfile | null>(null);
@@ -81,18 +98,8 @@ export function UpscQuestionBankBuilder() {
   const [count, setCount] = useState<number | null>(null);
   const [customMode, setCustomMode] = useState(false);
   const [customMix, setCustomMix] = useState<QuestionBankCustomMix>(emptyQuestionBankMix);
-  const [displayQuestionIds, setDisplayQuestionIds] = useState<string[]>([]);
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
   const [strategyHandoffs, setStrategyHandoffs] = useState<StrategyPracticeHandoff[]>([]);
-
-  useEffect(() => {
-    const nextSubjectSlug = getQuestionBankSubject(requestedSubject).slug;
-    setSubjectSlug(nextSubjectSlug);
-    setDifficulty(null);
-    setCount(null);
-    setCustomMode(false);
-    setCustomMix(emptyQuestionBankMix);
-  }, [requestedSubject]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -202,29 +209,14 @@ export function UpscQuestionBankBuilder() {
     () => questionBankCoverageRows.find((row) => row.subjectSlug === selectedSubject.slug),
     [selectedSubject.slug]
   );
-  const targetDayKey = recommendation.targetDays.join(",");
 
-  useEffect(() => {
+  const displayQuestionIds = useMemo(() => {
     if (requestedStrategyBlueprint && selectedStrategyPracticeQuestions.length) {
-      setDisplayQuestionIds(selectedStrategyPracticeQuestions.slice(0, activeCount).map((question) => question.id));
-      return;
+      return selectedStrategyPracticeQuestions.slice(0, activeCount).map((question) => question.id);
     }
 
-    setDisplayQuestionIds(selection.questions.map((question) => question.id));
-  }, [
-    activeCount,
-    activeDifficulty,
-    customMode,
-    effectiveCustomMix.EASY,
-    effectiveCustomMix.HARD,
-    effectiveCustomMix.MEDIUM,
-    effectiveCustomMix.PYQ_STYLE,
-    requestedStrategyBlueprint,
-    selectedStrategyPracticeQuestions,
-    selectedSubject.slug,
-    selection.questions,
-    targetDayKey,
-  ]);
+    return selection.questions.map((question) => question.id);
+  }, [activeCount, requestedStrategyBlueprint, selectedStrategyPracticeQuestions, selection.questions]);
 
   const displayedQuestions = useMemo(() => {
     if (!displayQuestionIds.length) return selection.questions;

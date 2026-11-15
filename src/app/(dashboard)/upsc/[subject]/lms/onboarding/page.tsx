@@ -1,7 +1,5 @@
-"use client";
+import { OnboardingPage } from "@/components/gs-lms/pages/OnboardingPage";
 
-import { OnboardingWizard } from "@/components/gs-lms/OnboardingWizard";
-
-export default function OnboardingPage() {
-  return <OnboardingWizard />;
+export default function Page() {
+  return <OnboardingPage />;
 }

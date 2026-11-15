@@ -44,7 +44,7 @@ from app.db.governance import InstitutionalAuditMixin
 
 class GsLmsFunnelStepEnum(int, enum.Enum):
     """The 14 steps of the Interactive Learning Funnel."""
-    DISCUSSION_GATE = 1
+    TOPIC_INTRO = 1
     BASIC_CONTENT = 2
     BASIC_RECALL = 3
     NCERT_CONTENT = 4

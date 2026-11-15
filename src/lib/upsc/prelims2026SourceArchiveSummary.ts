@@ -34,7 +34,9 @@ export function buildPrelims2026SourceArchiveSummaryFromScan(scan: SourceArchive
       "This summary exposes archive counts and rebuild tracks only. Raw file paths, file names and page-level proof stay inside the operator portal.",
     scan: {
       ok: scan.ok,
-      rootConnected: scan.rootExists,
+      rootConnected: scan.rootExists && scan.ok && scan.scanComplete,
+      scanComplete: scan.scanComplete,
+      scanErrorCount: scan.scanErrorCount,
       totalFiles: scan.totalFiles,
       totalDirectories: scan.totalDirectories,
       totalBytes: scan.totalBytes,

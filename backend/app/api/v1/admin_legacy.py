@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Any
 
 from app.db.session import get_db
-from app.models.domain import User
+from app.models.domain import Question, User
 from app.api.dependencies import get_current_admin
 from app.schemas.common import StandardResponse, PaginatedResponse
 from app.schemas.admin import (
@@ -16,6 +16,16 @@ from app.crud import admin as crud_admin
 from app.services.observability import observability_service
 
 router = APIRouter()
+
+
+def _get_active_question(db: Session, question_id: int) -> Question:
+    question = db.query(Question).filter(
+        Question.id == question_id,
+        Question.is_deleted.is_(False),
+    ).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return question
 
 # --- Subjects ---
 @router.post("/subjects", response_model=StandardResponse[SubjectOut])
@@ -104,7 +114,10 @@ def get_questions(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ) -> Any:
-    questions = crud_admin.get_questions(db=db, test_id=test_id, skip=skip, limit=limit)
+    query = db.query(Question).filter(Question.is_deleted.is_(False))
+    if test_id:
+        query = query.filter(Question.test_id == test_id)
+    questions = query.order_by(Question.question_number.asc()).offset(skip).limit(limit).all()
     return PaginatedResponse(success=True, message="Questions retrieved", data=questions, total=len(questions), page=skip//limit if limit else 0, size=limit)
 
 @router.put("/questions/{question_id}", response_model=StandardResponse[QuestionOut])
@@ -114,6 +127,7 @@ def update_question(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ) -> Any:
+    _get_active_question(db, question_id)
     question = crud_admin.update_question(db=db, question_id=question_id, obj_in=question_in)
     return StandardResponse(success=True, message="Question updated successfully", data=question)
 
@@ -123,7 +137,10 @@ def delete_question(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ) -> Any:
-    question = crud_admin.delete_question(db=db, question_id=question_id)
+    question = _get_active_question(db, question_id)
+    question.soft_delete(db, actor=str(current_admin.id))
+    db.commit()
+    db.refresh(question)
     return StandardResponse(success=True, message="Question deleted successfully", data=question)
 
 # --- Tests ---
@@ -190,9 +207,9 @@ def search_questions(
     min_quality: float = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin)
+    current_admin: User = Depends(get_current_admin),
 ):
-    query = db.query(Question)
+    query = db.query(Question).filter(Question.is_deleted.is_(False))
     if q: query = query.filter(Question.text_en.ilike(f"%{q}%"))
     if topic_id: query = query.filter(Question.topic_id == topic_id)
     if status: query = query.filter(Question.status == status)

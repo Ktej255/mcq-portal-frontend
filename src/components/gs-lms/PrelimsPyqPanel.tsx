@@ -17,25 +17,83 @@ interface PrelimsPyqPanelProps {
 
 export function PrelimsPyqPanel({ nodeId, subject = "geography" }: PrelimsPyqPanelProps) {
   const [pyqs, setPyqs] = useState<PyqOut[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
+  const [failedRequestKey, setFailedRequestKey] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [revealed, setRevealed] = useState<Record<number, PyqOut>>({});
+  const [revealErrors, setRevealErrors] = useState<Record<number, boolean>>({});
+  const [revealing, setRevealing] = useState<Record<number, boolean>>({});
+
+  // Loading and error are derived from the request key they belong to, so a new
+  // topic never inherits the previous request's flags and the effect never has
+  // to reset state when it starts.
+  const requestKey = `${subject}:${nodeId}`;
+  const loading = loadedRequestKey !== requestKey;
+  const fetchError = failedRequestKey === requestKey;
 
   useEffect(() => {
+    let cancelled = false;
     gsLmsService
       .getTopicPyqs(subject, nodeId, "PRELIMS")
-      .then((res) => setPyqs(res.pyqs))
-      .catch(() => setPyqs([]))
-      .finally(() => setLoading(false));
-  }, [nodeId, subject]);
+      .then((res) => {
+        if (cancelled) return;
+        setPyqs(res.pyqs);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPyqs([]);
+        setFailedRequestKey(requestKey);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedRequestKey(requestKey);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nodeId, subject, requestKey, retryCount]);
+
+  const handleRetry = () => {
+    setFailedRequestKey(null);
+    setLoadedRequestKey(null);
+    setRetryCount((count) => count + 1);
+  };
 
   const handleReveal = async (pyqId: number) => {
+    setRevealErrors((prev) => ({ ...prev, [pyqId]: false }));
+    setRevealing((prev) => ({ ...prev, [pyqId]: true }));
     try {
       const full = await gsLmsService.revealPyqAnswer(subject, pyqId);
       setRevealed((prev) => ({ ...prev, [pyqId]: full }));
     } catch {
-      /* ignore — keep question visible without answer */
+      setRevealErrors((prev) => ({ ...prev, [pyqId]: true }));
+    } finally {
+      setRevealing((prev) => ({ ...prev, [pyqId]: false }));
     }
   };
+
+  if (fetchError) {
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-[#e7c4b8] bg-[#fff8f5] p-5 space-y-3"
+      >
+        <div>
+          <h3 className="text-sm font-black text-[#13251d]">Prelims PYQs unavailable</h3>
+          <p className="mt-1 text-xs leading-5 text-[#5d675f]">
+            We could not load the PYQs for this topic. Please try again.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="rounded-lg bg-[#1d9e75] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#178a65] transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (loading || pyqs.length === 0) return null;
 
@@ -73,12 +131,22 @@ export function PrelimsPyqPanel({ nodeId, subject = "geography" }: PrelimsPyqPan
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => handleReveal(q.id)}
-                className="rounded-lg bg-[#1d9e75] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#178a65] transition-colors"
-              >
-                Reveal Answer
-              </button>
+              <div className="space-y-2">
+                {revealErrors[q.id] && (
+                  <p role="alert" className="text-xs leading-5 text-[#a14f3b]">
+                    We could not reveal this answer. Please try again.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleReveal(q.id)}
+                  disabled={Boolean(revealing[q.id])}
+                  aria-busy={Boolean(revealing[q.id])}
+                  className="rounded-lg bg-[#1d9e75] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#178a65] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {revealing[q.id] ? "Revealing…" : revealErrors[q.id] ? "Retry Reveal" : "Reveal Answer"}
+                </button>
+              </div>
             )}
           </div>
         );

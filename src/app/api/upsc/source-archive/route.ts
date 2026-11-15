@@ -21,6 +21,8 @@ export async function GET() {
       ok: false,
       rootPath,
       rootExists: false,
+      scanComplete: false,
+      scanErrorCount: 1,
       generatedAt: new Date().toISOString(),
       totalFiles: 0,
       totalDirectories: 0,

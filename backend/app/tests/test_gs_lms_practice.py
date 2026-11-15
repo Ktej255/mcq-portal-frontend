@@ -633,8 +633,12 @@ def test_submit_before_all_answered_returns_422(client):
     assert resp.status_code == 422
 
 
-def test_submit_already_submitted_returns_409(client):
-    """409 if session already submitted."""
+def test_submit_already_submitted_replays_result(client):
+    """A committed submission is replayed, not turned into a terminal conflict.
+
+    Retrying submit after a lost response must return the authoritative result
+    (idempotent mutation), and must not create a second scoring side effect.
+    """
     session_data = _start_session(client)
     session_id = session_data["session_id"]
 
@@ -649,9 +653,12 @@ def test_submit_already_submitted_returns_409(client):
     resp = client.post(f"/api/v1/gs-lms/geography/practice/{session_id}/submit")
     assert resp.status_code == 200
 
-    # Submit again
+    # Submit again — replay the same authoritative result
     resp2 = client.post(f"/api/v1/gs-lms/geography/practice/{session_id}/submit")
-    assert resp2.status_code == 409
+    assert resp2.status_code == 200
+    assert resp2.json()["message"] == "Session already submitted; result replayed"
+    assert resp2.json()["data"]["session_id"] == session_id
+    assert resp2.json()["data"]["correct_count"] == resp.json()["data"]["correct_count"]
 
 
 def test_submit_ownership_enforced(client_pair):

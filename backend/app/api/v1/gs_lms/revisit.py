@@ -22,6 +22,7 @@ from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
 from app.core.gs.models import GsSubject
 from app.core.gs_lms.models import GsLmsSyllabusNode
+from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
 from app.core.gs_lms.student_models import GsLmsRevisitSchedule
 from app.api.v1.gs_lms.dependencies import resolve_subject
 
@@ -85,16 +86,29 @@ def get_due_revisits(
     """
     today = date.today()
 
-    revisits = (
+    revisit_query = (
         db.query(GsLmsRevisitSchedule)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsRevisitSchedule.syllabus_node_id,
+        )
         .filter(
             GsLmsRevisitSchedule.student_id == current_user.id,
+            GsLmsSyllabusNode.subject_id == subject.id,
             GsLmsRevisitSchedule.due_date <= today,
             GsLmsRevisitSchedule.completed == False,
         )
-        .order_by(GsLmsRevisitSchedule.due_date.asc())
-        .all()
     )
+    # Paid-beta scope: never queue a revisit the learner cannot open. Legacy
+    # progress on unfinished topics stays stored (it reappears if the topic is
+    # authored and re-enters scope) but is not surfaced as a dead link.
+    if beta_scope_enabled():
+        ready_ids = compute_loop_ready_ids(db, subject.id)
+        revisit_query = revisit_query.filter(
+            GsLmsRevisitSchedule.syllabus_node_id.in_(ready_ids)
+        )
+
+    revisits = revisit_query.order_by(GsLmsRevisitSchedule.due_date.asc()).all()
 
     # Build response items, joining node title
     items: list[GsLmsRevisitItemOut] = []
@@ -146,9 +160,14 @@ def complete_revisit(
     """
     revisit = (
         db.query(GsLmsRevisitSchedule)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsRevisitSchedule.syllabus_node_id,
+        )
         .filter(
             GsLmsRevisitSchedule.id == revisit_id,
             GsLmsRevisitSchedule.student_id == current_user.id,
+            GsLmsSyllabusNode.subject_id == subject.id,
         )
         .one_or_none()
     )

@@ -6,11 +6,14 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 def verify_token(id_token: str) -> dict:
-    """Verify Clerk JWT and map standard claims to match database expectations."""
+    """Verify a Clerk JWT and map claims to the local user identity shape."""
     try:
-        # If mock auth is enabled and no JWT key is provided, allow unverified decode for easy dev testing
-        if not settings.CLERK_JWT_KEY and settings.ALLOW_MOCK_AUTH:
-            logger.warning("CLERK | CLERK_JWT_KEY is not set. Decoding token WITHOUT signature verification for development.")
+        # Unverified decoding is restricted to explicitly local/test runtimes.
+        # The dependency layer has the same guard; keeping it here prevents
+        # direct callers from weakening production or staging verification.
+        local_mock_environment = settings.APP_ENVIRONMENT in {"development", "test", "local"}
+        if not settings.CLERK_JWT_KEY and settings.ALLOW_MOCK_AUTH and local_mock_environment:
+            logger.warning("CLERK | CLERK_JWT_KEY is not set. Decoding token WITHOUT signature verification for local testing.")
             decoded_token = jwt.decode(id_token, options={"verify_signature": False})
         else:
             if not settings.CLERK_JWT_KEY:
@@ -31,17 +34,21 @@ def verify_token(id_token: str) -> dict:
                 options={"verify_exp": True}
             )
 
-        # Map Clerk sub/email/name/picture to match what dependencies.py expects (legacy Google/Firebase names)
+        # Preserve the legacy uid alias while exposing Clerk's canonical subject.
         sub = decoded_token.get("sub")
+        if not isinstance(sub, str) or not sub.strip():
+            raise ValueError("Token subject is required")
+        sub = sub.strip()
         mapped_token = {
+            "sub": sub,
             "uid": sub,
             "email": decoded_token.get("email") or decoded_token.get("email_address") or f"{sub}@clerk.local",
             "name": decoded_token.get("name") or decoded_token.get("first_name", "") or sub,
             "picture": decoded_token.get("picture") or decoded_token.get("image_url")
         }
         return mapped_token
-    except Exception as e:
-        logger.error(f"Clerk token verification failed: {e}")
+    except Exception:
+        logger.warning("Clerk token verification failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",

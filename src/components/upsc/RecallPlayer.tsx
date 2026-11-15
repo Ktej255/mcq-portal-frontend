@@ -21,6 +21,7 @@ import { resolveVideoSource } from "@/components/upsc/video/videoSource";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import {
   optionalService,
+  RecallProviderUnavailableError,
   type RecallSegmentOut,
   type RecallTurnResultOut,
 } from "@/services/api/optionalService";
@@ -55,6 +56,43 @@ const PALETTE = {
   sand: "#8a7a52",
 };
 
+const recallSessionStorageKey = (slug: string, segmentId: number) =>
+  `optional-recall-session-v1:${encodeURIComponent(slug)}:${segmentId}`;
+
+/** SessionStorage contains only a non-authoritative pointer; the API owns turns and scores. */
+const readRecallSessionPointer = (slug: string, segmentId: number): number | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(recallSessionStorageKey(slug, segmentId));
+    if (!raw) return null;
+    const sessionId = Number(raw);
+    return Number.isSafeInteger(sessionId) && sessionId > 0 ? sessionId : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeRecallSessionPointer = (slug: string, segmentId: number, sessionId: number) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      recallSessionStorageKey(slug, segmentId),
+      String(sessionId),
+    );
+  } catch {
+    // Browser storage can be unavailable or quota-restricted; the API remains authoritative.
+  }
+};
+
+const clearRecallSessionPointer = (slug: string, segmentId: number) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(recallSessionStorageKey(slug, segmentId));
+  } catch {
+    // Ignore storage failures; there is no durable client state to repair.
+  }
+};
+
 type LoadState = "idle" | "loading" | "loaded" | "error";
 type RecordStatus = "idle" | "recording" | "scoring";
 
@@ -75,6 +113,7 @@ export function RecallPlayer({ slug, onClose }: RecallPlayerProps) {
   const [active, setActive] = useState<RecallSegmentOut | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [latest, setLatest] = useState<RecallTurnResultOut | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
 
   const [recordStatus, setRecordStatus] = useState<RecordStatus>("idle");
   const [recordError, setRecordError] = useState<string | null>(null);
@@ -86,29 +125,95 @@ export function RecallPlayer({ slug, onClose }: RecallPlayerProps) {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setState("loading");
-    setError(null);
-    optionalService
-      .getRecallSegments(slug)
-      .then((res) => {
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setState("loading");
+      setError(null);
+      optionalService
+        .getRecallSegments(slug)
+        .then((res) => {
+          if (cancelled) return;
+          setSegments(res.segments);
+          setState("loaded");
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setError(messageFromError(err));
+          setState("error");
+        });
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(requestTimer);
+    };
+  }, [slug, isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const segmentId = active.segment_id;
+    const pointer = readRecallSessionPointer(slug, segmentId);
+    if (pointer == null) {
+      return;
+    }
+
+    let cancelled = false;
+    const sessionTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setSessionLoading(true);
+      // Keep the pointer available while the authoritative state is loading so a
+      // transient GET failure does not accidentally start a second session.
+      setSessionId(pointer);
+      optionalService
+        .getRecallSession(pointer)
+        .then((session) => {
         if (cancelled) return;
-        setSegments(res.segments);
-        setState("loaded");
+        if (session.segment_id !== segmentId) {
+          clearRecallSessionPointer(slug, segmentId);
+          setSessionId(null);
+          setLatest(null);
+          setRecordError("That saved recall session belongs to a different segment. Please record a new recall.");
+          return;
+        }
+        const restoredLatest = session.turns.length > 0
+          ? session.turns[session.turns.length - 1]
+          : null;
+        setSessionId(session.session_id);
+        setLatest(restoredLatest);
+        setRecordError(null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(messageFromError(err));
-        setState("error");
+        setLatest(null);
+        if (isNotFoundError(err)) {
+          clearRecallSessionPointer(slug, segmentId);
+          setSessionId(null);
+          setRecordError("That saved recall session is no longer available. Record a new recall to start again.");
+        } else {
+          // Keep the pointer so the next recording can still respond to the
+          // owner-scoped session even if this restore request was transiently unavailable.
+          setRecordError("We couldn't restore this recall session. Please try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSessionLoading(false);
       });
+    }, 0);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(sessionTimer);
     };
-  }, [slug, isLoaded, isSignedIn]);
+  }, [active, slug]);
 
   const openSegment = useCallback((segment: RecallSegmentOut) => {
     setActive(segment);
     setSessionId(null);
     setLatest(null);
+    setSessionLoading(false);
+    setRecordStatus("idle");
     setRecordError(null);
   }, []);
 
@@ -116,6 +221,8 @@ export function RecallPlayer({ slug, onClose }: RecallPlayerProps) {
     setActive(null);
     setSessionId(null);
     setLatest(null);
+    setSessionLoading(false);
+    setRecordStatus("idle");
     setRecordError(null);
   }, []);
 
@@ -129,17 +236,24 @@ export function RecallPlayer({ slug, onClose }: RecallPlayerProps) {
           sessionId == null
             ? await optionalService.startRecall(active.segment_id, blob)
             : await optionalService.respondRecall(sessionId, blob);
+        writeRecallSessionPointer(slug, active.segment_id, result.session_id);
         setSessionId(result.session_id);
         setLatest(result);
-      } catch {
-        setRecordError(
-          "We couldn't score that recall. Please try recording again.",
-        );
+      } catch (error) {
+        if (error instanceof RecallProviderUnavailableError) {
+          setRecordError(
+            `Recall scoring is temporarily unavailable (${error.provider}). Nothing was recorded; please record again to retry.`,
+          );
+        } else {
+          setRecordError(
+            "We couldn't score that recall. Nothing was recorded; please record again to retry.",
+          );
+        }
       } finally {
         setRecordStatus("idle");
       }
     },
-    [active, sessionId],
+    [active, sessionId, slug],
   );
 
   const stopRecording = useCallback(() => {
@@ -252,6 +366,7 @@ export function RecallPlayer({ slug, onClose }: RecallPlayerProps) {
             recordStatus={recordStatus}
             recordError={recordError}
             latest={latest}
+            sessionLoading={sessionLoading}
             onToggleRecord={toggleRecording}
             onDismissError={() => setRecordError(null)}
           />
@@ -304,6 +419,7 @@ function SegmentStage({
   recordStatus,
   recordError,
   latest,
+  sessionLoading,
   onToggleRecord,
   onDismissError,
 }: {
@@ -311,6 +427,7 @@ function SegmentStage({
   recordStatus: RecordStatus;
   recordError: string | null;
   latest: RecallTurnResultOut | null;
+  sessionLoading: boolean;
   onToggleRecord: () => void;
   onDismissError: () => void;
 }) {
@@ -365,7 +482,7 @@ function SegmentStage({
             data-testid="recall-mic"
             data-recording={isRecording ? "true" : "false"}
             onClick={onToggleRecord}
-            disabled={isScoring || complete}
+            disabled={isScoring || sessionLoading || complete}
             aria-pressed={isRecording}
             className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black uppercase tracking-[0.1em] transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-50 ${
               isRecording
@@ -376,6 +493,10 @@ function SegmentStage({
             {isScoring ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Scoring…
+              </>
+            ) : sessionLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Restoring…
               </>
             ) : isRecording ? (
               <>
@@ -424,6 +545,8 @@ function SegmentStage({
 
 function RecallResult({ result }: { result: RecallTurnResultOut }) {
   const percent = Math.max(0, Math.min(100, result.recall_percent));
+  const hasProvenance = Boolean(result.stt_provider || result.recall_provider);
+  const hasMockProvenance = result.stt_is_mock === true || result.recall_is_mock === true;
   return (
     <section
       data-testid="recall-result"
@@ -451,6 +574,31 @@ function RecallResult({ result }: { result: RecallTurnResultOut }) {
           style={{ width: `${percent}%`, backgroundColor: PALETTE.accent }}
         />
       </div>
+
+      {hasProvenance ? (
+        <div
+          data-testid="recall-provider-provenance"
+          data-mock={hasMockProvenance ? "true" : "false"}
+          className={`mt-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border px-3 py-2 text-xs font-semibold ${
+            hasMockProvenance
+              ? "border-violet-200 bg-violet-50 text-violet-800"
+              : "border-[#dcd5c7] bg-[#faf6ee] text-[#5d675f]"
+          }`}
+        >
+          {result.stt_provider ? (
+            <span>
+              Speech-to-text: {result.stt_provider}
+              {result.stt_is_mock === true ? " (deterministic mock)" : ""}
+            </span>
+          ) : null}
+          {result.recall_provider ? (
+            <span>
+              Recall scoring: {result.recall_provider}
+              {result.recall_is_mock === true ? " (deterministic mock)" : ""}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Explainability: recalled vs missed (R14.5) */}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -535,6 +683,12 @@ function ErrorPanel({ message }: { message: string }) {
       <span>{message}</span>
     </div>
   );
+}
+
+function isNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const anyErr = err as { response?: { status?: number }; status?: number };
+  return anyErr.response?.status === 404 || anyErr.status === 404;
 }
 
 function messageFromError(err: unknown): string {

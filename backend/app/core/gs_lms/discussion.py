@@ -5,8 +5,8 @@ transitions through INITIATED → IN_PROGRESS → COMPLETED. Completion sets the
 gate flag (session status = COMPLETED) that unlocks Topic_Page content.
 
 The engine manages session state and delegates AI response generation to a
-pluggable provider. A default mock provider is included for testing and
-development.
+pluggable provider. A deterministic provider is available only through
+explicit runtime configuration or direct test injection.
 
 Key responsibilities:
 - Session lifecycle management (INITIATED → IN_PROGRESS → COMPLETED)
@@ -20,6 +20,7 @@ Requirements traced: 2.1, 2.3, 2.4, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 
@@ -53,11 +54,21 @@ CONCEPT_GATE_THRESHOLD = 80.0
 # AI Response Provider Protocol
 # ---------------------------------------------------------------------------
 
+class DiscussionProviderUnavailableError(RuntimeError):
+    """Typed, retryable failure when no discussion provider can respond."""
+
+    def __init__(self, provider: str = "unconfigured") -> None:
+        super().__init__("AI discussion provider is unavailable")
+        self.provider = provider
+        self.retryable = True
+
+
 class AIResponseProvider(Protocol):
     """Protocol for AI response generation.
 
-    Implementations can range from a simple mock to a full LLM integration.
-    The engine delegates response text generation to this provider.
+    Implementations can range from an explicitly selected deterministic mock
+    to a full LLM integration. The engine delegates response generation to
+    this provider.
     """
 
     def generate_response(
@@ -68,29 +79,15 @@ class AIResponseProvider(Protocol):
         concepts_missed: list[str] | None = None,
         match_percentage: float | None = None,
     ) -> str:
-        """Generate an AI response given the conversation context.
-
-        Args:
-            topic_title: The title of the topic being discussed.
-            transcript: List of prior turns as dicts with 'role' and 'content'.
-            student_message: The latest student message to respond to.
-            concepts_missed: Optional list of concepts not yet covered by the student.
-                When provided, the AI should generate Socratic questions targeting these gaps.
-            match_percentage: Optional current concept match percentage (0.0-1.0).
-
-        Returns:
-            The AI response text.
-        """
+        """Generate an AI response given the conversation context."""
         ...
 
 
 class MockAIResponseProvider:
-    """Mock AI response provider for testing and development.
+    """Deterministic provider for explicitly configured development/testing."""
 
-    Generates counter-questions that probe depth based on turn position
-    in the conversation. Accepts but ignores concepts_missed and match_percentage
-    parameters (graceful handling per task 4.4).
-    """
+    provider_id = "deterministic-mock"
+    is_mock = True
 
     def generate_response(
         self,
@@ -124,22 +121,42 @@ class MockAIResponseProvider:
             )
 
 
-# ---------------------------------------------------------------------------
-# Default provider instance (module-level for easy override/injection)
-# ---------------------------------------------------------------------------
-
-_default_provider: AIResponseProvider = MockAIResponseProvider()
+# Runtime registration starts unavailable. Tests and callers can still inject
+# a provider explicitly with set_default_provider().
+_default_provider: AIResponseProvider | None = None
+_default_provider_identifier = "unconfigured"
 
 
 def get_default_provider() -> AIResponseProvider:
-    """Return the default AI response provider."""
+    """Return the configured provider or a typed retryable failure."""
+    if _default_provider is None:
+        raise DiscussionProviderUnavailableError(_default_provider_identifier)
     return _default_provider
 
 
 def set_default_provider(provider: AIResponseProvider) -> None:
-    """Override the default AI response provider (useful for testing)."""
-    global _default_provider
+    """Explicitly inject the default provider (preserves test/extensibility API)."""
+    global _default_provider, _default_provider_identifier
     _default_provider = provider
+    _default_provider_identifier = _provider_identifier(provider)
+
+
+def clear_default_provider(provider_identifier: str = "unconfigured") -> None:
+    """Mark runtime provider state unavailable without installing a fallback."""
+    global _default_provider, _default_provider_identifier
+    _default_provider = None
+    _default_provider_identifier = provider_identifier
+
+
+def _provider_identifier(provider: AIResponseProvider) -> str:
+    value = getattr(provider, "provider_id", None)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return provider.__class__.__name__
+
+
+def _provider_is_mock(provider: AIResponseProvider) -> bool:
+    return bool(getattr(provider, "is_mock", False))
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +455,52 @@ def add_ai_turn(
     return turn
 
 
+@dataclass(frozen=True)
+class GeneratedAIResponse:
+    """Generated text plus the provider that actually produced it."""
+
+    text: str
+    provider: str
+    is_mock: bool
+
+
+def generate_ai_response_with_provenance(
+    session: GsLmsDiscussionSession,
+    student_content: str,
+    transcript: list[dict] | None = None,
+    provider: AIResponseProvider | None = None,
+    concepts_missed: list[str] | None = None,
+    match_percentage: float | None = None,
+) -> GeneratedAIResponse:
+    """Generate a response and retain actual provider provenance."""
+    selected_provider = provider if provider is not None else get_default_provider()
+    provider_identifier = _provider_identifier(selected_provider)
+    try:
+        response_text = selected_provider.generate_response(
+            topic_title=_get_topic_title(session),
+            transcript=transcript or [],
+            student_message=student_content,
+            concepts_missed=concepts_missed,
+            match_percentage=match_percentage,
+        )
+    except DiscussionProviderUnavailableError:
+        # Preserve the typed provider failure and its retryable semantics.
+        raise
+    except Exception as exc:
+        # Provider implementations are an untrusted runtime boundary. Never
+        # let SDK/configuration failures escape as an opaque 500 or permit the
+        # caller to persist a student turn without a real AI response.
+        raise DiscussionProviderUnavailableError(provider_identifier) from exc
+
+    if not isinstance(response_text, str) or not response_text.strip():
+        raise DiscussionProviderUnavailableError(provider_identifier)
+    return GeneratedAIResponse(
+        text=response_text,
+        provider=_provider_identifier(selected_provider),
+        is_mock=_provider_is_mock(selected_provider),
+    )
+
+
 def generate_ai_response(
     session: GsLmsDiscussionSession,
     student_content: str,
@@ -446,55 +509,30 @@ def generate_ai_response(
     concepts_missed: list[str] | None = None,
     match_percentage: float | None = None,
 ) -> str:
-    """Generate an AI response for the given student message.
-
-    Delegates to the configured AI response provider. Does NOT persist
-    the response — use add_ai_turn() to persist after generation.
-
-    When concepts_missed is provided, the AI provider will generate Socratic
-    follow-up questions specifically targeting those missed concepts (R2.6).
-
-    Args:
-        session: The current discussion session.
-        student_content: The student's latest message.
-        transcript: Optional list of prior turns as dicts. If None, an empty
-            list is used (caller should provide full transcript for context).
-        provider: Optional AI provider override. Falls back to default.
-        concepts_missed: Optional list of concepts the student hasn't covered yet.
-            When provided, the AI targets these gaps with Socratic questions.
-        match_percentage: Optional current concept match percentage (0.0-1.0).
-
-    Returns:
-        The generated AI response text.
-    """
-    if provider is None:
-        provider = get_default_provider()
-
-    if transcript is None:
-        transcript = []
-
-    # Get topic title from the session's syllabus node relationship
-    topic_title = _get_topic_title(session)
-
-    return provider.generate_response(
-        topic_title=topic_title,
+    """Generate response text while preserving the existing injection API."""
+    return generate_ai_response_with_provenance(
+        session=session,
+        student_content=student_content,
         transcript=transcript,
-        student_message=student_content,
+        provider=provider,
         concepts_missed=concepts_missed,
         match_percentage=match_percentage,
-    )
+    ).text
 
 
 def check_threshold(session: GsLmsDiscussionSession, turn_count: int | None = None) -> bool:
-    """Check if the discussion gate should open.
+    """Check whether the optional discussion's completion criteria are met.
+
+    This governs the discussion session's own status only; it never locks
+    content access.
 
     Two modes of operation:
-    1. **Concept-based gate** (when topic has a concept_checklist):
-       Gate passes when match_percentage >= 80% AND at least 3 turns occurred.
+    1. **Concept-based completion** (when topic has a concept_checklist):
+       Completes when match_percentage >= 80% AND at least 3 turns occurred.
        This is evaluated externally via check_concept_gate() and stored on
        the session. This function checks the stored match_percentage.
     2. **Turn-count fallback** (when no concept_checklist):
-       Gate passes after MINIMUM_TURN_THRESHOLD (5) turns.
+       Completes after MINIMUM_TURN_THRESHOLD (5) turns.
 
     Args:
         session: The discussion session to check.
@@ -770,11 +808,14 @@ __all__ = [
     "MINIMUM_TURN_THRESHOLD",
     "CONCEPT_GATE_MINIMUM_TURNS",
     "CONCEPT_GATE_THRESHOLD",
-    # Provider protocol + mock
+    # Provider protocol + explicit mock
+    "DiscussionProviderUnavailableError",
+    "GeneratedAIResponse",
     "AIResponseProvider",
     "MockAIResponseProvider",
     "get_default_provider",
     "set_default_provider",
+    "clear_default_provider",
     # Concept extraction & matching
     "extract_matched_concepts",
     "compute_concept_match_percentage",
@@ -788,6 +829,7 @@ __all__ = [
     "add_student_turn",
     "add_ai_turn",
     "generate_ai_response",
+    "generate_ai_response_with_provenance",
     "check_threshold",
     "complete_session",
     # Gate check

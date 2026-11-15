@@ -81,6 +81,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   history: 'History',
   'daily-command': 'Today',
   'content-command': 'Content',
+  'content-coverage': 'Coverage',
   'mcq-command': 'Practice',
   'revision-command': 'Revise',
   'readiness-audit': 'Readiness',
@@ -108,6 +109,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   retro: 'Retro',
   revisit: 'Revisit',
   'mcq-readiness': 'MCQ Practice',
+  lms: 'Learning Portal',
+  gaps: 'Readiness',
   continue: 'Continue',
 };
 
@@ -120,6 +123,11 @@ function labelForSegment(segment: string) {
       .join(' ')
   );
 }
+
+// Segments that exist only as a prefix for a dynamic child route, such as
+// `/upsc/geography/lms/topic/[nodeId]`. Linking to the bare prefix would
+// prefetch a page that does not exist, so these render as plain text.
+const PREFIX_ONLY_SEGMENTS = new Set(['topic', 'threads']);
 
 function buildBreadcrumbs(pathname: string): Crumb[] {
   const segments = pathname.split('/').filter(Boolean);
@@ -146,10 +154,14 @@ function buildBreadcrumbs(pathname: string): Crumb[] {
       return;
     }
     acc += `/${segment}`;
-    // Day query (?day=) is not in the path; show "Day N" only if numeric segment.
+    // Raw record ids carry no meaning in a trail, and the segment before a
+    // dynamic child (e.g. `/lms/topic/[nodeId]`) is a route prefix without a
+    // page of its own. Linking either one prefetched a route that 404s.
+    if (/^\d+$/.test(segment)) return;
+    const isPrefixOnly = PREFIX_ONLY_SEGMENTS.has(segment);
     crumbs.push({
       label: labelForSegment(segment),
-      href: index < segments.length - 1 ? acc : undefined,
+      href: !isPrefixOnly && index < segments.length - 1 ? acc : undefined,
     });
   });
 

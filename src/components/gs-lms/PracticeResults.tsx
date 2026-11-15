@@ -1,15 +1,42 @@
 "use client";
 
+import Link from "next/link";
+
 import type { PracticeResultOut } from "@/services/api/gsLmsService";
+import { useSubjectLms } from "./SubjectLmsContext";
 
 interface PracticeResultsProps {
   result: PracticeResultOut;
+  /** Topic this session belongs to, used for the next-step links. */
+  nodeId?: number;
 }
 
-export function PracticeResults({ result }: PracticeResultsProps) {
-  const scorePercent = Math.round(
-    (result.correct_count / result.total_questions) * 100
-  );
+export function PracticeResults({ result, nodeId }: PracticeResultsProps) {
+  const { lmsBase } = useSubjectLms();
+  const scorePercent =
+    result.total_questions > 0
+      ? Math.round((result.correct_count / result.total_questions) * 100)
+      : 0;
+
+  const weakestType = result.type_accuracy
+    .filter((ta) => ta.total > 0 && ta.accuracy < 0.6)
+    .sort((a, b) => a.accuracy - b.accuracy)[0];
+
+  const nextStep =
+    scorePercent >= 80
+      ? {
+          label: "Strong recall",
+          body: "You can move on. Schedule this topic for a spaced revisit so the recall holds, then pick the next topic in your planner.",
+        }
+      : scorePercent >= 60
+        ? {
+            label: "Close, but not secure",
+            body: "Re-read the sections behind the questions you missed, then retry this set before starting a new topic.",
+          }
+        : {
+            label: "Full revision needed",
+            body: "Do not move on yet. Re-read the Basic and Advanced sections of this topic, then retry the set; your readiness report will keep this topic marked as weak until the evidence improves.",
+          };
 
   return (
     <div className="p-6 space-y-8">
@@ -25,6 +52,37 @@ export function PracticeResults({ result }: PracticeResultsProps) {
           </span>
         </div>
         <p className="text-sm text-[#13251d]/60">Score: {scorePercent}%</p>
+      </div>
+
+      {/* What to do next — the result must change the plan, not just report it. */}
+      <div className="rounded-xl border border-[#b9d9cd] bg-[#f3faf6] p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-[#085041]">{nextStep.label}</h3>
+        <p className="text-sm text-[#1a3a2a]">{nextStep.body}</p>
+        {weakestType && (
+          <p className="text-xs text-[#49675e]">
+            Weakest question type:{" "}
+            <span className="font-semibold">
+              {weakestType.question_type.replace(/_/g, " ")}
+            </span>{" "}
+            ({Math.round(weakestType.accuracy * 100)}% of {weakestType.total}).
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {nodeId !== undefined && (
+            <Link
+              href={`${lmsBase}/topic/${nodeId}`}
+              className="rounded-lg border border-[#b9d9cd] bg-white px-3 py-1.5 text-xs font-bold text-[#1d9e75] transition hover:bg-[#e7f5ee]"
+            >
+              Re-read this topic
+            </Link>
+          )}
+          <Link
+            href={`${lmsBase}/planner`}
+            className="rounded-lg bg-[#1d9e75] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#167a5b]"
+          >
+            Open today&apos;s plan
+          </Link>
+        </div>
       </div>
 
       {/* Per-question results */}

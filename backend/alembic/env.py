@@ -22,6 +22,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.models.domain import Base
 from app.core.config import settings
 
+# Import model modules so autogenerate can detect all shared-metadata tables.
+from app.core.payments import models as payment_models  # noqa: F401
+from app.core.current_affairs import ca_models as current_affairs_models  # noqa: F401
+from app.core.optional import mapping_models as optional_mapping_models  # noqa: F401
+from app.core.optional import current_affairs_models as optional_current_affairs_models  # noqa: F401
+
 # Import GS LMS models so autogenerate can detect them
 from app.core.gs_lms.models import (  # noqa: F401
     GsLmsSyllabusNode,
@@ -41,6 +47,8 @@ from app.core.gs_lms.student_models import (  # noqa: F401
     GsLmsVideoWatch,
     GsLmsOnboardingStatus,
 )
+# Readiness/demand/release/beta-access models
+from app.core.gs_lms import readiness_models  # noqa: F401
 # Import Interactive Learning Funnel models so autogenerate can detect them
 from app.core.gs_lms.funnel_models import (  # noqa: F401
     GsLmsFunnelProgress,

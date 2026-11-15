@@ -406,7 +406,7 @@ export default function BulkUploadPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [importMode, setImportMode] = useState<ImportMode>("EMPTY");
-  const [upscContext, setUpscContext] = useState<UpscBulkContext>(EMPTY_UPSC_BULK_CONTEXT);
+  const [upscContext] = useState<UpscBulkContext>(() => readUpscBulkContext());
   
   const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
@@ -425,9 +425,7 @@ export default function BulkUploadPage() {
   const hasBlockingUpscContextIssues = upscContextWarnings.length > 0;
 
   useEffect(() => {
-    setUpscContext(readUpscBulkContext());
-
-    const useLocalMetadata = () => {
+    const applyLocalMetadata = () => {
       setTests(LOCAL_TESTS_FALLBACK);
       setTopics(LOCAL_TOPICS_FALLBACK);
       setSelectedTestId(LOCAL_TESTS_FALLBACK[0].id);
@@ -436,7 +434,7 @@ export default function BulkUploadPage() {
 
     const loadMetadata = async () => {
       if (!legacyApiEnabled) {
-        useLocalMetadata();
+        applyLocalMetadata();
         return;
       }
 
@@ -448,7 +446,7 @@ export default function BulkUploadPage() {
         setTests(testsData);
         setTopics(topicsData);
       } catch {
-        useLocalMetadata();
+        applyLocalMetadata();
         toast.info("Using local UPSC metadata fallback.");
       }
     };
@@ -541,12 +539,7 @@ export default function BulkUploadPage() {
       setFile(null);
       setImportMode("EMPTY");
     } catch {
-      if (typeof window !== "undefined") {
-        saveLocalDraft();
-        return;
-      }
-
-      toast.error("Import failed. Please check your data format.");
+      toast.error("Import failed. No questions were imported and no local draft was saved. Please check your data and retry.");
     } finally {
       setIsUploading(false);
     }

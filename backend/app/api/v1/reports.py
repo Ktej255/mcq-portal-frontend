@@ -11,6 +11,26 @@ router = APIRouter()
 
 from app.services import report_service, student_longitudinal_profile, recommendation_service
 
+
+def _get_submitted_attempt(db: Session, attempt_id: int, user_id: int) -> Attempt:
+    attempt = db.query(Attempt).filter(
+        Attempt.id == attempt_id,
+        Attempt.user_id == user_id,
+        Attempt.is_deleted.is_(False),
+    ).first()
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    if attempt.status != AttemptStatusEnum.SUBMITTED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ATTEMPT_NOT_SUBMITTED",
+                "message": "Submit the attempt before opening its report.",
+                "retryable": False,
+            },
+        )
+    return attempt
+
 @router.get("/evolution")
 def get_evolution_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
     profile = student_longitudinal_profile.build_student_longitudinal_profile(db, current_user.id)
@@ -25,7 +45,9 @@ def get_report_recommendations(db: Session = Depends(get_db), current_user: User
 def get_aggregate_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
     reports = db.query(Report).join(Attempt).filter(
         Attempt.user_id == current_user.id,
-        Attempt.status == AttemptStatusEnum.SUBMITTED
+        Attempt.is_deleted.is_(False),
+        Attempt.status == AttemptStatusEnum.SUBMITTED,
+        Report.is_deleted.is_(False),
     ).order_by(Report.generated_at.asc()).all()
 
     if not reports:
@@ -59,7 +81,11 @@ def get_aggregate_report(db: Session = Depends(get_db), current_user: User = Dep
 
 @router.get("/{attempt_id}")
 def get_attempt_report(attempt_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
+    _get_submitted_attempt(db, attempt_id, current_user.id)
+
     report = report_service.generate_report(db=db, attempt_id=attempt_id, user_id=current_user.id)
+    if report.is_deleted:
+        raise HTTPException(status_code=404, detail="Report not found")
     
     # Format for frontend PerformanceReport
     data = {
@@ -108,10 +134,12 @@ def get_attempt_report(attempt_id: int, db: Session = Depends(get_db), current_u
 
 @router.get("/{attempt_id}/review")
 def get_report_review(attempt_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
+    _get_submitted_attempt(db, attempt_id, current_user.id)
     review_data = report_service.get_detailed_review(db=db, attempt_id=attempt_id, user_id=current_user.id)
     return StandardResponse(success=True, message="Detailed review retrieved", data=review_data)
 
 @router.get("/{attempt_id}/behavior")
 def get_behavioral_analysis(attempt_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
+    _get_submitted_attempt(db, attempt_id, current_user.id)
     analysis = report_service.get_behavioral_analysis(db=db, attempt_id=attempt_id, user_id=current_user.id)
     return StandardResponse(success=True, message="Behavioral analysis retrieved", data=analysis)

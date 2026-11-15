@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -15,10 +16,15 @@ import {
   ArrowLeft,
   Brain,
   Sparkles,
-  TrendingUp,
   Image as ImageIcon,
   Download,
 } from "lucide-react";
+import {
+  GsEvaluationProviderUnavailableError,
+  gsAnswerService,
+  type AnswerEvalStatus,
+  type EvaluationReportOut,
+} from "@/services/api/gsAnswerService";
 
 // ─── Tab Configuration ───────────────────────────────────────────────────────
 
@@ -170,7 +176,7 @@ function LearnTab() {
       </div>
 
       <Callout icon={<ArrowRight className="h-4 w-4 text-[#3b82f6]" />} title="What Comes Next" tone="blue">
-        This cosmic evolution directly determines Earth's composition. In the next sub-topic, we explore how the Solar System formed from this cosmic material — and why inner planets are rocky while outer ones are gaseous.
+        This cosmic evolution directly determines Earth&apos;s composition. In the next sub-topic, we explore how the Solar System formed from this cosmic material — and why inner planets are rocky while outer ones are gaseous.
       </Callout>
     </motion.div>
   );
@@ -354,21 +360,132 @@ function MainsTab() {
     1: { intro: "", body: "", conclusion: "" },
   });
   const [evaluating, setEvaluating] = useState(false);
+  const [uploadingHandwritten, setUploadingHandwritten] = useState(false);
+  const [evaluationStatus, setEvaluationStatus] = useState<AnswerEvalStatus | null>(null);
+  const [evaluationAttemptId, setEvaluationAttemptId] = useState<number | null>(null);
+  const [evaluationPollingStopped, setEvaluationPollingStopped] = useState(false);
+  const [evaluationReport, setEvaluationReport] = useState<EvaluationReportOut | null>(null);
+  const [evaluationMessage, setEvaluationMessage] = useState<string | null>(null);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   const questions = [
-    { id: 0, paper: "GS-1 • 2017", marks: "10 Marks • 150 Words", text: "Describe the theories regarding the origin of the Universe. How does the Big Bang Theory explain the present state of the Universe?", framework: ["Intro: Define cosmology, mention 3 theories", "Body: Steady State (Hoyle) — rejected by CMBR", "Body: Big Bang (Lemaitre/Gamow) — singularity, evidence trio", "Body: Present state — accelerating expansion, dark energy", "Conclusion: Connect to Earth formation, geoscience relevance"] },
-    { id: 1, paper: "GS-3 • 2023", marks: "15 Marks • 250 Words", text: "India's space programme has increasingly become a player in the international space science community. Discuss with suitable examples.", framework: ["Intro: India's journey — sounding rockets to interplanetary", "Body: AstroSat — multi-wavelength, UV 9.3B light-years", "Body: LIGO-India — gravitational waves, Maharashtra", "Body: Chandrayaan-3 — lunar south pole, 4th nation", "Body: Aditya-L1 — solar observatory at L1", "Conclusion: Cost-effective, ISRO credibility, Gaganyaan"] },
+    { id: 0, paper: "GS-1 • 2017", gsPaper: "GS1" as const, maxMarks: 10, marks: "10 Marks • 150 Words", text: "Describe the theories regarding the origin of the Universe. How does the Big Bang Theory explain the present state of the Universe?", framework: ["Intro: Define cosmology, mention 3 theories", "Body: Steady State (Hoyle) — rejected by CMBR", "Body: Big Bang (Lemaitre/Gamow) — singularity, evidence trio", "Body: Present state — accelerating expansion, dark energy", "Conclusion: Connect to Earth formation, geoscience relevance"] },
+    { id: 1, paper: "GS-3 • 2023", gsPaper: "GS3" as const, maxMarks: 15, marks: "15 Marks • 250 Words", text: "India's space programme has increasingly become a player in the international space science community. Discuss with suitable examples.", framework: ["Intro: India's journey — sounding rockets to interplanetary", "Body: AstroSat — multi-wavelength, UV 9.3B light-years", "Body: LIGO-India — gravitational waves, Maharashtra", "Body: Chandrayaan-3 — lunar south pole, 4th nation", "Body: Aditya-L1 — solar observatory at L1", "Conclusion: Cost-effective, ISRO credibility, Gaganyaan"] },
   ];
 
   const q = questions[activeQ];
   const draft = drafts[activeQ];
   const wordCount = (draft.intro + " " + draft.body + " " + draft.conclusion).trim().split(/\s+/).filter(Boolean).length;
 
-  const handleEvaluate = () => {
-    setEvaluating(true);
-    // TODO: Connect to backend evaluation API (same as Optional's AnswerWorkspace)
-    setTimeout(() => setEvaluating(false), 2000);
+  const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+  const terminalStatuses = new Set<AnswerEvalStatus>(["completed", "degraded", "failed", "review_required"]);
+
+  const pollEvaluation = async (
+    attemptId: number,
+    initialStatus: AnswerEvalStatus,
+    initialMessage?: string | null,
+  ) => {
+    setEvaluationAttemptId(attemptId);
+    setEvaluationPollingStopped(false);
+    let status = initialStatus;
+    let report: EvaluationReportOut | null = null;
+
+    for (let poll = 0; poll < 6; poll += 1) {
+      if (poll > 0) {
+        if (terminalStatuses.has(status)) break;
+        await wait(1000);
+      }
+      const current = await gsAnswerService.getStatus("geography", attemptId);
+      status = current.status;
+      report = current.report;
+    }
+
+    const stillProcessing = status === "in_progress";
+    setEvaluationStatus(status);
+    setEvaluationReport(report);
+    setEvaluationPollingStopped(stillProcessing);
+    setEvaluationMessage(
+      stillProcessing
+        ? "Evaluation is still processing. Automatic checks are paused; check again to continue."
+        : status === "failed"
+          ? "Evaluation failed. No report was produced. Please submit the answer again."
+          : status === "review_required"
+            ? initialMessage ?? "Review the extracted answer, then resubmit with acknowledgement before evaluation can continue."
+            : report
+              ? `Evaluation ${status.replaceAll("_", " ")}.`
+              : initialMessage ?? `Evaluation status: ${status.replaceAll("_", " ")}.`,
+    );
   };
+
+  const refreshEvaluationStatus = async () => {
+    if (evaluationAttemptId == null) return;
+    setEvaluationError(null);
+    try {
+      await pollEvaluation(evaluationAttemptId, "in_progress");
+    } catch {
+      setEvaluationError("Could not refresh evaluation status. Please try again.");
+    }
+  };
+
+  const handleEvaluate = async () => {
+    setEvaluating(true);
+    setEvaluationError(null);
+    setEvaluationMessage(null);
+    setEvaluationReport(null);
+    setEvaluationAttemptId(null);
+    setEvaluationPollingStopped(false);
+    try {
+      const ack = await gsAnswerService.submitTyped("geography", {
+        intro_text: draft.intro,
+        body_text: draft.body,
+        conclusion_text: draft.conclusion,
+        question_text: q.text,
+        gs_paper: q.gsPaper,
+        max_marks: q.maxMarks,
+      });
+      await pollEvaluation(ack.attempt_id, ack.status, ack.message);
+    } catch (error: unknown) {
+      setEvaluationError(
+        error instanceof GsEvaluationProviderUnavailableError
+          ? error.message
+          : "We couldn't submit this answer for evaluation. Please sign in or try again later.",
+      );
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const handleHandwrittenUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadingHandwritten(true);
+    setEvaluationError(null);
+    setEvaluationMessage(null);
+    setEvaluationReport(null);
+    setEvaluationAttemptId(null);
+    setEvaluationPollingStopped(false);
+    try {
+      const created = await gsAnswerService.createHandwritten("geography", {
+        question_text: q.text,
+        gs_paper: q.gsPaper,
+        max_marks: q.maxMarks,
+      });
+      await gsAnswerService.uploadPage("geography", created.attempt_id, file, 1);
+      const submitted = await gsAnswerService.submitAttempt("geography", created.attempt_id);
+      await pollEvaluation(submitted.attempt_id, submitted.status, submitted.message);
+    } catch (error: unknown) {
+      setEvaluationError(
+        error instanceof GsEvaluationProviderUnavailableError
+          ? error.message
+          : "We couldn't upload this handwritten answer. Please try a clearer image or type your answer instead.",
+      );
+    } finally {
+      setUploadingHandwritten(false);
+    }
+  };
+
+  const evaluationIsFailed = evaluationStatus === "failed";
+  const evaluationNeedsReview = evaluationStatus === "review_required";
+  const evaluationNeedsAttention = evaluationIsFailed || evaluationNeedsReview;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
@@ -453,21 +570,90 @@ function MainsTab() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 pt-2 border-t border-[#e8e2d5]">
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#e8e2d5]">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={handleEvaluate}
-            disabled={wordCount < 10 || evaluating}
+            onClick={() => void handleEvaluate()}
+            disabled={wordCount < 10 || evaluating || uploadingHandwritten}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0f766e] to-[#1d9e75] px-5 py-3 text-sm font-black text-white shadow-md disabled:opacity-40 transition-all"
           >
             {evaluating ? "Evaluating…" : "🎯 Evaluate Your Mains Answer"}
           </motion.button>
-          <label className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#99f6e4] px-4 py-2.5 text-xs font-black text-[#0f766e] cursor-pointer hover:bg-[#f0fdfa] transition">
-            📷 Upload Handwritten
-            <input type="file" accept="image/*" className="hidden" />
+          <label className={`inline-flex items-center gap-1.5 rounded-xl border-2 border-[#99f6e4] px-4 py-2.5 text-xs font-black text-[#0f766e] transition ${uploadingHandwritten ? "cursor-wait opacity-60" : "cursor-pointer hover:bg-[#f0fdfa]"}`}>
+            {uploadingHandwritten ? "Uploading…" : "📷 Upload Handwritten"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploadingHandwritten || evaluating}
+              onChange={(event) => {
+                void handleHandwrittenUpload(event.target.files?.[0]);
+                event.currentTarget.value = "";
+              }}
+            />
           </label>
         </div>
+        {evaluationError ? (
+          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            {evaluationError}
+          </p>
+        ) : null}
+        {evaluationMessage ? (
+          <div
+            role={evaluationNeedsAttention ? "alert" : "status"}
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+              evaluationIsFailed
+                ? "border-red-200 bg-red-50 text-red-700"
+                : evaluationNeedsReview || evaluationPollingStopped
+                  ? "border-[#f0d59a] bg-[#fff7e8] text-[#7a5a12]"
+                  : "border-[#b9d9cd] bg-[#e7f5ee] text-[#085041]"
+            }`}
+          >
+            <p>{evaluationMessage}</p>
+            {evaluationPollingStopped && evaluationAttemptId != null ? (
+              <button
+                type="button"
+                onClick={() => void refreshEvaluationStatus()}
+                className="mt-2 rounded-md border border-[#d39b2a] px-2.5 py-1.5 text-[11px] font-black text-[#7a5a12] hover:bg-[#fff1d1]"
+              >
+                Check evaluation status again
+              </button>
+            ) : null}
+            {evaluationReport ? (
+              <div className="mt-2 space-y-2 border-t border-[#b9d9cd] pt-2">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 font-black">
+                  {evaluationReport.marks_awarded != null && evaluationReport.max_marks != null ? (
+                    <span>Marks: {evaluationReport.marks_awarded}/{evaluationReport.max_marks}</span>
+                  ) : null}
+                  {evaluationReport.overall_score != null ? <span>Overall score: {evaluationReport.overall_score}</span> : null}
+                  <span>{evaluationReport.is_complete ? "Complete report" : "Report needs review"}</span>
+                  {evaluationReport.word_count != null && evaluationReport.word_limit != null ? (
+                    <span>Words: {evaluationReport.word_count}/{evaluationReport.word_limit}</span>
+                  ) : null}
+                </div>
+                {evaluationReport.incomplete_sections.length > 0 ? (
+                  <p>
+                    Incomplete sections: {evaluationReport.incomplete_sections.map((section) => section.replaceAll("_", " ")).join(", ")}
+                  </p>
+                ) : null}
+                {Object.entries(evaluationReport.sections).length > 0 ? (
+                  <div className="space-y-1.5">
+                    {Object.entries(evaluationReport.sections).map(([sectionName, section]) => (
+                      <div key={sectionName} className="rounded-lg border border-[#b9d9cd]/70 bg-white/60 px-2.5 py-2">
+                        <div className="flex flex-wrap justify-between gap-2 font-black capitalize">
+                          <span>{sectionName.replaceAll("_", " ")}</span>
+                          {section.score != null ? <span>Score: {section.score}</span> : null}
+                        </div>
+                        <p className="mt-0.5 font-medium">{section.feedback || "No section feedback was returned."}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );
@@ -529,9 +715,10 @@ export default function ContentPreviewPage() {
   const [activeTab, setActiveTab] = useState<TabId>("learn");
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set(["learn"]));
 
-  useEffect(() => {
-    setVisitedTabs(prev => new Set([...prev, activeTab]));
-  }, [activeTab]);
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => new Set([...prev, tab]));
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5] text-[#13251d]">
@@ -557,14 +744,14 @@ export default function ContentPreviewPage() {
           {/* Progress */}
           <div className="mt-3 flex items-center gap-3">
             <div className="flex-1"><ProgressIndicator current={visitedTabs.size} total={TABS.length} /></div>
-            <button
-              onClick={() => alert("PDF download coming soon! This chapter will be available as a formatted PDF for offline study.")}
-              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/40 hover:text-[#1d9e75] transition-all shadow-sm shrink-0"
+            <div
+              role="status"
+              aria-label="PDF coming soon"
+              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] shadow-sm shrink-0 opacity-70 cursor-default"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </button>
+              <span>PDF coming soon</span>
+            </div>
           </div>
         </motion.div>
 
@@ -577,7 +764,7 @@ export default function ContentPreviewPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 whitespace-nowrap ${
                   isActive
                     ? "bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md scale-[1.02]"
@@ -622,7 +809,7 @@ export default function ContentPreviewPage() {
                 <span className="hidden sm:inline">Start</span>
               </span>
               {nextTab ? (
-                <button onClick={() => setActiveTab(nextTab.id)}
+                <button onClick={() => handleTabChange(nextTab.id)}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-4 py-2.5 text-xs font-black text-white shadow-md hover:scale-[1.02] transition-all">
                   <span>Next: {nextTab.label}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -632,12 +819,12 @@ export default function ContentPreviewPage() {
                   <CheckCircle2 className="h-3.5 w-3.5" /> All Sections Done
                 </span>
               )}
-              <a href="/upsc/content-preview/solar-system"
+              <Link href="/upsc/content-preview/solar-system"
                 className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
                 <span className="hidden sm:inline">1.2 Solar System</span>
                 <span className="sm:hidden">Next</span>
                 <ArrowRight className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </motion.div>
           );
         })()}

@@ -25,13 +25,48 @@ const SUBJECT_COLORS: Record<string, string> = {
 export function CAProgressBar() {
   const [analytics, setAnalytics] = useState<CAAnalyticsOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     caService.getAnalytics()
-      .then(setAnalytics)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .then((nextAnalytics) => {
+        if (cancelled) return;
+        setAnalytics(nextAnalytics);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-bold leading-5 text-[#7a5410]">
+          Your Current Affairs progress could not be loaded, so this bar is hidden rather than shown as zero.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadFailed(false);
+            setLoading(true);
+            setAttempt((count) => count + 1);
+          }}
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410]"
+        >
+          Retry load
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !analytics) {
     return <div className="h-24 animate-pulse bg-[#e7f5ee] rounded-xl" />;

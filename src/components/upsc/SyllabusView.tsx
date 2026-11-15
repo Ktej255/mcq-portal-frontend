@@ -44,6 +44,11 @@ import {
  * subject has no reviewed segments yet it shows the shared {@link NotYetAuthored}
  * panel rather than an empty or fake-complete page.
  *
+ * Honest-failure rule (founder decision, 2026-10-31): a failed analysis request
+ * is reported as a failure with a retry. It is never filled in from the
+ * frontend's offline syllabus modules, because "the trend says …" and "hidden
+ * topics asked" are claims about reviewed backend rows.
+ *
  * Segments are grouped by paper → section (R4.4) so the analysis mirrors the
  * Paper I / Paper II + Section A/B structure students already navigate.
  */
@@ -90,15 +95,18 @@ interface SegmentGroup {
   segments: SyllabusSegmentAnalysisOut[];
 }
 
-function paperHeading(seg: SyllabusSegmentAnalysisOut): string {
-  if (seg.paper_label && PAPER_LABELS[seg.paper_label]) return PAPER_LABELS[seg.paper_label];
-  return seg.paper_name ?? "Paper";
+interface SyllabusRequestKey {
+  slug: string;
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  /** Bumped by "Try again" so a failed request re-runs against the backend. */
+  nonce: number;
 }
 
-function sectionHeading(seg: SyllabusSegmentAnalysisOut): string {
-  const label = seg.section_label ? SECTION_LABELS[seg.section_label] : null;
-  if (label && seg.section_name) return `${label} — ${seg.section_name}`;
-  return label ?? seg.section_name ?? "";
+interface SyllabusRequestState {
+  key: SyllabusRequestKey | null;
+  status: LoadState;
+  error: string | null;
 }
 
 /** Group segments into paper → section blocks, preserving server order (R4.4). */
@@ -130,35 +138,52 @@ function groupSegments(segments: SyllabusSegmentAnalysisOut[]): SegmentGroup[] {
 export function SyllabusView({ slug, onClose }: SyllabusViewProps) {
   const { isLoaded, isSignedIn } = useApiConfig();
 
+  const [nonce, setNonce] = useState(0);
+  const requestKey = useMemo<SyllabusRequestKey>(
+    () => ({ slug, isLoaded, isSignedIn, nonce }),
+    [slug, isLoaded, isSignedIn, nonce],
+  );
   const [data, setData] = useState<SyllabusAnalysisOut | null>(null);
-  const [state, setState] = useState<LoadState>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<SyllabusRequestState>({
+    key: null,
+    status: "idle",
+    error: null,
+  });
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!requestKey.isLoaded || !requestKey.isSignedIn) return;
     let cancelled = false;
-    setState("loading");
-    setError(null);
     optionalService
-      .getSyllabusAnalysis(slug)
+      .getSyllabusAnalysis(requestKey.slug)
       .then((res) => {
         if (cancelled) return;
         setData(res);
-        setState("loaded");
+        setRequestState({ key: requestKey, status: "loaded", error: null });
         // Open the first segment by default so the three layers are immediately
         // visible; the rest stay collapsed and are picked to expand.
         setExpanded(new Set(res.segments.length > 0 ? [res.segments[0].node_id] : []));
       })
       .catch((err: unknown) => {
+        // Honest failure: the analysis is not rebuilt from frontend modules.
         if (cancelled) return;
-        setError(messageFromError(err));
-        setState("error");
+        setData(null);
+        setExpanded(new Set());
+        setRequestState({
+          key: requestKey,
+          status: "error",
+          error: messageFromError(err),
+        });
       });
     return () => {
       cancelled = true;
     };
-  }, [slug, isLoaded, isSignedIn]);
+  }, [requestKey]);
+
+  const requestIsPending =
+    requestKey.isLoaded && requestKey.isSignedIn && requestState.key !== requestKey;
+  const state: LoadState = requestIsPending ? "loading" : requestState.status;
+  const error = requestIsPending ? null : requestState.error;
 
   const groups = useMemo(() => groupSegments(data?.segments ?? []), [data]);
 
@@ -209,7 +234,9 @@ export function SyllabusView({ slug, onClose }: SyllabusViewProps) {
         </section>
 
         {state === "loading" ? <LoadingPanel /> : null}
-        {state === "error" && error ? <ErrorPanel message={error} /> : null}
+        {state === "error" && error ? (
+          <ErrorPanel message={error} onRetry={() => setNonce((n) => n + 1)} />
+        ) : null}
 
         {state === "loaded" ? (
           data && data.segments.length > 0 ? (
@@ -511,14 +538,31 @@ function LoadingPanel() {
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
+/**
+ * Load-failure panel. It states the failure and offers a retry only — the
+ * offline syllabus modules deliberately are not used here, so "couldn't load"
+ * never looks like a coverage answer.
+ */
+function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
       data-testid="syllabus-view-error"
-      className="flex items-start gap-2 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
+      className="flex flex-col gap-3 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
     >
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{message}</span>
+      <span className="flex items-start gap-2">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{message}</span>
+      </span>
+      {onRetry ? (
+        <button
+          type="button"
+          data-testid="syllabus-view-error-retry"
+          onClick={onRetry}
+          className="self-start rounded-xl border border-[#8a4b52] bg-[#fbf0ee] px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#8a4b52] hover:bg-[#8a4b52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a4b52]/40"
+        >
+          Try again
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -531,7 +575,7 @@ function messageFromError(err: unknown): string {
     }
     if (anyErr.message) return anyErr.message;
   }
-  return "Couldn't load the syllabus analysis. Please try again.";
+  return "Couldn't load the reviewed syllabus analysis from the library, so nothing is shown here. Please try again.";
 }
 
 export default SyllabusView;

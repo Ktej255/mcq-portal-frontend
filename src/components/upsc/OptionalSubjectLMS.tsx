@@ -84,10 +84,13 @@ export function OptionalSubjectLMS({ slug, title, group }: { slug: string; title
   const [attemptedIds, setAttemptedIds] = useState<Set<string>>(new Set());
   const [attempts, setAttempts] = useState<OptionalAttempt[]>([]);
   useEffect(() => {
-    setStats(getOptionalStats(slug));
-    const list = getOptionalAttempts(slug);
-    setAttempts(list);
-    setAttemptedIds(new Set(list.map((a) => a.refId)));
+    const refreshTimer = window.setTimeout(() => {
+      const list = getOptionalAttempts(slug);
+      setStats(getOptionalStats(slug));
+      setAttempts(list);
+      setAttemptedIds(new Set(list.map((a) => a.refId)));
+    }, 0);
+    return () => window.clearTimeout(refreshTimer);
   }, [tab, slug]);
 
   const activePaper = papers[paperIndex];

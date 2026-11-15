@@ -32,7 +32,12 @@ from typing import List, Optional, Sequence
 from sqlalchemy import asc
 from sqlalchemy.orm import Session
 
-from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsNodeTypeEnum
+from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
+from app.core.gs_lms.models import (
+    GsLmsContentSection,
+    GsLmsSyllabusNode,
+    GsLmsNodeTypeEnum,
+)
 from app.core.gs.models import GsReviewStatusEnum
 from app.core.gs_lms.student_models import (
     GsLmsDailyPlan,
@@ -229,6 +234,19 @@ def compute_projected_completion(
 # ---------------------------------------------------------------------------
 
 
+def plan_eligible_ids(db: Session, subject_id: int) -> set[int] | None:
+    """Node ids the planner may schedule, or None when scope is unrestricted.
+
+    The paid beta only opens loop-ready topics, so the planner must not
+    schedule a topic the learner is blocked from entering. Both the position
+    lookup and the item list use this filter, which keeps their indexes in
+    the same sequence.
+    """
+    if not beta_scope_enabled():
+        return None
+    return compute_loop_ready_ids(db, subject_id)
+
+
 def find_current_position(db: Session, student_id: int, subject_id: int) -> int:
     """Find the first uncompleted item index in the syllabus sequence.
 
@@ -260,13 +278,21 @@ def find_current_position(db: Session, student_id: int, subject_id: int) -> int:
         .all()
     )
 
+    eligible_ids = plan_eligible_ids(db, subject_id)
+    if eligible_ids is not None:
+        leaf_nodes = [node for node in leaf_nodes if node.id in eligible_ids]
+
     if not leaf_nodes:
         return 0
 
-    # Get IDs of nodes the student has fully completed (all 4 sections done).
+    # A node is complete only when every persisted content section is complete.
     completed_node_ids = set()
     for node in leaf_nodes:
-        # A node is "completed" if all its sections are marked completed.
+        section_count = (
+            db.query(GsLmsContentSection)
+            .filter(GsLmsContentSection.syllabus_node_id == node.id)
+            .count()
+        )
         progress_records = (
             db.query(GsLmsStudentSectionProgress)
             .filter(
@@ -276,8 +302,7 @@ def find_current_position(db: Session, student_id: int, subject_id: int) -> int:
             )
             .count()
         )
-        # A leaf topic has 4 sections; consider completed if all 4 done.
-        if progress_records >= 4:
+        if section_count > 0 and progress_records >= section_count:
             completed_node_ids.add(node.id)
 
     # Find first uncompleted position.
@@ -313,6 +338,10 @@ def get_syllabus_plan_items(
         .order_by(asc(GsLmsSyllabusNode.display_order))
         .all()
     )
+
+    eligible_ids = plan_eligible_ids(db, subject_id)
+    if eligible_ids is not None:
+        leaf_nodes = [node for node in leaf_nodes if node.id in eligible_ids]
 
     return [
         PlanItem(node_id=node.id, title=node.title, item_type="section")
@@ -465,6 +494,7 @@ __all__ = [
     # DB-interacting functions
     "find_current_position",
     "get_syllabus_plan_items",
+    "plan_eligible_ids",
     "get_plan_history",
     "create_daily_plan",
     "record_replan_event",

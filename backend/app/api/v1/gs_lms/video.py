@@ -61,11 +61,16 @@ class VideoStatusOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _get_node_or_404(db: Session, node_id: int) -> GsLmsSyllabusNode:
-    """Fetch a syllabus node by ID or raise 404."""
+def _get_node_or_404(
+    db: Session, node_id: int, subject_id: int
+) -> GsLmsSyllabusNode:
+    """Fetch a syllabus node owned by the requested subject or raise 404."""
     node = (
         db.query(GsLmsSyllabusNode)
-        .filter(GsLmsSyllabusNode.id == node_id)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
+        )
         .one_or_none()
     )
     if node is None:
@@ -96,7 +101,7 @@ def mark_video_watched(
 
     Validates: Requirements 1.3, 1.5
     """
-    _get_node_or_404(db, node_id)
+    _get_node_or_404(db, node_id, subject.id)
 
     now = datetime.now(timezone.utc)
     duration = body.duration_seconds if body else None
@@ -149,7 +154,7 @@ def get_video_status(
 
     Validates: Requirements 1.4
     """
-    _get_node_or_404(db, node_id)
+    _get_node_or_404(db, node_id, subject.id)
 
     watch = (
         db.query(GsLmsVideoWatch)

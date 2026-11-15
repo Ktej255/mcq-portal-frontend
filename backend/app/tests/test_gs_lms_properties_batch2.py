@@ -4,7 +4,7 @@ Tasks: 4.5, 5.3, 7.3, 7.6
 Properties tested:
   - Property 10: Sequential MCQ access control
   - Property 11: MCQ scoring and per-type accuracy
-  - Property 12: AI Discussion content gating invariant
+  - Property 12: Progressive content access (discussion is optional)
   - Property 13: Discussion minimum exchange threshold
   - Property 14: Gap profile weak area identification
   - Property 15: Gap prioritization ordering
@@ -299,60 +299,107 @@ class TestMCQScoringAndTypeAccuracy:
 
 
 # ---------------------------------------------------------------------------
-# Property 12: AI Discussion content gating invariant
-# Validates: Requirements 5.1, 5.4, 5.6
+# Property 12: Progressive content access (discussion is optional)
+# Validates: Requirements 2.1, 2.2, 2.6, 5.4
 # ---------------------------------------------------------------------------
 
-class TestAIDiscussionContentGating:
-    """Property 12: For any (student, topic) pair, the topic's content sections
-    are accessible if and only if the student has a COMPLETED discussion session
-    for that topic. No completed session means content is blocked; a completed
-    session means content is directly accessible on all subsequent visits.
+class _FakeSection:
+    """Minimal stand-in for GsLmsContentSection in lock-state properties."""
 
-    **Validates: Requirements 5.1, 5.4, 5.6**
+    def __init__(self, section_id: int):
+        self.id = section_id
+
+
+class TestProgressiveContentAccess:
+    """Property 12 (revised): Content access is progressive and independent of
+    the optional AI discussion.
+
+    The first section is always accessible. Every later section is accessible
+    iff the nearest previous non-skippable section is complete. Completing a
+    discussion may personalise skip allowances, but its absence must never
+    lock content or prevent section completion.
+
+    **Validates: Requirements 2.1, 2.2, 2.6, 5.4**
     """
 
+    @given(completed_flags=st.lists(st.booleans(), min_size=1, max_size=6))
+    @settings(max_examples=50)
+    def test_first_section_always_unlocked(self, completed_flags):
+        """Section 1 is accessible for any completion state, with no discussion."""
+        from app.api.v1.gs_lms.content import _compute_lock_states
+
+        sections = [_FakeSection(index + 1) for index in range(len(completed_flags))]
+        progress = {
+            section.id: completed
+            for section, completed in zip(sections, completed_flags)
+        }
+
+        states = _compute_lock_states(sections, progress)
+
+        assert states[0]["locked"] is False
+        for index in range(1, len(sections)):
+            assert states[index]["locked"] is (
+                not progress[sections[index - 1].id]
+            ), "Each later section must unlock exactly when its predecessor is complete"
+
     @given(
-        has_completed=st.booleans(),
-        num_visits=st.integers(min_value=1, max_value=10),
+        flags=st.lists(
+            st.tuples(st.booleans(), st.booleans()),
+            min_size=2,
+            max_size=6,
+        )
     )
     @settings(max_examples=50)
-    def test_content_accessible_iff_completed_discussion(self, has_completed, num_visits):
-        """Content accessible iff student has COMPLETED discussion."""
-        # Pure logic simulation of the gate check
-        # has_completed_discussion returns True/False
-        content_accessible = has_completed
+    def test_skippable_sections_never_lock_or_block(self, flags):
+        """Skippable sections stay accessible and never block later sections."""
+        from app.api.v1.gs_lms.content import _compute_lock_states
 
-        if has_completed:
-            # Content must be accessible on all subsequent visits
-            for _ in range(num_visits):
-                assert content_accessible is True, (
-                    "Content must be accessible when discussion is COMPLETED"
-                )
-        else:
-            assert content_accessible is False, (
-                "Content must be blocked when no completed discussion exists"
+        sections = [_FakeSection(index + 1) for index in range(len(flags))]
+        progress = {
+            section.id: completed
+            for section, (completed, _skippable) in zip(sections, flags)
+        }
+        skip = {
+            section.id
+            for section, (_completed, skippable) in zip(sections, flags)
+            if skippable
+        }
+
+        states = _compute_lock_states(sections, progress, skip)
+
+        for state in states:
+            if state["section"].id in skip:
+                assert state["locked"] is False
+
+        # The first non-skippable section is always accessible.
+        required = [section for section in sections if section.id not in skip]
+        if required:
+            first_required_state = next(
+                state
+                for state in states
+                if state["section"].id == required[0].id
             )
+            assert first_required_state["locked"] is False
 
-
-    @given(
-        has_session=st.booleans(),
-        session_status=st.sampled_from(["INITIATED", "IN_PROGRESS", "COMPLETED", "ABANDONED"]),
-    )
-    @settings(max_examples=50)
-    def test_only_completed_status_unlocks_content(self, has_session, session_status):
-        """Only a session with status=COMPLETED unlocks content."""
-        if not has_session:
-            # No session at all → blocked
-            content_accessible = False
-        else:
-            # Only COMPLETED status unlocks
-            content_accessible = session_status == "COMPLETED"
-
-        if session_status == "COMPLETED" and has_session:
-            assert content_accessible is True
-        else:
-            assert content_accessible is False
+        # Every non-skippable section depends only on the nearest previous
+        # non-skippable section.
+        for index, state in enumerate(states):
+            section = state["section"]
+            if section.id in skip:
+                continue
+            previous_required = next(
+                (
+                    previous
+                    for previous in reversed(sections[:index])
+                    if previous.id not in skip
+                ),
+                None,
+            )
+            expected_locked = (
+                previous_required is not None
+                and not progress[previous_required.id]
+            )
+            assert state["locked"] is expected_locked
 
 
 # ---------------------------------------------------------------------------

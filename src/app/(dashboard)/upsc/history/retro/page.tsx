@@ -1,11 +1,4 @@
-import { HistoryRetroRoute } from "@/components/upsc/HistorySubjectRoutes";
-
-export default async function HistoryRetroPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ day?: string }>;
-}) {
-  const params = await searchParams;
-  const day = Number(params?.day ?? "1");
-  return <HistoryRetroRoute initialDay={Number.isFinite(day) ? day : 1} />;
+import { redirect } from "next/navigation";
+export default function HistoryRetroPage() {
+  redirect("/upsc/history/lms");
 }

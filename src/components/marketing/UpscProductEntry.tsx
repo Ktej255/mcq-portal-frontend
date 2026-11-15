@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import CountUp from "react-countup";
 import {
   ArrowRight,
@@ -79,15 +79,19 @@ export function UpscProductEntry() {
     process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_STUDENT_PREVIEW_LOGIN === "true";
 
   useEffect(() => {
-    setIsVisible(true);
     const rawPass = localStorage.getItem(accessStorageKey);
-    if (!rawPass) return;
+    const frame = window.requestAnimationFrame(() => {
+      setIsVisible(true);
+      if (!rawPass) return;
 
-    try {
-      setAccessPass(JSON.parse(rawPass) as AccessPass);
-    } catch {
-      localStorage.removeItem(accessStorageKey);
-    }
+      try {
+        setAccessPass(JSON.parse(rawPass) as AccessPass);
+      } catch {
+        localStorage.removeItem(accessStorageKey);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const accessStatus = useMemo(() => {
@@ -128,7 +132,7 @@ export function UpscProductEntry() {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: {
       opacity: 0,
       y: shouldReduceMotion ? 0 : 20,
@@ -138,7 +142,7 @@ export function UpscProductEntry() {
       y: 0,
       transition: shouldReduceMotion ? { duration: 0 } : { duration: 0.5, ease: "easeOut" },
     },
-  } as any;
+  };
 
   const cardHoverVariants = shouldReduceMotion
     ? {}
@@ -268,7 +272,7 @@ export function UpscProductEntry() {
                   
                   <p className="text-base leading-relaxed text-[#5d675f]">
                     We analyzed all 100 questions from UPSC Prelims 2026 and compared them to everything 
-                    we taught in our course. Here's the complete, transparent breakdown.
+                    we taught in our course. Here&apos;s the complete, transparent breakdown.
                   </p>
                 </div>
 
@@ -342,7 +346,7 @@ export function UpscProductEntry() {
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-[#5d675f]">
                     Most institutes hide their actual results. We believe you deserve complete transparency 
-                    about what works and what doesn't—because your success depends on honest preparation, not marketing claims.
+                    about what works and what doesn&apos;t—because your success depends on honest preparation, not marketing claims.
                   </p>
                 </div>
 

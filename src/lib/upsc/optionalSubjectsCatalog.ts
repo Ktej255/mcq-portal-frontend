@@ -6,10 +6,12 @@
  * `slug` (used by {@link optionalSubjectRoute}), a display `name`, and an
  * honest `status` describing how far that subject's content has been authored.
  *
- * Honesty rule (R3.5 / design Property 8): only subjects with reviewed,
- * authored content are marked `available`. Everything not yet authored stays
- * `coming-soon` so the UI never presents an empty subject as ready. Geography
- * is the Phase-1 stabilization target and is the only `available` subject now.
+ * Honesty rule (R3.5 / design Property 8): `available` means this subject has
+ * reviewed content behind its workspace — it is the flag the learner-facing
+ * counts and copy rely on, so it must never be set for a subject whose notes,
+ * PYQs or Read material are merely drafted or merely structured. A subject
+ * stays `coming-soon` until its rows are reviewed in the backend, which is a
+ * reviewer decision, not a frontend one (founder decision, 2026-10-31).
  *
  * Literature optionals exist in the real exam but are intentionally excluded
  * here: this catalog covers the 25 standard (non-literature) optionals.
@@ -29,7 +31,18 @@ export type OptionalSubjectCatalogEntry = {
 
 /**
  * The 25 standard UPSC optional subjects (alphabetical by display name).
- * Geography and Anthropology are currently authored/available.
+ *
+ * Exactly one subject — Geography — is `available`. Verified against the
+ * backend database on 2026-10-30: Geography optional has reviewed ContentUnits
+ * and reviewed PYQs (14 nodes / 26 PYQs); Sociology has a subject row with 69
+ * unreviewed nodes and no reviewed content, and Anthropology has no
+ * `optional_subjects` row at all, so every `/api/v1/optional/anthropology/*`
+ * call 404s and selecting it cannot be saved. On 2026-10-31 the founder decided
+ * both Anthropology and Sociology stay `coming-soon` until their content is
+ * reviewed, which also removes their Read/Syllabus/PYQ/Practice/Gap/Recall
+ * affordances (`SubjectShell` gates every one of them on `available`). The
+ * frontend can still render their syllabus skeleton offline; that is not a
+ * content claim and must not be labelled as one.
  */
 export const OPTIONAL_SUBJECTS: readonly OptionalSubjectCatalogEntry[] = [
   { slug: "agriculture", name: "Agriculture", status: "coming-soon" },
@@ -38,7 +51,7 @@ export const OPTIONAL_SUBJECTS: readonly OptionalSubjectCatalogEntry[] = [
     name: "Animal Husbandry & Veterinary Science",
     status: "coming-soon",
   },
-  { slug: "anthropology", name: "Anthropology", status: "available" },
+  { slug: "anthropology", name: "Anthropology", status: "coming-soon" },
   { slug: "botany", name: "Botany", status: "coming-soon" },
   { slug: "chemistry", name: "Chemistry", status: "coming-soon" },
   { slug: "civil-engineering", name: "Civil Engineering", status: "coming-soon" },
@@ -104,7 +117,7 @@ export const SUBJECT_STATUS_META: Record<
 > = {
   available: {
     label: "Available now",
-    description: "Authored content is live - open to start preparing.",
+    description: "Reviewed notes and PYQs are published for this subject, and every content surface shows its real availability.",
   },
   "coming-soon": {
     label: "Coming soon",

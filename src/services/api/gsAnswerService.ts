@@ -41,6 +41,16 @@ export interface AnswerAck {
   review_required?: boolean;
 }
 
+export class GsEvaluationProviderUnavailableError extends Error {
+  readonly code = 'EVALUATION_PROVIDER_UNAVAILABLE';
+  readonly retryable = true;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'GsEvaluationProviderUnavailableError';
+  }
+}
+
 export interface PageUploadOut {
   attempt_id: number;
   image_id: number;
@@ -92,11 +102,46 @@ const unwrap = <T>(data: unknown): T => {
   return (record.data ?? record) as T;
 };
 
+const PROVIDER_UNAVAILABLE_MESSAGE =
+  'Answer evaluation is temporarily unavailable. Please retry later.';
+
+type AxiosLikeError = {
+  response?: {
+    status?: unknown;
+    data?: unknown;
+  };
+};
+
+const normalizeEvaluationError = (error: unknown): unknown => {
+  if (!error || typeof error !== 'object') return error;
+
+  const response = (error as AxiosLikeError).response;
+  if (response?.status !== 503 || !response.data || typeof response.data !== 'object') {
+    return error;
+  }
+
+  const detail = (response.data as Record<string, unknown>).detail;
+  if (!detail || typeof detail !== 'object') return error;
+
+  const detailRecord = detail as Record<string, unknown>;
+  if (detailRecord.code !== 'EVALUATION_PROVIDER_UNAVAILABLE') return error;
+
+  const message =
+    typeof detailRecord.message === 'string' && detailRecord.message.trim()
+      ? detailRecord.message
+      : PROVIDER_UNAVAILABLE_MESSAGE;
+  return new GsEvaluationProviderUnavailableError(message);
+};
+
 export const gsAnswerService = {
   /** Submit a typed descriptive answer; returns the evaluation ack. */
   submitTyped: async (subject = 'geography', payload: TypedAnswerIn): Promise<AnswerAck> => {
-    const response = await apiClient.post(`gs-lms/${subject}/answers/typed`, payload);
-    return unwrap<AnswerAck>(response.data);
+    try {
+      const response = await apiClient.post(`gs-lms/${subject}/answers/typed`, payload);
+      return unwrap<AnswerAck>(response.data);
+    } catch (error) {
+      throw normalizeEvaluationError(error);
+    }
   },
 
   /** Create a handwritten attempt (then upload pages and submit). */
@@ -134,12 +179,16 @@ export const gsAnswerService = {
   ): Promise<AnswerAck> => {
     const form = new FormData();
     form.append('acknowledge_review', String(acknowledgeReview));
-    const response = await apiClient.post(
-      `gs-lms/${subject}/answers/${attemptId}/submit`,
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-    return unwrap<AnswerAck>(response.data);
+    try {
+      const response = await apiClient.post(
+        `gs-lms/${subject}/answers/${attemptId}/submit`,
+        form,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      return unwrap<AnswerAck>(response.data);
+    } catch (error) {
+      throw normalizeEvaluationError(error);
+    }
   },
 
   /** Poll the evaluation job status (and report when ready). */

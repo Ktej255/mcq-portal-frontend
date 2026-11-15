@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { OptionalSubjectLMS } from "@/components/upsc/OptionalSubjectLMS";
-import { getOptionalSubject, optionalSubjects } from "@/lib/upsc/yearlyPlanner";
+import { SubjectShell } from "@/components/upsc/SubjectShell";
+import { OPTIONAL_SUBJECTS } from "@/lib/upsc/optionalSubjectsCatalog";
 
 export function generateStaticParams() {
-  return optionalSubjects.map((subject) => ({ slug: subject.slug }));
+  return OPTIONAL_SUBJECTS.map((subject) => ({ slug: subject.slug }));
 }
 
 export default async function OptionalSubjectDetailPage({
@@ -13,14 +13,15 @@ export default async function OptionalSubjectDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const subject = getOptionalSubject(slug);
+  const subject = OPTIONAL_SUBJECTS.find((entry) => entry.slug === slug);
 
   if (!subject) {
     notFound();
   }
 
-  // Every optional opens the LMS course player. Geography is the richest
-  // reference (PYQs, interactive map, trends); other subjects inherit the same
-  // shell driven by their own scraped syllabus, with those modules being filled.
-  return <OptionalSubjectLMS slug={subject.slug} title={subject.title} group={subject.group} />;
+  // The visible subject route uses the canonical authenticated shell. It owns
+  // syllabus, PYQ, practice, recall, and answer-workspace navigation through
+  // the shared Optional API contracts; the legacy browser-local course player
+  // remains isolated from this entry path.
+  return <SubjectShell slug={subject.slug} />;
 }

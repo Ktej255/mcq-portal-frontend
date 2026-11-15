@@ -28,9 +28,11 @@ from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsNodeTypeEnum
 from app.core.gs_lms.student_models import GsLmsOnboardingStatus
+from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
+from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsOnboardingStatusOut,
     GsLmsOnboardingCompleteIn,
@@ -69,21 +71,29 @@ def _get_onboarding_record(
     )
 
 
-def _get_first_reviewed_leaf(db: Session) -> GsLmsSyllabusNode | None:
-    """Find the first REVIEWED leaf node in the syllabus tree by display_order.
+def _get_first_reviewed_leaf(
+    db: Session, subject_id: int
+) -> GsLmsSyllabusNode | None:
+    """Find the first REVIEWED leaf for a subject by display_order.
 
     This serves as the default first topic for onboarding when the student
-    doesn't specify one.
+    doesn't specify one. When the paid-beta scope is enforced, the default is
+    the first topic the learner can actually enter, so onboarding never hands
+    them a locked topic.
     """
-    return (
-        db.query(GsLmsSyllabusNode)
-        .filter(
-            GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
-            GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
-        )
-        .order_by(GsLmsSyllabusNode.display_order, GsLmsSyllabusNode.id)
-        .first()
+    query = db.query(GsLmsSyllabusNode).filter(
+        GsLmsSyllabusNode.subject_id == subject_id,
+        GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
+        GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
     )
+    if beta_scope_enabled():
+        ready_ids = compute_loop_ready_ids(db, subject_id)
+        if not ready_ids:
+            return None
+        query = query.filter(GsLmsSyllabusNode.id.in_(ready_ids))
+    return query.order_by(
+        GsLmsSyllabusNode.display_order, GsLmsSyllabusNode.id
+    ).first()
 
 
 def _build_status_out(
@@ -133,6 +143,7 @@ def _build_status_out(
 
 @router.get("/onboarding/status")
 def get_onboarding_status(
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -154,6 +165,7 @@ def get_onboarding_status(
 @router.post("/onboarding/complete")
 def complete_onboarding(
     payload: GsLmsOnboardingCompleteIn,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -189,6 +201,7 @@ def complete_onboarding(
             db.query(GsLmsSyllabusNode)
             .filter(
                 GsLmsSyllabusNode.id == first_topic_id,
+                GsLmsSyllabusNode.subject_id == subject.id,
                 GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
                 GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
             )
@@ -199,9 +212,19 @@ def complete_onboarding(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Specified first topic not found or not a reviewed leaf topic",
             )
+        if beta_scope_enabled() and topic.id not in compute_loop_ready_ids(
+            db, subject.id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Specified first topic is not open in the paid beta yet. "
+                    "Choose a topic that is marked as available."
+                ),
+            )
     else:
         # Default to the first reviewed leaf node
-        default_topic = _get_first_reviewed_leaf(db)
+        default_topic = _get_first_reviewed_leaf(db, subject.id)
         first_topic_id = default_topic.id if default_topic else None
 
     # Derive bandwidth from study_window_minutes if provided
@@ -246,6 +269,7 @@ def complete_onboarding(
 @router.put("/onboarding/level")
 def update_learner_level(
     payload: GsLmsLearnerLevelUpdateIn,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:

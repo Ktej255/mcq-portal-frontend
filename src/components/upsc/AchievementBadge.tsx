@@ -67,13 +67,16 @@ export function AchievementNotification({ badge, onClose }: NotificationProps) {
 
   useEffect(() => {
     if (badge) {
-      setVisible(true);
-      const timer = setTimeout(() => {
+      const showTimer = window.setTimeout(() => setVisible(true), 0);
+      const timer = window.setTimeout(() => {
         setVisible(false);
         setTimeout(onClose, 300); // Trigger cleanup after transition
       }, 5000); // Display for 5 seconds
 
-      return () => clearTimeout(timer);
+      return () => {
+        window.clearTimeout(showTimer);
+        window.clearTimeout(timer);
+      };
     }
   }, [badge, onClose]);
 

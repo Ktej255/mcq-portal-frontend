@@ -23,6 +23,8 @@ Asserts:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -255,7 +257,9 @@ def test_honesty_gate_hides_unreviewed_content(seeded_engine):
             d.close()
 
     app.dependency_overrides[get_db] = _override_get_db
-    app.dependency_overrides[get_current_user] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=1, google_uid="optional-content-test", role="STUDENT"
+    )
     try:
         c = TestClient(app)
         data = c.get(

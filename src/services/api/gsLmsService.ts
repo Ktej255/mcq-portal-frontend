@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient } from './client';
 
 /**
@@ -30,6 +31,21 @@ export interface SyllabusNodeOut {
   review_status: string;
   completion_percent: number | null;
   completed: boolean | null;
+  /** Reviewed standalone MCQs; practice is available only when > 0. */
+  mcq_count: number;
+  /**
+   * Reviewed PYQ evidence mapped to this leaf. Raw counts only; the weighted
+   * demand share stays on the topic strip and readiness dashboard.
+   */
+  prelims_pyq_count: number;
+  mains_pyq_count: number;
+  /**
+   * Paid-beta availability for a leaf topic. `null` when the beta scope is
+   * disabled or the node is not a leaf. `false` means the topic is visible on
+   * the map but cannot be entered until its content, demand, and practice
+   * gates pass — showing it honestly beats a dead end.
+   */
+  beta_ready: boolean | null;
   day_lesson_id: number | null;
   ordering_justification: string | null;
   children: SyllabusNodeOut[];
@@ -41,6 +57,13 @@ export interface SyllabusTreeOut {
   total_nodes: number;
   tree: SyllabusNodeOut[];
 }
+
+/**
+ * Substring of the backend 409 detail for a topic outside the paid-beta scope.
+ * Used to turn a failed topic load into a calm "not open yet" state instead of
+ * a retry loop the learner cannot succeed at.
+ */
+export const BETA_LOCKED_ERROR_FRAGMENT = "not open in the paid beta";
 
 // -- Content Sections (Progressive Disclosure) ------------------------------
 
@@ -68,6 +91,15 @@ export interface TopicSectionsOut {
 
 /** Typed content blocks from backend — flexible structure. */
 export type ContentBlock = Record<string, unknown>;
+
+export interface ExternalResourceOut {
+  id: number;
+  section_label: string;
+  title: string;
+  source_name: string;
+  url: string;
+  relevance_description: string | null;
+}
 
 // -- PYQs -------------------------------------------------------------------
 
@@ -126,6 +158,11 @@ export interface PracticeAttemptResultOut {
   time_taken_seconds: number | null;
 }
 
+export interface PracticeAnswerResponseOut {
+  session: PracticeSessionOut;
+  attempt_result: PracticeAttemptResultOut;
+}
+
 export interface QuestionTypeAccuracyOut {
   question_type: string;
   total: number;
@@ -161,16 +198,58 @@ export interface DiscussionSessionOut {
   turns: DiscussionTurnOut[];
 }
 
+export interface DiscussionAlreadyCompletedOut {
+  already_completed: true;
+  syllabus_node_id: number;
+  gate_passed: true;
+}
+
+export type DiscussionStartOut = DiscussionSessionOut | DiscussionAlreadyCompletedOut;
+
 export interface DiscussionTurnResponseOut {
   session_id: number;
   status: string;
   student_turn: DiscussionTurnOut;
   ai_turn: DiscussionTurnOut;
   gate_passed: boolean;
+  provider: string;
+  is_mock: boolean;
   concepts_matched: string[] | null;
   concepts_missed: string[] | null;
   match_percentage: number | null;
 }
+
+interface DiscussionUnavailableDetail {
+  code: 'DISCUSSION_PROVIDER_UNAVAILABLE';
+  message: string;
+  retryable: true;
+  provider: string;
+}
+
+export class DiscussionProviderUnavailableError extends Error {
+  readonly code = 'DISCUSSION_PROVIDER_UNAVAILABLE';
+  readonly retryable = true;
+
+  constructor(
+    message: string,
+    readonly provider: string,
+  ) {
+    super(message);
+    this.name = 'DiscussionProviderUnavailableError';
+  }
+}
+
+const parseDiscussionUnavailable = (error: unknown): DiscussionProviderUnavailableError | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 503) return null;
+  const detail = error.response.data?.detail as Partial<DiscussionUnavailableDetail> | undefined;
+  if (
+    detail?.code !== 'DISCUSSION_PROVIDER_UNAVAILABLE' ||
+    detail.retryable !== true ||
+    typeof detail.message !== 'string' ||
+    typeof detail.provider !== 'string'
+  ) return null;
+  return new DiscussionProviderUnavailableError(detail.message, detail.provider);
+};
 
 // -- Progress / Gaps --------------------------------------------------------
 
@@ -216,6 +295,187 @@ export interface ProgressOut {
   mega_topics: MegaTopicProgressOut[];
 }
 
+// -- Readiness --------------------------------------------------------------
+
+export type ReadinessStatus =
+  | 'UNTOUCHED'
+  | 'IN_PROGRESS'
+  | 'UNVERIFIED'
+  | 'WEAK'
+  | 'DEVELOPING'
+  | 'SECURE'
+  | 'STRONG';
+
+export type ReadinessBand =
+  | 'INSUFFICIENT_EVIDENCE'
+  | 'FOUNDATION'
+  | 'DEVELOPING'
+  | 'COMPETITIVE'
+  | 'STRONG';
+
+export type ReadinessConfidenceLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface ReadinessConfidenceOut {
+  level: ReadinessConfidenceLevel;
+  assessed_demand_pct: number;
+  demand_mapping_pct: number;
+  weighted_confidence: number;
+}
+
+export interface ReadinessProjectionOut {
+  questions: number;
+  correct: { low: number; expected: number; high: number };
+  net_marks: { low: number; expected: number; high: number };
+  assumptions: string[];
+}
+
+export interface ReadinessSummaryOut {
+  readiness_score: number;
+  band: ReadinessBand;
+  band_suppressed: boolean;
+  confidence: ReadinessConfidenceOut;
+  projection: ReadinessProjectionOut;
+}
+
+export interface ReadinessTopicOut {
+  node_id: number;
+  title: string;
+  mega_topic: string;
+  display_order: number;
+  demand_score: number;
+  demand_share_pct: number;
+  demand_confidence_pct: number;
+  pyq_count: number;
+  last_pyq_year: number | null;
+  mains_pyq_count: number;
+  last_mains_year: number | null;
+  coverage_pct: number;
+  depth_pct: number;
+  prep_pct: number;
+  performance_pct: number;
+  confidence_pct: number;
+  status: ReadinessStatus;
+  gap_marks: number;
+  has_evidence: boolean;
+  practice_attempts: number;
+  practice_correct: number;
+  recall_score_pct: number | null;
+  mcq_count: number;
+  next_action: string;
+  next_section: string | null;
+  reason: string;
+}
+
+export interface ReadinessNextActionOut {
+  node_id: number;
+  title: string;
+  action: string;
+  reason: string;
+  status: ReadinessStatus;
+  marks_at_stake: number;
+  demand_score: number;
+}
+
+export interface ReadinessDataQualityOut {
+  topics_total: number;
+  topics_with_pyq: number;
+  topics_without_pyq: number;
+  topics_with_mcq: number;
+  topics_without_mcq: number;
+  demand_mapping_pct: number;
+  notes: string[];
+}
+
+export interface ReadinessOut {
+  generated_at: string;
+  subject: string;
+  model_version: string;
+  summary: ReadinessSummaryOut;
+  coverage: {
+    demand_weighted_pct: number;
+    topics_touched: number;
+    topics_total: number;
+  };
+  depth: {
+    demand_weighted_pct: number;
+    deep_topics: number;
+  };
+  evidence: {
+    assessed_topics: number;
+    assessed_demand_pct: number;
+  };
+  topics: ReadinessTopicOut[];
+  next_actions: ReadinessNextActionOut[];
+  data_quality: ReadinessDataQualityOut;
+}
+
+// -- Mains outcome estimate -------------------------------------------------
+
+export type MainsConfidenceLevel =
+  | "moderate"
+  | "low"
+  | "very_low"
+  | "insufficient";
+
+export interface MainsPaperProjectionOut {
+  paper: string;
+  answers: number;
+  out_of: number;
+  low_marks: number;
+  expected_marks: number;
+  high_marks: number;
+}
+
+export interface MainsOutcomeOut {
+  generated_at: string;
+  available: boolean;
+  minimum_questions: number;
+  answers_evaluated: number;
+  submitted_answers: number;
+  excluded_incomplete_reports: number;
+  excluded_duplicate_attempts: number;
+  papers_with_evidence: number;
+  unknown_paper_answers: number;
+  band: {
+    low_pct: number;
+    expected_pct: number;
+    high_pct: number;
+    observed_min_pct: number;
+    observed_max_pct: number;
+  } | null;
+  projection: {
+    covered_papers: string[];
+    covered_marks: number;
+    low_marks: number;
+    expected_marks: number;
+    high_marks: number;
+    per_paper: MainsPaperProjectionOut[];
+  } | null;
+  confidence: {
+    level: MainsConfidenceLevel;
+    label: string;
+    distinct_questions: number;
+    papers_with_evidence: number;
+    spread_pct: number | null;
+  };
+  caveats: string[];
+  next_step: string;
+  reason: string | null;
+}
+
+export interface ReadinessTrendPointOut {
+  date: string;
+  computed_at: string;
+  readiness_score: number;
+  band: ReadinessBand;
+  confidence_level: ReadinessConfidenceLevel;
+  coverage_pct: number;
+  depth_pct: number;
+  assessed_demand_pct: number;
+  projected_correct_expected: number | null;
+  projected_net_expected: number | null;
+}
+
 // -- Daily Planner ----------------------------------------------------------
 
 export interface PlanItemOut {
@@ -227,6 +487,10 @@ export interface PlanItemOut {
   revisit_id: number | null;
   revisit_type: string | null;
   overdue: boolean;
+  sequence_position: number | null;
+  sequence_total: number | null;
+  prelims_pyq_count: number | null;
+  mains_pyq_count: number | null;
 }
 
 export interface DailyPlanOut {
@@ -341,6 +605,20 @@ export const gsLmsService = {
     await apiClient.post(`gs-lms/${subject}/topics/${nodeId}/video/watched`, payload);
   },
 
+  /**
+   * Fetch reviewed external reading resources for a topic.
+   * @fulfills Requirement 12.1, 12.2, 12.3, 12.5
+   */
+  getExternalResources: async (
+    subject = "geography",
+    nodeId: number,
+  ): Promise<ExternalResourceOut[]> => {
+    const response = await apiClient.get(
+      `gs-lms/${subject}/topics/${nodeId}/external-resources`,
+    );
+    return unwrap<ExternalResourceOut[]>(response.data);
+  },
+
   // -------------------------------------------------------------------------
   // PYQs
   // -------------------------------------------------------------------------
@@ -434,14 +712,15 @@ export const gsLmsService = {
   // -------------------------------------------------------------------------
 
   /**
-   * Start an AI discussion session for a topic (gates content access).
+   * Start an AI discussion session for a topic (optional recall check;
+   * never gates content access).
    * @fulfills Requirement 1.1, 6.1
    */
-  startDiscussion: async (subject = "geography", nodeId: number): Promise<DiscussionSessionOut> => {
+  startDiscussion: async (subject = "geography", nodeId: number): Promise<DiscussionStartOut> => {
     const response = await apiClient.post(`gs-lms/${subject}/discussion/start`, {
       syllabus_node_id: nodeId,
     });
-    return unwrap<DiscussionSessionOut>(response.data);
+    return unwrap<DiscussionStartOut>(response.data);
   },
 
   /**
@@ -453,11 +732,17 @@ export const gsLmsService = {
     sessionId: number,
     content: string,
   ): Promise<DiscussionTurnResponseOut> => {
-    const response = await apiClient.post(
-      `gs-lms/${subject}/discussion/${sessionId}/turn`,
-      { content },
-    );
-    return unwrap<DiscussionTurnResponseOut>(response.data);
+    try {
+      const response = await apiClient.post(
+        `gs-lms/${subject}/discussion/${sessionId}/turn`,
+        { content },
+      );
+      return unwrap<DiscussionTurnResponseOut>(response.data);
+    } catch (error) {
+      const unavailable = parseDiscussionUnavailable(error);
+      if (unavailable) throw unavailable;
+      throw error;
+    }
   },
 
   /**
@@ -489,6 +774,47 @@ export const gsLmsService = {
   getGaps: async (subject = "geography"): Promise<GapOut> => {
     const response = await apiClient.get(`gs-lms/${subject}/gaps`);
     return unwrap<GapOut>(response.data);
+  },
+
+  // -------------------------------------------------------------------------
+  // Readiness
+  // -------------------------------------------------------------------------
+
+  /**
+   * Fetch the evidence-based readiness report: what UPSC demands, what the
+   * learner covered, the resulting gap, next actions, and a bounded outcome
+   * estimate. The API withholds a performance band until enough assessed
+   * demand exists, so callers must handle `band_suppressed`.
+   */
+  getReadiness: async (
+    subject = "geography",
+    options?: { persist?: boolean },
+  ): Promise<ReadinessOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/readiness`, {
+      params:
+        options?.persist === undefined
+          ? undefined
+          : { persist: options.persist },
+    });
+    return unwrap<ReadinessOut>(response.data);
+  },
+
+  /** Fetch daily readiness snapshots, oldest first. */
+  getReadinessTrend: async (
+    subject = "geography",
+    limit = 30,
+  ): Promise<ReadinessTrendPointOut[]> => {
+    const response = await apiClient.get(`gs-lms/${subject}/readiness/trend`, {
+      params: { limit },
+    });
+    return unwrap<ReadinessTrendPointOut[]>(response.data);
+  },
+
+  getMainsOutcome: async (
+    subject = "geography",
+  ): Promise<MainsOutcomeOut> => {
+    const response = await apiClient.get(`gs-lms/${subject}/readiness/mains`);
+    return unwrap<MainsOutcomeOut>(response.data);
   },
 
   // -------------------------------------------------------------------------

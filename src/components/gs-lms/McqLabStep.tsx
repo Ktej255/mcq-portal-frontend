@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Target, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/api/funnelService';
 
 /**
@@ -15,10 +14,47 @@ import { funnelService, McqLabQuestionOut, McqLabResultOut } from '@/services/ap
 interface McqLabStepProps {
   nodeId: number;
   subject?: string;
-  onComplete: () => void;
+  onComplete: () => void | Promise<void>;
 }
 
-type McqLabMode = 'loading' | 'answering' | 'submitting' | 'result';
+type McqLabMode = 'loading' | 'answering' | 'submitting' | 'result' | 'error';
+
+type ApiErrorDetails = {
+  status?: number;
+  message: string;
+};
+
+function getApiErrorDetails(error: unknown, fallback: string): ApiErrorDetails {
+  const response =
+    error && typeof error === 'object' && 'response' in error
+      ? (error as { response?: unknown }).response
+      : undefined;
+  const responseRecord =
+    response && typeof response === 'object'
+      ? (response as Record<string, unknown>)
+      : {};
+  const data =
+    responseRecord.data && typeof responseRecord.data === 'object'
+      ? (responseRecord.data as Record<string, unknown>)
+      : {};
+  const detail = data.detail;
+  const detailMessage =
+    detail && typeof detail === 'object' && 'message' in detail
+      ? (detail as { message?: unknown }).message
+      : undefined;
+
+  return {
+    status: typeof responseRecord.status === 'number' ? responseRecord.status : undefined,
+    message:
+      typeof detail === 'string'
+        ? detail
+        : typeof detailMessage === 'string'
+          ? detailMessage
+          : typeof data.message === 'string'
+            ? data.message
+            : fallback,
+  };
+}
 
 export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLabStepProps) {
   const [mode, setMode] = useState<McqLabMode>('loading');
@@ -26,15 +62,72 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [result, setResult] = useState<McqLabResultOut | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A 409 means the topic does not yet have a complete reviewed set. That is a
+  // content coverage gap, not a transient failure, so retrying can never help.
+  const [coverageGap, setCoverageGap] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const submissionInFlight = useRef(false);
 
-  // Load questions
+  // Restore a submitted result when returning to the step; otherwise load a
+  // fresh reviewed set. A missing result is the normal first-attempt path.
   useEffect(() => {
-    funnelService.getMcqLabQuestions(subject, nodeId)
-      .then((qs) => {
+    let active = true;
+
+    const loadQuestions = async () => {
+      try {
+        const qs = await funnelService.getMcqLabQuestions(subject, nodeId);
+        if (!active) return;
         setQuestions(qs);
         setMode('answering');
-      })
-      .catch(() => setError('Failed to load MCQ Lab questions'));
+      } catch (err: unknown) {
+        if (!active) return;
+        const details = getApiErrorDetails(err, '');
+        setCoverageGap(details.status === 409);
+        setError(details.message || 'Failed to load MCQ Lab questions');
+        setMode('error');
+      }
+    };
+
+    const loadResult = async () => {
+      try {
+        const savedResult = await funnelService.getMcqLabResult(subject, nodeId);
+        if (!active) return;
+        if (!savedResult) {
+          // No saved attempt yet: go straight to the question flow.
+          void loadQuestions();
+          return;
+        }
+        setResult(savedResult);
+        setMode('result');
+      } catch (err: unknown) {
+        if (!active) return;
+        const details = getApiErrorDetails(err, 'Could not restore the previous MCQ result.');
+        if (details.status === 404) {
+          void loadQuestions();
+          return;
+        }
+        setError(`${details.message} You can retry loading the MCQ Lab.`);
+        setMode('error');
+      }
+    };
+
+    // Starting a new Lab session clears the previous one. The clear is deferred
+    // by one microtask so this effect never writes state synchronously; every
+    // response below already arrives asynchronously, so the ordering is
+    // unchanged, and the `active` flag stops a stale clear after a re-run.
+    queueMicrotask(() => {
+      if (!active) return;
+      setMode('loading');
+      setQuestions([]);
+      setAnswers({});
+      setResult(null);
+      setError(null);
+    });
+    void loadResult();
+
+    return () => {
+      active = false;
+    };
   }, [nodeId, subject]);
 
   const answeredCount = Object.keys(answers).length;
@@ -46,6 +139,8 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
 
   const handleSubmit = useCallback(async () => {
     if (!allAnswered) return;
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
     setMode('submitting');
     setError(null);
 
@@ -59,15 +154,80 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
       setResult(res);
       setMode('result');
     } catch {
-      setError('Submission failed. Your answers are saved locally — please retry.');
+      setError('Submission failed. Your answers remain on this page while you retry.');
       setMode('answering');
+    } finally {
+      submissionInFlight.current = false;
     }
   }, [allAnswered, answers, questions, subject, nodeId]);
 
+  const handleContinueWithoutLab = async () => {
+    if (advancing) return;
+    setAdvancing(true);
+    try {
+      await onComplete();
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
+  if (coverageGap) {
+    return (
+      <div
+        role="status"
+        className="rounded-2xl border border-[#efd8a7] bg-[#fff8e8] p-6"
+      >
+        <p className="text-sm font-semibold text-[#6f4a12]">
+          MCQ practice is not open for this topic yet
+        </p>
+        <p className="mt-1 text-sm text-[#6f4a12]/80">
+          {error} The lab needs 15 reviewed questions, and this topic has fewer
+          today. That is a coverage gap on our side, not a judgement of your
+          preparation. The readiness report will keep this topic marked
+          practice-unverified until the set is complete.
+        </p>
+        <button
+          type="button"
+          onClick={handleContinueWithoutLab}
+          disabled={advancing}
+          className="mt-4 w-full rounded-xl border border-[#ef9f27]/50 bg-white py-3 text-sm font-black text-[#6f4a12] transition hover:bg-[#ef9f27]/10 disabled:opacity-50"
+        >
+          {advancing ? "Continuing…" : "Continue without the MCQ Lab →"}
+        </button>
+        <p className="mt-2 text-xs text-[#6f4a12]/60">
+          Mains practice and the growth report stay available, so the topic can
+          still be completed.
+        </p>
+      </div>
+    );
+  }
+
+  if (error && mode === 'error') {
+    return (
+      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-sm text-red-800">{error}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-800 hover:bg-red-100"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </button>
+      </div>
+    );
+  }
+
   if (error && mode === 'loading') {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
         <p className="text-sm text-red-800">{error}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-800 hover:bg-red-100"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </button>
       </div>
     );
   }
@@ -78,6 +238,28 @@ export function McqLabStep({ nodeId, subject = "geography", onComplete }: McqLab
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="h-24 bg-[#e7f5ee] rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (mode === 'answering' && questions.length === 0 && !error) {
+    return (
+      <div className="rounded-2xl border border-[#efd8a7] bg-[#fff8e8] p-6 text-center">
+        <p className="text-sm font-semibold text-[#6f4a12]">
+          No MCQ Lab questions are available for this topic yet.
+        </p>
+        <p className="mt-1 text-xs text-[#6f4a12]/70">
+          This is a coverage gap, not a learner failure. You can continue and the
+          topic will stay practice-unverified in readiness.
+        </p>
+        <button
+          type="button"
+          onClick={handleContinueWithoutLab}
+          disabled={advancing}
+          className="mt-4 w-full rounded-xl border border-[#ef9f27]/50 bg-white py-3 text-sm font-black text-[#6f4a12] transition hover:bg-[#ef9f27]/10 disabled:opacity-50"
+        >
+          {advancing ? "Continuing…" : "Continue without the MCQ Lab →"}
+        </button>
       </div>
     );
   }

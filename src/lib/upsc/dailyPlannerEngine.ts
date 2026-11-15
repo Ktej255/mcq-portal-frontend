@@ -2,6 +2,7 @@ import type { QuestionBankAttempt } from "@/lib/upsc/questionBankEngine";
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
 import type { SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 
 export type DailyPlannerProgress = SubjectDayProgress & {
   meTimeCompletedAt?: string;
@@ -359,9 +360,24 @@ function repairDetail(progress?: DailyPlannerProgress) {
   );
 }
 
+/**
+ * Planner destination for a legacy "room" name.
+ *
+ * The day-based rooms (`/upsc/{slug}/watch`, `/talk`, `/track`, `/revisit`,
+ * `/mcq-readiness`) were retired when the GS LMS became the study surface: the
+ * subject landing pages now redirect into `/upsc/{slug}/lms`, and Geography has
+ * no room pages at all. Until this function was re-pointed, every planner
+ * affordance on the learner's Today page — the primary "do this next" button —
+ * linked to a retired route, so a learner either bounced through a redirect
+ * into the LMS entry page (losing the intent) or hit a 404 on Geography.
+ *
+ * `day` is kept in the signature because the planner still reasons in day
+ * terms, but the LMS sequences topics, not days, so it is no longer sent as a
+ * `?day=` parameter the destination would silently ignore.
+ */
 function routeFor(subjectSlug: string, room: "watch" | "talk" | "mcq-readiness" | "track" | "revisit", day: number) {
-  if (room === "track") return `/upsc/${subjectSlug}/track?day=${day}`;
-  return `/upsc/${subjectSlug}/${room}?day=${day}`;
+  void day;
+  return lmsHrefForRoom(subjectSlug, room);
 }
 
 function findSession(sessions: SubjectSession[], day: number) {

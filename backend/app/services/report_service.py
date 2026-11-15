@@ -7,6 +7,7 @@ from app.services.narrative_service import generate_performance_narrative
 from app.services.longitudinal_service import update_student_evolution
 from app.services.domain_contracts import detect_analytics_anomalies
 from app.services.scoring_engine import ScoringEngine
+from app.services.test_engine_service import published_question_query
 
 def generate_report(db: Session, attempt_id: int, user_id: int) -> Report:
     attempt = db.query(Attempt).filter(Attempt.id == attempt_id, Attempt.user_id == user_id).first()
@@ -24,7 +25,7 @@ def generate_report(db: Session, attempt_id: int, user_id: int) -> Report:
         return existing_report
 
     test = attempt.test
-    questions = db.query(Question).filter(Question.test_id == test.id).all()
+    questions = published_question_query(db, test.id).all()
     answers = db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id == attempt_id).all()
     
     ans_map = {ans.question_id: ans for ans in answers}
@@ -125,7 +126,7 @@ def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
 
             # --- CORE PEDAGOGICAL TRUTH ---
             attempt = report.attempt
-            questions = attempt.test.questions
+            questions = published_question_query(db, attempt.test_id).all()
             answers = attempt.answers
             events = db.query(ExamEvent).filter(ExamEvent.attempt_id == attempt_id).all()
 
@@ -265,7 +266,7 @@ def get_detailed_review(db: Session, attempt_id: int, user_id: int):
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
         
-    questions = db.query(Question).filter(Question.test_id == attempt.test_id).all()
+    questions = published_question_query(db, attempt.test_id).all()
     answers = db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id == attempt_id).all()
     events = db.query(ExamEvent).filter(ExamEvent.attempt_id == attempt_id).order_by(ExamEvent.timestamp.asc()).all()
     

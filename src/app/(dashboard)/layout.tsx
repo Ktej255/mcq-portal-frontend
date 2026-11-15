@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
@@ -16,9 +16,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isLoaded } = useApiConfig();
-  const pathname = usePathname();
+  const { role } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isAdminShell = isOperatorRoute(pathname);
+  const isAdminShell = role === "ADMIN";
 
   if (!isLoaded) return (
     <div className="flex h-screen items-center justify-center bg-[#f7f4ee]">

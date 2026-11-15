@@ -74,6 +74,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [watchNote, setWatchNote] = useState("");
   const [baselineKnowledge, setBaselineKnowledge] = useState("");
   const [savedNote, setSavedNote] = useState(false);
+  const [watchSaveError, setWatchSaveError] = useState<string | null>(null);
   const [isDemoPlaying, setIsDemoPlaying] = useState(false);
   const [handoffStatus, setHandoffStatus] = useState<"Idle" | "Armed" | "Opening">("Idle");
   const [cameraStatus, setCameraStatus] = useState<"idle" | "granted" | "denied">("idle");
@@ -83,11 +84,11 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [showFallbackCheckpoint, setShowFallbackCheckpoint] = useState(false);
   const [fallbackQuizAnswered, setFallbackQuizAnswered] = useState(false);
   const [selectedFallbackOption, setSelectedFallbackOption] = useState<string | null>(null);
-  const [fallbackTimerCount, setFallbackTimerCount] = useState(0);
+  const [, setFallbackTimerCount] = useState(0);
   const [userDoubt, setUserDoubt] = useState("");
   const [aiDoubtResponse, setAiDoubtResponse] = useState("");
   const [dismissCount, setDismissCount] = useState(0);
-  const [sentimentLog, setSentimentLog] = useState<string[]>([]);
+  const [, setSentimentLog] = useState<string[]>([]);
   const [voiceHeuristicPaused, setVoiceHeuristicPaused] = useState(false);
 
   const requestCamera = async () => {
@@ -96,7 +97,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
       setCameraStatus("granted");
       setCameraStream(stream);
       return stream;
-    } catch (err) {
+    } catch {
       setCameraStatus("denied");
       return null;
     }
@@ -153,7 +154,11 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     const startBackgroundVoiceListener = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioWindow = window as unknown as {
+          webkitAudioContext?: typeof AudioContext;
+        };
+        const AudioContextClass = window.AudioContext || audioWindow.webkitAudioContext;
+        if (!AudioContextClass) return;
         audioCtx = new AudioContextClass();
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
@@ -408,7 +413,7 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     return () => clearAutoHandoff();
   }, []);
 
-  const persistWatch = (patch: {
+  const persistWatch = async (patch: {
     watchState?: SubjectWatchState;
     watchMinutes?: number;
     watchNote?: string;
@@ -420,10 +425,10 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     baselineKnowledge?: string;
     baselineSavedAt?: string;
     watched?: boolean;
-  } = {}) => {
+  } = {}): Promise<boolean> => {
     const nextState = patch.watchState ?? watchState;
     const existing = getDayProgress(activeSession.day);
-    saveDayProgress(activeSession.day, {
+    return saveDayProgress(activeSession.day, {
       watched: patch.watched ?? nextState === "Watched",
       watchState: nextState,
       watchMinutes: patch.watchMinutes ?? watchMinutes,
@@ -599,27 +604,55 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     });
   };
 
-  const markWatched = () => {
+  const markWatched = async (): Promise<boolean> => {
     clearAutoHandoff();
+    const previousState = watchState;
+    const previousMinutes = watchMinutes;
+    const previousSceneIndex = activeSceneIndex;
+    const previousCompletedSceneIds = completedSceneIds;
+
+    setWatchSaveError(null);
     setWatchState("Watched");
     setWatchMinutes(durationMinutes);
     setActiveSceneIndex(watchScenes.length - 1);
     setCompletedSceneIds(watchScenes.map((scene) => scene.id));
     setHandoffStatus("Idle");
-    persistWatch({
+    const persisted = await persistWatch({
       watchState: "Watched",
       watchMinutes: durationMinutes,
       watchSceneIndex: watchScenes.length - 1,
       watchSceneCompletedIds: watchScenes.map((scene) => scene.id),
       watched: true,
     });
+
+    if (!persisted) {
+      setWatchState(previousState);
+      setWatchMinutes(previousMinutes);
+      setActiveSceneIndex(previousSceneIndex);
+      setCompletedSceneIds(previousCompletedSceneIds);
+      setHandoffStatus("Idle");
+      setSavedNote(false);
+      setWatchSaveError("We couldn't save this class to your account. Your notes are preserved; retry before continuing to Talk.");
+      void persistWatch({
+        watchState: previousState,
+        watchMinutes: previousMinutes,
+        watchSceneIndex: previousSceneIndex,
+        watchSceneCompletedIds: previousCompletedSceneIds,
+        watched: previousState === "Watched",
+      });
+      return false;
+    }
+
     setSavedNote(true);
+    setWatchSaveError(null);
+    return true;
   };
 
-  const completeAndDiscuss = () => {
-    clearAutoHandoff();
-    markWatched();
-    router.push(`${basePath}/talk?day=${activeSession.day}`);
+  const completeAndDiscuss = async () => {
+    const persisted = await markWatched();
+    if (persisted) {
+      router.push(`${basePath}/talk?day=${activeSession.day}`);
+    }
   };
 
   if (!isLoaded || !isHydratedForActiveDay) {
@@ -1646,7 +1679,20 @@ export function SubjectWatchRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                 </button>
               </div>
 
-              {savedNote && (
+              {watchSaveError && (
+                <div role="alert" className="mt-4 flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
+                  <p className="text-sm font-bold leading-6">{watchSaveError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void markWatched()}
+                    className="ml-auto shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-xs font-black hover:bg-red-100"
+                  >
+                    Retry save
+                  </button>
+                </div>
+              )}
+
+              {savedNote && !watchSaveError && (
                 <div className="mt-4 flex items-start gap-3 rounded-md bg-[var(--subject-light)] p-3">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--subject-accent)]" />
                   <p className="text-sm font-bold leading-6 text-[var(--subject-dark)]">

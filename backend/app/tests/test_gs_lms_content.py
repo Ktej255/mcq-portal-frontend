@@ -4,18 +4,18 @@ Covers:
 - GET /api/v1/gs-lms/geography/topics/{node_id}/sections
   - Progressive disclosure: only first section unlocked initially
   - Content blocks hidden for locked sections
-  - AI Discussion gate enforcement
+  - AI Discussion is optional and never blocks content
   - Review-gate: only REVIEWED sections visible
   - Topic completion status
 
 - POST /api/v1/gs-lms/geography/topics/{node_id}/sections/{section_id}/complete
   - Marks section complete, unlocks next
-  - Enforces AI Discussion gate
+  - Works without any discussion session
   - Enforces sequential order (cannot complete locked section)
   - Idempotent completion
   - All 4 completed → topic_completed = True
 
-Requirements traced: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 5.1
+Requirements traced: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
 """
 
 from __future__ import annotations
@@ -89,9 +89,13 @@ def seed_data(session_factory):
     """Seed a syllabus node with 4 REVIEWED sections and one UNREVIEWED section."""
     db = session_factory()
     try:
-        # Create GS Geography subject
-        subject = GsSubject(id=1, slug="geography", name="GS Geography", display_order=1)
-        db.add(subject)
+        # Create GS subjects
+        db.add_all(
+            [
+                GsSubject(id=1, slug="geography", name="GS Geography", display_order=1),
+                GsSubject(id=2, slug="history", name="GS History", display_order=2),
+            ]
+        )
         db.flush()
 
         # Create a syllabus node (leaf topic)
@@ -139,11 +143,24 @@ def seed_data(session_factory):
         )
         db.add(unreviewed)
 
+        # A reviewed node belonging to another subject must not be reachable
+        # through the Geography URL.
+        cross_subject_node = GsLmsSyllabusNode(
+            id=101,
+            subject_id=2,
+            title="History Basics",
+            node_type=GsLmsNodeTypeEnum.LEAF_TOPIC,
+            weight=1.0,
+            display_order=2,
+            review_status=GsReviewStatusEnum.REVIEWED,
+        )
+        db.add(cross_subject_node)
+
         db.commit()
     finally:
         db.close()
 
-    return {"node_id": 100, "section_ids": [1, 2, 3, 4]}
+    return {"node_id": 100, "section_ids": [1, 2, 3, 4], "cross_subject_node_id": 101}
 
 
 @pytest.fixture()
@@ -200,16 +217,40 @@ class TestGetTopicSections:
         resp = client.get("/api/v1/gs-lms/geography/topics/9999/sections")
         assert resp.status_code == 404
 
-    def test_discussion_gate_blocks_content(self, client, seed_data):
-        """Without a COMPLETED discussion, all sections should be locked (R5.1)."""
+    def test_rejects_node_owned_by_another_subject(self, client, seed_data):
+        """A Geography URL cannot read a reviewed History node."""
+        resp = client.get(
+            f"/api/v1/gs-lms/geography/topics/{seed_data['cross_subject_node_id']}/sections"
+        )
+        assert resp.status_code == 404
+
+    def test_rejects_unknown_subject_slug(self, client, seed_data):
+        """An unknown URL subject is rejected before node lookup."""
+        resp = client.get(
+            f"/api/v1/gs-lms/unknown/topics/{seed_data['node_id']}/sections"
+        )
+        assert resp.status_code == 404
+
+    def test_content_available_without_discussion(self, client, seed_data):
+        """No discussion session must not block the first section.
+
+        The AI discussion is optional in the beta contract: it is reported as
+        diagnostic state (``discussion_gate_passed``) but never gates content.
+        """
         resp = client.get(f"/api/v1/gs-lms/geography/topics/{seed_data['node_id']}/sections")
         assert resp.status_code == 200
         body = resp.json()
         assert body["success"] is True
         data = body["data"]
         assert data["discussion_gate_passed"] is False
-        # All sections locked when gate not passed
-        for section in data["sections"]:
+
+        # First section is available without any discussion.
+        first = data["sections"][0]
+        assert first["locked"] is False
+        assert first["blocks"] is not None
+
+        # Later sections still follow progressive completion order.
+        for section in data["sections"][1:]:
             assert section["locked"] is True
             assert section["blocks"] is None
 
@@ -264,6 +305,41 @@ class TestGetTopicSections:
         data = resp.json()["data"]
         assert data["topic_completed"] is False
 
+    def test_complete_five_section_topics_use_canonical_order(
+        self, client, seed_data, seed_discussion_completed, session_factory
+    ):
+        """A complete topic follows the funnel order, not stale import order."""
+        db = session_factory()
+        try:
+            db.add(
+                GsLmsContentSection(
+                    id=5,
+                    syllabus_node_id=seed_data["node_id"],
+                    section_label=GsLmsSectionLabelEnum.CURRENT_AFFAIRS,
+                    title="Current Affairs",
+                    blocks=[{"type": "text", "content": "Current content"}],
+                    display_order=5,
+                    review_status=GsReviewStatusEnum.REVIEWED,
+                    authored=True,
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        resp = client.get(
+            f"/api/v1/gs-lms/geography/topics/{seed_data['node_id']}/sections"
+        )
+        assert resp.status_code == 200
+        labels = [section["section_label"] for section in resp.json()["data"]["sections"]]
+        assert labels == [
+            "BASIC",
+            "NCERT_LEVEL",
+            "ADVANCED",
+            "CURRENT_AFFAIRS",
+            "EXAMINER_TRAPS",
+        ]
+
 
 # ---------------------------------------------------------------------------
 # POST /geography/topics/{node_id}/sections/{section_id}/complete
@@ -273,13 +349,22 @@ class TestGetTopicSections:
 class TestCompleteSection:
     """Tests for the POST complete section endpoint."""
 
-    def test_complete_blocked_without_discussion(self, client, seed_data):
-        """Cannot complete section without discussion gate passed (R5.1)."""
+    def test_complete_works_without_discussion(self, client, seed_data):
+        """A section can be completed without any discussion session.
+
+        Discussion is optional; completing content must never depend on it.
+        """
         resp = client.post(
             f"/api/v1/gs-lms/geography/topics/{seed_data['node_id']}/sections/1/complete"
         )
-        assert resp.status_code == 422
-        assert "AI Discussion required" in resp.json()["detail"]
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["discussion_gate_passed"] is False
+
+        # Section 1 completed; section 2 unlocked without a discussion.
+        assert data["sections"][0]["completed"] is True
+        assert data["sections"][1]["locked"] is False
+        assert data["sections"][1]["blocks"] is not None
 
     def test_complete_first_section_succeeds(
         self, client, seed_data, seed_discussion_completed

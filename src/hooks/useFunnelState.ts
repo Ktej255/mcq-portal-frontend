@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { funnelService, FunnelStateOut } from '@/services/api/funnelService';
 
 /**
@@ -15,7 +15,7 @@ import { funnelService, FunnelStateOut } from '@/services/api/funnelService';
 export type TabId = 'learn' | 'ncert' | 'current' | 'traps' | 'mcq-lab' | 'mains';
 
 export const STEP_TAB_MAP: Record<number, TabId> = {
-  1: 'learn',       // Discussion Gate
+  1: 'learn',       // Topic intro / optional knowledge check
   2: 'learn',       // BASIC Content
   3: 'learn',       // BASIC Recall
   4: 'ncert',       // NCERT Content
@@ -64,32 +64,29 @@ export function useFunnelState(nodeId: number, subject = "geography"): UseFunnel
   }, [nodeId, subject]);
 
   useEffect(() => {
-    loadState();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        void loadState();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadState]);
 
   const currentStep = state?.current_step ?? 1;
-  const completedSteps = state?.completed_steps ?? [];
+  const completedSteps = useMemo(() => state?.completed_steps ?? [], [state?.completed_steps]);
   const activeTab = STEP_TAB_MAP[currentStep] ?? 'learn';
 
   const completeStep = useCallback(async (step: number) => {
     try {
       const newState = await funnelService.completeStep(subject, nodeId, step);
-      setState((previousState) => {
-        const completed_steps = Array.from(new Set([
-          ...((previousState?.completed_steps ?? []) as number[]),
-          ...((newState.completed_steps ?? []) as number[]),
-          step,
-        ])).sort((a, b) => a - b);
-        const nextStep = Math.min(step + 1, 14);
-        const current_step = Math.max(newState.current_step ?? nextStep, nextStep);
-
-        return {
-          ...(previousState ?? newState),
-          ...newState,
-          current_step,
-          completed_steps,
-        };
-      });
+      // The backend response is authoritative. Do not manufacture completion
+      // or advance current_step locally; rejected/partial transitions must
+      // remain visible until the server confirms them.
+      setState(newState);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to complete step';
       setError(message);

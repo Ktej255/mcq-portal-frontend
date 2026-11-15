@@ -1,10 +1,7 @@
-"""Gemini AI Response Provider for the GS LMS Discussion Engine.
+"""Gemini provider for the GS LMS discussion engine.
 
-Bridges the AIResponseProvider protocol with Google's Generative AI SDK.
-Falls back to MockAIResponseProvider on any SDK failure to ensure the
-discussion flow is never blocked.
-
-Requirements traced: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
+Provider failures are surfaced as typed retryable unavailability. There is no
+silent deterministic fallback and no fabricated AI response.
 """
 
 from __future__ import annotations
@@ -16,7 +13,9 @@ import google.generativeai as genai
 
 from app.core.gs_lms.discussion import (
     AIResponseProvider,
+    DiscussionProviderUnavailableError,
     MockAIResponseProvider,
+    clear_default_provider,
     set_default_provider,
 )
 
@@ -30,12 +29,10 @@ _SYSTEM_INSTRUCTION = (
 
 
 class GeminiAIResponseProvider:
-    """Concrete AIResponseProvider backed by Google Generative AI (Gemini).
+    """Concrete AIResponseProvider backed by Gemini."""
 
-    Implements the AIResponseProvider protocol defined in
-    app.core.gs_lms.discussion. On SDK failure, delegates to the
-    MockAIResponseProvider and logs the error.
-    """
+    provider_id = "gemini"
+    is_mock = False
 
     def __init__(self, model_name: str = "gemini-1.5-flash"):
         from app.core.config import settings
@@ -47,7 +44,6 @@ class GeminiAIResponseProvider:
             model_name,
             system_instruction=_SYSTEM_INSTRUCTION,
         )
-        self._fallback = MockAIResponseProvider()
 
     def generate_response(
         self,
@@ -57,11 +53,7 @@ class GeminiAIResponseProvider:
         concepts_missed: list[str] | None = None,
         match_percentage: float | None = None,
     ) -> str:
-        """Generate a Gemini-powered counter-question, falling back to mock on error.
-
-        When concepts_missed is provided, the prompt is enhanced to generate
-        Socratic questions specifically targeting those missed concepts (R2.6).
-        """
+        """Generate a Gemini-powered Socratic counter-question."""
         prompt = self._build_prompt(
             topic_title, transcript, student_message,
             concepts_missed=concepts_missed,
@@ -69,16 +61,17 @@ class GeminiAIResponseProvider:
         )
         try:
             response = self._model.generate_content(prompt)
-            return response.text
+            text = response.text
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError("Gemini returned an empty response")
+            return text
         except Exception as exc:
             logger.error(
-                "Gemini discussion call failed, falling back to mock: %s", exc
+                "Gemini discussion call failed; provider=%s error_type=%s",
+                self.provider_id,
+                type(exc).__name__,
             )
-            return self._fallback.generate_response(
-                topic_title, transcript, student_message,
-                concepts_missed=concepts_missed,
-                match_percentage=match_percentage,
-            )
+            raise DiscussionProviderUnavailableError(self.provider_id) from exc
 
     def _build_prompt(
         self,
@@ -109,8 +102,13 @@ class GeminiAIResponseProvider:
                 "to guide the student toward explaining it."
             )
             if match_percentage is not None:
+                displayed_percentage = (
+                    match_percentage * 100
+                    if 0.0 <= match_percentage <= 1.0
+                    else match_percentage
+                )
                 lines.append(
-                    f"(Current concept coverage: {match_percentage:.0%}. "
+                    f"(Current concept coverage: {displayed_percentage:.0f}%. "
                     "The gate opens at 80%.)"
                 )
         else:
@@ -120,22 +118,39 @@ class GeminiAIResponseProvider:
 
 
 def register_discussion_provider() -> None:
-    """Wire the real Gemini provider if API key is available.
-
-    Called from app/main.py at startup. If the key is missing or provider
-    instantiation fails, the Discussion_Engine retains the MockAIResponseProvider.
-    """
+    """Register exactly the explicitly configured runtime provider at startup."""
     from app.core.config import settings
+
+    selection = settings.GS_LMS_DISCUSSION_PROVIDER
+    if selection == "mock":
+        if (
+            settings.APP_ENVIRONMENT not in {"development", "test", "local"}
+            or not settings.ENABLE_GS_LMS_DISCUSSION_MOCK
+        ):
+            clear_default_provider("deterministic-mock")
+            logger.error(
+                "Deterministic discussion provider denied by runtime policy; environment=%s",
+                settings.APP_ENVIRONMENT,
+            )
+            return
+        set_default_provider(MockAIResponseProvider())
+        logger.warning("Discussion engine: explicit deterministic mock registered")
+        return
+
+    if selection != "gemini":
+        clear_default_provider(selection)
+        logger.error("Unsupported GS LMS discussion provider selection")
+        return
+
     api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
     if not api_key:
-        logger.warning(
-            "GOOGLE_API_KEY not set — Discussion_Engine retaining MockAIResponseProvider"
-        )
+        clear_default_provider("gemini")
+        logger.warning("Gemini discussion provider is not configured")
         return
 
     try:
-        provider = GeminiAIResponseProvider()
-        set_default_provider(provider)
-        logger.info("Discussion_Engine: GeminiAIResponseProvider registered")
-    except Exception as exc:
-        logger.error("Failed to register GeminiAIResponseProvider: %s", exc)
+        set_default_provider(GeminiAIResponseProvider())
+        logger.info("Discussion engine: Gemini provider registered")
+    except Exception:
+        clear_default_provider("gemini")
+        logger.exception("Failed to initialize Gemini discussion provider")

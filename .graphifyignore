@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+__pycache__
+venv
+.pytest_cache
+dist
+build
+.DS_Store
+*.log
+*.sqlite
+*.db

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, CheckCircle2, type LucideIcon } from 'lucide-react';
 import { caService, ThreadSummaryOut } from '@/services/api/caService';
 
 /**
@@ -24,7 +24,7 @@ const SUBJECT_COLORS: Record<string, string> = {
   'internal-security': 'bg-indigo-500',
 };
 
-const DIRECTION_ICONS: Record<string, { icon: any; label: string }> = {
+const DIRECTION_ICONS: Record<string, { icon: LucideIcon; label: string }> = {
   escalating: { icon: TrendingUp, label: '↑' },
   'de-escalating': { icon: TrendingDown, label: '↓' },
   evolving: { icon: ArrowRight, label: '→' },
@@ -34,12 +34,27 @@ const DIRECTION_ICONS: Record<string, { icon: any; label: string }> = {
 export function TimelineView() {
   const [threads, setThreads] = useState<ThreadSummaryOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     caService.getThreadsOverview()
-      .then(setThreads)
-      .finally(() => setLoading(false));
-  }, []);
+      .then((nextThreads) => {
+        if (cancelled) return;
+        setThreads(nextThreads);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
 
   if (loading) {
     return (
@@ -47,6 +62,27 @@ export function TimelineView() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-20 animate-pulse bg-[#e7f5ee] rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-bold leading-5 text-[#7a5410]">
+          Threads could not be loaded, so this is not an empty timeline.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadFailed(false);
+            setLoading(true);
+            setAttempt((count) => count + 1);
+          }}
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410]"
+        >
+          Retry load
+        </button>
       </div>
     );
   }

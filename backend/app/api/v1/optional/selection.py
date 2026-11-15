@@ -35,10 +35,8 @@ from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
 from app.core.optional.models import OptionalSubject
 from app.core.optional.student_models import SubjectSelection
-from app.core.optional.entitlement import (
-    EntitlementProvider,
-    get_entitlement_provider,
-)
+from app.core.optional.entitlement import EntitlementProvider
+from app.api.v1.optional.dependencies import get_entitlement_provider_dep
 from app.api.v1.optional.schemas import (
     SubjectSelectionIn,
     SubjectSelectionOut,
@@ -46,11 +44,6 @@ from app.api.v1.optional.schemas import (
 )
 
 router = APIRouter()
-
-
-def get_entitlement_provider_dep() -> EntitlementProvider:
-    """Entitlement provider dependency (test-overridable)."""
-    return get_entitlement_provider()
 
 
 def _get_subject_or_404(db: Session, slug: str) -> OptionalSubject:
@@ -157,7 +150,12 @@ def get_access(
     when restricted (R16.2).
     """
     subject = _get_subject_or_404(db, slug)
-    decision = provider.check_access(student_id=current_user.id, subject=subject)
+    decision = provider.check_access(
+        student_id=current_user.id,
+        external_user_id=getattr(current_user, "google_uid", None),
+        subject=subject,
+        db=db,
+    )
     return StandardResponse(
         success=True,
         message="Access decision",

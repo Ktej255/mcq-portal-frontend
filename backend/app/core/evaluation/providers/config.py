@@ -72,17 +72,35 @@ _BUILTIN_CONFIGS: Dict[str, ProviderConfig] = {
 
 
 def active_provider_key() -> str:
-    """The provider key the engine uses by default (R3.1).
+    """Return the canonical shared evaluation provider selection (R3.1).
 
-    Resolution: ``EVALUATION_PROVIDER`` env var, else ``OPTIONAL_EVAL_PROVIDER``
-    (legacy), else ``"mock"``. Swapping models in production is just changing
-    this value (R3.4).
+    The live Gemini path is the safe default. Deterministic evaluation is never
+    selected implicitly; callers must explicitly opt into ``mock`` through the
+    Optional policy controls in non-production environments.
     """
     return (
         os.environ.get("EVALUATION_PROVIDER")
         or os.environ.get("OPTIONAL_EVAL_PROVIDER")
-        or "mock"
+        or "gemini"
     ).strip().lower()
+
+
+def mock_provider_enabled() -> bool:
+    """Return whether the deterministic shared mock is allowed at runtime.
+
+    The shared registry is also used by GS LMS, so its built-in mock must obey
+    the same explicit non-production policy as Optional evaluation. Tests and
+    local callers may still inject a provider factory directly into a registry;
+    this gate applies only to the built-in runtime provider.
+    """
+    # Import lazily to keep this config module usable by the domain-neutral
+    # registry without constructing application settings during import.
+    from app.core.config import settings
+
+    return (
+        settings.APP_ENVIRONMENT in {"development", "test", "local"}
+        and settings.ENABLE_OPTIONAL_EVAL_MOCK
+    )
 
 
 def load_provider_config(key: str) -> ProviderConfig:
@@ -155,4 +173,5 @@ __all__ = [
     "StructuredOutputMode",
     "active_provider_key",
     "load_provider_config",
+    "mock_provider_enabled",
 ]

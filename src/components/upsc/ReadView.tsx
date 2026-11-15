@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -45,6 +45,12 @@ import {
  * authored topic any subtopic lacking reviewed content is clearly marked
  * (never rendered blank or fake-complete).
  *
+ * Honest-failure rule (founder decision, 2026-10-31): the notes a learner reads
+ * come from stored, reviewed backend rows only. If the tree or the content
+ * request fails this view reports the failure with a retry instead of falling
+ * back to the frontend's offline topic modules — a failed load must never
+ * render as published notes.
+ *
  * Diagram blocks render the real ported hand-drawn SVG via `OptionalDiagram`
  * (the LMS-owned registry from `read/OptionalDiagrams`), keyed by `diagram_id`,
  * with a graceful labelled fallback for any unknown id (task 6.2).
@@ -83,72 +89,86 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
   const [treeState, setTreeState] = useState<LoadState>("idle");
   const [contentState, setContentState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Bumped by "Retry" so a failed request re-runs; both effects depend on it.
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   // 1) Load the syllabus tree and collect the top-level TOPIC nodes.
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setTreeState("loading");
-    setError(null);
-    optionalService
-      .getSyllabusTree(slug)
-      .then((tree) => {
-        if (cancelled) return;
-        const topicNodes: SyllabusNodeOut[] = [];
-        for (const paper of tree.papers) {
-          for (const section of paper.sections) {
-            for (const n of section.nodes) topicNodes.push(n);
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setTreeState("loading");
+      setError(null);
+      optionalService
+        .getSyllabusTree(slug)
+        .then((tree) => {
+          if (cancelled) return;
+          const topicNodes: SyllabusNodeOut[] = [];
+          for (const paper of tree.papers) {
+            for (const section of paper.sections) {
+              for (const n of section.nodes) topicNodes.push(n);
+            }
           }
-        }
-        setTopics(topicNodes);
-        // Pick the requested topic (by title) or the first authored topic.
-        const wanted = topicTitle
-          ? topicNodes.find(
-              (n) => n.title.trim().toLowerCase() === topicTitle.trim().toLowerCase(),
-            )
-          : undefined;
-        const fallback = topicNodes.find((n) => n.authored) ?? topicNodes[0];
-        const chosen = wanted ?? fallback ?? null;
-        setActiveNodeId(chosen ? chosen.node_id : null);
-        setTreeState("loaded");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageFromError(err));
-        setTreeState("error");
-      });
+          setTopics(topicNodes);
+          const wanted = topicTitle
+            ? topicNodes.find(
+                (n) => n.title.trim().toLowerCase() === topicTitle.trim().toLowerCase(),
+              )
+            : undefined;
+          const firstAuthored = topicNodes.find((n) => n.authored) ?? topicNodes[0];
+          const chosen = wanted ?? firstAuthored ?? null;
+          setActiveNodeId(chosen ? chosen.node_id : null);
+          setTreeState("loaded");
+        })
+        .catch((err: unknown) => {
+          // Honest failure: no offline tree, no invented node ids.
+          if (cancelled) return;
+          setTopics([]);
+          setActiveNodeId(null);
+          setError(messageFromError(err));
+          setTreeState("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
-  }, [slug, topicTitle, isLoaded, isSignedIn]);
-
-  // 2) Load the active topic's content (with its subtopic children).
-  useEffect(() => {
-    if (activeNodeId == null || !isLoaded || !isSignedIn) return;
-    let cancelled = false;
-    setContentState("loading");
-    setError(null);
-    optionalService
-      .getTopicContent(slug, activeNodeId)
-      .then((data) => {
-        if (cancelled) return;
-        setNode(data);
-        setContentState("loaded");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageFromError(err));
-        setContentState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, activeNodeId, isLoaded, isSignedIn]);
+  }, [slug, topicTitle, isLoaded, isSignedIn, reloadNonce]);
 
   const activeTopicMeta = useMemo(
     () => topics.find((t) => t.node_id === activeNodeId) ?? null,
     [topics, activeNodeId],
   );
+
+  // 2) Load the active topic's content (with its subtopic children).
+  useEffect(() => {
+    if (activeNodeId == null || !isLoaded || !isSignedIn) return;
+    let cancelled = false;
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setContentState("loading");
+      setError(null);
+      optionalService
+        .getTopicContent(slug, activeNodeId)
+        .then((data) => {
+          if (cancelled) return;
+          setNode(data);
+          setContentState("loaded");
+        })
+        .catch((err: unknown) => {
+          // Honest failure: the notes come from the backend or not at all.
+          if (cancelled) return;
+          setNode(null);
+          setError(messageFromError(err));
+          setContentState("error");
+        });
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(requestTimer);
+    };
+  }, [slug, activeNodeId, isLoaded, isSignedIn, reloadNonce]);
 
   const overview = useMemo(() => extractOverview(node?.content ?? null), [node]);
 
@@ -224,7 +244,16 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
         ) : null}
 
         {(treeState === "error" || contentState === "error") && error ? (
-          <ErrorPanel message={error} />
+          <ErrorPanel
+            message={error}
+            onRetry={() => {
+              // Re-run the real requests; nothing is filled in offline.
+              setError(null);
+              setTreeState("loading");
+              setContentState("idle");
+              setReloadNonce((n) => n + 1);
+            }}
+          />
         ) : null}
 
         {contentState === "loaded" && node ? (
@@ -506,14 +535,25 @@ function LoadingPanel() {
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
+function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
       data-testid="read-view-error"
-      className="flex items-start gap-2 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
+      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
     >
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{message}</span>
+      <div className="flex items-start gap-2">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{message}</span>
+      </div>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-xl border border-[#d29b9b] bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wider text-[#8a4b52] hover:bg-[#faf4f4]"
+        >
+          Retry
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -547,7 +587,7 @@ function messageFromError(err: unknown): string {
     }
     if (anyErr.message) return anyErr.message;
   }
-  return "Couldn't load the deep notes. Please try again.";
+  return "Couldn't load the published notes for this topic, so nothing is shown here. Please try again.";
 }
 
 export default ReadView;

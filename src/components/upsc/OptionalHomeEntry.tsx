@@ -30,20 +30,23 @@ export function OptionalHomeEntry() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setSelected(readSelectedOptional());
-    setIsLoaded(true);
-    optionalService
-      .getSelection()
-      .then((sel) => {
-        if (sel.selected && sel.slug && sel.name) {
-          const next = { slug: sel.slug, name: sel.name };
-          setSelected(next);
-          writeSelectedOptional(next);
-        }
-      })
-      .catch(() => {
-        /* offline / unauthenticated — keep the localStorage value */
-      });
+    const hydrationTimer = window.setTimeout(() => {
+      setSelected(readSelectedOptional());
+      setIsLoaded(true);
+      void optionalService
+        .getSelection()
+        .then((sel) => {
+          if (sel.selected && sel.slug && sel.name) {
+            const next = { slug: sel.slug, name: sel.name };
+            setSelected(next);
+            writeSelectedOptional(next);
+          }
+        })
+        .catch(() => {
+          /* offline / unauthenticated — keep the localStorage value */
+        });
+    }, 0);
+    return () => window.clearTimeout(hydrationTimer);
   }, []);
 
   // Avoid a hydration mismatch: localStorage is only available on the client.
@@ -104,7 +107,9 @@ export function OptionalHomeEntry() {
           Choose your optional
         </p>
         <p className="mt-0.5 text-xs font-semibold text-[#49675e]">
-          Pick from all 25 UPSC optional subjects to unlock its dedicated prep surface.
+          Pick from all 25 UPSC optional subjects. Geography is the only optional with reviewed
+          content today; the other 24, Anthropology and Sociology included, show an honest
+          coming-soon status until their material is reviewed.
         </p>
       </div>
       <span className="inline-flex items-center gap-2 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-bold text-white">

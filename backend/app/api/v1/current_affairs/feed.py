@@ -22,6 +22,7 @@ from app.core.current_affairs.ca_engine import (
     CAItemFilters,
 )
 from app.core.current_affairs.ca_models import CAStudentProgress
+from app.core.gs_lms.models import GsLmsSyllabusNode
 
 router = APIRouter()
 
@@ -52,6 +53,12 @@ class CAFeedOut(BaseModel):
     page_size: int
 
 
+class CASyllabusLinkOut(BaseModel):
+    node_id: int
+    topic_title: str
+    link_type: str
+
+
 class CAItemDetailOut(BaseModel):
     id: int
     title: str
@@ -67,7 +74,7 @@ class CAItemDetailOut(BaseModel):
     source_authority: str
     relevance_score: int
     threads: List[dict] = []
-    syllabus_links: List[dict] = []
+    syllabus_links: List[CASyllabusLinkOut] = []
 
 
 # ---------------------------------------------------------------------------
@@ -170,9 +177,33 @@ def get_item_detail(
         for assoc in (item.thread_associations or [])
         if assoc.thread
     ]
+
+    item_syllabus_links = list(item.syllabus_links or [])
+    linked_node_ids = {link.syllabus_node_id for link in item_syllabus_links}
+    node_titles = {
+        node_id: title
+        for node_id, title in (
+            db.query(GsLmsSyllabusNode.id, GsLmsSyllabusNode.title)
+            .filter(GsLmsSyllabusNode.id.in_(linked_node_ids))
+            .all()
+            if linked_node_ids
+            else []
+        )
+        if isinstance(title, str) and title.strip()
+    }
+    if linked_node_ids != set(node_titles):
+        raise HTTPException(
+            status_code=500,
+            detail="Current Affairs syllabus link integrity error",
+        )
+
     syllabus_links = [
-        {"node_id": link.syllabus_node_id, "link_type": link.link_type}
-        for link in (item.syllabus_links or [])
+        CASyllabusLinkOut(
+            node_id=link.syllabus_node_id,
+            topic_title=node_titles[link.syllabus_node_id],
+            link_type=link.link_type,
+        )
+        for link in item_syllabus_links
     ]
 
     return CAItemDetailOut(

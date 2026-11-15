@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import type { ProductPlan } from "@/lib/upsc/yearlyPlanner";
@@ -36,24 +36,8 @@ export function UpscPricingIntentRecorder({
   commerceMode: string;
   readyForPayment: boolean;
 }) {
-  const [savedIntent, setSavedIntent] = useState<SavedPricingIntent | null>(null);
-
-  const fallbackIntent: SavedPricingIntent = {
-    planId: plan.id,
-    title: plan.title,
-    months: plan.months,
-    listPrice: plan.listPrice,
-    launchPrice: plan.launchPrice,
-    savings,
-    discountPercent: plan.discountPercent,
-    effectiveMonthly: plan.effectiveMonthly,
-    commerceMode,
-    readyForPayment,
-    savedAt: "",
-  };
-
-  useEffect(() => {
-    const intent: SavedPricingIntent = {
+  const savedIntent = useMemo<SavedPricingIntent>(
+    () => ({
       planId: plan.id,
       title: plan.title,
       months: plan.months,
@@ -65,24 +49,26 @@ export function UpscPricingIntentRecorder({
       commerceMode,
       readyForPayment,
       savedAt: new Date().toISOString(),
-    };
+    }),
+    [
+      commerceMode,
+      plan.discountPercent,
+      plan.effectiveMonthly,
+      plan.id,
+      plan.launchPrice,
+      plan.listPrice,
+      plan.months,
+      plan.title,
+      readyForPayment,
+      savings,
+    ],
+  );
 
-    window.localStorage.setItem(pricingIntentStorageKey, JSON.stringify(intent));
-    setSavedIntent(intent);
-  }, [
-    commerceMode,
-    plan.discountPercent,
-    plan.effectiveMonthly,
-    plan.id,
-    plan.launchPrice,
-    plan.listPrice,
-    plan.months,
-    plan.title,
-    readyForPayment,
-    savings,
-  ]);
+  useEffect(() => {
+    window.localStorage.setItem(pricingIntentStorageKey, JSON.stringify(savedIntent));
+  }, [savedIntent]);
 
-  const receipt = savedIntent ?? fallbackIntent;
+  const receipt = savedIntent;
 
   return (
     <section
@@ -104,8 +90,9 @@ export function UpscPricingIntentRecorder({
             {receipt.title} intent saved for pilot onboarding
           </h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#49675e]">
-            The portal can remember this choice before live payments open: {money(receipt.launchPrice)} for{" "}
-            {receipt.months} month{receipt.months === 1 ? "" : "s"}, saving {money(receipt.savings)} against monthly billing.
+            {receipt.months === 1
+              ? `The portal can remember this choice before live payments open: ${money(receipt.launchPrice)} per month, the base monthly price.`
+              : `The portal can remember this choice before live payments open: ${money(receipt.launchPrice)} for ${receipt.months} months, saving ${money(receipt.savings)} against monthly billing.`}
           </p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#085041] text-white">

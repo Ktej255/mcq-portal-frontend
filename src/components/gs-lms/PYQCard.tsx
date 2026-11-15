@@ -14,14 +14,18 @@ interface PYQCardProps {
 export function PYQCard({ pyq, onReveal, subject = "geography" }: PYQCardProps) {
   const [revealed, setRevealed] = useState(pyq.revealed);
   const [revealing, setRevealing] = useState(false);
+  const [revealError, setRevealError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const isMains = pyq.exam_type === "MAINS";
 
   const handleReveal = async () => {
     setRevealing(true);
+    setRevealError(null);
     try {
       await onReveal(pyq.id);
       setRevealed(true);
+    } catch {
+      setRevealError("We couldn't reveal this answer. Please try again.");
     } finally {
       setRevealing(false);
     }
@@ -48,13 +52,32 @@ export function PYQCard({ pyq, onReveal, subject = "geography" }: PYQCardProps) 
 
       {/* Reveal section */}
       {!revealed ? (
-        <button
-          onClick={handleReveal}
-          disabled={revealing}
-          className="text-sm font-medium text-[#1d9e75] hover:text-[#178a65] transition-colors disabled:opacity-50"
-        >
-          {revealing ? "Revealing…" : "Reveal Answer"}
-        </button>
+        <div className="space-y-2">
+          {revealError ? (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 rounded-md bg-[#fff4e5] px-3 py-2 text-xs text-[#8c5d14]"
+            >
+              <span>{revealError}</span>
+              <button
+                type="button"
+                onClick={handleReveal}
+                disabled={revealing}
+                className="shrink-0 font-semibold underline hover:no-underline disabled:opacity-60"
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleReveal}
+            disabled={revealing}
+            className="text-sm font-medium text-[#1d9e75] hover:text-[#178a65] transition-colors disabled:opacity-50"
+          >
+            {revealing ? "Revealing…" : "Reveal Answer"}
+          </button>
+        </div>
       ) : (
         <div className="space-y-2 pt-3 border-t border-[#dcd5c7]">
           {pyq.answer_text && (

@@ -9,7 +9,7 @@ import { MobileAnswerUploader } from "@/components/upsc/MobileAnswerUploader";
 export const metadata: Metadata = {
   title: "Mains Answer Upload | UPSC Command",
   description:
-    "Photograph your UPSC mains answer sheets, order the pages, and upload them in a single tap for AI evaluation.",
+    "Photograph your UPSC mains answer sheets, order the pages, and assemble them into a single downloadable PDF to review or share. Scored typed practice lives in each topic's Mains step.",
 };
 
 export default function AnswerUploadPage() {

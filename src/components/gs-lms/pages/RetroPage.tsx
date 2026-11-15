@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
@@ -25,26 +26,49 @@ export function RetroPage() {
   const [reflection, setReflection] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    gsLmsService
+  // `loading` begins true and is cleared by every completion path, so the loader
+  // performs no synchronous state write and can be called straight from the
+  // mount effect. Retries clear the previous failure from the click handler.
+  const fetchRetro = useCallback(() => {
+    return gsLmsService
       .getCurrentRetro(subject)
       .then((data) => {
         setRetro(data);
+        setError(null);
         if (data.reflection_text) setReflection(data.reflection_text);
         if (data.completed) setDone(true);
       })
+      .catch(() => {
+        setRetro(null);
+        setError("We couldn't load your retrospective. Please try again.");
+      })
       .finally(() => setLoading(false));
-  }, [isLoaded, isSignedIn, subject]);
+  }, [subject]);
+
+  const retryFetchRetro = () => {
+    setLoading(true);
+    setError(null);
+    void fetchRetro();
+  };
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    void fetchRetro();
+  }, [isLoaded, isSignedIn, fetchRetro]);
 
   const handleSubmit = async () => {
     if (!reflection.trim()) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await gsLmsService.completeRetro(subject, reflection);
       setDone(true);
+    } catch {
+      setSubmitError("We couldn't save your retrospective. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +82,35 @@ export function RetroPage() {
     );
   }
 
-  if (!retro) return null;
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="rounded-xl border border-[#ef9f27]/30 bg-[#fff4df] p-5 space-y-3">
+          <h1 className="text-lg font-semibold text-[#6f4a12]">Unable to load your retrospective</h1>
+          <p className="text-sm text-[#6f4a12]/80">{error}</p>
+          <button
+            onClick={retryFetchRetro}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!retro) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5">
+          <h1 className="text-lg font-semibold text-[#1a3a2a]">No retrospective available</h1>
+          <p className="text-sm text-[#13251d]/60 mt-1">
+            There is no retrospective to review for this subject yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -72,9 +124,9 @@ export function RetroPage() {
         </p>
       </div>
 
-      {retro.topics_completed && retro.topics_completed.length > 0 && (
+      {retro.topics_completed && retro.topics_completed.length > 0 ? (
         <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4">
-          <h2 className="text-sm font-semibold text-[#1a3a2a] mb-3">✅ Topics Completed This Week</h2>
+          <h2 className="text-sm font-semibold text-[#1a3a2a] mb-3">Topics Completed This Week</h2>
           <ul className="space-y-1">
             {retro.topics_completed.map((t) => (
               <li key={t.node_id} className="text-sm text-[#13251d]/80 flex items-center gap-2">
@@ -84,11 +136,26 @@ export function RetroPage() {
             ))}
           </ul>
         </section>
+      ) : (
+        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4">
+          <h2 className="text-sm font-semibold text-[#1a3a2a] mb-1">Topics Completed This Week</h2>
+          <p className="text-sm text-[#13251d]/65">
+            No topic has been fully completed in the last seven days. Partial
+            reading is not counted here; a topic only appears when every
+            reviewed section is done.
+          </p>
+          <Link
+            href={`${lmsBase}/planner`}
+            className="mt-2 inline-block text-sm font-medium text-[#1d9e75] hover:underline"
+          >
+            Open today&apos;s plan →
+          </Link>
+        </section>
       )}
 
       {retro.gap_summary && retro.gap_summary.length > 0 && (
         <section className="rounded-xl border border-[#ef9f27]/30 bg-[#fff4df] p-4">
-          <h2 className="text-sm font-semibold text-[#6f4a12] mb-3">⚠️ Areas That Need Work</h2>
+          <h2 className="text-sm font-semibold text-[#6f4a12] mb-3">Areas That Need Work</h2>
           <ul className="space-y-1">
             {retro.gap_summary.map((g, i) => (
               <li key={i} className="text-sm text-[#6f4a12]/80 flex items-center justify-between">
@@ -97,6 +164,12 @@ export function RetroPage() {
               </li>
             ))}
           </ul>
+          <Link
+            href={`${lmsBase}/gaps`}
+            className="mt-2 inline-block text-sm font-medium text-[#6f4a12] underline decoration-[#ef9f27]/50 hover:decoration-[#6f4a12]"
+          >
+            See which topics this affects in readiness →
+          </Link>
         </section>
       )}
 
@@ -117,6 +190,22 @@ export function RetroPage() {
           />
         )}
       </section>
+
+      {submitError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-[#ef9f27]/30 bg-[#fff4df] p-4 space-y-2"
+        >
+          <p className="text-sm text-[#6f4a12]">{submitError}</p>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !reflection.trim()}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {done ? (
         <div className="flex items-center gap-3">

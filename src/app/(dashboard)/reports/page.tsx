@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BarChart3, BrainCircuit, CalendarDays, ClipboardCheck, FileText, Focus, LibraryBig, Target, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, CalendarDays, ClipboardCheck, FileText, LibraryBig, Target } from "lucide-react";
 
 import { LmsProgressCard } from "@/components/upsc/LmsProgressCard";
+import { dashboardService, type PerformanceReport } from "@/services/api/dashboardService";
 import {
   buildDailyPlannerDecision,
   readLocalAutoSessionHandoff,
@@ -84,6 +85,10 @@ export default function ReportsPage() {
   const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
   const [strategyPracticeHandoffs, setStrategyPracticeHandoffs] = useState<StrategyPracticeHandoff[]>([]);
   const [strategyQuestionAttempts, setStrategyQuestionAttempts] = useState<QuestionBankAttempt[]>([]);
+  const [attemptReportId, setAttemptReportId] = useState<string | null>(null);
+  const [attemptReport, setAttemptReport] = useState<PerformanceReport | null>(null);
+  const [attemptReportLoading, setAttemptReportLoading] = useState(false);
+  const [attemptReportError, setAttemptReportError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -110,6 +115,47 @@ export default function ReportsPage() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  const attemptReportRequestRef = useRef(0);
+
+  const loadAttemptReport = useCallback((reportId: string) => {
+    const requestId = ++attemptReportRequestRef.current;
+    // The "start of a request" writes are deferred by one microtask so the
+    // mount effect never produces a synchronous cascading render. The response
+    // handlers below are already asynchronous, so the ordering of this request
+    // versus a newer one is still decided by requestId.
+    queueMicrotask(() => {
+      if (requestId !== attemptReportRequestRef.current) return;
+      setAttemptReportId(reportId);
+      setAttemptReport(null);
+      setAttemptReportLoading(true);
+      setAttemptReportError(null);
+    });
+
+    dashboardService
+      .getReport(reportId)
+      .then((report) => {
+        if (requestId === attemptReportRequestRef.current) setAttemptReport(report);
+      })
+      .catch(() => {
+        if (requestId === attemptReportRequestRef.current) {
+          setAttemptReportError("This attempt report could not be loaded. Please retry.");
+        }
+      })
+      .finally(() => {
+        if (requestId === attemptReportRequestRef.current) setAttemptReportLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    const attemptId = new URLSearchParams(window.location.search).get("attemptId");
+    if (!attemptId) return;
+
+    loadAttemptReport(attemptId);
+    return () => {
+      attemptReportRequestRef.current += 1;
+    };
+  }, [loadAttemptReport]);
 
   const allSubjectReport = useMemo(
     () => buildUpscStudentReportSnapshot(progressBySubject, questionBankAttemptsBySubject),
@@ -224,6 +270,36 @@ export default function ReportsPage() {
       <div>
         {/* LMS Backend Progress — real data from the Geography LMS */}
         <LmsProgressCard />
+
+        {attemptReportId && (
+          <section className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#eef9f3] p-5 shadow-sm md:p-7" data-testid="attempt-report-source">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Persisted attempt report</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight">Attempt {attemptReportId}</h2>
+            {attemptReportLoading && <p className="mt-3 text-sm font-semibold text-[#5d675f]">Loading the ownership-scoped report…</p>}
+            {attemptReportError && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-[#9b2c2c]">
+                <p role="alert">{attemptReportError}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (attemptReportId) loadAttemptReport(attemptReportId);
+                  }}
+                  disabled={attemptReportLoading}
+                  className="rounded-md border border-[#c98f8f] px-3 py-1.5 text-xs font-black text-[#8c2424] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {attemptReportLoading ? "Retrying…" : "Retry"}
+                </button>
+              </div>
+            )}
+            {attemptReport && (
+              <div className="mt-4 grid gap-3 text-sm font-semibold text-[#315044] sm:grid-cols-3">
+                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Status</span>{attemptReport.processingStatus ?? attemptReport.processing_status}</div>
+                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Score</span>{attemptReport.totalScore}</div>
+                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Accuracy</span>{attemptReport.accuracy}%</div>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">

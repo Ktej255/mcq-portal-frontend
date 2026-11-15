@@ -119,7 +119,11 @@ export function UpscCurrentAffairsBridge() {
   const [completedStrategyTasks, setCompletedStrategyTasks] = useState<string[]>([]);
 
   useEffect(() => {
-    setSubjectSlug(getCurrentAffairsSubject(requestedSubject).slug);
+    const timer = window.setTimeout(() => {
+      setSubjectSlug(getCurrentAffairsSubject(requestedSubject).slug);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [requestedSubject]);
 
   useEffect(() => {

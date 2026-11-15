@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 import { loadCashfreeSDK } from "@/lib/upsc/cashfreeLoader";
-import { paymentService, type CreateOrderResponse } from "@/services/api/paymentService";
+import {
+  isMatchingActiveSubscription,
+  paymentService,
+  type CreateOrderResponse,
+  type SubscriptionResponse,
+} from "@/services/api/paymentService";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -15,7 +20,7 @@ export interface CashfreeCheckoutProps {
   billingCycle: string;
   amount: number;
   planTitle: string;
-  onSuccess: (orderId: string) => void;
+  onSuccess: (orderId: string, subscription: SubscriptionResponse) => void;
   onFailure: (error: string) => void;
 }
 
@@ -24,6 +29,14 @@ export interface CashfreeCheckoutProps {
 // ---------------------------------------------------------------------------
 
 const MAX_RETRIES = 3;
+const SUBSCRIPTION_POLL_INTERVAL_MS = 2000;
+const SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS = 30000;
+
+type CheckoutStatus = "loading" | "active" | "pending" | "error";
+type PollTimer = {
+  id: number;
+  resolve: (shouldContinue: boolean) => void;
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -37,22 +50,110 @@ export function CashfreeCheckout({
   onSuccess,
   onFailure,
 }: CashfreeCheckoutProps) {
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<CheckoutStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [hasSubmittedOrder, setHasSubmittedOrder] = useState(false);
 
-  const checkoutInitiated = useRef(false);
+  const isMountedRef = useRef(false);
+  const flowIdRef = useRef(0);
+  const pollTimerRef = useRef<PollTimer | null>(null);
+  const submittedOrderRef = useRef<CreateOrderResponse | null>(null);
+
+  const clearPollTimer = useCallback(() => {
+    const pendingTimer = pollTimerRef.current;
+    if (!pendingTimer) return;
+
+    window.clearTimeout(pendingTimer.id);
+    pollTimerRef.current = null;
+    pendingTimer.resolve(false);
+  }, []);
+
+  const isCurrentFlow = useCallback((flowId: number) =>
+    isMountedRef.current && flowIdRef.current === flowId,
+  []);
+
+  const waitForPollInterval = useCallback(
+    (flowId: number) =>
+      new Promise<boolean>((resolve) => {
+        const id = window.setTimeout(() => {
+          pollTimerRef.current = null;
+          resolve(isCurrentFlow(flowId));
+        }, SUBSCRIPTION_POLL_INTERVAL_MS);
+        pollTimerRef.current = { id, resolve };
+      }),
+    [isCurrentFlow],
+  );
+
+  // -------------------------------------------------------------------------
+  // Confirm only after the signed webhook has created the matching subscription
+  // -------------------------------------------------------------------------
+
+  const confirmSubscription = useCallback(
+    async (orderData: CreateOrderResponse, flowId: number) => {
+      const deadline = Date.now() + SUBSCRIPTION_CONFIRMATION_TIMEOUT_MS;
+
+      while (isCurrentFlow(flowId) && Date.now() < deadline) {
+        try {
+          const subscription = await paymentService.getSubscription();
+
+          if (!isCurrentFlow(flowId)) return;
+
+          if (
+            isMatchingActiveSubscription(subscription, {
+              order_id: orderData.order_id,
+              plan_tier: planTier,
+              billing_cycle: billingCycle,
+            })
+          ) {
+            onSuccess(orderData.order_id, subscription);
+            return;
+          }
+        } catch {
+          // The webhook may still be processing. Keep polling until the bounded
+          // confirmation window expires rather than treating a transient read
+          // failure as proof that the payment failed.
+        }
+
+        if (!isCurrentFlow(flowId) || Date.now() >= deadline) break;
+        if (!(await waitForPollInterval(flowId))) return;
+      }
+
+      if (!isCurrentFlow(flowId)) return;
+
+      const message =
+        "Payment was submitted, but secure subscription confirmation timed out. It may still be processing; retry confirmation before paying again.";
+      setError(message);
+      setStatus("error");
+      onFailure(message);
+    },
+    [billingCycle, isCurrentFlow, onFailure, onSuccess, planTier, waitForPollInterval],
+  );
+
+  const beginSubscriptionConfirmation = useCallback(
+    (orderData: CreateOrderResponse) => {
+      clearPollTimer();
+      const flowId = ++flowIdRef.current;
+      setOrderId(orderData.order_id);
+      setError(null);
+      setStatus("pending");
+      void confirmSubscription(orderData, flowId);
+    },
+    [clearPollTimer, confirmSubscription],
+  );
 
   // -------------------------------------------------------------------------
   // Create order and launch checkout
   // -------------------------------------------------------------------------
 
   const initiatePayment = useCallback(async () => {
-    setLoading(true);
+    clearPollTimer();
+    const flowId = ++flowIdRef.current;
+    submittedOrderRef.current = null;
+    setHasSubmittedOrder(false);
+    setStatus("loading");
     setError(null);
-    checkoutInitiated.current = false;
 
     try {
       // Step 1: Create server-side order
@@ -60,8 +161,8 @@ export function CashfreeCheckout({
         planTier,
         billingCycle,
       );
+      if (!isCurrentFlow(flowId)) return;
 
-      setPaymentSessionId(orderData.payment_session_id);
       setOrderId(orderData.order_id);
 
       // Step 2: Load Cashfree SDK
@@ -69,47 +170,77 @@ export function CashfreeCheckout({
       if (!cashfree) {
         throw new Error("Failed to load payment SDK. Please refresh the page.");
       }
+      if (!isCurrentFlow(flowId)) return;
 
       // Step 3: Launch checkout modal
-      checkoutInitiated.current = true;
-      setLoading(false);
-
+      setStatus("active");
       const checkoutResult = await cashfree.checkout({
         paymentSessionId: orderData.payment_session_id,
         redirectTarget: "_modal",
       });
+      if (!isCurrentFlow(flowId)) return;
 
-      // Step 4: Handle checkout result
+      // Step 4: SDK success means only that payment was submitted. Activation
+      // requires the matching webhook-backed subscription below.
       if (checkoutResult?.error) {
         const errMsg =
           checkoutResult.error?.message ||
           "Payment was not completed. Please try again.";
         setError(errMsg);
+        setStatus("error");
         onFailure(errMsg);
       } else if (checkoutResult?.paymentDetails?.paymentMessage) {
-        // Payment succeeded
-        onSuccess(orderData.order_id);
+        submittedOrderRef.current = orderData;
+        setHasSubmittedOrder(true);
+        beginSubscriptionConfirmation(orderData);
       } else {
         // Modal closed without completing — treat as user cancellation
         setError("Payment was cancelled. You can retry when ready.");
+        setStatus("error");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (!isCurrentFlow(flowId)) return;
+
+      const paymentError =
+        err && typeof err === "object"
+          ? (err as { response?: { data?: { message?: unknown } }; message?: unknown })
+          : null;
+      const responseMessage = paymentError?.response?.data?.message;
+      const errorMessage = paymentError?.message;
       const message =
-        err?.response?.data?.message ||
-        err?.message ||
+        (typeof responseMessage === "string" && responseMessage) ||
+        (typeof errorMessage === "string" && errorMessage) ||
         "An unexpected error occurred while initiating payment.";
       setError(message);
-      setLoading(false);
+      setStatus("error");
       onFailure(message);
     }
-  }, [planTier, billingCycle, onSuccess, onFailure]);
+  }, [
+    beginSubscriptionConfirmation,
+    billingCycle,
+    clearPollTimer,
+    isCurrentFlow,
+    onFailure,
+    planTier,
+  ]);
 
   // -------------------------------------------------------------------------
-  // Mount: start payment flow
+  // Mount and unmount cleanup
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    initiatePayment();
+    isMountedRef.current = true;
+    const initiationTimer = window.setTimeout(() => {
+      void initiatePayment();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(initiationTimer);
+      isMountedRef.current = false;
+      flowIdRef.current += 1;
+      clearPollTimer();
+    };
+    // The checkout flow intentionally starts once per mounted checkout.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -120,14 +251,21 @@ export function CashfreeCheckout({
   const handleRetry = () => {
     if (retryCount >= MAX_RETRIES) return;
     setRetryCount((prev) => prev + 1);
-    initiatePayment();
+
+    // If Cashfree already reported submission, retry confirmation for that same
+    // order instead of creating a second order that could lead to double payment.
+    if (submittedOrderRef.current) {
+      beginSubscriptionConfirmation(submittedOrderRef.current);
+    } else {
+      void initiatePayment();
+    }
   };
 
   // -------------------------------------------------------------------------
   // Render: Loading state
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (status === "loading") {
     return (
       <div
         data-testid="cashfree-checkout-loading"
@@ -145,10 +283,36 @@ export function CashfreeCheckout({
   }
 
   // -------------------------------------------------------------------------
-  // Render: Error state
+  // Render: Webhook confirmation pending
   // -------------------------------------------------------------------------
 
-  if (error) {
+  if (status === "pending") {
+    return (
+      <div
+        data-testid="cashfree-checkout-pending"
+        className="flex flex-col items-center justify-center gap-3 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-6"
+      >
+        <Loader2 className="h-6 w-6 animate-spin text-[#1d9e75]" />
+        <p className="text-center text-sm font-bold text-[#085041]">
+          Payment submitted. Waiting for secure subscription confirmation…
+        </p>
+        {orderId && (
+          <p className="text-xs font-semibold text-[#49675e]">
+            Order reference: {orderId}
+          </p>
+        )}
+        <p className="text-center text-xs font-semibold text-[#49675e]">
+          Your plan will activate only after our signed payment webhook is verified.
+        </p>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Render: Error / retry state
+  // -------------------------------------------------------------------------
+
+  if (status === "error" && error) {
     return (
       <div
         data-testid="cashfree-checkout-error"
@@ -173,7 +337,7 @@ export function CashfreeCheckout({
             className="inline-flex w-fit items-center gap-2 rounded-md bg-[#1d9e75] px-4 py-2 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Retry Payment
+            {hasSubmittedOrder ? "Retry confirmation" : "Retry Payment"}
           </button>
         ) : (
           <p className="text-xs font-semibold text-red-700">

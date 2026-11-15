@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from app.models.domain import WorkflowStatusEnum
 from app.services.domain_contracts import normalize_option_id
 
 # Subject Schemas
@@ -48,6 +49,8 @@ class QuestionCreate(BaseModel):
     source: Optional[str] = None
     difficulty: str = Field(default="MEDIUM", description="E.g., EASY, MEDIUM, HARD")
     question_number: Optional[int] = None
+    status: WorkflowStatusEnum = WorkflowStatusEnum.DRAFT
+    quality_notes: Optional[Dict[str, Any]] = None
 
     @field_validator("correct_option")
     @classmethod
@@ -105,6 +108,7 @@ class QuestionOut(BaseModel):
     explanation_quality_score: Optional[float] = None
     is_outdated: bool
     last_reviewed_at: Optional[Any] = None
+    quality_notes: Optional[Dict[str, Any]] = None
     
     # Forensic Metadata
     content_hash: Optional[str] = None

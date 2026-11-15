@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
+import { activeAuthProvider } from "./env";
 
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (process.env.NEXT_PUBLIC_AUTH_PROVIDER !== "clerk") {
+  if (activeAuthProvider !== "clerk") {
     return NextResponse.next();
   }
 

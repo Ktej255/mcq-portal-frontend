@@ -20,28 +20,38 @@ Requirements traced: 6.1, 6.2, 6.3, 6.4, 6.5
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
+    GsLmsContentSection,
     GsLmsNodeTypeEnum,
 )
 from app.core.gs_lms.student_models import (
-    GsLmsStudentSectionProgress,
+    GsLmsDiscussionSession,
+    GsLmsDiscussionStatusEnum,
     GsLmsGapSnapshot,
 )
 from app.core.gs_lms.coverage import (
     compute_gap_profile,
     get_latest_gap_snapshot,
+)
+from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.content import (
+    _compute_skippable_section_ids,
+    _compute_skippable_section_labels,
+    _get_learner_level,
+    _get_student_progress,
+    _is_topic_completed,
 )
 from app.api.v1.gs_lms.schemas import (
     GsLmsProgressOut,
@@ -59,45 +69,87 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _compute_progress(db: Session, student_id: int) -> GsLmsProgressOut:
+def _compute_progress(
+    db: Session,
+    student_id: int,
+    subject_id: int,
+) -> GsLmsProgressOut:
     """Compute overall and per-mega-topic progress for a student.
 
-    A leaf topic is considered "completed" when all 4 of its content sections
-    have been marked complete by the student. Progress is computed only for
-    REVIEWED syllabus nodes.
+    A leaf topic is complete when all of its reviewed, non-skippable sections
+    are complete according to the same learner-aware policy used by content.py.
+    The actual reviewed section set preserves legacy four-section topics and
+    supports canonical five-section topics.
     """
-    # Get all REVIEWED leaf topics
+    # Get all REVIEWED leaf topics for this subject.
     leaf_nodes = (
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
+            GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .all()
     )
 
     total_topics = len(leaf_nodes)
+    leaf_ids = [node.id for node in leaf_nodes]
 
-    # Get completed section counts per node for this student
-    # A topic is "completed" when it has 4 completed sections
-    completed_counts = (
-        db.query(
-            GsLmsStudentSectionProgress.syllabus_node_id,
-            func.count(GsLmsStudentSectionProgress.id).label("completed_sections"),
+    # Load reviewed sections once, restricting progress to this subject's
+    # reviewed leaf topics instead of counting arbitrary student rows.
+    sections_by_node: dict[int, list[GsLmsContentSection]] = defaultdict(list)
+    if leaf_ids:
+        reviewed_sections = (
+            db.query(GsLmsContentSection)
+            .filter(
+                GsLmsContentSection.syllabus_node_id.in_(leaf_ids),
+                GsLmsContentSection.review_status == GsReviewStatusEnum.REVIEWED,
+            )
+            .all()
         )
-        .filter(
-            GsLmsStudentSectionProgress.student_id == student_id,
-            GsLmsStudentSectionProgress.completed == True,  # noqa: E712
-        )
-        .group_by(GsLmsStudentSectionProgress.syllabus_node_id)
-        .all()
-    )
-    completed_map = {row[0]: row[1] for row in completed_counts}
+        for section in reviewed_sections:
+            sections_by_node[section.syllabus_node_id].append(section)
 
-    # A topic is complete if it has 4 completed sections
-    completed_node_ids = {
-        node_id for node_id, count in completed_map.items() if count >= 4
-    }
+    all_section_ids = [
+        section.id
+        for sections in sections_by_node.values()
+        for section in sections
+    ]
+    progress_map = _get_student_progress(db, student_id, all_section_ids)
+    learner_level = _get_learner_level(db, student_id)
+
+    # The latest completed discussion match is topic-specific and controls
+    # which sections are skippable for intermediate/advanced learners.
+    latest_match_by_node: dict[int, float | None] = {}
+    if leaf_ids:
+        sessions = (
+            db.query(GsLmsDiscussionSession)
+            .filter(
+                GsLmsDiscussionSession.student_id == student_id,
+                GsLmsDiscussionSession.syllabus_node_id.in_(leaf_ids),
+                GsLmsDiscussionSession.status == GsLmsDiscussionStatusEnum.COMPLETED,
+            )
+            .order_by(GsLmsDiscussionSession.completed_at.desc())
+            .all()
+        )
+        for session in sessions:
+            latest_match_by_node.setdefault(
+                session.syllabus_node_id, session.match_percentage
+            )
+
+    completed_node_ids: set[int] = set()
+    for node in leaf_nodes:
+        sections = sections_by_node.get(node.id, [])
+        section_ids = [section.id for section in sections]
+        skippable_labels = _compute_skippable_section_labels(
+            learner_level, latest_match_by_node.get(node.id)
+        )
+        skippable_ids = _compute_skippable_section_ids(
+            sections, skippable_labels
+        )
+        if _is_topic_completed(progress_map, section_ids, skippable_ids):
+            completed_node_ids.add(node.id)
+
     completed_topics = sum(
         1 for node in leaf_nodes if node.id in completed_node_ids
     )
@@ -111,6 +163,7 @@ def _compute_progress(db: Session, student_id: int) -> GsLmsProgressOut:
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.MEGA_TOPIC,
+            GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .order_by(GsLmsSyllabusNode.display_order)
@@ -121,7 +174,7 @@ def _compute_progress(db: Session, student_id: int) -> GsLmsProgressOut:
     mega_topic_progress: list[GsLmsMegaTopicProgressOut] = []
     for mega in mega_topics:
         # Find all leaf descendants of this mega topic
-        children_leaves = _get_leaf_descendants(db, mega.id)
+        children_leaves = _get_leaf_descendants(db, mega.id, subject_id)
         total_children = len(children_leaves)
         completed_children = sum(
             1 for child in children_leaves if child.id in completed_node_ids
@@ -149,7 +202,11 @@ def _compute_progress(db: Session, student_id: int) -> GsLmsProgressOut:
     )
 
 
-def _get_leaf_descendants(db: Session, mega_topic_id: int) -> list[GsLmsSyllabusNode]:
+def _get_leaf_descendants(
+    db: Session,
+    mega_topic_id: int,
+    subject_id: int,
+) -> list[GsLmsSyllabusNode]:
     """Get all REVIEWED leaf-topic descendants of a mega-topic node.
 
     Traverses the tree via parent_id links to find all leaf nodes under the
@@ -165,6 +222,7 @@ def _get_leaf_descendants(db: Session, mega_topic_id: int) -> list[GsLmsSyllabus
             db.query(GsLmsSyllabusNode)
             .filter(
                 GsLmsSyllabusNode.parent_id == current_id,
+                GsLmsSyllabusNode.subject_id == subject_id,
                 GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
             )
             .all()
@@ -262,6 +320,7 @@ def _build_gap_out_from_profile(profile, computed_at_iso: str) -> GsLmsGapOut:
 
 @router.get("/progress")
 def get_progress(
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -272,7 +331,7 @@ def get_progress(
 
     Requirements: 6.1
     """
-    progress = _compute_progress(db, current_user.id)
+    progress = _compute_progress(db, current_user.id, subject.id)
     return StandardResponse(
         success=True,
         message="Progress retrieved",

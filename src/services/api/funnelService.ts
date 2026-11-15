@@ -90,6 +90,10 @@ export interface MainsEvalStatusOut {
   job_id: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'DEGRADED';
   report: EvaluationReportOut | null;
+  /** Scoring reference, revealed only after a report exists. */
+  model_answer: string | null;
+  /** Outline or approach of the scoring reference, revealed with the report. */
+  explanation: string | null;
 }
 
 export interface EvaluationReportOut {
@@ -111,8 +115,15 @@ export interface GrowthReportOut {
     recall_score: number;       // 0-100
     confidence_score: number;   // 0-100
     is_rushed: boolean;
+    // null means a snapshot that predates evidence tracking; it must not be
+    // presented as "not attempted".
+    has_reading_evidence?: boolean | null;
+    has_recall_evidence?: boolean | null;
   }>;
   mcq_total_score: number;      // 0-100
+  // False means the MCQ Lab was never submitted; the score is a placeholder,
+  // not a failed attempt.
+  has_mcq_evidence?: boolean | null;
   mcq_type_breakdown: Array<{
     question_type: string;
     total: number;
@@ -218,8 +229,10 @@ export const funnelService = {
     return unwrap<McqLabResultOut>(response.data);
   },
 
-  getMcqLabResult: async (subject = "geography", nodeId: number): Promise<McqLabResultOut> => {
+  getMcqLabResult: async (subject = "geography", nodeId: number): Promise<McqLabResultOut | null> => {
     const response = await apiClient.get(`gs-lms/${subject}/funnel/${nodeId}/mcq-lab/result`);
+    // A first visit has no saved attempt; the API answers 200 with a null body.
+    if (response.data === null || response.data === undefined) return null;
     return unwrap<McqLabResultOut>(response.data);
   },
 

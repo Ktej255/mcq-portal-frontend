@@ -55,44 +55,103 @@ class RetroCompleteIn(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _get_current_week_number(db: Session, student_id: int) -> int:
-    """Compute the current week number for the student (1-based, total plans ÷ 7)."""
-    total_plans = (
-        db.query(GsLmsDailyPlan)
+    """Compute the current week number from the student's first plan date.
+
+    Counting plan rows made the seventh study day open week 2, so week 1's
+    retrospective could never be shown. Anchoring to the first plan date keeps
+    days 1–7 in week 1 regardless of how many plans were created.
+    """
+    from sqlalchemy import func
+
+    first_plan_date = (
+        db.query(func.min(GsLmsDailyPlan.plan_date))
         .filter(GsLmsDailyPlan.student_id == student_id)
-        .count()
+        .scalar()
     )
-    return max(1, (total_plans // 7) + 1)
+    anchor = first_plan_date or date.today()
+    return max(1, ((date.today() - anchor).days // 7) + 1)
 
 
 def _get_completed_topics_this_week(db: Session, student_id: int) -> list[dict]:
-    """Get topics completed in the last 7 days."""
-    from sqlalchemy import and_
-    from datetime import timedelta
-    from app.core.gs_lms.student_models import GsLmsStudentSectionProgress
-    from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsNodeTypeEnum
-    from sqlalchemy import func
+    """Get topics whose reviewed sections were all completed in the last 7 days.
 
-    cutoff = date.today() - timedelta(days=7)
-    completed_nodes = (
-        db.query(
-            GsLmsStudentSectionProgress.syllabus_node_id,
-            func.count(GsLmsStudentSectionProgress.id).label("count"),
-        )
+    A topic is only claimed as completed when every reviewed section is done,
+    and the final section was completed inside the window. Requiring all
+    sections is deliberately conservative for learners with skip allowances:
+    the retro may omit a topic, but it will never claim a half-read topic is
+    finished.
+    """
+    from datetime import timedelta
+
+    from app.core.gs.models import GsReviewStatusEnum
+    from app.core.gs_lms.models import (
+        GsLmsContentSection,
+        GsLmsNodeTypeEnum,
+        GsLmsSyllabusNode,
+    )
+    from app.core.gs_lms.student_models import GsLmsStudentSectionProgress
+
+    cutoff = datetime.combine(date.today() - timedelta(days=7), datetime.min.time())
+    candidate_ids = [
+        row[0]
+        for row in db.query(GsLmsStudentSectionProgress.syllabus_node_id)
         .filter(
             GsLmsStudentSectionProgress.student_id == student_id,
             GsLmsStudentSectionProgress.completed == True,  # noqa: E712
-            GsLmsStudentSectionProgress.completed_at >= datetime.combine(cutoff, datetime.min.time()),
+            GsLmsStudentSectionProgress.completed_at >= cutoff,
         )
-        .group_by(GsLmsStudentSectionProgress.syllabus_node_id)
-        .having(func.count(GsLmsStudentSectionProgress.id) >= 4)
+        .distinct()
         .all()
-    )
+    ]
 
-    result = []
-    for row in completed_nodes:
-        node = db.query(GsLmsSyllabusNode).filter(GsLmsSyllabusNode.id == row.syllabus_node_id).one_or_none()
-        if node and node.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC:
-            result.append({"node_id": node.id, "title": node.title})
+    result: list[dict] = []
+    for node_id in candidate_ids:
+        node = (
+            db.query(GsLmsSyllabusNode)
+            .filter(GsLmsSyllabusNode.id == node_id)
+            .one_or_none()
+        )
+        if node is None or node.node_type != GsLmsNodeTypeEnum.LEAF_TOPIC:
+            continue
+
+        reviewed_section_ids = [
+            row[0]
+            for row in db.query(GsLmsContentSection.id)
+            .filter(
+                GsLmsContentSection.syllabus_node_id == node_id,
+                GsLmsContentSection.review_status == GsReviewStatusEnum.REVIEWED,
+            )
+            .all()
+        ]
+        if not reviewed_section_ids:
+            continue
+
+        completion_rows = (
+            db.query(
+                GsLmsStudentSectionProgress.section_id,
+                GsLmsStudentSectionProgress.completed_at,
+            )
+            .filter(
+                GsLmsStudentSectionProgress.student_id == student_id,
+                GsLmsStudentSectionProgress.syllabus_node_id == node_id,
+                GsLmsStudentSectionProgress.completed == True,  # noqa: E712
+            )
+            .all()
+        )
+        completed_at = {
+            section_id: completed
+            for section_id, completed in completion_rows
+            if completed is not None
+        }
+        if not all(section_id in completed_at for section_id in reviewed_section_ids):
+            continue
+        last_completed = max(
+            completed_at[section_id] for section_id in reviewed_section_ids
+        )
+        if last_completed < cutoff:
+            continue
+
+        result.append({"node_id": node.id, "title": node.title})
     return result
 
 
@@ -144,6 +203,13 @@ def get_current_retro(
             completed=False,
         )
         db.add(retro)
+        db.commit()
+        db.refresh(retro)
+    elif not retro.completed:
+        # The week is still open, so the evidence shown must reflect everything
+        # completed since the first visit — not a snapshot frozen on day one.
+        retro.topics_completed = _get_completed_topics_this_week(db, current_user.id)
+        retro.gap_summary = _get_latest_gap_summary(db, current_user.id)
         db.commit()
         db.refresh(retro)
 

@@ -4,10 +4,10 @@
 Two layers:
 
 * **Provider unit tests** — the deterministic ``MockEvaluationProvider``
-  produces a *complete* schema-valid report, and the ``GatewayEvaluationProvider``
-  degrades *honestly* to an all-incomplete report when the gateway returns
-  non-conforming output. These pin design **Property 6** (report-completeness
-  honesty) at the provider seam.
+  produces a *complete* schema-valid report, while the
+  ``GatewayEvaluationProvider`` fails closed with a typed unavailable error
+  when the gateway returns non-conforming output. These pin design **Property
+  6** (report-completeness honesty) at the provider seam.
 
 * **Endpoint property tests** (``POST /api/v1/optional/{slug}/answers`` +
   ``GET /api/v1/optional/answers/{id}/report``):
@@ -43,7 +43,17 @@ from app.main import app
 # Importing the models registers every ``optional_*`` table on Base.metadata.
 from app.core.optional import models as optional_models  # noqa: F401
 from app.core.optional import student_models as optional_student_models  # noqa: F401
-from app.core.optional.models import OptionalSubject, SyllabusNode
+from app.core.optional.models import (
+    OptionalSubject,
+    Paper,
+    PaperLabelEnum,
+    Pyq,
+    Section,
+    SectionLabelEnum,
+    SyllabusNode,
+    SyllabusNodeTypeEnum,
+    OptionalReviewStatusEnum,
+)
 from app.core.optional.importer import import_geography_optional
 from app.core.optional.prompts import (
     REQUIRED_EVALUATION_SECTIONS,
@@ -54,7 +64,15 @@ from app.core.optional.providers import (
     MockEvaluationProvider,
     GatewayEvaluationProvider,
 )
-from app.core.optional.providers.evaluation import _all_incomplete
+from app.core.optional.providers.evaluation import (
+    EvaluationProviderUnavailableError,
+    _all_incomplete,
+)
+from app.core.evaluation.providers.evaluation import (
+    _PROVIDERS,
+    get_evaluation_provider,
+)
+from app.core.config import settings
 from app.core.inference.contracts import InferenceResponse
 from app.api.v1.optional.answers import get_evaluation_provider_dep
 
@@ -95,26 +113,26 @@ def test_all_incomplete_is_honest_not_complete():
     assert report.sections == {}
 
 
-def test_gateway_provider_degrades_honestly_on_bad_output(monkeypatch):
+def test_gateway_provider_fails_closed_on_bad_output(monkeypatch):
     """A non-JSON gateway response must NOT become a fabricated complete report."""
     provider = GatewayEvaluationProvider(provider_name="gemini")
 
     class _BadProvider:
         def generate(self, request):
             # The default inference mock returns prose, not JSON — exactly the
-            # case that must degrade honestly rather than parse into a report.
+            # case that must fail closed rather than become a persisted report.
             return InferenceResponse(text="[MOCK RESPONSE] not json", provider="mock")
 
     from app.core.inference.gateway import InferenceGateway
 
     monkeypatch.setattr(InferenceGateway, "get_provider", lambda name=None: _BadProvider())
 
-    report = provider.evaluate(answer_text="answer", rubric="rubric")
-    assert report.is_complete is False
-    assert set(report.incomplete_sections) == set(REQUIRED_EVALUATION_SECTIONS)
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        provider.evaluate(answer_text="answer", rubric="rubric")
+    assert exc.value.operation == "response_validation"
 
 
-def test_gateway_provider_degrades_honestly_on_call_failure(monkeypatch):
+def test_gateway_provider_fails_closed_on_call_failure(monkeypatch):
     provider = GatewayEvaluationProvider(provider_name="gemini")
 
     from app.core.inference.gateway import InferenceGateway
@@ -124,9 +142,51 @@ def test_gateway_provider_degrades_honestly_on_call_failure(monkeypatch):
 
     monkeypatch.setattr(InferenceGateway, "get_provider", _boom)
 
-    report = provider.evaluate(answer_text="answer", rubric="rubric")
-    assert report.is_complete is False
-    assert set(report.incomplete_sections) == set(REQUIRED_EVALUATION_SECTIONS)
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        provider.evaluate(answer_text="answer", rubric="rubric")
+    assert exc.value.operation == "provider_call"
+
+
+def test_evaluation_provider_defaults_to_gemini(monkeypatch):
+    _PROVIDERS.clear()
+    monkeypatch.delenv("OPTIONAL_EVAL_PROVIDER", raising=False)
+    monkeypatch.setattr(settings, "OPTIONAL_EVAL_PROVIDER", "gemini")
+
+    provider = get_evaluation_provider()
+
+    assert isinstance(provider, GatewayEvaluationProvider)
+    assert provider.name == "gemini"
+
+
+def test_evaluation_mock_requires_nonproduction_and_explicit_enablement(monkeypatch):
+    _PROVIDERS.clear()
+    monkeypatch.setenv("OPTIONAL_EVAL_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "ENABLE_OPTIONAL_EVAL_MOCK", True)
+
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        get_evaluation_provider()
+    assert exc.value.operation == "runtime_policy"
+
+    _PROVIDERS.clear()
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "test")
+    monkeypatch.setattr(settings, "ENABLE_OPTIONAL_EVAL_MOCK", False)
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        get_evaluation_provider()
+    assert exc.value.operation == "runtime_policy"
+
+    _PROVIDERS.clear()
+    monkeypatch.setattr(settings, "ENABLE_OPTIONAL_EVAL_MOCK", True)
+    assert isinstance(get_evaluation_provider(), MockEvaluationProvider)
+
+
+def test_unknown_evaluation_provider_fails_closed(monkeypatch):
+    _PROVIDERS.clear()
+    monkeypatch.setenv("OPTIONAL_EVAL_PROVIDER", "untrusted-provider")
+
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        get_evaluation_provider()
+    assert exc.value.operation == "provider_selection"
 
 
 # ===========================================================================
@@ -224,6 +284,51 @@ def _first_topic_node_id(SessionLocal) -> int:
         )
         assert node is not None
         return node.id
+    finally:
+        db.close()
+
+
+def _create_other_subject_references(SessionLocal) -> tuple[int, int]:
+    db = SessionLocal()
+    try:
+        subject = OptionalSubject(
+            slug="other-subject",
+            name="Other Subject",
+            display_order=99,
+            is_complete=True,
+        )
+        paper = Paper(
+            subject=subject,
+            label=PaperLabelEnum.PAPER_I,
+            name="Other Paper I",
+            display_order=1,
+        )
+        section = Section(
+            paper=paper,
+            label=SectionLabelEnum.SECTION_A,
+            name="Other Section A",
+            display_order=1,
+        )
+        node = SyllabusNode(
+            section=section,
+            title="Other subject topic",
+            node_type=SyllabusNodeTypeEnum.TOPIC,
+            review_status=OptionalReviewStatusEnum.REVIEWED,
+        )
+        pyq = Pyq(
+            subject=subject,
+            paper=paper,
+            section=section,
+            topic_node=node,
+            year=2020,
+            paper_label=PaperLabelEnum.PAPER_I,
+            section_label=SectionLabelEnum.SECTION_A,
+            question_text="Other subject PYQ",
+            review_status=OptionalReviewStatusEnum.REVIEWED,
+        )
+        db.add_all([subject, paper, section, node, pyq])
+        db.commit()
+        return node.id, pyq.id
     finally:
         db.close()
 
@@ -400,6 +505,42 @@ def test_attempt_is_filed_under_topic(make_client, seeded_engine):
         db.close()
 
 
+def test_topic_reference_cannot_cross_subject(make_client, seeded_engine):
+    _, SessionLocal = seeded_engine
+    other_node_id, _ = _create_other_subject_references(SessionLocal)
+    client = make_client(_CompleteProvider())
+
+    response = client.post(
+        "/api/v1/optional/geography/answers",
+        json={
+            "mode": "TYPED",
+            "body_text": "cross-subject topic reference",
+            "topic_node_id": other_node_id,
+        },
+    )
+
+    assert response.status_code == 404
+    assert "for this subject" in response.json()["detail"]
+
+
+def test_pyq_reference_cannot_cross_subject(make_client, seeded_engine):
+    _, SessionLocal = seeded_engine
+    _, other_pyq_id = _create_other_subject_references(SessionLocal)
+    client = make_client(_CompleteProvider())
+
+    response = client.post(
+        "/api/v1/optional/geography/answers",
+        json={
+            "mode": "TYPED",
+            "body_text": "cross-subject PYQ reference",
+            "pyq_id": other_pyq_id,
+        },
+    )
+
+    assert response.status_code == 404
+    assert "for this subject" in response.json()["detail"]
+
+
 def test_report_does_not_leak_across_students(make_client):
     # Student 1 submits and gets an attempt id.
     client1 = make_client(_CompleteProvider(), student_id=STUDENT_ID)
@@ -466,3 +607,36 @@ def test_report_requires_auth():
     bare = TestClient(app)
     resp = bare.get("/api/v1/optional/answers/1/report")
     assert resp.status_code == 401
+
+
+class _UnavailableProvider(EvaluationProvider):
+    name = "test-unavailable"
+
+    def evaluate(self, *, answer_text, rubric, question=None,
+                 required_sections=REQUIRED_EVALUATION_SECTIONS):
+        raise EvaluationProviderUnavailableError("gemini", "provider_call")
+
+
+def test_provider_failure_returns_retryable_503_without_persistence(make_client, seeded_engine):
+    _, SessionLocal = seeded_engine
+    client = make_client(_UnavailableProvider())
+
+    response = client.post(
+        "/api/v1/optional/geography/answers",
+        json={"mode": "TYPED", "body_text": "retry this answer later"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+        "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+    }
+
+    from app.core.optional.student_models import AnswerAttempt, EvaluationReport
+
+    db = SessionLocal()
+    try:
+        assert db.query(AnswerAttempt).count() == 0
+        assert db.query(EvaluationReport).count() == 0
+    finally:
+        db.close()

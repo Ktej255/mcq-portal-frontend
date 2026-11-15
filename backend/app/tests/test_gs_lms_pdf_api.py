@@ -32,7 +32,7 @@ from app.core.gs_lms import student_models as gs_lms_student_models  # noqa: F40
 from app.core.gs import models as gs_models  # noqa: F401
 from app.models import domain as domain_models  # noqa: F401
 
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
@@ -79,6 +79,23 @@ def seed_data(session_factory):
     """Seed a REVIEWED syllabus node with 4 REVIEWED sections."""
     db = session_factory()
     try:
+        db.add_all(
+            [
+                GsSubject(
+                    id=1,
+                    slug="geography",
+                    name="Geography Studies",
+                    display_order=1,
+                ),
+                GsSubject(
+                    id=2,
+                    slug="history",
+                    name="History Studies",
+                    display_order=2,
+                ),
+            ]
+        )
+
         # Create a REVIEWED leaf topic node
         node = GsLmsSyllabusNode(
             id=200,
@@ -123,11 +140,29 @@ def seed_data(session_factory):
         )
         db.add(unreviewed_node)
 
+        # A reviewed node belonging to another subject must not be reachable
+        # through the Geography URL.
+        cross_subject_node = GsLmsSyllabusNode(
+            id=202,
+            subject_id=2,
+            title="History Topic",
+            node_type=GsLmsNodeTypeEnum.LEAF_TOPIC,
+            weight=1.0,
+            display_order=3,
+            review_status=GsReviewStatusEnum.REVIEWED,
+        )
+        db.add(cross_subject_node)
+
         db.commit()
     finally:
         db.close()
 
-    return {"node_id": 200, "section_ids": [10, 11, 12, 13], "unreviewed_node_id": 201}
+    return {
+        "node_id": 200,
+        "section_ids": [10, 11, 12, 13],
+        "unreviewed_node_id": 201,
+        "cross_subject_node_id": 202,
+    }
 
 
 @pytest.fixture()
@@ -272,6 +307,22 @@ class TestDownloadTopicPdf:
         assert "Advanced Topics" in body_text
         assert "NCERT Level" in body_text
         assert "Examiner Traps" in body_text
+        assert "Geography Studies" in body_text
+        assert "GS Geography" not in body_text
+
+    def test_rejects_node_owned_by_another_subject(self, client, seed_data):
+        """A Geography URL cannot download a reviewed History node."""
+        resp = client.get(
+            f"/api/v1/gs-lms/geography/topics/{seed_data['cross_subject_node_id']}/pdf"
+        )
+        assert resp.status_code == 404
+
+    def test_rejects_unknown_subject_slug(self, client, seed_data):
+        """An unknown URL subject is rejected before node lookup."""
+        resp = client.get(
+            f"/api/v1/gs-lms/unknown/topics/{seed_data['node_id']}/pdf"
+        )
+        assert resp.status_code == 404
 
     def test_content_type_header_set(
         self, client, seed_data, seed_all_sections_complete

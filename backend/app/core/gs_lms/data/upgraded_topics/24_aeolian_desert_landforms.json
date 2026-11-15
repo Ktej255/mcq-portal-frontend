@@ -187,7 +187,7 @@
         {"label": "C", "text": "Only three"},
         {"label": "D", "text": "All four"}
       ],
-      "correct_option": "B",
+      "correct_option": "C",
       "explanation": "Statements 1, 2, and 4 need careful analysis. Statement 1 is correct — the concave side faces downwind. Statement 2 is correct — the horns point downwind. Statement 3 is WRONG — barchans form where sand supply is LIMITED (not abundant) and wind direction is CONSISTENT (not variable); star dunes form with variable winds and abundant sand. Statement 4 is correct — barchans migrate 10-30 m/year. Hence only two (statements 1 and 2... wait: 1, 2, 4 are correct = three). Correct answer: C (only three: 1, 2, and 4).",
       "question_type": "STATEMENT_BASED",
       "display_order": 2,

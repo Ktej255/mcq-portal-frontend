@@ -35,7 +35,7 @@ from app.core.gs_lms import student_models as gs_lms_student_models  # noqa: F40
 from app.core.gs import models as gs_models  # noqa: F401
 from app.models import domain as domain_models  # noqa: F401
 
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsNodeTypeEnum,
@@ -66,6 +66,18 @@ def test_engine():
         if any(name.startswith(p) for p in relevant_prefixes)
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
+
+    # The LMS routes resolve the subject from the URL slug before doing any
+    # onboarding work, so the fixture must seed the subject itself.
+    session = sessionmaker(bind=engine)()
+    try:
+        session.add(
+            GsSubject(id=1, slug="geography", name="GS Geography", display_order=1)
+        )
+        session.commit()
+    finally:
+        session.close()
+
     yield engine
     engine.dispose()
 

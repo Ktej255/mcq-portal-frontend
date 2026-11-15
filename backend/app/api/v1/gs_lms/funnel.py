@@ -10,6 +10,7 @@ Requirements traced: 1.4, 1.6, 3.3, 3.5, 13.2, 13.7
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import List
 
@@ -20,20 +21,35 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
-from app.core.gs.models import GsSubject
-from app.core.gs_lms.models import GsLmsSyllabusNode
-from app.core.gs_lms.funnel_models import GsLmsReadingTime
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.models import (
+    GsLmsContentSection,
+    GsLmsSectionLabelEnum,
+    GsLmsSyllabusNode,
+)
+from app.core.gs_lms.funnel_models import GsLmsReadingTime, GsLmsRecallAttempt
 from app.core.gs_lms.funnel_engine import (
     get_funnel_state,
     complete_step,
     StepNotReachableError,
     StepAlreadyCompletedError,
+    FunnelCompletionSideEffectError,
     TOTAL_STEPS,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Recall steps may advance only after a persisted text or audio response exists.
+RECALL_STEP_TO_SECTION = {
+    3: "BASIC",
+    5: "NCERT_LEVEL",
+    7: "ADVANCED",
+    9: "CURRENT_AFFAIRS",
+    11: "EXAMINER_TRAPS",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +95,7 @@ def get_funnel_state_endpoint(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_beta_topic(db, subject.id, node_id)
 
     state = get_funnel_state(db, current_user.id, node_id)
 
@@ -111,6 +128,41 @@ def complete_funnel_step(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_beta_topic(db, subject.id, node_id)
+
+    required_section = RECALL_STEP_TO_SECTION.get(body.step)
+    if required_section is not None:
+        # A recall response is only required when the topic actually has
+        # reviewed content for that section. Missing content must never trap a
+        # student on a recall step they cannot answer.
+        reviewed_section_exists = (
+            db.query(GsLmsContentSection.id)
+            .filter(
+                GsLmsContentSection.syllabus_node_id == node_id,
+                GsLmsContentSection.section_label
+                == GsLmsSectionLabelEnum(required_section),
+                GsLmsContentSection.review_status == GsReviewStatusEnum.REVIEWED,
+            )
+            .first()
+        )
+        if reviewed_section_exists is not None:
+            recall_attempt = (
+                db.query(GsLmsRecallAttempt.id)
+                .filter(
+                    GsLmsRecallAttempt.student_id == current_user.id,
+                    GsLmsRecallAttempt.syllabus_node_id == node_id,
+                    GsLmsRecallAttempt.section_label == required_section,
+                )
+                .first()
+            )
+            if recall_attempt is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Submit the {required_section} recall response before completing "
+                        f"funnel step {body.step}"
+                    ),
+                )
 
     try:
         state = complete_step(db, current_user.id, node_id, body.step)
@@ -119,6 +171,20 @@ def complete_funnel_step(
         raise HTTPException(status_code=409, detail=str(e))
     except StepAlreadyCompletedError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except FunnelCompletionSideEffectError as exc:
+        db.rollback()
+        logger.warning(
+            "GS LMS funnel finalization unavailable operation=%s",
+            exc.operation,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "FUNNEL_COMPLETION_UNAVAILABLE",
+                "message": "Topic completion is temporarily unavailable. Please retry.",
+                "retryable": True,
+            },
+        ) from exc
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -144,6 +210,17 @@ def submit_reading_time(
     Validates duration is between 1 and 7200 seconds. Adds to cumulative
     total (capped at 7200). Creates or updates the reading time record.
     """
+    # Validate the node belongs to the URL subject before reading or mutating
+    # any section-time state. Section ownership alone is insufficient because
+    # a node from another subject can otherwise be addressed through this path.
+    node = db.query(GsLmsSyllabusNode).filter(
+        GsLmsSyllabusNode.id == node_id,
+        GsLmsSyllabusNode.subject_id == subject.id,
+    ).first()
+    if not node:
+        raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_beta_topic(db, subject.id, node_id)
+
     # Validate section belongs to the node
     from app.core.gs_lms.models import GsLmsContentSection
     section = db.query(GsLmsContentSection).filter(

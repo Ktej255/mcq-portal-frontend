@@ -17,19 +17,21 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsPyq,
     GsLmsExamTypeEnum,
 )
 from app.core.gs_lms.student_models import GsLmsPyqReveal
+from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.schemas import GsLmsPyqOut, GsLmsPyqListOut
 
 router = APIRouter()
@@ -39,12 +41,17 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_reviewed_node(db: Session, node_id: int) -> GsLmsSyllabusNode:
-    """Retrieve a REVIEWED syllabus node or raise 404."""
+def _get_reviewed_node(
+    db: Session,
+    node_id: int,
+    subject_id: int,
+) -> GsLmsSyllabusNode:
+    """Retrieve a REVIEWED syllabus node owned by the URL subject or raise 404."""
     node = (
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
@@ -107,6 +114,7 @@ def get_topic_pyqs(
         None,
         description="Filter by exam type: PRELIMS or MAINS",
     ),
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -119,7 +127,7 @@ def get_topic_pyqs(
     - If no REVIEWED PYQs exist and unreviewed PYQs exist → "under review" message
     - If no PYQs exist at all → empty list with "no PYQs available" message
     """
-    node = _get_reviewed_node(db, node_id)
+    node = _get_reviewed_node(db, node_id, subject.id)
 
     # Validate exam_type if provided
     if exam_type is not None:
@@ -134,6 +142,7 @@ def get_topic_pyqs(
 
     # Query REVIEWED PYQs for this node
     query = db.query(GsLmsPyq).filter(
+        GsLmsPyq.subject_id == subject.id,
         GsLmsPyq.syllabus_node_id == node_id,
         GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
     )
@@ -147,6 +156,7 @@ def get_topic_pyqs(
     if not reviewed_pyqs:
         # Check if there are ANY PYQs (including unreviewed) for this topic
         unreviewed_filter = db.query(GsLmsPyq).filter(
+            GsLmsPyq.subject_id == subject.id,
             GsLmsPyq.syllabus_node_id == node_id,
         )
         if exam_type_upper:
@@ -190,6 +200,7 @@ def get_topic_pyqs(
 @router.post("/pyqs/{pyq_id}/reveal")
 def reveal_pyq(
     pyq_id: int,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -205,6 +216,7 @@ def reveal_pyq(
         db.query(GsLmsPyq)
         .filter(
             GsLmsPyq.id == pyq_id,
+            GsLmsPyq.subject_id == subject.id,
             GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
@@ -226,13 +238,28 @@ def reveal_pyq(
     )
 
     if not existing_reveal:
-        # Persist reveal event
+        # Persist reveal event. A concurrent first reveal can win the unique
+        # constraint between the read above and this commit; recover that
+        # idempotently without hiding unrelated integrity failures.
         reveal = GsLmsPyqReveal(
             student_id=current_user.id,
             pyq_id=pyq_id,
         )
         db.add(reveal)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            existing_reveal = (
+                db.query(GsLmsPyqReveal)
+                .filter(
+                    GsLmsPyqReveal.student_id == current_user.id,
+                    GsLmsPyqReveal.pyq_id == pyq_id,
+                )
+                .one_or_none()
+            )
+            if existing_reveal is None:
+                raise
 
     # Return the PYQ with answer revealed
     pyq_out = _pyq_to_out(pyq, revealed=True)

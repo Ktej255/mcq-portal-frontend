@@ -14,17 +14,43 @@ interface PYQPanelProps {
 export function PYQPanel({ nodeId }: PYQPanelProps) {
   const [activeTab, setActiveTab] = useState<"PRELIMS" | "MAINS">("PRELIMS");
   const [pyqs, setPyqs] = useState<PyqOut[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
+  const [failedRequestKey, setFailedRequestKey] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { subject } = useSubjectLms();
+  const requestKey = `${subject}:${nodeId}:${activeTab}`;
+  const loading = loadedRequestKey !== requestKey;
+  // Failure is recorded against the request that failed, so switching tab or
+  // topic can never show the previous request's error, and no state has to be
+  // reset when this effect starts.
+  const fetchError = failedRequestKey === requestKey;
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
+
     gsLmsService
       .getTopicPyqs(subject, nodeId, activeTab)
-      .then((res) => setPyqs(res.pyqs))
-      .catch(() => setPyqs([]))
-      .finally(() => setLoading(false));
-  }, [nodeId, activeTab, subject]);
+      .then((res) => {
+        if (cancelled) return;
+        setPyqs(res.pyqs);
+      })
+      .catch(() => {
+        if (!cancelled) setFailedRequestKey(requestKey);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedRequestKey(requestKey);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nodeId, activeTab, subject, requestKey, retryCount]);
+
+  const handleRetry = () => {
+    setFailedRequestKey(null);
+    setLoadedRequestKey(null);
+    setRetryCount((count) => count + 1);
+  };
 
   const handleReveal = async (pyqId: number) => {
     const updated = await gsLmsService.revealPyqAnswer(subject, pyqId);
@@ -64,6 +90,12 @@ export function PYQPanel({ nodeId }: PYQPanelProps) {
             <div className="h-24 bg-gray-200 rounded-lg" />
             <div className="h-24 bg-gray-200 rounded-lg" />
           </div>
+        ) : fetchError ? (
+          <LmsEmptyState
+            title={`${activeTab === "PRELIMS" ? "Prelims" : "Mains"} PYQs unavailable`}
+            description={`We couldn't load ${activeTab.toLowerCase()} questions for ${subject} topic ${nodeId}. Please try again.`}
+            action={{ label: "Retry", onClick: handleRetry }}
+          />
         ) : pyqs.length === 0 ? (
           <LmsEmptyState
             title="No PYQs available"
@@ -72,7 +104,7 @@ export function PYQPanel({ nodeId }: PYQPanelProps) {
         ) : (
           <div className="space-y-3">
             {pyqs.map((pyq) => (
-              <PYQCard key={pyq.id} pyq={pyq} onReveal={handleReveal} />
+              <PYQCard key={pyq.id} pyq={pyq} onReveal={handleReveal} subject={subject} />
             ))}
           </div>
         )}

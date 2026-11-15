@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService, Question } from '@/services/api/adminService';
+import { lmsHrefForRoom } from '@/lib/upsc/lmsRoomRouting';
 import { legacyApiEnabled } from '@/env';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,8 +79,9 @@ function getDraftRoute(draft: LocalBulkQuestionDraft) {
   const batchCode = asText(notes.batch_code);
   const prefix = batchCode?.split("-")[0] ?? "";
   const slug = (subject && subjectSlugByName[subject]) || subjectSlugByPrefix[prefix] || "geography";
-  const day = asText(notes.day) ?? "1";
-  return `/upsc/${slug}/mcq-readiness?day=${day}`;
+  // The legacy `?day=` room is retired; the LMS practice tab is where a drafted
+  // MCQ set is actually worked.
+  return lmsHrefForRoom(slug, "mcq-readiness");
 }
 
 function getDraftSummary(draft: LocalBulkQuestionDraft) {
@@ -98,7 +100,7 @@ export default function QuestionsControlRoom() {
   const [page, setPage] = useState(0);
   const [limit] = useState(20);
   const [search, setSearch] = useState('');
-  const [localDrafts, setLocalDrafts] = useState<LocalBulkQuestionDraft[]>([]);
+  const [localDrafts, setLocalDrafts] = useState<LocalBulkQuestionDraft[]>(() => readLocalBulkQuestionDrafts());
   const queryClient = useQueryClient();
 
   const { data: response, isLoading, isError } = useQuery({
@@ -122,10 +124,6 @@ export default function QuestionsControlRoom() {
   const total = response?.total || 0;
   const totalPages = Math.ceil(total / limit);
   const localDraftQuestionCount = localDrafts.reduce((sum, draft) => sum + draft.questions.length, 0);
-
-  useEffect(() => {
-    setLocalDrafts(readLocalBulkQuestionDrafts());
-  }, []);
 
   const removeLocalDraft = (draftId: string) => {
     const nextDrafts = localDrafts.filter((draft) => draft.id !== draftId);

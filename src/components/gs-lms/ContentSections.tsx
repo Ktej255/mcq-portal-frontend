@@ -21,7 +21,13 @@ export function ContentSections({ sections, onComplete }: ContentSectionsProps) 
     ordered[0]?.section_id ?? null,
   );
 
-  if (ordered.length === 0) return null;
+  if (ordered.length === 0) {
+    return (
+      <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 text-sm text-[#13251d]/60">
+        No content sections available.
+      </div>
+    );
+  }
 
   const active = ordered.find((s) => s.section_id === activeId) ?? ordered[0];
 
@@ -55,7 +61,7 @@ export function ContentSections({ sections, onComplete }: ContentSectionsProps) 
       <div className="mt-4 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5">
         <h2 className="mb-4 text-base font-semibold text-[#13251d]">{active.title}</h2>
         <RichBlocks blocks={active.blocks} />
-        {!active.completed && (
+        {!active.completed && !active.locked && (
           <button
             type="button"
             onClick={() => onComplete(active.section_id)}

@@ -265,10 +265,10 @@ def import_content_sections(
     """Import content sections for a syllabus node.
 
     Each section dict has keys:
-      - section_label (str): BASIC, ADVANCED, NCERT_LEVEL, CURRENT_AFFAIRS, or EXAMINER_TRAPS
+      - section_label (str): BASIC, NCERT_LEVEL, ADVANCED, CURRENT_AFFAIRS, or EXAMINER_TRAPS
       - title (str): Section title
       - blocks (list[dict]): Content blocks
-      - display_order (int): 1-4
+      - display_order (int): 1-5
       - authored (bool): Whether content is authored
 
     Idempotency: matches by (syllabus_node_id + section_label).
@@ -405,6 +405,65 @@ def import_pyqs(
 # ---------------------------------------------------------------------------
 
 
+def _validate_mcq_questions(questions_data: list[dict[str, Any]]) -> None:
+    """Reject structurally invalid MCQ payloads before any row is written.
+
+    UPSC Prelims questions are always four-option single-correct items. A
+    malformed question (fewer/more options, duplicate labels, empty option
+    text, a correct_option that does not match a label, or duplicate question
+    text within one node's batch) would otherwise be imported and stamped
+    REVIEWED, i.e. shown to learners as validated practice. Validation is
+    done up front so a bad payload aborts the whole import instead of
+    leaving a partially refreshed topic behind.
+    """
+    seen_texts: dict[str, int] = {}
+    for index, q_data in enumerate(questions_data, start=1):
+        label = f"MCQ #{index}"
+        question_text = q_data.get("question_text")
+        if not isinstance(question_text, str) or not question_text.strip():
+            raise ValueError(f"{label}: question_text must be a non-empty string.")
+
+        normalized_text = question_text.strip()
+        if normalized_text in seen_texts:
+            raise ValueError(
+                f"{label}: duplicate question_text (also used by "
+                f"MCQ #{seen_texts[normalized_text]}). Questions are matched "
+                f"by text, so duplicates would silently overwrite each other."
+            )
+        seen_texts[normalized_text] = index
+
+        options = q_data.get("options")
+        if not isinstance(options, list) or len(options) != 4:
+            raise ValueError(
+                f"{label}: expected exactly 4 options, got "
+                f"{len(options) if isinstance(options, list) else type(options).__name__}."
+            )
+
+        labels: list[str] = []
+        for option in options:
+            if not isinstance(option, dict):
+                raise ValueError(f"{label}: each option must be an object with label/text.")
+            opt_label = option.get("label")
+            opt_text = option.get("text")
+            if not isinstance(opt_label, str) or not opt_label.strip():
+                raise ValueError(f"{label}: every option needs a non-empty label.")
+            if not isinstance(opt_text, str) or not opt_text.strip():
+                raise ValueError(
+                    f"{label}: option {opt_label!r} has empty text."
+                )
+            labels.append(opt_label.strip())
+
+        if len(set(labels)) != 4:
+            raise ValueError(f"{label}: option labels must be unique, got {labels}.")
+
+        correct_option = q_data.get("correct_option")
+        if correct_option not in labels:
+            raise ValueError(
+                f"{label}: correct_option {correct_option!r} does not match "
+                f"any option label {labels}."
+            )
+
+
 def import_mcq_questions(
     db: Session,
     questions_data: list[dict[str, Any]],
@@ -424,8 +483,13 @@ def import_mcq_questions(
 
     Idempotency: matches by (syllabus_node_id + question_text).
 
+    The whole batch is structurally validated first (4 unique, non-empty
+    options; correct_option matches a label; no duplicate question text), so
+    malformed authoring output cannot be imported and stamped REVIEWED.
+
     Returns counts of created and updated questions.
     """
+    _validate_mcq_questions(questions_data)
     rs_enum = GsReviewStatusEnum(review_status)
     created = 0
     updated = 0

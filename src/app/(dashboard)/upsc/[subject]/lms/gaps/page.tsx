@@ -1,14 +1,5 @@
-"use client";
+import { GapsPage } from "@/components/gs-lms/pages/GapsPage";
 
-import { GapDashboard } from "@/components/gs-lms/GapDashboard";
-
-export default function GapsPage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">
-        Gaps &amp; Weak Areas
-      </h1>
-      <GapDashboard />
-    </div>
-  );
+export default function Page() {
+  return <GapsPage />;
 }

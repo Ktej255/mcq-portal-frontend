@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,6 +27,8 @@ import { getSubjectBatchCode } from "@/lib/upsc/subjectPlans";
 import { readLocalMcqCommandQuestionsForBatch } from "@/lib/upsc/mcqDraftBank";
 import { awardGamificationRewards } from "@/lib/upsc/gamification";
 import { toast } from "sonner";
+import type { QuestionPayload } from "@/services/api/adminService";
+
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -40,6 +42,18 @@ type RetroQuestion = {
   frameLabel: string;
   aiPrompt: string;
   aiCorrection: string;
+};
+
+type RetroSavePayload = {
+  day: number;
+  completedAt: string;
+  retroNote: string;
+  retroAiCorrection: string;
+  patterns: Array<{
+    frame: string;
+    studentLogic: string;
+    correction: string;
+  }>;
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -75,7 +89,7 @@ function buildMentalModelCorrection(session: SubjectSession): string {
   ].join(" ");
 }
 
-function getOptionText(question: any, option: string) {
+function getOptionText(question: QuestionPayload, option: string) {
   const options = question.options_en;
   if (!options || typeof options !== "object") return "";
   return String(options[option] ?? "");
@@ -91,7 +105,7 @@ function buildRetroInterview(
   const assessmentSummary = progress?.assessmentSummary?.trim() ?? "";
 
   const batchCode = getSubjectBatchCode(subjectSlug, session.day);
-  let questions: any[] = [];
+  let questions: QuestionPayload[] = [];
   try {
     questions = readLocalMcqCommandQuestionsForBatch(batchCode) || [];
   } catch (e) {
@@ -180,6 +194,10 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   const [studentDraft, setStudentDraft] = useState("");
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<number, string>>({});
   const [retroSaved, setRetroSaved] = useState(false);
+  const [retroSaveError, setRetroSaveError] = useState("");
+  const [isSavingRetro, setIsSavingRetro] = useState(false);
+  const [pendingRetroSave, setPendingRetroSave] = useState<RetroSavePayload | null>(null);
+  const retroSaveInFlightRef = useRef(false);
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
 
   const activeSession =
@@ -198,18 +216,24 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
   // Hydrate retro status from saved progress
   useEffect(() => {
     if (!isLoaded || hydratedDay === activeDay) return;
-    if (activeProgress?.retroCompleted) setRetroSaved(true);
-    else setRetroSaved(false);
-    setHydratedDay(activeDay);
+    const hydrationTimer = window.setTimeout(() => {
+      setRetroSaved(Boolean(activeProgress?.retroCompleted));
+      setHydratedDay(activeDay);
+    }, 0);
+    return () => window.clearTimeout(hydrationTimer);
   }, [isLoaded, activeDay, activeProgress, hydratedDay]);
 
   const selectDay = (day: number) => {
+    if (retroSaveInFlightRef.current) return;
     const bounded = Math.min(Math.max(day, 1), plan.sessions.length);
     setActiveDay(bounded);
     setActiveQuestionIndex(0);
     setStudentDraft("");
     setSubmittedAnswers({});
     setRetroSaved(false);
+    setRetroSaveError("");
+    setIsSavingRetro(false);
+    setPendingRetroSave(null);
     setHydratedDay(null);
   };
 
@@ -230,84 +254,129 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     }
   };
 
-  const saveRetro = () => {
-    const retroNote = retroQuestions
-      .map(
-        (q, i) =>
-          `Q${i + 1} [${q.frameLabel}]: ${submittedAnswers[q.index] ?? "(no response)"}`,
-      )
-      .join("\n\n");
-    const retroAiCorrection = retroQuestions
-      .map((q) => `${q.frameLabel}: ${q.aiCorrection}`)
-      .join("\n\n");
+  const saveRetro = async (capturedPayload?: RetroSavePayload) => {
+    if (retroSaveInFlightRef.current) return;
 
-    // Persist retro results into day progress
-    saveDayProgress(activeSession.day, {
-      retroCompleted: true,
-      retroNote,
-      retroAiCorrection,
-      retroCompletedAt: new Date().toISOString(),
-    });
-
-    // Save behavioural reasoning patterns to student profile
-    const profile = readStudentProfile();
-    if (profile) {
-      const patterns = retroQuestions.map((q, i) => ({
+    const payload = capturedPayload ?? {
+      day: activeSession.day,
+      completedAt: new Date().toISOString(),
+      retroNote: retroQuestions
+        .map(
+          (q, i) =>
+            `Q${i + 1} [${q.frameLabel}]: ${submittedAnswers[q.index] ?? "(no response)"}`,
+        )
+        .join("\n\n"),
+      retroAiCorrection: retroQuestions
+        .map((q) => `${q.frameLabel}: ${q.aiCorrection}`)
+        .join("\n\n"),
+      patterns: retroQuestions.map((q) => ({
         frame: q.frameLabel,
-        studentLogic: submittedAnswers[i] ?? "",
+        studentLogic: submittedAnswers[q.index] ?? "",
         correction: q.aiCorrection,
-      }));
-      
-      let existingReflections: any[] = [];
-      if (profile.retroReflections) {
-        try {
-          const parsed = JSON.parse(profile.retroReflections);
-          existingReflections = Array.isArray(parsed) ? parsed : [parsed];
-        } catch {
-          // Ignore
-        }
-      }
-      
-      const newReflection = {
-        subject: plan.slug,
-        day: activeSession.day,
-        topic: activeSession.title,
-        completedAt: new Date().toISOString(),
-        patterns,
-      };
-      
-      // Filter out duplicate reflection for same day and subject
-      existingReflections = existingReflections.filter(
-        (ref) => !(ref.subject === plan.slug && ref.day === activeSession.day)
-      );
-      existingReflections.push(newReflection);
+      })),
+    } satisfies RetroSavePayload;
 
-      saveStudentProfile({
-        ...profile,
-        retroReflections: JSON.stringify(existingReflections),
-        updatedAt: new Date().toISOString(),
-      });
-    }
+    retroSaveInFlightRef.current = true;
+    setPendingRetroSave(payload);
+    setRetroSaveError("");
+    setIsSavingRetro(true);
 
-    // Award gamification rewards
     try {
-      const rewardResult = awardGamificationRewards("retro-complete");
-      if (rewardResult.addedPoints > 0) {
-        toast.success("Retrospective Saved!", {
-          description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+      const remoteAccepted = await saveDayProgress(payload.day, {
+        retroCompleted: true,
+        retroNote: payload.retroNote,
+        retroAiCorrection: payload.retroAiCorrection,
+        retroCompletedAt: payload.completedAt,
+      });
+
+      if (!remoteAccepted) {
+        // Keep the learner's answer and correction as a local draft, but do not
+        // leave a local completion flag that could look successful after reload.
+        await saveDayProgress(payload.day, {
+          retroCompleted: false,
+          retroNote: payload.retroNote,
+          retroAiCorrection: payload.retroAiCorrection,
+          retroCompletedAt: undefined,
         });
-        if (rewardResult.unlockedBadge) {
-          toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
-            description: rewardResult.unlockedBadge.description,
-            icon: rewardResult.unlockedBadge.icon,
+        setRetroSaved(false);
+        setRetroSaveError(
+          "Retrospective could not be saved to your account. Your answers remain on this device; retry when connected.",
+        );
+        return;
+      }
+
+      // The profile reflection is a separate best-effort write. It never
+      // determines whether the subject retrospective itself is complete.
+      try {
+        const profile = readStudentProfile();
+        if (profile) {
+          let existingReflections: Array<Record<string, unknown>> = [];
+          if (profile.retroReflections) {
+            try {
+              const parsed = JSON.parse(profile.retroReflections) as unknown;
+              existingReflections = Array.isArray(parsed)
+                ? parsed.filter(
+                    (ref): ref is Record<string, unknown> =>
+                      typeof ref === "object" && ref !== null && !Array.isArray(ref),
+                  )
+                : [];
+            } catch {
+              // Ignore malformed optional profile history and preserve the main save.
+            }
+          }
+
+          existingReflections = existingReflections.filter(
+            (ref) => !(ref.subject === plan.slug && ref.day === payload.day),
+          );
+          existingReflections.push({
+            subject: plan.slug,
+            day: payload.day,
+            topic: activeSession.title,
+            completedAt: payload.completedAt,
+            patterns: payload.patterns,
+          });
+
+          saveStudentProfile({
+            ...profile,
+            retroReflections: JSON.stringify(existingReflections),
+            updatedAt: new Date().toISOString(),
           });
         }
+      } catch (error) {
+        console.error("Failed to save optional retro profile reflection", error);
       }
-    } catch (e) {
-      console.error("Failed to award rewards", e);
-    }
 
-    setRetroSaved(true);
+      // Award rewards only after the account-owned subject progress is accepted.
+      try {
+        const rewardResult = awardGamificationRewards("retro-complete");
+        if (rewardResult.addedPoints > 0) {
+          toast.success("Retrospective Saved!", {
+            description: `Earned +${rewardResult.addedPoints} XP and +${rewardResult.addedCoins} Coins!`,
+          });
+          if (rewardResult.unlockedBadge) {
+            toast.message(`Milestone Unlocked: ${rewardResult.unlockedBadge.title}`, {
+              description: rewardResult.unlockedBadge.description,
+              icon: rewardResult.unlockedBadge.icon,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to award rewards", e);
+      }
+
+      setRetroSaveError("");
+      setPendingRetroSave(null);
+      setRetroSaved(true);
+    } catch (error) {
+      console.error("Failed to save optional retro progress", error);
+      setRetroSaved(false);
+      setRetroSaveError(
+        "Retrospective could not be saved to your account. Your answers remain on this device; retry when connected.",
+      );
+    } finally {
+      retroSaveInFlightRef.current = false;
+      setIsSavingRetro(false);
+    }
   };
 
   // ── Loading state ──
@@ -485,6 +554,31 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
             ) : (
               /* ── Active interview ── */
               <>
+                {retroSaveError ? (
+                  <div
+                    data-testid="retro-save-error"
+                    role="alert"
+                    className="rounded-lg border border-[#d97706]/45 bg-[#fff4df] p-4"
+                  >
+                    <p className="text-sm font-black text-[#6f4a12]">Retrospective still needs a remote save</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-[#6f4a12]">
+                      {retroSaveError}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid="retro-save-retry"
+                      onClick={() => {
+                        if (pendingRetroSave) void saveRetro(pendingRetroSave);
+                      }}
+                      disabled={isSavingRetro || !pendingRetroSave}
+                      className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-3 text-sm font-black text-white transition hover:brightness-90 disabled:opacity-50"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      {isSavingRetro ? "Retrying save..." : "Retry save"}
+                    </button>
+                  </div>
+                ) : null}
+
                 {/* Progress stepper */}
                 <div className="flex items-center gap-3">
                   {retroQuestions.map((question, index) => (
@@ -589,11 +683,13 @@ export function SubjectRetroRoom({ plan, initialDay }: { plan: SubjectSprintPlan
                         type="button"
                         data-testid={`retro-next-${activeQuestion.index}`}
                         onClick={nextQuestion}
-                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 sm:w-auto"
+                        disabled={isSavingRetro}
+                        aria-busy={isSavingRetro}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--subject-dark)] px-4 text-sm font-black text-white transition hover:brightness-90 disabled:cursor-wait disabled:opacity-50 sm:w-auto"
                       >
                         {isLastQuestion ? (
                           <>
-                            <CheckCircle2 className="h-4 w-4" /> Save all patterns
+                            <CheckCircle2 className="h-4 w-4" /> {isSavingRetro ? "Saving patterns..." : "Save all patterns"}
                           </>
                         ) : (
                           <>

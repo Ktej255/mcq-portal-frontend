@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Target, TrendingUp } from "lucide-react";
+import { BarChart3, Target } from "lucide-react";
 import { gsLmsService } from "@/services/api/gsLmsService";
-import type { ProgressOut, GapOut } from "@/services/api/gsLmsService";
+import type { ProgressOut, ReadinessOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
 
 /**
  * LMS Progress Card — shown at top of the Reports page.
- * Fetches real backend data (getProgress + getGaps) and displays
- * overall completion, per-mega-topic progress, and weak areas.
+ * Fetches real backend data (getProgress + getReadiness) and displays
+ * overall completion, per-mega-topic progress, and the demand-weighted
+ * readiness summary. It never turns missing evidence into a weak-area claim.
  *
  * Additive: placed above existing localStorage-based reports.
  * Falls back gracefully if backend unreachable.
@@ -18,27 +19,30 @@ import { useApiConfig } from "@/lib/hooks/useApi";
 export function LmsProgressCard() {
   const { isLoaded, isSignedIn } = useApiConfig();
   const [progress, setProgress] = useState<ProgressOut | null>(null);
-  const [gaps, setGaps] = useState<GapOut | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessOut | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
-      setLoading(false);
-      return;
-    }
+    const requestTimer = window.setTimeout(() => {
+      if (!isLoaded || !isSignedIn) {
+        setLoading(false);
+        return;
+      }
 
-    Promise.all([
-      gsLmsService.getProgress("geography").catch(() => null),
-      gsLmsService.getGaps("geography").catch(() => null),
-    ])
-      .then(([prog, gap]) => {
-        setProgress(prog);
-        setGaps(gap);
-      })
-      .finally(() => setLoading(false));
+      Promise.all([
+        gsLmsService.getProgress("geography").catch(() => null),
+        gsLmsService.getReadiness("geography", { persist: false }).catch(() => null),
+      ])
+        .then(([prog, ready]) => {
+          setProgress(prog);
+          setReadiness(ready);
+        })
+        .finally(() => setLoading(false));
+    }, 0);
+    return () => window.clearTimeout(requestTimer);
   }, [isLoaded, isSignedIn]);
 
-  if (loading || (!progress && !gaps)) return null;
+  if (loading || (!progress && !readiness)) return null;
 
   return (
     <section className="mb-6 rounded-2xl border border-[#b9d9cd] bg-gradient-to-br from-[#e7f5ee] to-[#fffdf8] p-5 shadow-sm">
@@ -51,7 +55,7 @@ export function LmsProgressCard() {
           href="/upsc/geography/lms/gaps"
           className="text-xs font-bold text-[#1d9e75] hover:underline"
         >
-          Full gap analysis →
+          Full readiness analysis →
         </Link>
       </div>
 
@@ -99,25 +103,67 @@ export function LmsProgressCard() {
         </div>
       )}
 
-      {/* Weak Areas Summary */}
-      {gaps && gaps.weak_topics.length > 0 && (
-        <div className="rounded-xl border border-[#ef9f27]/30 bg-[#fff8e8] p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="h-4 w-4 text-[#ef9f27]" />
-            <p className="text-xs font-bold text-[#6f4a12]">
-              {gaps.weak_topics.length} weak area{gaps.weak_topics.length > 1 ? "s" : ""} detected
+      {/* Readiness Summary */}
+      {readiness && (
+        <div
+          className={`rounded-xl border p-3 ${
+            readiness.summary.band_suppressed
+              ? "border-[#ef9f27]/30 bg-[#fff8e8]"
+              : "border-[#b9d9cd] bg-[#e7f5ee]"
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Target
+                className={`h-4 w-4 ${
+                  readiness.summary.band_suppressed
+                    ? "text-[#ef9f27]"
+                    : "text-[#0f6b4f]"
+                }`}
+              />
+              <p
+                className={`text-xs font-bold ${
+                  readiness.summary.band_suppressed
+                    ? "text-[#6f4a12]"
+                    : "text-[#0f6b4f]"
+                }`}
+              >
+                {readiness.summary.band_suppressed
+                  ? "Readiness band withheld"
+                  : `Readiness band: ${readiness.summary.band.replace(/_/g, " ").toLowerCase()}`}
+              </p>
+            </div>
+            <p
+              className={`text-[11px] font-semibold ${
+                readiness.summary.band_suppressed
+                  ? "text-[#6f4a12]/80"
+                  : "text-[#0f6b4f]/80"
+              }`}
+            >
+              {Math.round(readiness.evidence.assessed_demand_pct)}% of demand assessed
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {gaps.weak_topics.slice(0, 5).map((wt) => (
-              <span
-                key={wt.node_id}
-                className="text-[11px] font-bold text-[#6f4a12] bg-white border border-[#ef9f27]/30 rounded-md px-2 py-0.5"
-              >
-                {wt.title} ({Math.round(wt.accuracy * 100)}%)
-              </span>
-            ))}
-          </div>
+
+          {readiness.summary.band_suppressed ? (
+            <p className="mt-1.5 text-[11px] leading-snug text-[#6f4a12]/80">
+              Not enough tested demand for a band. Unassessed topics are not
+              treated as weak; they need a diagnostic first.
+            </p>
+          ) : null}
+
+          {readiness.next_actions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {readiness.next_actions.slice(0, 3).map((action) => (
+                <Link
+                  key={action.node_id}
+                  href={`/upsc/geography/lms/topic/${action.node_id}`}
+                  className="rounded-md border border-[#dcd5c7] bg-white px-2 py-0.5 text-[11px] font-bold text-[#1a3a2a] hover:border-[#1d9e75]"
+                >
+                  {action.title} · {action.marks_at_stake.toFixed(1)} marks
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

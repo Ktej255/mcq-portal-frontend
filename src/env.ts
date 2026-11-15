@@ -1,8 +1,19 @@
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
+const isLocalDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+const isBuildPhase =
+  process.env.NEXT_PHASE === 'phase-production-build' ||
+  Boolean(process.env.NEXT_DIST_DIR) ||
+  Boolean(process.env.VERCEL);
+
+if (!configuredApiBaseUrl && !isLocalDevelopment && !isBuildPhase) {
+  throw new Error(
+    'NEXT_PUBLIC_API_BASE_URL or NEXT_PUBLIC_API_URL must be configured outside local development.'
+  );
+}
+
 export const env = {
-  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
-  NEXT_PUBLIC_USE_MOCK_AUTH:
-    process.env.NEXT_PUBLIC_USE_MOCK_AUTH ??
-    (!process.env.NEXT_PUBLIC_AUTH_PROVIDER && process.env.NODE_ENV === 'development' ? 'true' : undefined),
+  NEXT_PUBLIC_API_BASE_URL: configuredApiBaseUrl || '/api/v1',
+  NEXT_PUBLIC_USE_MOCK_AUTH: process.env.NEXT_PUBLIC_USE_MOCK_AUTH,
   NEXT_PUBLIC_AUTH_PROVIDER: process.env.NEXT_PUBLIC_AUTH_PROVIDER,
   NEXT_PUBLIC_DEBUG_API: process.env.NEXT_PUBLIC_DEBUG_API,
   NEXT_PUBLIC_ENABLE_LEGACY_API: process.env.NEXT_PUBLIC_ENABLE_LEGACY_API,

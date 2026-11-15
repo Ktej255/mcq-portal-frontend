@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, date, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,16 @@ from app.core.gs_lms.funnel_models import (
     GsLmsGrowthReport,
     GsLmsSpacedRepSchedule,
 )
-from app.core.gs_lms.models import GsLmsContentSection, GsLmsSyllabusNode
+from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs_lms.models import (
+    GsLmsAnswerAttempt,
+    GsLmsAnswerAttemptStatusEnum,
+    GsLmsContentSection,
+    GsLmsEvaluationReport,
+    GsLmsExamTypeEnum,
+    GsLmsPyq,
+    GsLmsSyllabusNode,
+)
 from app.core.gs_lms.spaced_repetition import (
     compute_initial_interval,
     schedule_after_completion,
@@ -39,6 +48,11 @@ class SectionMetrics:
     recall_score: float          # 0.0–1.0
     confidence_score: float      # 0.0–1.0
     is_rushed: bool
+    # Evidence flags distinguish "scored zero" from "never recorded". A
+    # section with no reading or recall record must not be presented as a
+    # learner deficit; it is simply unevidenced.
+    has_reading_evidence: bool = False
+    has_recall_evidence: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,6 +78,29 @@ class GrowthReportData:
     recall_interval_days: int
     comparison_data: Optional[dict]
     weaknesses: List[WeaknessItem]
+    # False when the learner never submitted an MCQ Lab session for this topic.
+    # The score is then reported as 0.0 for schema stability, but it must not be
+    # presented as a failed attempt.
+    has_mcq_evidence: bool = False
+
+
+def _snapshot_evidenced_recall_avg(metrics: list) -> Optional[float]:
+    """Average recorded recall (0–100) from a persisted snapshot, or None.
+
+    Snapshots predating evidence flags are inferred from a positive recall
+    score; a missing recall must not enter the average as a zero.
+    """
+    values: List[float] = []
+    for m in metrics or []:
+        has = m.get("has_recall_evidence")
+        raw = float(m.get("recall_score") or 0.0)
+        if has is None:
+            has = raw > 0
+        if has:
+            values.append(raw)
+    if not values:
+        return None
+    return round(sum(values) / len(values) * 100, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -113,9 +150,10 @@ def identify_weaknesses(
                 recommended_action="Re-read this section more carefully",
             ))
 
-    # Low recall
+    # Low recall — only when a recall attempt actually exists. A section that
+    # was skipped or never checked is not evidence of weak recall.
     for sm in section_metrics:
-        if sm.recall_score < LOW_RECALL_THRESHOLD:
+        if sm.has_recall_evidence and sm.recall_score < LOW_RECALL_THRESHOLD:
             weaknesses.append(WeaknessItem(
                 category="low_recall",
                 label=sm.section_label.replace("_", " "),
@@ -134,6 +172,57 @@ def identify_weaknesses(
             ))
 
     return weaknesses
+
+
+# ---------------------------------------------------------------------------
+# Mains score derivation
+# ---------------------------------------------------------------------------
+
+def latest_mains_score(
+    db: Session,
+    student_id: int,
+    node_id: int,
+) -> Optional[Tuple[Optional[float], Optional[int]]]:
+    """Return the latest evaluated, linked Mains score for a topic.
+
+    Only attempts linked to a reviewed Mains PYQ for the node's subject and
+    syllabus node are attributable to this Growth Report. Free-form attempts
+    have no durable topic relationship and are therefore excluded.
+    """
+    node = (
+        db.query(GsLmsSyllabusNode)
+        .filter(GsLmsSyllabusNode.id == node_id)
+        .one_or_none()
+    )
+    if node is None:
+        return None
+
+    row = (
+        db.query(GsLmsEvaluationReport, GsLmsAnswerAttempt, GsLmsPyq)
+        .join(
+            GsLmsAnswerAttempt,
+            GsLmsEvaluationReport.attempt_id == GsLmsAnswerAttempt.id,
+        )
+        .join(GsLmsPyq, GsLmsAnswerAttempt.pyq_id == GsLmsPyq.id)
+        .filter(
+            GsLmsAnswerAttempt.student_id == student_id,
+            GsLmsAnswerAttempt.is_deleted.is_(False),
+            GsLmsAnswerAttempt.status == GsLmsAnswerAttemptStatusEnum.EVALUATED,
+            GsLmsEvaluationReport.student_id == student_id,
+            GsLmsPyq.subject_id == node.subject_id,
+            GsLmsPyq.syllabus_node_id == node_id,
+            GsLmsPyq.exam_type == GsLmsExamTypeEnum.MAINS,
+            GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
+        )
+        .order_by(GsLmsAnswerAttempt.id.desc())
+        .first()
+    )
+    if row is None:
+        return None
+
+    report, attempt, pyq = row
+    max_marks = report.max_marks or attempt.max_marks or pyq.marks
+    return report.marks_awarded, max_marks
 
 
 # ---------------------------------------------------------------------------
@@ -166,9 +255,26 @@ def generate_growth_report(
     topic_title = node.title if node else f"Topic {node_id}"
 
     # --- Gather Section Metrics ---
+    # Only report sections that exist for this topic. A missing section is a
+    # content-coverage fact, not a learner weakness, so inventing five rows
+    # with zero scores would turn unread content into a false deficit.
+    topic_sections = (
+        db.query(GsLmsContentSection)
+        .filter(GsLmsContentSection.syllabus_node_id == node_id)
+        .order_by(GsLmsContentSection.display_order.asc())
+        .all()
+    )
+    section_labels: List[str] = []
+    for content_section in topic_sections:
+        label = getattr(content_section.section_label, "value", content_section.section_label)
+        if label and str(label) not in section_labels:
+            section_labels.append(str(label))
+    if not section_labels:
+        section_labels = SECTION_LABELS
+
     section_metrics: List[SectionMetrics] = []
 
-    for section_label in SECTION_LABELS:
+    for section_label in section_labels:
         # Get reading time
         reading_time = db.query(GsLmsReadingTime).filter(
             GsLmsReadingTime.student_id == student_id,
@@ -177,6 +283,7 @@ def generate_growth_report(
             GsLmsContentSection.section_label == section_label,
         ).first()
 
+        has_reading_evidence = reading_time is not None
         duration = reading_time.duration_seconds if reading_time else 0
         estimated = reading_time.estimated_duration_seconds if reading_time and reading_time.estimated_duration_seconds else 300
 
@@ -192,6 +299,7 @@ def generate_growth_report(
             .first()
         )
 
+        has_recall_evidence = recall is not None
         recall_score = recall.recall_score if recall else 0.0
         confidence_score = recall.confidence_score if recall else 0.0
 
@@ -200,7 +308,9 @@ def generate_growth_report(
             reading_time_seconds=duration,
             recall_score=recall_score,
             confidence_score=confidence_score,
-            is_rushed=is_section_rushed(duration, estimated),
+            is_rushed=has_reading_evidence and is_section_rushed(duration, estimated),
+            has_reading_evidence=has_reading_evidence,
+            has_recall_evidence=has_recall_evidence,
         ))
 
     # --- MCQ Lab Results ---
@@ -215,7 +325,14 @@ def generate_growth_report(
         .first()
     )
 
-    mcq_total_score = (mcq_session.score * 100) if mcq_session and mcq_session.score else 0.0
+    # A missing session is "not recorded", not a zero score. Keep 0.0 for the
+    # stored column, but carry the evidence flag so the API can say so.
+    has_mcq_evidence = mcq_session is not None
+    mcq_total_score = (
+        round(mcq_session.score * 100, 1)
+        if mcq_session and mcq_session.score is not None
+        else 0.0
+    )
 
     # Type breakdown from MCQ Lab attempts
     mcq_type_breakdown = []
@@ -244,14 +361,19 @@ def generate_growth_report(
         ]
 
     # --- Mains Score (if attempted) ---
-    # Check for evaluation report via existing answer attempt system
-    mains_score: Optional[float] = None
-    mains_max_marks: Optional[int] = None
+    mains_result = latest_mains_score(db, student_id, node_id)
+    mains_score, mains_max_marks = mains_result or (None, None)
 
     # --- Spaced Repetition Schedule ---
+    # Average only sections with a recorded recall attempt. Counting unevidenced
+    # sections as zero would shorten the interval as a punishment for missing
+    # evidence rather than for demonstrated forgetting.
+    evidenced_recalls = [
+        sm.recall_score for sm in section_metrics if sm.has_recall_evidence
+    ]
     avg_recall = (
-        sum(sm.recall_score for sm in section_metrics) / len(section_metrics)
-        if section_metrics else 0.0
+        sum(evidenced_recalls) / len(evidenced_recalls)
+        if evidenced_recalls else 0.0
     )
     schedule = schedule_after_completion(avg_recall, today)
 
@@ -286,18 +408,23 @@ def generate_growth_report(
 
     comparison_data = None
     if prior_reports:
+        # Trends include only topics with real evidence. Historical reports that
+        # never recorded a recall or an MCQ attempt must not appear as zeros,
+        # or the "improvement" line is measuring missing data.
         avg_recall_trend = []
         mcq_accuracy_trend = []
         for pr in reversed(prior_reports):
-            metrics = pr.section_metrics or []
-            if metrics:
-                avg_r = sum(m.get("recall_score", 0) for m in metrics) / len(metrics)
-                avg_recall_trend.append(round(avg_r * 100, 1))
-            mcq_accuracy_trend.append(round((pr.mcq_total_score or 0), 1))
+            avg_r = _snapshot_evidenced_recall_avg(pr.section_metrics or [])
+            if avg_r is not None:
+                avg_recall_trend.append(avg_r)
+            if pr.mcq_type_breakdown:
+                mcq_accuracy_trend.append(round((pr.mcq_total_score or 0), 1))
 
-        # Add current topic's scores
-        avg_recall_trend.append(round(avg_recall * 100, 1))
-        mcq_accuracy_trend.append(round(mcq_total_score, 1))
+        # Add current topic's scores only where evidence exists.
+        if evidenced_recalls:
+            avg_recall_trend.append(round(avg_recall * 100, 1))
+        if has_mcq_evidence:
+            mcq_accuracy_trend.append(round(mcq_total_score, 1))
 
         comparison_data = {
             "avg_recall_trend": avg_recall_trend,
@@ -332,6 +459,8 @@ def generate_growth_report(
                 "recall_score": sm.recall_score,
                 "confidence_score": sm.confidence_score,
                 "is_rushed": sm.is_rushed,
+                "has_reading_evidence": sm.has_reading_evidence,
+                "has_recall_evidence": sm.has_recall_evidence,
             }
             for sm in section_metrics
         ],
@@ -370,6 +499,7 @@ def generate_growth_report(
         recall_interval_days=schedule.recall_interval_days,
         comparison_data=comparison_data,
         weaknesses=weaknesses,
+        has_mcq_evidence=has_mcq_evidence,
     )
 
 
@@ -384,5 +514,6 @@ __all__ = [
     "RUSHED_THRESHOLD",
     "is_section_rushed",
     "identify_weaknesses",
+    "latest_mains_score",
     "generate_growth_report",
 ]

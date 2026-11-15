@@ -222,11 +222,15 @@ def _handle_payment_webhook(
     event_type: str | None,
     source_ip: str | None,
 ) -> Response:
-    """Process a payment status webhook."""
-    # Extract order_id and payment status from Cashfree payload
+    """Process one payment status event with monotonic order transitions.
+
+    ``failed -> paid`` is a valid recovery transition. Once an order is paid,
+    later failure events are stale and must never downgrade it. The current
+    webhook log row is mutated directly so a replay cannot relabel another
+    event that is still pending.
+    """
     order_data = data.get("order", {})
     payment_data = data.get("payment", {})
-
     order_id = order_data.get("order_id") or data.get("order_id")
     cashfree_order_id = order_data.get("order_id")
     payment_status = (
@@ -235,9 +239,7 @@ def _handle_payment_webhook(
         or data.get("payment_status")
         or ""
     ).upper()
-
-    # Log the webhook
-    _log_webhook(
+    webhook_log = _log_webhook(
         db=db,
         event_type=event_type,
         order_id=order_id,
@@ -245,27 +247,28 @@ def _handle_payment_webhook(
         payment_status=payment_status,
         raw_payload=payload,
         signature_valid=True,
-        processing_outcome="pending",  # Will update below
+        processing_outcome="pending",
         source_ip=source_ip,
     )
 
-    # 10. If unknown order_id: return 200, log warning
     if not order_id:
         logger.warning(
             "Webhook received without order_id, event_type=%s, IP=%s",
             event_type,
             source_ip,
         )
+        webhook_log.processing_outcome = "missing_order"
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # Look up the order in our database
+    # The lock is effective on databases that support row-level locking and is
+    # intentionally harmless for the in-memory SQLite regression database.
     order = (
         db.query(PaymentOrder)
         .filter(PaymentOrder.order_id == order_id)
+        .with_for_update()
         .first()
     )
-
     if order is None:
         logger.warning(
             "Webhook for unknown order_id=%s, event_type=%s, IP=%s",
@@ -273,46 +276,42 @@ def _handle_payment_webhook(
             event_type,
             source_ip,
         )
-        # Update log outcome
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "unknown_order"})
+        webhook_log.processing_outcome = "unknown_order"
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # 9. If duplicate (order already "paid" or "failed"): return 200, no reprocessing
-    if order.status in ("paid", "failed"):
-        logger.info(
-            "Duplicate webhook for order_id=%s (already '%s'), skipping",
-            order_id,
-            order.status,
+    paid_statuses = {"PAID", "SUCCESS"}
+    failed_statuses = {"FAILED", "CANCELLED", "USER_DROPPED"}
+
+    if order.status == "paid":
+        webhook_log.processing_outcome = (
+            "stale_status" if payment_status in failed_statuses else "duplicate"
         )
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "duplicate"})
+        logger.info(
+            "Ignoring payment event for already-paid order_id=%s status=%s",
+            order_id,
+            payment_status,
+        )
+        db.commit()
+        return Response(status_code=200, content="OK")
+
+    if order.status == "failed" and payment_status not in paid_statuses:
+        webhook_log.processing_outcome = (
+            "duplicate" if payment_status in failed_statuses else "unhandled_status"
+        )
         db.commit()
         return Response(status_code=200, content="OK")
 
     now = datetime.now(timezone.utc)
 
-    # 7. If status is "PAID": update order, create subscription
-    if payment_status in ("PAID", "SUCCESS"):
+    if payment_status in paid_statuses:
         order.status = "paid"
         order.webhook_received_at = now
         order.updated_at = now
         order.payment_method = payment_data.get("payment_method")
         order.cashfree_payment_id = payment_data.get("cf_payment_id")
-
         _create_subscription(db=db, order=order, now=now)
-
-        # Update log outcome
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "processed"})
-
+        webhook_log.processing_outcome = "processed"
         logger.info(
             "Order %s marked as paid, subscription created for user %s",
             order_id,
@@ -321,31 +320,21 @@ def _handle_payment_webhook(
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # 8. If status is "FAILED": update order to "failed"
-    if payment_status in ("FAILED", "CANCELLED", "USER_DROPPED"):
+    if payment_status in failed_statuses:
         order.status = "failed"
         order.webhook_received_at = now
         order.updated_at = now
-
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "processed"})
-
+        webhook_log.processing_outcome = "processed"
         logger.info("Order %s marked as failed (status=%s)", order_id, payment_status)
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # 11. Unknown status: log and return 200
     logger.info(
         "Webhook with unhandled payment_status='%s' for order_id=%s",
         payment_status,
         order_id,
     )
-    db.query(PaymentWebhookLog).filter(
-        PaymentWebhookLog.order_id == order_id,
-        PaymentWebhookLog.processing_outcome == "pending",
-    ).update({"processing_outcome": "unhandled_status"})
+    webhook_log.processing_outcome = "unhandled_status"
     db.commit()
     return Response(status_code=200, content="OK")
 
@@ -361,12 +350,7 @@ def _handle_refund_webhook(
     event_type: str | None,
     source_ip: str | None,
 ) -> Response:
-    """Process a refund status webhook.
-
-    If refund status "SUCCESS" → update refund_status to "refunded",
-    cancel subscription if full refund.
-    If "FAILED" → update to "refund_failed".
-    """
+    """Process a refund status event and update only its audit row."""
     refund_data = data.get("refund", {})
     order_id = (
         refund_data.get("order_id")
@@ -375,9 +359,7 @@ def _handle_refund_webhook(
     )
     refund_status = (refund_data.get("refund_status") or "").upper()
     refund_amount = refund_data.get("refund_amount")
-
-    # Log the webhook
-    _log_webhook(
+    webhook_log = _log_webhook(
         db=db,
         event_type=event_type,
         order_id=order_id,
@@ -395,24 +377,21 @@ def _handle_refund_webhook(
             event_type,
             source_ip,
         )
+        webhook_log.processing_outcome = "missing_order"
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # Look up the order
     order = (
         db.query(PaymentOrder)
         .filter(PaymentOrder.order_id == order_id)
+        .with_for_update()
         .first()
     )
-
     if order is None:
         logger.warning(
             "Refund webhook for unknown order_id=%s, IP=%s", order_id, source_ip
         )
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "unknown_order"})
+        webhook_log.processing_outcome = "unknown_order"
         db.commit()
         return Response(status_code=200, content="OK")
 
@@ -421,13 +400,10 @@ def _handle_refund_webhook(
     if refund_status == "SUCCESS":
         order.refund_status = "refunded"
         order.updated_at = now
-
-        # Cancel subscription if full refund
         is_full_refund = (
             refund_amount is not None and float(refund_amount) >= order.amount
         )
         if is_full_refund:
-            # Cancel the associated subscription
             subscription = (
                 db.query(Subscription)
                 .filter(
@@ -443,12 +419,7 @@ def _handle_refund_webhook(
                     "Subscription cancelled for order %s (full refund)",
                     order_id,
                 )
-
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "processed"})
-
+        webhook_log.processing_outcome = "processed"
         logger.info(
             "Refund SUCCESS for order %s (amount=%s, full=%s)",
             order_id,
@@ -461,25 +432,16 @@ def _handle_refund_webhook(
     if refund_status == "FAILED":
         order.refund_status = "refund_failed"
         order.updated_at = now
-
-        db.query(PaymentWebhookLog).filter(
-            PaymentWebhookLog.order_id == order_id,
-            PaymentWebhookLog.processing_outcome == "pending",
-        ).update({"processing_outcome": "processed"})
-
+        webhook_log.processing_outcome = "processed"
         logger.info("Refund FAILED for order %s", order_id)
         db.commit()
         return Response(status_code=200, content="OK")
 
-    # Unknown refund status
     logger.info(
         "Refund webhook with unhandled status='%s' for order_id=%s",
         refund_status,
         order_id,
     )
-    db.query(PaymentWebhookLog).filter(
-        PaymentWebhookLog.order_id == order_id,
-        PaymentWebhookLog.processing_outcome == "pending",
-    ).update({"processing_outcome": "unhandled_status"})
+    webhook_log.processing_outcome = "unhandled_status"
     db.commit()
     return Response(status_code=200, content="OK")

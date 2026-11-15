@@ -30,7 +30,7 @@ from app.core.gs_lms.funnel_models import (
     GsLmsWeaknessPattern,
     GsLmsExternalResource,
 )
-from app.core.gs_lms.growth_report import generate_growth_report
+from app.core.gs_lms.growth_report import generate_growth_report, latest_mains_score
 from app.core.gs_lms.spaced_repetition import compute_next_interval
 from app.api.v1.gs_lms.dependencies import resolve_subject
 
@@ -48,6 +48,10 @@ class SectionMetricOut(BaseModel):
     recall_score: float
     confidence_score: float
     is_rushed: bool
+    # None means the snapshot predates evidence tracking; the client must not
+    # read that as "not attempted". New snapshots always send a boolean.
+    has_reading_evidence: bool | None = None
+    has_recall_evidence: bool | None = None
 
 
 class WeaknessOut(BaseModel):
@@ -68,6 +72,9 @@ class GrowthReportOut(BaseModel):
     generated_at: str
     section_metrics: List[SectionMetricOut]
     mcq_total_score: float
+    # False means the MCQ Lab was never submitted for this topic; the score is
+    # then a placeholder, not a failed attempt.
+    has_mcq_evidence: bool = False
     mcq_type_breakdown: List[dict]
     mains_score: float | None
     mains_max_marks: int | None
@@ -113,6 +120,17 @@ def get_growth_report(
     db: Session = Depends(get_db),
 ):
     """Generate or retrieve the Growth Report for a completed topic."""
+    node = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
+        )
+        .one_or_none()
+    )
+    if node is None:
+        raise HTTPException(status_code=404, detail="Topic node not found")
+
     # Check if report already exists
     existing = (
         db.query(GsLmsGrowthReport)
@@ -125,15 +143,53 @@ def get_growth_report(
     )
 
     if existing:
+        # Older snapshots may predate Mains evaluation. Reconcile only the
+        # nullable Mains fields from the same scoped source; leave all other
+        # snapshot metrics unchanged.
+        if existing.mains_score is None:
+            mains_result = latest_mains_score(db, current_user.id, node_id)
+            if mains_result is not None:
+                existing.mains_score, existing.mains_max_marks = mains_result
+                db.commit()
+
         comparison = None
         if existing.comparison_data:
             comparison = ComparisonOut(**existing.comparison_data)
 
+        # Snapshots store section scores as 0.0–1.0 fractions. The API contract
+        # is percentage-based, so an existing snapshot must be scaled exactly
+        # like a freshly generated one or a revisit shows "0.7%".
+        section_metrics = []
+        for sm in existing.section_metrics or []:
+            reading_seconds = int(sm.get("reading_time_seconds") or 0)
+            raw_recall = float(sm.get("recall_score") or 0.0)
+            raw_confidence = float(sm.get("confidence_score") or 0.0)
+            has_reading = sm.get("has_reading_evidence")
+            if has_reading is None:
+                # Older snapshots cannot distinguish "unread" from "not
+                # tracked"; only a positive duration is safe evidence.
+                has_reading = reading_seconds > 0
+            has_recall = sm.get("has_recall_evidence")
+            if has_recall is None:
+                has_recall = raw_recall > 0
+            section_metrics.append(SectionMetricOut(
+                section_label=sm.get("section_label", ""),
+                reading_time_seconds=reading_seconds,
+                recall_score=round(raw_recall * 100, 1),
+                confidence_score=round(raw_confidence * 100, 1),
+                is_rushed=bool(sm.get("is_rushed")) and bool(has_reading),
+                has_reading_evidence=bool(has_reading),
+                has_recall_evidence=bool(has_recall),
+            ))
+
         return GrowthReportOut(
             topic_title=existing.syllabus_node.title if existing.syllabus_node else f"Topic {node_id}",
             generated_at=existing.generated_at.isoformat(),
-            section_metrics=[SectionMetricOut(**sm) for sm in (existing.section_metrics or [])],
+            section_metrics=section_metrics,
             mcq_total_score=existing.mcq_total_score,
+            # A submitted session always produced a type breakdown; legacy
+            # snapshots without one never recorded an MCQ attempt.
+            has_mcq_evidence=bool(existing.mcq_type_breakdown),
             mcq_type_breakdown=existing.mcq_type_breakdown or [],
             mains_score=existing.mains_score,
             mains_max_marks=existing.mains_max_marks,
@@ -161,10 +217,13 @@ def get_growth_report(
                 recall_score=round(sm.recall_score * 100, 1),
                 confidence_score=round(sm.confidence_score * 100, 1),
                 is_rushed=sm.is_rushed,
+                has_reading_evidence=sm.has_reading_evidence,
+                has_recall_evidence=sm.has_recall_evidence,
             )
             for sm in report_data.section_metrics
         ],
         mcq_total_score=report_data.mcq_total_score,
+        has_mcq_evidence=report_data.has_mcq_evidence,
         mcq_type_breakdown=report_data.mcq_type_breakdown,
         mains_score=report_data.mains_score,
         mains_max_marks=report_data.mains_max_marks,
@@ -195,8 +254,13 @@ def get_upcoming_recalls(
 
     schedules = (
         db.query(GsLmsSpacedRepSchedule)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsSpacedRepSchedule.syllabus_node_id,
+        )
         .filter(
             GsLmsSpacedRepSchedule.student_id == current_user.id,
+            GsLmsSyllabusNode.subject_id == subject.id,
             GsLmsSpacedRepSchedule.completed == False,
             GsLmsSpacedRepSchedule.due_date >= today,
             GsLmsSpacedRepSchedule.due_date <= cutoff,
@@ -229,9 +293,13 @@ def complete_recall_session(
     db: Session = Depends(get_db),
 ):
     """Mark a recall session as complete and schedule the next one."""
-    sched = db.query(GsLmsSpacedRepSchedule).filter(
+    sched = db.query(GsLmsSpacedRepSchedule).join(
+        GsLmsSyllabusNode,
+        GsLmsSyllabusNode.id == GsLmsSpacedRepSchedule.syllabus_node_id,
+    ).filter(
         GsLmsSpacedRepSchedule.id == schedule_id,
         GsLmsSpacedRepSchedule.student_id == current_user.id,
+        GsLmsSyllabusNode.subject_id == subject.id,
     ).first()
 
     if not sched:
@@ -308,6 +376,17 @@ def get_external_resources(
     db: Session = Depends(get_db),
 ):
     """Get curated external reading resources for a topic (max 5, REVIEWED only)."""
+    node = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
+        )
+        .one_or_none()
+    )
+    if node is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
     resources = (
         db.query(GsLmsExternalResource)
         .filter(

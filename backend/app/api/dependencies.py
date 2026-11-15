@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User, RoleEnum
@@ -21,107 +22,184 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
-    auth_provided = bool(auth)
-    logger.info(f"FORENSIC | get_current_user check | Auth provided: {auth_provided}")
-    
+    logger.info("Authentication check; bearer credentials present=%s", bool(auth))
+
     if not auth:
-        logger.warning("FORENSIC | No auth credentials provided in request headers")
+        logger.warning("Authentication rejected because no bearer credentials were provided")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated: No Bearer token found in headers",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials: Token verification failed",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
+    token_cred = auth.credentials.strip() if auth.credentials else ""
     try:
-        token_cred = auth.credentials.strip() if auth.credentials else ""
         if token_cred.startswith("MOCK_TOKEN"):
-            # SECURITY: the MOCK_TOKEN bypass is a dev/test/e2e affordance only.
-            # It is honored ONLY when explicitly enabled (settings.ALLOW_MOCK_AUTH),
-            # which defaults to False, so production can never be impersonated via
-            # a static token string. When disabled, a MOCK_TOKEN is just an
-            # invalid credential and is rejected like any other bad token (401).
-            if not settings.ALLOW_MOCK_AUTH:
-                logger.warning(
-                    "FORENSIC | MOCK_TOKEN presented but ALLOW_MOCK_AUTH is "
-                    "disabled — rejecting as invalid credential"
-                )
+            # SECURITY: this bypass remains available only when explicitly enabled.
+            if (
+                not settings.ALLOW_MOCK_AUTH
+                or settings.APP_ENVIRONMENT not in {"development", "test", "local"}
+            ):
+                logger.warning("Mock authentication rejected because it is disabled or not allowed in this environment")
                 raise credentials_exception
-            logger.warning("FORENSIC | Using MOCK_TOKEN bypass")
-            
-            # Support MOCK_TOKEN_<google_uid> for persona simulation
-            if "_" in token_cred:
-                target_uid = token_cred.split("_", 1)[1]
+
+            logger.warning("Using explicitly enabled local mock authentication")
+            if token_cred == "MOCK_TOKEN":
+                target_uid = None
+            elif token_cred.startswith("MOCK_TOKEN_"):
+                target_uid = token_cred[len("MOCK_TOKEN_"):].strip()
+                if not target_uid:
+                    logger.warning("Mock authentication rejected because the persona is empty")
+                    raise credentials_exception
+
                 user = db.query(User).filter(User.google_uid == target_uid).first()
                 if user:
                     return user
-            
-            # Default fallback for legacy MOCK_TOKEN
+
+                logger.warning("Mock authentication rejected because the persona does not exist")
+                raise credentials_exception
+            else:
+                logger.warning("Mock authentication rejected because the token format is invalid")
+                raise credentials_exception
+
+            # Only the exact unscoped MOCK_TOKEN may provision the explicit
+            # local validator. Persona tokens must resolve an existing user and
+            # can never fall through to this ADMIN account.
             user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
             if not user:
                 user = User(
                     google_uid="dev-validator-id",
-                    email="validator@upsc.local",
+                    # Reserved documentation domain: clearly fictitious, and the
+                    # only kind of address UserResponse's EmailStr will serialise
+                    # (RFC 2606 `.local` domains are rejected on the way out).
+                    email="validator@example.com",
                     full_name="Institutional Validator",
-                    role=RoleEnum.ADMIN
+                    role=RoleEnum.ADMIN,
                 )
                 db.add(user)
-                db.commit()
-                db.refresh(user)
+                try:
+                    db.commit()
+                    db.refresh(user)
+                except IntegrityError:
+                    db.rollback()
+                    user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
+                    if not user:
+                        raise credentials_exception
             return user
-        decoded_token = verify_token(auth.credentials)
-    except Exception as e:
-        logger.error(f"FORENSIC | Token verification exception: {str(e)}")
+
+        decoded_token = verify_token(token_cred)
+    except HTTPException:
+        logger.warning("Authentication credential verification failed")
+        raise credentials_exception
+    except Exception:
+        logger.warning("Authentication credential verification failed")
         raise credentials_exception
 
-    google_uid = decoded_token.get("uid")
+    clerk_sub = decoded_token.get("sub")
     email = decoded_token.get("email")
     name = decoded_token.get("name")
     picture = decoded_token.get("picture")
-    
-    logger.debug("FORENSIC | Token decoded | UID: %s", google_uid)
 
-    if not google_uid or not email:
-        logger.error("FORENSIC | Token missing UID or Email claims")
+    if not isinstance(clerk_sub, str) or not clerk_sub.strip() or not isinstance(email, str) or not email.strip():
+        logger.warning("Verified credential omitted a required identity claim")
         raise credentials_exception
 
-    user = db.query(User).filter(User.google_uid == google_uid).first()
-    
-    # Check if user should be an admin based on email
+    clerk_sub = clerk_sub.strip()
+    email = email.strip()
+    display_name = (
+        name.strip()
+        if isinstance(name, str) and name.strip() and name.strip() != clerk_sub
+        else None
+    )
+    profile_picture = (
+        picture.strip() if isinstance(picture, str) and picture.strip() else None
+    )
     is_bootstrap_admin = email in settings.ADMIN_EMAILS
-    
-    # Auto-create user on first login
-    if not user:
-        logger.info(f"FORENSIC | User not found in DB, auto-creating account for {email}")
-        user = User(
-            google_uid=google_uid,
-            email=email,
-            full_name=name,
-            profile_picture=picture,
-            role=RoleEnum.ADMIN if is_bootstrap_admin else RoleEnum.STUDENT
+
+    def reconciliation_required() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Login reconciliation required: this email is already linked to "
+                "a different external identity. No account changes were made."
+            ),
         )
-        db.add(user)
+
+    def refresh_mutable_fields(existing_user: User) -> User:
+        email_owner = (
+            db.query(User)
+            .filter(User.email == email, User.id != existing_user.id)
+            .first()
+        )
+        if email_owner:
+            db.rollback()
+            raise reconciliation_required()
+
+        changed = False
+        candidate_updates = [("email", email)]
+        if display_name is not None:
+            candidate_updates.append(("full_name", display_name))
+        if profile_picture is not None:
+            candidate_updates.append(("profile_picture", profile_picture))
+
+        for attribute, value in candidate_updates:
+            if getattr(existing_user, attribute) != value:
+                setattr(existing_user, attribute, value)
+                changed = True
+        if is_bootstrap_admin and existing_user.role != RoleEnum.ADMIN:
+            existing_user.role = RoleEnum.ADMIN
+            changed = True
+
+        if changed:
+            try:
+                db.commit()
+                db.refresh(existing_user)
+            except IntegrityError:
+                db.rollback()
+                raise reconciliation_required()
+        return existing_user
+
+    # Clerk's canonical subject remains stored in the legacy google_uid column so
+    # existing User.id foreign keys remain stable.
+    user = db.query(User).filter(User.google_uid == clerk_sub).first()
+    if user:
+        return refresh_mutable_fields(user)
+
+    email_owner = db.query(User).filter(User.email == email).first()
+    if email_owner:
+        db.rollback()
+        raise reconciliation_required()
+
+    user = User(
+        google_uid=clerk_sub,
+        email=email,
+        full_name=display_name,
+        profile_picture=profile_picture,
+        role=RoleEnum.ADMIN if is_bootstrap_admin else RoleEnum.STUDENT,
+    )
+    db.add(user)
+    try:
         db.commit()
         db.refresh(user)
-    elif is_bootstrap_admin and user.role != RoleEnum.ADMIN:
-        logger.info(f"FORENSIC | Elevating user {email} to ADMIN based on allowlist")
-        user.role = RoleEnum.ADMIN
-        db.commit()
-        db.refresh(user)
-    else:
-        logger.info(f"FORENSIC | User found in DB | Role: {user.role}")
-        
-    return user
+        return user
+    except IntegrityError:
+        # A concurrent first login for this same Clerk subject may have won.
+        db.rollback()
+        concurrent_user = db.query(User).filter(User.google_uid == clerk_sub).first()
+        if concurrent_user:
+            return refresh_mutable_fields(concurrent_user)
+        raise reconciliation_required()
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    logger.debug("FORENSIC | get_current_admin check | User id: %s | Role: %s", current_user.id, current_user.role)
+    logger.info("Admin authorization check for local user id=%s role=%s", current_user.id, current_user.role)
     if current_user.role != "ADMIN" and current_user.role != RoleEnum.ADMIN:
-        logger.warning(f"FORENSIC | ACCESS DENIED | User {current_user.email} attempted admin access with role {current_user.role}")
+        logger.warning("Admin authorization denied for local user id=%s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Admin privileges required. Your current role is {current_user.role}"

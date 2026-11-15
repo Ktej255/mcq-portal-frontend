@@ -9,17 +9,12 @@ import {
   Volume2,
   Calendar,
   ChevronRight,
-  Award,
   Sparkles,
   Trophy,
   Activity,
   User,
-  Heart,
-  TrendingUp,
   Brain,
-  ShieldAlert,
   Loader2,
-  BookOpen,
   ArrowLeft
 } from "lucide-react";
 import type { StudentProfile } from "@/lib/upsc/studentProfile";
@@ -62,14 +57,14 @@ export function WelcomeVideoOverlay({ onComplete }: { onComplete: () => void }) 
 
   const slides = [
     {
-      title: "Pedagogical Feedback Loop",
-      desc: "Learn a topic, express it in your own words, and clear the 95% recall gate before attempting high-quality MCQ variations.",
+      title: "Recall-Gated Study Loop",
+      desc: "Every topic ends with a recall check — say or type what you remember — and a day-start banner asks for a quick recall of yesterday's topic.",
       badge: "Methodology",
     },
     {
-      title: "Active Attention Monitoring",
-      desc: "An intelligent webcam focus check automatically pauses lessons if you look away, keeping you deeply engaged in the content.",
-      badge: "Attention",
+      title: "Prelims Demand Evidence",
+      desc: "Each syllabus leaf shows how many reviewed Prelims and Mains PYQs asked for it, so you can see what UPSC rewards before you invest study time.",
+      badge: "Evidence",
     },
     {
       title: "Sunday AI-Guided Retros",
@@ -78,7 +73,7 @@ export function WelcomeVideoOverlay({ onComplete }: { onComplete: () => void }) 
     },
     {
       title: "Frictionless Mobile Uploads",
-      desc: "Snap photos of your written answers on your mobile device. They are stitched, ordered, and evaluated automatically.",
+      desc: "Snap photos of your written answers on your mobile device. They are stitched and ordered into one PDF you can download.",
       badge: "Mains Prep",
     },
   ];
@@ -201,7 +196,7 @@ type SubjectBlock = {
   whyPicked: string;
 };
 
-const getSubjectSequence = (attemptYear: string, startMonth: string): SubjectBlock[] => {
+const getSubjectSequence = (attemptYear: string): SubjectBlock[] => {
   // Base subjects list
   const subjects = [
     {
@@ -282,6 +277,42 @@ const getSubjectSequence = (attemptYear: string, startMonth: string): SubjectBlo
   });
 };
 
+// The paid beta only opens Geography (28 of 69 topics loop-ready); the other
+// seven GS subject rooms are gated. The planner still records the founder's
+// recommended target order, but it must not present those sprints as startable.
+const BETA_OPEN_SUBJECT_IDS: readonly string[] = ["geography"];
+
+const MONTH_INDEX: Record<string, number> = {
+  January: 0,
+  February: 1,
+  March: 2,
+  April: 3,
+  May: 4,
+  June: 5,
+  July: 6,
+  August: 7,
+  September: 8,
+  October: 9,
+  November: 10,
+  December: 11,
+};
+
+/** Calendar year of the chosen launch month. A month that has already passed
+ *  this year rolls to next year, so the plan never opens in the past. The old
+ *  copy hardcoded 2026 regardless of the attempt year or month chosen. */
+const resolvePlanStartYear = (startMonth: string, now = new Date()): number => {
+  const month = MONTH_INDEX[startMonth] ?? now.getMonth();
+  return month < now.getMonth() ? now.getFullYear() + 1 : now.getFullYear();
+};
+
+const LAUNCH_MONTH_OPTIONS = ["July", "September", "October"] as const;
+
+/** Default to the first offered launch month that has not passed yet, so the
+ *  first generated plan is not already one the warning has to contradict. */
+const resolveDefaultStartMonth = (now = new Date()): string =>
+  LAUNCH_MONTH_OPTIONS.find((month) => MONTH_INDEX[month] >= now.getMonth()) ??
+  LAUNCH_MONTH_OPTIONS[0];
+
 // ─────────────────────────────────────────────────────────────────────
 // JourneyLaunchTakeover Component
 // ─────────────────────────────────────────────────────────────────────
@@ -291,7 +322,7 @@ export function JourneyLaunchTakeover({ onAnimationComplete }: { onAnimationComp
   const statuses = [
     "Initializing UPSC Command Center...",
     "Allocating Dynamic Rest Buffers...",
-    "Deploying Active Attention Guard...",
+    "Saving your launch window...",
     "Aligning Sunday AI Retro Room...",
     "Launching UPSC Mission Control..."
   ];
@@ -309,7 +340,7 @@ export function JourneyLaunchTakeover({ onAnimationComplete }: { onAnimationComp
       clearInterval(statusInterval);
       clearTimeout(completionTimer);
     };
-  }, [onAnimationComplete]);
+  }, [onAnimationComplete, statuses.length]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0b1411] text-white p-6 overflow-hidden">
@@ -363,10 +394,10 @@ export function JourneyLaunchTakeover({ onAnimationComplete }: { onAnimationComp
             key={i}
             className="star"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              transform: `scale(${Math.random() * 1.5 + 0.5})`
+              top: `${(i * 37) % 100}%`,
+              left: `${(i * 61) % 100}%`,
+              animationDelay: `${((i * 13) % 30) / 10}s`,
+              transform: `scale(${((i * 17) % 15) / 10 + 0.5})`
             }}
           />
         ))}
@@ -416,12 +447,17 @@ export function InductionChecklist({
 
   // Plan Generator Input State
   const [attemptYear, setAttemptYear] = useState<string>("2027");
-  const [startMonth, setStartMonth] = useState<string>("September");
+  const [startMonth, setStartMonth] = useState<string>(() => resolveDefaultStartMonth());
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   // Generated Plan State
   const [generatedPlan, setGeneratedPlan] = useState<SubjectBlock[]>([]);
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
+
+  // Derived plan facts: the launch year follows the chosen month (never a
+  // hardcoded 2026), and the buffer is uniform across sprints by design.
+  const planStartYear = resolvePlanStartYear(startMonth);
+  const planBufferDays = generatedPlan[0]?.bufferDays ?? 2;
 
   // Quiz State
   const [q1, setQ1] = useState<string | null>(null);
@@ -452,22 +488,22 @@ export function InductionChecklist({
   const domains = [
     {
       title: "Content Domain (Learning Gap)",
-      desc: "UPSC tests conceptual mastery, not raw memorization. We audit your core syllabus benchmarks, pinpoint exact keywords missed, and isolate target study concepts.",
-      details: ["Active Syllabus Node Mapping", "Static NCERT vs Applied Gaps", "Visual map overlays & diagrams"],
+      desc: "UPSC tests conceptual mastery, not raw memorization. The syllabus map shows every Geography leaf with its reviewed PYQ demand, and each topic's sections end with a recall check so you can see what you can explain and what you cannot.",
+      details: ["Syllabus map with open and in-preparation leaves", "Reviewed PYQ demand evidence per topic", "Topic sections with inline self-check quizzes"],
       icon: Brain,
       color: "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
     },
     {
       title: "Communication Domain (Understanding Gap)",
-      desc: "If you cannot explain a concept orally in simple terms, you have a gap in understanding. Our blank speech-recall canvas evaluates mechanism precision and verbal recall.",
-      details: ["Vocal Feynman Recall Checks", "Real-time AI Keyword Verification", "Comparative Verdict Column Sheets"],
+      desc: "If you cannot explain a concept in your own words, the gap is in understanding. The recall check asks you to reproduce a section from memory — by voice or typed — and scores which key concepts you actually recalled.",
+      details: ["Voice or typed recall submission", "Weighted concept matching scored out of 100", "Matched and missed concepts after each attempt"],
       icon: Activity,
       color: "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]"
     },
     {
       title: "Personality Domain (Consistency & Grit)",
-      desc: "Preparation is a marathon. Health blocks, stress, family responsibilities, and emotional status directly impact consistency. We protect this with me-time check-ins and responsive buffers.",
-      details: ["Me-Time Mindset Auditing", "Automatic 2-3 Day Rest Buffers", "Adaptive study pacing based on mood"],
+      desc: "Preparation is a marathon. Health blocks, stress, family responsibilities, and emotional status directly impact consistency. We protect this with me-time check-ins and planned rest buffers between sprints.",
+      details: ["Me-Time mood check-ins per study day", "Planned rest buffers between sprints", "Attempt-year launch planning"],
       icon: User,
       color: "border-[#d95f43] bg-[#fff0ec] text-[#9d3824]"
     }
@@ -477,7 +513,7 @@ export function InductionChecklist({
     setIsGeneratingPlan(true);
     // Simulate AI plan assembly
     setTimeout(() => {
-      const plan = getSubjectSequence(attemptYear, startMonth);
+      const plan = getSubjectSequence(attemptYear);
       setGeneratedPlan(plan);
       setIsGeneratingPlan(false);
       setOnboardingState("generated_plan");
@@ -890,7 +926,7 @@ export function InductionChecklist({
                   {activeDomain.desc}
                 </p>
                 <div className="mt-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider opacity-60">Audited parameters:</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider opacity-60">What this looks like in the product:</p>
                   <ul className="mt-1.5 flex flex-wrap gap-2">
                     {activeDomain.details.map((detail) => (
                       <li key={detail} className="rounded bg-white/70 px-2.5 py-1 text-xs font-black">
@@ -986,7 +1022,7 @@ export function InductionChecklist({
                 Which month are you starting?
               </label>
               <div className="grid grid-cols-3 gap-3">
-                {["July", "September", "October"].map((month) => {
+                {LAUNCH_MONTH_OPTIONS.map((month) => {
                   const isSel = startMonth === month;
                   return (
                     <button
@@ -1000,7 +1036,7 @@ export function InductionChecklist({
                       }`}
                     >
                       <Calendar className={`h-5 w-5 mx-auto mb-1 ${isSel ? "text-[#1d9e75]" : "text-[#8a8174]"}`} />
-                      <span>{month} 2026</span>
+                      <span>{month} {resolvePlanStartYear(month)}</span>
                     </button>
                   );
                 })}
@@ -1042,23 +1078,45 @@ export function InductionChecklist({
   // ─── GENERATED PLAN STATE ───
   if (onboardingState === "generated_plan") {
     const activeSub = generatedPlan.find((s) => s.id === expandedSubjectId) || generatedPlan[0];
+    const activeIsOpen = activeSub ? BETA_OPEN_SUBJECT_IDS.includes(activeSub.id) : false;
 
     return (
       <section className="fixed inset-0 z-50 flex items-center justify-center bg-[#13251d]/95 p-4 overflow-y-auto animate-in fade-in duration-300">
         <div className="w-full max-w-4xl rounded-2xl border border-[#dcd5c7] bg-[#f7f4ee] p-6 md:p-8 shadow-2xl text-[#13251d] my-8">
           <div className="mb-6 border-b border-[#cfe5dc] pb-4">
             <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1d9e75]">Generated Roadmap</span>
-            <h2 className="text-3xl font-black tracking-tight text-[#13251d]">Your Customized UPSC Yearly Plan</h2>
+            <h2 className="text-3xl font-black tracking-tight text-[#13251d]">Your Target UPSC Subject Sequence</h2>
             <p className="text-sm font-medium text-[#657066] mt-1">
-              Custom pace for {attemptYear} starting {startMonth} 2026. Rest buffers are pre-allocated between modules.
+              Custom pace for the {attemptYear} attempt starting {startMonth} {planStartYear}. Rest buffers are pre-allocated between modules.
             </p>
+          </div>
+
+          {Number(attemptYear) <= planStartYear ? (
+            <div className="rounded-lg border border-[#efb3a3] bg-[#fff0ec] p-3 text-xs font-bold leading-5 text-[#9d3824] mb-4">
+              A {startMonth} {planStartYear} launch leaves no full cycle before the {attemptYear} attempt. Pick the
+              next attempt year on the previous step for a timeline you can actually follow.
+            </div>
+          ) : null}
+
+          <div
+            data-testid="induction-beta-scope"
+            className="rounded-lg border border-[#e6dcc2] bg-[#faf6ee] p-4 text-xs font-bold leading-5 text-[#8a7a52] mb-4 flex items-start gap-3"
+          >
+            <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[#b08428]" />
+            <div>
+              <span className="font-black text-[#6f5a24] block mb-0.5">Paid beta opens with Geography:</span>
+              This is your planning sequence for all eight GS subjects, but only the Geography sprint is open
+              today (28 of 69 topics loop-ready). The other seven sprints sit in preparation and unlock subject
+              by subject — nothing here opens their rooms yet.
+            </div>
           </div>
 
           <div className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 text-xs font-bold leading-5 text-[#085041] mb-6 flex items-start gap-3">
             <Sparkles className="h-4 w-4 text-[#1d9e75] shrink-0 mt-0.5" />
             <div>
               <span className="font-black text-[#13251d] block mb-0.5">Buffer Protection Active:</span>
-              We have inserted a {attemptYear === "2028" ? "4-day" : "2-day"} buffer after every subject. Longer timelines raise health/family interruptions; buffers absorb these shocks so you never fall behind.
+              We have inserted a {planBufferDays}-day buffer after every subject. Health, family, and duty
+              interruptions are absorbed by these buffers so you never fall behind.
             </div>
           </div>
 
@@ -1068,10 +1126,13 @@ export function InductionChecklist({
             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-200">
               {generatedPlan.map((sub, index) => {
                 const isSelected = expandedSubjectId === sub.id;
+                const isOpenInBeta = BETA_OPEN_SUBJECT_IDS.includes(sub.id);
                 return (
                   <div key={sub.id} className="flex items-center">
                     <button
                       type="button"
+                      data-testid={`induction-sprint-${sub.id}`}
+                      data-subject-status={isOpenInBeta ? "open" : "in-preparation"}
                       onClick={() => setExpandedSubjectId(sub.id)}
                       className={cn(
                         "flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 transition-all p-2 text-center",
@@ -1082,6 +1143,14 @@ export function InductionChecklist({
                     >
                       <span className="text-[10px] font-black opacity-60">Sprint {index + 1}</span>
                       <span className="text-xs font-extrabold line-clamp-2 mt-0.5 leading-tight">{sub.name.split(" ")[0]}</span>
+                      <span
+                        className={cn(
+                          "text-[8px] font-black uppercase tracking-wider rounded-full px-1.5 py-0.5 mt-1",
+                          isOpenInBeta ? "bg-[#1d9e75]/15 text-[#085041]" : "bg-[#f2ead9] text-[#8a7a52]"
+                        )}
+                      >
+                        {isOpenInBeta ? "Open" : "Soon"}
+                      </span>
                     </button>
                     {index < generatedPlan.length - 1 && (
                       <span className="text-xs font-black text-[#cfe5dc] px-1">➔</span>
@@ -1099,6 +1168,14 @@ export function InductionChecklist({
                 <div>
                   <span className="text-[9px] font-black uppercase text-[#1d9e75] tracking-widest">Selected Sprint Profile</span>
                   <h4 className="text-lg font-black text-[#13251d]">{activeSub.name}</h4>
+                  <span
+                    className={cn(
+                      "inline-flex mt-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
+                      activeIsOpen ? "bg-[#1d9e75]/15 text-[#085041]" : "bg-[#f2ead9] text-[#8a7a52]"
+                    )}
+                  >
+                    {activeIsOpen ? "Open in beta" : "In preparation — opens in a later beta wave"}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="block text-[9px] font-black text-[#657066] uppercase">Planned Duration</span>
@@ -1108,7 +1185,7 @@ export function InductionChecklist({
               
               <div className="text-xs leading-relaxed font-semibold text-[#4f5e55]">
                 <p className="bg-[#f7f4ee] p-3.5 rounded-lg border border-[#dcd5c7] text-[#34453b]">
-                  <span className="block text-[9px] font-black text-[#1d9e75] uppercase mb-1">Neural Sequence Logic</span>
+                  <span className="block text-[9px] font-black text-[#1d9e75] uppercase mb-1">Sequence logic</span>
                   {activeSub.whyPicked}
                 </p>
               </div>
@@ -1129,7 +1206,7 @@ export function InductionChecklist({
               onClick={handleSavePlan}
               className="inline-flex h-11 items-center justify-center rounded-md bg-[#1d9e75] px-6 text-sm font-black text-white hover:bg-[#0c7a59] transition shadow-md shadow-[#1d9e75]/15"
             >
-              Lock Plan & Start Journey <ArrowRight className="ml-2 h-4 w-4" />
+              Save Plan & Start Journey <ArrowRight className="ml-2 h-4 w-4" />
             </button>
           </div>
         </div>
@@ -1162,14 +1239,16 @@ export function InductionChecklist({
 
           <h2 className="text-3xl font-black tracking-tight text-white">Congratulations!</h2>
           <p className="mt-3 text-sm font-bold text-[#cfe5dc] leading-relaxed">
-            You have successfully completed the first step of your journey. Your dynamic year plan has been updated and registered in your Vision Document.
+            You have successfully completed the first step of your journey. Your attempt year and launch month are
+            saved to your student profile, and your subject order is kept as a planning target: Geography opens
+            now, and the other seven sprints open as their beta content ships.
           </p>
 
           <div className="my-6 rounded-lg bg-white/5 border border-white/10 p-4 text-xs font-semibold leading-5 text-white/70 text-left">
             <span className="text-[10px] font-black text-[#1d9e75] block uppercase tracking-wider mb-1">Registered attempt details:</span>
             <p>• Attempt Year: {attemptYear}</p>
-            <p>• Start Month: {startMonth} 2026</p>
-            <p>• Subject order &amp; active buffers: Locked</p>
+            <p>• Start Month: {startMonth} {planStartYear}</p>
+            <p>• Subject order: planning target (Geography open now)</p>
           </div>
 
           <button

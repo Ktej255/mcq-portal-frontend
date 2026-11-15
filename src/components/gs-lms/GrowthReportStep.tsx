@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Clock, Brain, Target, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, Clock, Target, Calendar, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { funnelService, GrowthReportOut } from '@/services/api/funnelService';
 
 /**
@@ -16,25 +16,78 @@ import { funnelService, GrowthReportOut } from '@/services/api/funnelService';
 interface GrowthReportStepProps {
   nodeId: number;
   subject?: string;
-  onComplete?: () => void;
+  onComplete?: () => void | Promise<void>;
+  /**
+   * When false the completion action is hidden. Used on an already-completed
+   * topic, where the report is shown for reference only.
+   */
+  showCompleteAction?: boolean;
 }
 
-export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: GrowthReportStepProps) {
-  const [report, setReport] = useState<GrowthReportOut | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function GrowthReportStep({
+  nodeId,
+  subject = "geography",
+  onComplete,
+  showCompleteAction = true,
+}: GrowthReportStepProps) {
+  const [retryCount, setRetryCount] = useState(0);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [continuing, setContinuing] = useState(false);
+  const [continueError, setContinueError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<{
+    key: string;
+    report: GrowthReportOut | null;
+    error: string | null;
+  }>({ key: "", report: null, error: null });
+
+  // Result, error and loading are keyed to the request that produced them, so a
+  // new topic or retry never shows the previous request's state and no state has
+  // to be cleared when the effect starts.
+  const requestKey = `${subject}:${nodeId}:${retryCount}`;
+  const settled = loadedKey === requestKey && outcome.key === requestKey;
+  const loading = !settled;
+  const report = settled ? outcome.report : null;
+  const error = settled ? outcome.error : null;
+  const canComplete = Boolean(onComplete) && showCompleteAction;
 
   useEffect(() => {
+    let cancelled = false;
+
     funnelService.getGrowthReport(subject, nodeId)
       .then((data) => {
-        setReport(data);
-        setLoading(false);
+        if (!cancelled) setOutcome({ key: requestKey, report: data, error: null });
       })
       .catch(() => {
-        setError('Failed to generate growth report');
-        setLoading(false);
+        if (!cancelled) setOutcome({ key: requestKey, report: null, error: 'We could not prepare your growth report.' });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedKey(requestKey);
       });
-  }, [nodeId, subject]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nodeId, subject, requestKey]);
+
+  const handleRetry = () => {
+    setRetryCount((count) => count + 1);
+  };
+
+  // Aggregating the report is a read of progress that is already saved. A
+  // failed aggregate must never trap the learner on the final step, so the
+  // error state offers an explicit, honest way to finish the topic without it.
+  const handleContinueWithoutReport = async () => {
+    if (!onComplete || continuing) return;
+    setContinuing(true);
+    setContinueError(null);
+    try {
+      await onComplete();
+    } catch {
+      setContinueError('We could not finish the topic. Please try again.');
+    } finally {
+      setContinuing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -48,11 +101,53 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
 
   if (error || !report) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="text-sm text-red-800">{error || 'Report unavailable'}</p>
+      <div
+        role="alert"
+        className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center"
+      >
+        <p className="text-sm font-bold text-red-800">
+          {error || 'Your growth report is not available right now.'}
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-red-900/80">
+          Everything you completed in this topic is already saved. You can retry
+          the report, or finish the topic now and open the report later from the
+          completed topic.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="rounded-lg bg-red-800 px-4 py-2 text-xs font-black text-white"
+          >
+            Retry report
+          </button>
+          {canComplete && (
+            <button
+              type="button"
+              onClick={() => void handleContinueWithoutReport()}
+              disabled={continuing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-black text-[#1a3a2a] disabled:opacity-60"
+            >
+              {continuing ? 'Finishing…' : 'Finish topic without the report'}
+              {!continuing && <ArrowRight className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
+        {continueError && (
+          <p className="mt-3 text-xs font-bold text-red-800">{continueError}</p>
+        )}
       </div>
     );
   }
+
+  const recallEvidenceCount = report.section_metrics.filter(
+    (section) => section.has_recall_evidence === true
+  ).length;
+  const unevidencedSections = report.section_metrics.filter(
+    (section) =>
+      section.has_reading_evidence === false || section.has_recall_evidence === false
+  ).length;
+  const mcqMissing = report.has_mcq_evidence === false;
 
   return (
     <div className="space-y-5">
@@ -77,35 +172,62 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
         <h3 className="text-xs font-black text-[#49675e] uppercase flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5" /> Section Performance
         </h3>
-        {report.section_metrics.map((section, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="rounded-lg border border-[#dcd5c7] bg-white p-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-[#1a3a2a]">
-                {section.section_label.replace(/_/g, ' ')}
-              </span>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-[#49675e]">
-                  {Math.floor(section.reading_time_seconds / 60)}m {section.reading_time_seconds % 60}s
+        {unevidencedSections > 0 && (
+          <p className="rounded-lg border border-[#efd8a7] bg-[#fff8e8] px-3 py-2 text-[10px] leading-relaxed text-[#6f4a12]">
+            {unevidencedSections === 1 ? 'One section has' : `${unevidencedSections} sections have`}{' '}
+            no recorded reading or recall. They are marked as not recorded
+            instead of being scored as zero, so this report does not treat
+            missing evidence as weak preparation.
+          </p>
+        )}
+        {report.section_metrics.map((section, idx) => {
+          const recallMissing = section.has_recall_evidence === false;
+          const readingMissing = section.has_reading_evidence === false;
+          return (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className="rounded-lg border border-[#dcd5c7] bg-white p-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-black text-[#1a3a2a]">
+                  {section.section_label.replace(/_/g, ' ')}
                 </span>
-                <span className={`text-xs font-black ${section.recall_score >= 60 ? 'text-[#1d9e75]' : 'text-amber-600'}`}>
-                  {section.recall_score}%
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-[#49675e]">
+                    {readingMissing
+                      ? 'Reading not recorded'
+                      : `${Math.floor(section.reading_time_seconds / 60)}m ${section.reading_time_seconds % 60}s`}
+                  </span>
+                  <span
+                    className={`text-xs font-black ${
+                      recallMissing
+                        ? 'text-[#49675e]'
+                        : section.recall_score >= 60
+                          ? 'text-[#1d9e75]'
+                          : 'text-amber-600'
+                    }`}
+                  >
+                    {recallMissing ? 'No recall check' : `${section.recall_score}%`}
+                  </span>
+                  {!recallMissing && (
+                    <span className="text-[10px] font-black text-[#49675e]">
+                      {section.confidence_score}% confidence
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            {section.is_rushed && (
-              <div className="flex items-center gap-1 mt-1">
-                <AlertTriangle className="h-3 w-3 text-amber-500" />
-                <span className="text-[10px] text-amber-700">Rushed — consider re-reading</span>
-              </div>
-            )}
-          </motion.div>
-        ))}
+              {section.is_rushed && !readingMissing && (
+                <div className="flex items-center gap-1 mt-1">
+                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  <span className="text-[10px] text-amber-700">Rushed — consider re-reading</span>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* MCQ Lab Score */}
@@ -113,22 +235,32 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
         <h3 className="text-xs font-black text-[#49675e] uppercase flex items-center gap-1.5 mb-3">
           <Target className="h-3.5 w-3.5" /> MCQ Lab
         </h3>
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-black text-[#1d9e75]">{report.mcq_total_score}%</div>
-            <div className="text-[10px] text-[#49675e]">Score</div>
+        {mcqMissing ? (
+          <div>
+            <div className="text-sm font-black text-[#49675e]">Not taken</div>
+            <p className="mt-1 text-[10px] leading-relaxed text-[#49675e]">
+              No MCQ Lab result was recorded for this topic. It is marked as not
+              taken instead of being scored as zero.
+            </p>
           </div>
-          <div className="flex-1 space-y-1">
-            {report.mcq_type_breakdown.map((tb) => (
-              <div key={tb.question_type} className="flex items-center justify-between text-[10px]">
-                <span className="text-[#5d675f]">{tb.question_type.replace(/_/g, ' ')}</span>
-                <span className={`font-black ${tb.accuracy >= 50 ? 'text-[#085041]' : 'text-red-600'}`}>
-                  {tb.accuracy}%
-                </span>
-              </div>
-            ))}
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-black text-[#1d9e75]">{report.mcq_total_score}%</div>
+              <div className="text-[10px] text-[#49675e]">Score</div>
+            </div>
+            <div className="flex-1 space-y-1">
+              {report.mcq_type_breakdown.map((tb) => (
+                <div key={tb.question_type} className="flex items-center justify-between text-[10px]">
+                  <span className="text-[#5d675f]">{tb.question_type.replace(/_/g, ' ')}</span>
+                  <span className={`font-black ${tb.accuracy >= 50 ? 'text-[#085041]' : 'text-red-600'}`}>
+                    {tb.accuracy}%
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Mains Score (if attempted) */}
@@ -144,7 +276,7 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
       {/* Spaced Repetition Schedule */}
       <div className="rounded-xl border border-[#b9d9cd] bg-white p-4">
         <h3 className="text-xs font-black text-[#49675e] uppercase flex items-center gap-1.5 mb-2">
-          <Calendar className="h-3.5 w-3.5" /> Next Recall Session
+          <Calendar className="h-3.5 w-3.5" /> Next section recall
         </h3>
         <p className="text-sm font-black text-[#1a3a2a]">
           {new Date(report.next_recall_date).toLocaleDateString('en-IN', {
@@ -152,7 +284,13 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
           })}
         </p>
         <p className="text-[10px] text-[#49675e] mt-0.5">
-          In {report.recall_interval_days} days — based on your recall performance
+          {recallEvidenceCount > 0
+            ? `In ${report.recall_interval_days} days — based on the recall checks you recorded`
+            : `In ${report.recall_interval_days} days — scheduled conservatively because no recall check was recorded`}
+        </p>
+        <p className="text-[10px] text-[#49675e]/80 mt-1">
+          First-pass recall for this topic&apos;s sections. Separate from the
+          Day 3/7/21 topic revisits listed in Today.
         </p>
       </div>
 
@@ -204,13 +342,21 @@ export function GrowthReportStep({ nodeId, subject = "geography", onComplete }: 
       )}
 
       {/* Complete Button */}
-      {onComplete && (
+      {canComplete && onComplete && (
         <button
-          onClick={onComplete}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black flex items-center justify-center gap-2"
+          type="button"
+          onClick={() => void handleContinueWithoutReport()}
+          disabled={continuing}
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <CheckCircle2 className="h-4 w-4" /> Topic Complete — View Next
+          <CheckCircle2 className="h-4 w-4" />
+          {continuing ? 'Marking topic complete…' : 'Topic Complete — View Next'}
         </button>
+      )}
+      {canComplete && continueError && (
+        <p role="alert" className="text-center text-xs font-bold text-red-700">
+          {continueError}
+        </p>
       )}
     </div>
   );

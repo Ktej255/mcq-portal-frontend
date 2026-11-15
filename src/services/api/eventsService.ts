@@ -42,6 +42,8 @@ class EventsService {
   private boundFullscreenHandler: (() => void) | null = null;
   private boundOnlineHandler: (() => void) | null = null;
   private boundOfflineHandler: (() => void) | null = null;
+  private flushQueue: Promise<void> = Promise.resolve();
+  private telemetryFinalized = false;
 
   init(attemptId: string) {
     if (this.flushTimer) clearInterval(this.flushTimer);
@@ -61,35 +63,46 @@ class EventsService {
   }
 
   async flush(attemptId: string) {
-    if (this.eventBuffer.length === 0) return;
+    const flushOperation = this.flushQueue.then(async () => {
+      if (this.eventBuffer.length === 0) return;
 
-    const eventsToFlush = [...this.eventBuffer];
-    this.eventBuffer = [];
+      const eventsToFlush = [...this.eventBuffer];
+      this.eventBuffer = [];
 
-    try {
-      await apiClient.post(`attempts/${attemptId}/events`, {
-        events: eventsToFlush
-      });
-      console.log(`[EventsService] Flushed ${eventsToFlush.length} events`);
-    } catch (err) {
-      console.error('[EventsService] Failed to flush events:', err);
-      // Put them back in the buffer for next retry
-      this.eventBuffer = [...eventsToFlush, ...this.eventBuffer];
-    }
+      try {
+        await apiClient.post(`attempts/${attemptId}/events`, {
+          events: eventsToFlush
+        });
+        console.log(`[EventsService] Flushed ${eventsToFlush.length} events`);
+      } catch (err) {
+        // Restore failed events ahead of anything recorded while the request was in flight.
+        this.eventBuffer = [...eventsToFlush, ...this.eventBuffer];
+        console.error('[EventsService] Failed to flush events:', err);
+      }
+    });
+
+    // Serialize flushes so concurrent timer, batch, and final flushes cannot overwrite
+    // one another's buffers. A failed operation leaves its events buffered for retry.
+    this.flushQueue = flushOperation.catch(() => undefined);
+    await flushOperation;
   }
 
   stop(attemptId?: string) {
+    if (this.telemetryFinalized) return;
+    this.telemetryFinalized = true;
+
     this.stopTelemetry(attemptId);
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    if (attemptId) this.flush(attemptId);
+    if (attemptId) void this.flush(attemptId);
   }
 
   private startTelemetry(attemptId: string) {
     if (typeof window === 'undefined' || this.heartbeatTimer) return;
 
+    this.telemetryFinalized = false;
     this.telemetryStartedAt = Date.now();
     this.lastInteractionAt = Date.now();
     this.sequence = 0;

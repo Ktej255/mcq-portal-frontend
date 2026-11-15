@@ -45,6 +45,8 @@ export type SourceArchiveIntakeResponse = {
   ok: boolean;
   rootPath: string;
   rootExists: boolean;
+  scanComplete: boolean;
+  scanErrorCount: number;
   generatedAt: string;
   totalFiles: number;
   totalDirectories: number;

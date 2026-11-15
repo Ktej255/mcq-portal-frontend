@@ -26,18 +26,33 @@ import {
  * curiosity gaps, analogies, and testing-effect prompts.
  *
  * Blocks are flexible `Record<string, unknown>`; every accessor is defensive
- * so unknown/legacy block shapes degrade gracefully to a paragraph.
+ * so unknown or malformed block shapes degrade to an explicit placeholder.
  */
 
 const GREEN = "#1d9e75";
-const INK = "#13251d";
-const AMBER = "#ef9f27";
+
+type ContentRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is ContentRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(record: ContentRecord, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
 
 // ---------------------------------------------------------------------------
 // Inline markup: **highlight** → emphasized keyword, *em* → italic emphasis.
 // ---------------------------------------------------------------------------
-function renderInline(text: string): React.ReactNode {
-  if (!text) return null;
+function renderInline(text: unknown): React.ReactNode {
+  if (typeof text !== "string" || !text) return null;
   // Split on **...** while keeping delimiters.
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
@@ -101,11 +116,11 @@ const CALLOUT_TONES: Record<
 };
 
 function Callout({ block }: { block: ContentBlock }) {
-  const tone = (block.tone as string) || "insight";
+  const tone = readString(block, "tone") || "insight";
   const t = CALLOUT_TONES[tone] ?? CALLOUT_TONES.insight;
-  const title = (block.title as string) || t.label;
-  const text = block.text as string | undefined;
-  const items = block.items as string[] | undefined;
+  const title = readString(block, "title") || t.label;
+  const text = readString(block, "text");
+  const items = readStringArray(block.items);
   return (
     <div
       className="rounded-xl border p-4"
@@ -139,8 +154,16 @@ function Callout({ block }: { block: ContentBlock }) {
 // Stat grid — big distinctive numbers (von Restorff effect).
 // ---------------------------------------------------------------------------
 function StatGrid({ block }: { block: ContentBlock }) {
-  const items = (block.items as Array<{ value: string; label: string }>) || [];
-  if (!items.length) return null;
+  const items = Array.isArray(block.items)
+    ? block.items.reduce<Array<{ value: string; label: string }>>((validItems, item) => {
+        if (!isRecord(item)) return validItems;
+        const value = readString(item, "value");
+        const label = readString(item, "label");
+        if (value !== undefined && label !== undefined) validItems.push({ value, label });
+        return validItems;
+      }, [])
+    : [];
+  if (!items.length) return <UnsupportedBlock />;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {items.map((s, i) => (
@@ -164,12 +187,20 @@ function StatGrid({ block }: { block: ContentBlock }) {
 // Key terms — definition cards.
 // ---------------------------------------------------------------------------
 function KeyTerms({ block }: { block: ContentBlock }) {
-  const terms =
-    (block.terms as Array<{ term: string; definition: string }>) ||
-    (block.term
-      ? [{ term: block.term as string, definition: block.definition as string }]
-      : []);
-  if (!terms.length) return null;
+  const terms = Array.isArray(block.terms)
+    ? block.terms.reduce<Array<{ term: string; definition: string }>>((validTerms, item) => {
+        if (!isRecord(item)) return validTerms;
+        const term = readString(item, "term");
+        const definition = readString(item, "definition");
+        if (term !== undefined && definition !== undefined) validTerms.push({ term, definition });
+        return validTerms;
+      }, [])
+    : (() => {
+        const term = readString(block, "term");
+        const definition = readString(block, "definition");
+        return term !== undefined && definition !== undefined ? [{ term, definition }] : [];
+      })();
+  if (!terms.length) return <UnsupportedBlock />;
   return (
     <div className="flex flex-col gap-2">
       {terms.map((t, i) => (
@@ -191,14 +222,14 @@ function KeyTerms({ block }: { block: ContentBlock }) {
 //   Format B (topics 7+):  { left: {label, items}, right: {label, items} }
 // ---------------------------------------------------------------------------
 function Compare({ block }: { block: ContentBlock }) {
-  const left = block.left as { label?: string; items?: string[] } | undefined;
-  const right = block.right as { label?: string; items?: string[] } | undefined;
+  const left = isRecord(block.left) ? block.left : undefined;
+  const right = isRecord(block.right) ? block.right : undefined;
 
   // Format B: left/right with items arrays
   if (left && right) {
-    const title = block.title as string | undefined;
-    const leftItems = left.items || [];
-    const rightItems = right.items || [];
+    const title = readString(block, "title");
+    const leftItems = readStringArray(left.items);
+    const rightItems = readStringArray(right.items);
     return (
       <div className="overflow-hidden rounded-xl border border-[#dcd5c7]">
         {title && (
@@ -208,8 +239,8 @@ function Compare({ block }: { block: ContentBlock }) {
         )}
         <div className="grid grid-cols-2 divide-x divide-[#dcd5c7]">
           <div className="p-3">
-            {left.label && (
-              <p className="mb-2 text-[12px] font-bold text-[#1d9e75]">{left.label}</p>
+            {readString(left, "label") && (
+              <p className="mb-2 text-[12px] font-bold text-[#1d9e75]">{readString(left, "label")}</p>
             )}
             <ul className="flex flex-col gap-1.5">
               {leftItems.map((item, i) => (
@@ -221,8 +252,8 @@ function Compare({ block }: { block: ContentBlock }) {
             </ul>
           </div>
           <div className="p-3">
-            {right.label && (
-              <p className="mb-2 text-[12px] font-bold text-[#ef9f27]">{right.label}</p>
+            {readString(right, "label") && (
+              <p className="mb-2 text-[12px] font-bold text-[#ef9f27]">{readString(right, "label")}</p>
             )}
             <ul className="flex flex-col gap-1.5">
               {rightItems.map((item, i) => (
@@ -239,17 +270,27 @@ function Compare({ block }: { block: ContentBlock }) {
   }
 
   // Format A: columns/rows table
-  const columns = (block.columns as string[]) || ["A", "B"];
-  const rows =
-    (block.rows as Array<{ label?: string; a: string; b: string }>) || [];
-  if (!rows.length) return null;
+  const columns = readStringArray(block.columns);
+  const safeColumns = columns.length ? columns : ["A", "B"];
+  const rows = Array.isArray(block.rows)
+    ? block.rows.reduce<Array<{ label?: string; a: string; b: string }>>((validRows, row) => {
+        if (!isRecord(row)) return validRows;
+        const a = readString(row, "a");
+        const b = readString(row, "b");
+        if (a !== undefined && b !== undefined) {
+          validRows.push({ label: readString(row, "label"), a, b });
+        }
+        return validRows;
+      }, [])
+    : [];
+  if (!rows.length) return <UnsupportedBlock />;
   return (
     <div className="overflow-hidden rounded-xl border border-[#dcd5c7]">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-[#1d9e75]/10">
             {block.rowHeader !== false ? <th className="w-px" /> : null}
-            {columns.map((c, i) => (
+            {safeColumns.map((c, i) => (
               <th
                 key={i}
                 className="px-3 py-2 text-left text-[12px] font-bold uppercase tracking-wide text-[#1a3a2a]"
@@ -284,11 +325,25 @@ function Compare({ block }: { block: ContentBlock }) {
 //   Format B (topics 7+):  { items: [{year, event}] }
 // ---------------------------------------------------------------------------
 function Timeline({ block }: { block: ContentBlock }) {
-  const rawEvents =
-    (block.events as Array<{ year: string; title?: string; detail?: string; event?: string }>) || [];
-  const rawItems =
-    (block.items as Array<{ year: string; title?: string; detail?: string; event?: string }>) || [];
-  
+  type TimelineItem = { year: string; title?: string; detail?: string; event?: string };
+  const readTimelineItems = (value: unknown): TimelineItem[] => {
+    if (!Array.isArray(value)) return [];
+    return value.reduce<TimelineItem[]>((validItems, item) => {
+      if (!isRecord(item)) return validItems;
+      const year = readString(item, "year");
+      if (year === undefined) return validItems;
+      validItems.push({
+        year,
+        title: readString(item, "title"),
+        detail: readString(item, "detail"),
+        event: readString(item, "event"),
+      });
+      return validItems;
+    }, []);
+  };
+  const rawEvents = readTimelineItems(block.events);
+  const rawItems = readTimelineItems(block.items);
+
   // Merge both formats into a unified shape
   const events = (rawEvents.length > 0 ? rawEvents : rawItems).map((e) => ({
     year: e.year,
@@ -296,9 +351,9 @@ function Timeline({ block }: { block: ContentBlock }) {
     detail: e.detail,
   }));
 
-  if (!events.length) return null;
+  if (!events.length) return <UnsupportedBlock />;
 
-  const title = block.title as string | undefined;
+  const title = readString(block, "title");
 
   return (
     <div>
@@ -334,10 +389,10 @@ function Timeline({ block }: { block: ContentBlock }) {
 //   Format B (topics 7+):  { wrong, correct }
 // ---------------------------------------------------------------------------
 function Trap({ block }: { block: ContentBlock }) {
-  const title = (block.title as string) || "Examiner Trap";
-  const text = block.text as string | undefined;
-  const wrong = block.wrong as string | undefined;
-  const correct = block.correct as string | undefined;
+  const title = readString(block, "title") || "Examiner Trap";
+  const text = readString(block, "text");
+  const wrong = readString(block, "wrong");
+  const correct = readString(block, "correct");
 
   return (
     <div className="rounded-xl border border-[#e6c2c2] bg-[#fbf0ee] p-4">
@@ -368,7 +423,7 @@ function Trap({ block }: { block: ContentBlock }) {
 // Memory hook / mnemonic.
 // ---------------------------------------------------------------------------
 function Memory({ block }: { block: ContentBlock }) {
-  const text = block.text as string | undefined;
+  const text = readString(block, "text");
   return (
     <div className="flex items-start gap-2 rounded-xl border border-[#d8c8f0] bg-[#f3eefb] p-3.5">
       <Brain className="mt-0.5 h-4 w-4 shrink-0 text-[#5b3a86]" />
@@ -386,7 +441,7 @@ function Memory({ block }: { block: ContentBlock }) {
 // Analogy.
 // ---------------------------------------------------------------------------
 function Analogy({ block }: { block: ContentBlock }) {
-  const text = block.text as string | undefined;
+  const text = readString(block, "text");
   return (
     <div className="flex items-start gap-2 rounded-xl border border-[#e6dcc2] bg-[#faf6ee] p-3.5">
       <Quote className="mt-0.5 h-4 w-4 shrink-0 text-[#b08a2e]" />
@@ -400,8 +455,8 @@ function Analogy({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 function Quiz({ block }: { block: ContentBlock }) {
   const [revealed, setRevealed] = useState(false);
-  const question = block.question as string | undefined;
-  const answer = block.answer as string | undefined;
+  const question = readString(block, "question");
+  const answer = readString(block, "answer");
   return (
     <div className="rounded-xl border-2 border-dashed border-[#1d9e75]/40 bg-[#f0faf5] p-4">
       <div className="flex items-center gap-1.5 text-[#1a3a2a]">
@@ -432,9 +487,9 @@ function Quiz({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 function Collapsible({ block }: { block: ContentBlock }) {
   const [open, setOpen] = useState(false);
-  const title = (block.title as string) || "Dig deeper";
-  const text = (block.text as string) || (block.content as string) || undefined;
-  const items = block.items as string[] | undefined;
+  const title = readString(block, "title") || "Dig deeper";
+  const text = readString(block, "text") || readString(block, "content");
+  const items = readStringArray(block.items);
   return (
     <div className="rounded-xl border border-[#dcd5c7] bg-white">
       <button
@@ -471,9 +526,9 @@ function Collapsible({ block }: { block: ContentBlock }) {
 // Points list.
 // ---------------------------------------------------------------------------
 function Points({ block }: { block: ContentBlock }) {
-  const items = (block.items as string[]) || [];
-  const heading = (block.heading as string) || (block.title as string) || undefined;
-  if (!items.length) return null;
+  const items = readStringArray(block.items);
+  const heading = readString(block, "heading") || readString(block, "title");
+  if (!items.length) return <UnsupportedBlock />;
   return (
     <div>
       {heading ? (
@@ -497,8 +552,8 @@ function Points({ block }: { block: ContentBlock }) {
 // Lightweight inline SVG diagrams keyed by id (no asset pipeline needed).
 // ---------------------------------------------------------------------------
 function Diagram({ block }: { block: ContentBlock }) {
-  const id = block.id as string | undefined;
-  const caption = block.caption as string | undefined;
+  const id = readString(block, "id");
+  const caption = readString(block, "caption");
   let svg: React.ReactNode = null;
 
   if (id === "universe-composition") {
@@ -559,14 +614,18 @@ function Diagram({ block }: { block: ContentBlock }) {
 function NcertReference({ block }: { block: ContentBlock }) {
   const [showPdf, setShowPdf] = useState(false);
   const [useFallbackViewer, setUseFallbackViewer] = useState(true);
-  const book = block.book as string | undefined;
-  const classNum = block.class as string | undefined;
-  const chapter = block.chapter as string | undefined;
-  const pageStart = block.page_start as number | undefined;
-  const pageEnd = block.page_end as number | undefined;
-  const externalUrl = block.external_url as string | undefined;
-  const content = (block.text || block.content) as string | undefined;
-  const keyFacts = block.key_facts as string[] | undefined;
+  const book = readString(block, "book");
+  const classNum = readString(block, "class");
+  const chapter = readString(block, "chapter");
+  const pageStart = typeof block.page_start === "number" && Number.isFinite(block.page_start)
+    ? block.page_start
+    : undefined;
+  const pageEnd = typeof block.page_end === "number" && Number.isFinite(block.page_end)
+    ? block.page_end
+    : undefined;
+  const externalUrl = readString(block, "external_url");
+  const content = readString(block, "text") || readString(block, "content");
+  const keyFacts = readStringArray(block.key_facts);
 
   const pageRange = pageStart && pageEnd
     ? `pp. ${pageStart}-${pageEnd}`
@@ -683,20 +742,34 @@ function NcertReference({ block }: { block: ContentBlock }) {
 // ---------------------------------------------------------------------------
 // Master block dispatcher.
 // ---------------------------------------------------------------------------
+function UnsupportedBlock({ type }: { type?: string } = {}) {
+  return (
+    <div
+      role="status"
+      className="rounded-lg border border-[#e6c2c2] bg-[#fbf0ee] px-3 py-2 text-sm text-[#6e4b50]"
+    >
+      <p>This content block is unavailable.</p>
+      {type ? <p className="mt-0.5 text-xs">Unsupported block type: {type}</p> : null}
+    </div>
+  );
+}
+
 export function RichBlock({ block }: { block: ContentBlock }) {
-  const type = (block.type as string) || "para";
-  const text = block.text as string | undefined;
+  if (!isRecord(block)) return <UnsupportedBlock />;
+
+  const type = readString(block, "type");
+  const text = readString(block, "text");
 
   switch (type) {
     case "heading":
     case "h2":
     case "h3":
-      return (
+      return text !== undefined ? (
         <h3 className="mt-5 mb-1 flex items-center gap-2 text-base font-bold text-[#13251d]">
           <span className="h-4 w-1 rounded-full" style={{ backgroundColor: GREEN }} />
           {text}
         </h3>
-      );
+      ) : <UnsupportedBlock />;
     case "callout":
       return <Callout block={block} />;
     case "statgrid":
@@ -731,17 +804,16 @@ export function RichBlock({ block }: { block: ContentBlock }) {
     case "ncert":
       return <NcertReference block={block} />;
     case "para":
+      return text !== undefined ? (
+        <p className="text-sm leading-7 text-[#31443a]">{renderInline(text)}</p>
+      ) : <UnsupportedBlock />;
     default:
-      return (
-        <p className="text-sm leading-7 text-[#31443a]">
-          {text != null ? renderInline(text) : JSON.stringify(block)}
-        </p>
-      );
+      return <UnsupportedBlock type={type} />;
   }
 }
 
 export function RichBlocks({ blocks }: { blocks: ContentBlock[] | null | undefined }) {
-  if (!blocks?.length) return null;
+  if (!Array.isArray(blocks) || !blocks.length) return null;
   return (
     <div className="flex flex-col gap-3">
       {blocks.map((b, i) => (

@@ -472,7 +472,7 @@ export const pyqTips: { title: string; detail: string }[] = [
 
 export const testFormats: { title: string; detail: string }[] = [
   { title: "Daily quiz", detail: "A short daily set on static topics + current affairs to build the habit." },
-  { title: "Prelims test series", detail: "Full-length and sectional Prelims mocks on the real UPSC pattern." },
+  { title: "Prelims practice sets", detail: "Topic-wise and sectional Prelims sets on the real UPSC pattern; full-length mocks are on the roadmap." },
   { title: "CSAT practice", detail: "Comprehension, reasoning and quantitative aptitude for the qualifying paper." },
   { title: "Mains answer writing", detail: "GS and essay prompts with structured, criteria-based evaluation." },
 ];
@@ -480,7 +480,7 @@ export const testFormats: { title: string; detail: string }[] = [
 export const testFeatures: { title: string; detail: string }[] = [
   { title: "Instant scoring & solutions", detail: "Detailed explanations the moment you submit — learn while it's fresh." },
   { title: "Weakness analytics", detail: "Accuracy by subject and micro-topic, not just a single score." },
-  { title: "All-India percentile", detail: "See where you stand against other aspirants on each test." },
+  { title: "Personal accuracy trend", detail: "Track your own accuracy across attempts — progress, not a peer rank." },
   { title: "Spaced re-tests", detail: "Missed questions resurface at the right interval for retention." },
 ];
 
@@ -491,8 +491,8 @@ export const testFeatures: { title: string; detail: string }[] = [
 
 export const pricingStats: { label: string; value: string }[] = [
   { label: "Base monthly", value: "₹399" },
-  { label: "GS subjects", value: "8" },
-  { label: "Optional pages", value: "48" },
+  { label: "GS live", value: "1 of 8" },
+  { label: "Optional reviewed", value: "1 of 25" },
 ];
 
 export const billingOptions: { label: string; save?: string }[] = [
@@ -507,7 +507,6 @@ export type PricingTier = {
   price: string;
   cadence: string;
   tagline: string;
-  usage: string;
   features: string[];
   featured?: boolean;
 };
@@ -518,12 +517,11 @@ export const pricingTiers: PricingTier[] = [
     price: "₹399",
     cadence: "/mo effective",
     tagline: "Build baseline habits before you commit to higher tiers.",
-    usage: "1 hour daily AI interaction. Generous rate limits apply.",
     features: [
-      "Core UPSC GS Subject Path",
+      "Live Geography GS path, more subjects as they ship",
       "Daily Planner & Workspace notes",
       "Standard MCQ Generator (50/day limit)",
-      "1 Spaced Weak-Topic run",
+      "1 Spaced Weak-Topic repair run",
       "Basic Syllabus check sheet",
     ],
   },
@@ -532,10 +530,9 @@ export const pricingTiers: PricingTier[] = [
     price: "₹699",
     cadence: "/mo effective",
     tagline: "Structural prep including optional subject libraries.",
-    usage: "3 hours daily AI interaction. Generous rate limits apply.",
     features: [
       "Everything in Foundation",
-      "Full Optional Subject Catalog (Academic/Lit)",
+      "Geography optional with reviewed content; 24 more opening as they are authored",
       "Advanced MCQ Generator (200/day limit)",
       "5 Spaced Weak-Topics repair runs",
       "Priority Syllabus & PYQ library",
@@ -545,8 +542,7 @@ export const pricingTiers: PricingTier[] = [
     name: "Pro",
     price: "₹999",
     cadence: "/mo effective",
-    tagline: "Priority AI queues, unlimited testing, and mains uploading.",
-    usage: "6 hours daily AI interaction. Generous rate limits apply.",
+    tagline: "Deep diagnostics, unlimited practice, and mobile mains uploading.",
     features: [
       "Everything in Plus",
       "Unlimited MCQ Generator & practice tests",
@@ -560,13 +556,10 @@ export const pricingTiers: PricingTier[] = [
     name: "Ultimate",
     price: "₹1,299",
     cadence: "/mo effective",
-    tagline: "No limits whatsoever. Complete command and direct support.",
-    usage: "Unlimited everything. Zero limits apply.",
+    tagline: "Complete command of the live portal, with direct guidance.",
     features: [
       "Everything in Pro",
-      "Unlimited AI interaction hours",
-      "No hourly or daily rate limits at all",
-      "Priority AI text and talk model response",
+      "Priority access to new live features as they ship",
       "Direct guidance channel with Sarit Classes",
     ],
   },

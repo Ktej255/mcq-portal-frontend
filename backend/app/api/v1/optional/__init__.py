@@ -12,6 +12,10 @@
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_user
+from app.api.v1.optional.dependencies import (
+    require_optional_recall_access,
+    require_optional_subject_access,
+)
 from app.api.v1.optional import health
 from app.api.v1.optional import content
 from app.api.v1.optional import pyqs
@@ -31,17 +35,19 @@ from app.api.v1.optional import current_affairs
 # at the aggregate level enforces auth-gating uniformly across every sub-router.
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
+subject_content_dependencies = [Depends(require_optional_subject_access)]
+
 router.include_router(health.router, tags=["optional"])
-router.include_router(content.router, tags=["optional"])
-router.include_router(pyqs.router, tags=["optional"])
-router.include_router(practice.router, tags=["optional"])
+router.include_router(content.router, tags=["optional"], dependencies=subject_content_dependencies)
+router.include_router(pyqs.router, tags=["optional"], dependencies=subject_content_dependencies)
+router.include_router(practice.router, tags=["optional"], dependencies=subject_content_dependencies)
 router.include_router(transcribe.router, tags=["optional"])
 router.include_router(ocr.router, tags=["optional"])
-router.include_router(answers.router, tags=["optional"])
-router.include_router(progress.router, tags=["optional"])
-router.include_router(recall.router, tags=["optional"])
+router.include_router(answers.router, tags=["optional"], dependencies=subject_content_dependencies)
+router.include_router(progress.router, tags=["optional"], dependencies=subject_content_dependencies)
+router.include_router(recall.router, tags=["optional"], dependencies=[Depends(require_optional_recall_access)])
 router.include_router(selection.router, tags=["optional"])
-router.include_router(mapping.router, tags=["optional"])
-router.include_router(subject_config.router, tags=["optional"])
+router.include_router(mapping.router, tags=["optional"], dependencies=subject_content_dependencies)
+router.include_router(subject_config.router, tags=["optional"], dependencies=subject_content_dependencies)
 router.include_router(review.router, tags=["optional"])
-router.include_router(current_affairs.router, tags=["optional"])
+router.include_router(current_affairs.router, tags=["optional"], dependencies=subject_content_dependencies)

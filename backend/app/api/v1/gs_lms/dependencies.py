@@ -13,6 +13,30 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.gs.models import GsSubject
+from app.core.gs_lms.beta_scope import (
+    BETA_LOCKED_MESSAGE,
+    beta_scope_enabled,
+    compute_loop_ready_ids,
+)
+
+
+def ensure_beta_topic(db: Session, subject_id: int, node_id: int) -> None:
+    """Reject entry to a topic outside the paid-beta scope.
+
+    Returns 409 (not 404) because the topic exists and is visible on the
+    syllabus map; it simply is not open for learning yet. The message is
+    learner-facing and states the reason without blaming the learner.
+    Operators are never routed through this helper, so coverage work is not
+    blocked by the scope.
+    """
+    if not beta_scope_enabled():
+        return
+    if node_id in compute_loop_ready_ids(db, subject_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=BETA_LOCKED_MESSAGE,
+    )
 
 
 def resolve_subject(

@@ -52,6 +52,7 @@ export type StudentPlanSummary = {
 };
 
 export const profileStorageKey = "sarit-upsc-student-profile-v1";
+const pendingProfileStorageKey = "sarit-upsc-student-profile-pending-v1";
 
 export const defaultStudentProfile: StudentProfile = {
   level: "beginner",
@@ -84,6 +85,14 @@ function isStudentLevel(level: StudentProfile["level"] | undefined): level is St
   return level === "beginner" || level === "intermediate" || level === "advanced";
 }
 
+function isPlanTier(value: unknown): value is PlanTier {
+  return value === "foundation" || value === "plus" || value === "pro" || value === "ultimate";
+}
+
+function isBillingCycle(value: unknown): value is BillingCycle {
+  return value === "monthly" || value === "yearly" || value === "two-year" || value === "three-year";
+}
+
 function isPreparationStage(stage: StudentProfile["preparationStage"] | undefined): stage is PreparationStage {
   return stage === "not-started" || stage === "coaching-complete" || stage === "multiple-attempts";
 }
@@ -107,6 +116,16 @@ export function normalizeStudentProfile(profile: Partial<StudentProfile>) {
       : preparationStage === "not-started" || savedAttemptHistory === "two-plus-attempts"
         ? "no-attempt"
         : savedAttemptHistory;
+  // Legacy duration ids (for example "eighteen-month") are not billing
+  // cycles in the tier x cycle model. Keep the stored value only when it is a
+  // current tier/cycle, otherwise fall back to the default so the pricing
+  // page never filters its plan grid down to zero cards.
+  const subscriptionPlanId = isPlanTier(profile.subscriptionPlanId)
+    ? profile.subscriptionPlanId
+    : defaultStudentProfile.subscriptionPlanId;
+  const billingCycle = isBillingCycle(profile.billingCycle)
+    ? profile.billingCycle
+    : defaultStudentProfile.billingCycle;
 
   return {
     ...defaultStudentProfile,
@@ -114,11 +133,14 @@ export function normalizeStudentProfile(profile: Partial<StudentProfile>) {
     level,
     preparationStage,
     attemptHistory,
+    subscriptionPlanId,
+    billingCycle,
   } as StudentProfile;
 }
 
 export function readStudentProfile() {
   if (typeof window === "undefined") return null;
+  if (window.localStorage.getItem(pendingProfileStorageKey)) return null;
   const raw = window.localStorage.getItem(profileStorageKey);
   if (!raw) return null;
   try {
@@ -134,12 +156,47 @@ export function readStudentProfile() {
   }
 }
 
+function clearPendingProfileIfCurrent(serializedProfile: string) {
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem(pendingProfileStorageKey) === serializedProfile) {
+    window.localStorage.removeItem(pendingProfileStorageKey);
+  }
+}
+
 export function saveStudentProfile(profile: StudentProfile) {
   const normalizedProfile = normalizeStudentProfile(profile);
   if (typeof window === "undefined") return normalizedProfile;
-  window.localStorage.setItem(profileStorageKey, JSON.stringify(normalizedProfile));
-  void saveRemoteStudentProfile(normalizedProfile);
+  const serializedProfile = JSON.stringify(normalizedProfile);
+  window.localStorage.setItem(profileStorageKey, serializedProfile);
+  window.localStorage.setItem(pendingProfileStorageKey, serializedProfile);
+  void saveRemoteStudentProfile(normalizedProfile)
+    .then((persisted) => {
+      if (persisted) clearPendingProfileIfCurrent(serializedProfile);
+    })
+    .catch(() => {
+      // Keep the pending marker and local draft available for a later retry.
+    });
   return normalizedProfile;
+}
+
+/**
+ * Persist a profile locally while waiting for the canonical backend write.
+ * Callers that gate access on profile creation must use the boolean result.
+ */
+export async function saveStudentProfileAndWait(profile: StudentProfile): Promise<boolean> {
+  const normalizedProfile = normalizeStudentProfile(profile);
+  if (typeof window === "undefined") return false;
+  const serializedProfile = JSON.stringify(normalizedProfile);
+  window.localStorage.setItem(profileStorageKey, serializedProfile);
+  window.localStorage.setItem(pendingProfileStorageKey, serializedProfile);
+
+  try {
+    const persisted = await saveRemoteStudentProfile(normalizedProfile);
+    if (persisted) clearPendingProfileIfCurrent(serializedProfile);
+    return persisted;
+  } catch {
+    return false;
+  }
 }
 
 export async function syncLocalStudentProfile() {

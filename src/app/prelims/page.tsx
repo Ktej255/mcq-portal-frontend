@@ -53,7 +53,7 @@ const approach = [
   {
     icon: Target,
     title: "MCQ Practice with Per-Type Scoring",
-    desc: "Practice topic-wise and full-length with real-time scoring broken down by question type — factual, application, elimination, and mapping.",
+    desc: "Practice topic-wise and sectional with real-time scoring broken down by question type — factual, application, elimination, and mapping.",
   },
   {
     icon: BarChart3,

@@ -6,14 +6,13 @@ Routes (mounted under /api/v1/gs-lms/{subject_slug}; auth-gated at the package r
 
 Progressive disclosure logic:
 - Only REVIEWED sections are visible to students (review-gate).
-- For first-time topic visits, content is blocked until the student has a
-  COMPLETED discussion session for that topic (AI Discussion gate).
-- If the student already completed discussion (or is returning), they get
-  full progressive access.
-- Section 1 (BASIC) is always unlocked (if discussion gate passed).
-- Section N is unlocked if section N-1 is completed.
+- The AI discussion is optional and never blocks content. ``discussion_gate_passed``
+  remains in the response as diagnostic state for readiness/skip policy.
+- Section 1 (BASIC) is always unlocked.
+- Skippable sections are always unlocked and never block topic completion.
+- Other sections are unlocked when the nearest previous non-skippable section is completed.
 - Content blocks are included only for unlocked sections; None for locked.
-- When all 4 sections are completed → topic is content-complete.
+- When all non-skippable sections are completed → topic is content-complete.
 
 Requirements traced: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 5.1, 9.1, 9.2
 """
@@ -34,6 +33,7 @@ from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
+    GsLmsSectionLabelEnum,
 )
 from app.core.gs_lms.student_models import (
     GsLmsStudentSectionProgress,
@@ -42,7 +42,7 @@ from app.core.gs_lms.student_models import (
     GsLmsVideoWatch,
     GsLmsOnboardingStatus,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsTopicSectionsOut,
     GsLmsContentSectionOut,
@@ -57,11 +57,16 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _get_node_or_404(db: Session, node_id: int) -> GsLmsSyllabusNode:
-    """Fetch a syllabus node by ID or raise 404."""
+def _get_node_or_404(
+    db: Session, node_id: int, subject_id: int
+) -> GsLmsSyllabusNode:
+    """Fetch a syllabus node owned by the requested subject or raise 404."""
     node = (
         db.query(GsLmsSyllabusNode)
-        .filter(GsLmsSyllabusNode.id == node_id)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
+        )
         .one_or_none()
     )
     if node is None:
@@ -73,10 +78,11 @@ def _get_node_or_404(db: Session, node_id: int) -> GsLmsSyllabusNode:
 
 
 def _has_completed_discussion(db: Session, student_id: int, node_id: int) -> bool:
-    """Check if the student has a COMPLETED discussion session for this topic.
+    """Check if the student completed the optional knowledge-check discussion.
 
-    Returns True if at least one session with status=COMPLETED exists,
-    meaning the AI Discussion gate has been passed.
+    Returns True if at least one session with status=COMPLETED exists. This is
+    diagnostic evidence used for skip allowances and readiness; it never gates
+    content access.
     """
     session = (
         db.query(GsLmsDiscussionSession)
@@ -90,9 +96,24 @@ def _has_completed_discussion(db: Session, student_id: int, node_id: int) -> boo
     return session is not None
 
 
+_CANONICAL_SECTION_ORDER = {
+    GsLmsSectionLabelEnum.BASIC: 1,
+    GsLmsSectionLabelEnum.NCERT_LEVEL: 2,
+    GsLmsSectionLabelEnum.ADVANCED: 3,
+    GsLmsSectionLabelEnum.CURRENT_AFFAIRS: 4,
+    GsLmsSectionLabelEnum.EXAMINER_TRAPS: 5,
+}
+
+
 def _get_reviewed_sections(db: Session, node_id: int) -> list[GsLmsContentSection]:
-    """Fetch all REVIEWED content sections for a node, ordered by display_order."""
-    return (
+    """Fetch reviewed sections in the canonical five-section funnel order.
+
+    Older topics may contain only the historical four-section set; those are
+    kept in persisted ``display_order`` so legacy fixtures/content remain
+    compatible. Complete five-section topics use the funnel's canonical order
+    regardless of stale importer display-order values.
+    """
+    sections = (
         db.query(GsLmsContentSection)
         .filter(
             GsLmsContentSection.syllabus_node_id == node_id,
@@ -101,6 +122,11 @@ def _get_reviewed_sections(db: Session, node_id: int) -> list[GsLmsContentSectio
         .order_by(GsLmsContentSection.display_order)
         .all()
     )
+
+    labels = {section.section_label for section in sections}
+    if set(_CANONICAL_SECTION_ORDER).issubset(labels):
+        sections.sort(key=lambda section: _CANONICAL_SECTION_ORDER[section.section_label])
+    return sections
 
 
 def _get_student_progress(
@@ -127,28 +153,33 @@ def _get_student_progress(
 def _compute_lock_states(
     sections: list[GsLmsContentSection],
     progress_map: dict[int, bool],
-    discussion_gate_passed: bool,
+    skippable_section_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
-    """Compute lock/unlock state for each section.
+    """Compute progressive lock/unlock state for each section.
 
-    Logic:
-    - If discussion gate NOT passed: all sections are locked.
-    - Section 1 (first by display_order): always unlocked when gate passed.
-    - Section N (N>1): unlocked if section N-1 is completed.
+    Content access never depends on the optional AI discussion. The first
+    section is always unlocked, skippable sections never lock, and every other
+    section unlocks once the nearest previous non-skippable section is complete.
     """
+    skip = skippable_section_ids or set()
     result: list[dict[str, Any]] = []
     for i, section in enumerate(sections):
         completed = progress_map.get(section.id, False)
-        if not discussion_gate_passed:
-            locked = True
-        elif i == 0:
-            # First section is always unlocked once gate passed
+        if section.id in skip:
             locked = False
         else:
-            # Unlocked only if previous section is completed
-            prev_section = sections[i - 1]
-            prev_completed = progress_map.get(prev_section.id, False)
-            locked = not prev_completed
+            previous_required = next(
+                (
+                    previous_section
+                    for previous_section in reversed(sections[:i])
+                    if previous_section.id not in skip
+                ),
+                None,
+            )
+            locked = (
+                previous_required is not None
+                and not progress_map.get(previous_required.id, False)
+            )
 
         result.append({
             "section": section,
@@ -259,16 +290,19 @@ def get_topic_sections(
     """Return all sections for a topic with lock/unlock state per student.
 
     Progressive disclosure: only unlocked sections include content blocks.
-    Discussion gate must be passed before any content is accessible.
+    The optional AI discussion is reported for diagnostics but never gates
+    content access.
 
-    Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.6, 5.1
+    Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.6
     """
-    node = _get_node_or_404(db, node_id)
+    node = _get_node_or_404(db, node_id, subject.id)
+    # Paid-beta scope: a visible-but-unfinished topic must not open.
+    ensure_beta_topic(db, subject.id, node.id)
 
     # Fetch reviewed sections only (review-gate: R10.3)
     sections = _get_reviewed_sections(db, node_id)
 
-    # Check AI Discussion gate (R5.1)
+    # Optional discussion state — diagnostic only, never a lock.
     discussion_gate_passed = _has_completed_discussion(
         db, current_user.id, node_id
     )
@@ -277,14 +311,14 @@ def get_topic_sections(
     section_ids = [s.id for s in sections]
     progress_map = _get_student_progress(db, current_user.id, section_ids)
 
-    # Compute lock states
-    section_states = _compute_lock_states(sections, progress_map, discussion_gate_passed)
-
     # --- Section-skip logic based on learner level + match percentage ---
     learner_level = _get_learner_level(db, current_user.id)
     match_percentage = _get_latest_match_percentage(db, current_user.id, node_id)
     skippable_labels = _compute_skippable_section_labels(learner_level, match_percentage)
     skippable_ids = _compute_skippable_section_ids(sections, skippable_labels)
+
+    # Compute lock states after skip semantics are known.
+    section_states = _compute_lock_states(sections, progress_map, skippable_ids)
 
     # Build response
     sections_out: list[GsLmsContentSectionOut] = []
@@ -351,14 +385,18 @@ def complete_section(
     """Mark a content section as complete and unlock the next section.
 
     Enforces:
-    - AI Discussion gate must be passed first (R5.1)
     - Section must belong to the given topic
     - Section must be unlocked (progressive order — R2.2)
-    - Completing the 4th section marks the topic as content-complete (R2.5)
+    - Completing the final required section marks the topic as content-complete (R2.5)
 
-    Validates: Requirements 2.2, 2.5, 2.6, 5.1
+    The optional AI discussion is not required; it is reported back as
+    diagnostic state only.
+
+    Validates: Requirements 2.2, 2.5, 2.6
     """
-    node = _get_node_or_404(db, node_id)
+    node = _get_node_or_404(db, node_id, subject.id)
+    # Paid-beta scope: a visible-but-unfinished topic must not open.
+    ensure_beta_topic(db, subject.id, node.id)
 
     # Verify the section exists and belongs to this node
     section = (
@@ -376,23 +414,24 @@ def complete_section(
             detail="Section not found for this topic",
         )
 
-    # Enforce AI Discussion gate (R5.1)
+    # Optional discussion state — diagnostic only, never a lock.
     discussion_gate_passed = _has_completed_discussion(
         db, current_user.id, node_id
     )
-    if not discussion_gate_passed:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="AI Discussion required before content access",
-        )
 
     # Fetch all reviewed sections to check ordering
     all_sections = _get_reviewed_sections(db, node_id)
     section_ids = [s.id for s in all_sections]
     progress_map = _get_student_progress(db, current_user.id, section_ids)
 
+    # Compute skippable sections for this student + topic before lock states.
+    learner_level = _get_learner_level(db, current_user.id)
+    match_percentage = _get_latest_match_percentage(db, current_user.id, node_id)
+    skippable_labels = _compute_skippable_section_labels(learner_level, match_percentage)
+    skippable_ids = _compute_skippable_section_ids(all_sections, skippable_labels)
+
     # Compute current lock states to verify section is unlocked
-    section_states = _compute_lock_states(all_sections, progress_map, discussion_gate_passed)
+    section_states = _compute_lock_states(all_sections, progress_map, skippable_ids)
 
     # Find target section in states
     target_state = None
@@ -413,12 +452,6 @@ def complete_section(
             detail="Previous section not completed",
         )
 
-    # Compute skippable sections for this student + topic
-    learner_level = _get_learner_level(db, current_user.id)
-    match_percentage = _get_latest_match_percentage(db, current_user.id, node_id)
-    skippable_labels = _compute_skippable_section_labels(learner_level, match_percentage)
-    skippable_ids = _compute_skippable_section_ids(all_sections, skippable_labels)
-
     # Already completed? Return success idempotently
     if target_state["completed"]:
         # Re-fetch full state for response
@@ -434,7 +467,7 @@ def complete_section(
                 topic_completed=topic_completed,
                 learner_level=learner_level,
                 sections=_build_sections_response(
-                    all_sections, updated_progress_map, discussion_gate_passed, skippable_ids
+                    all_sections, updated_progress_map, skippable_ids
                 ),
             ),
         )
@@ -487,7 +520,7 @@ def complete_section(
             topic_completed=topic_completed,
             learner_level=learner_level,
             sections=_build_sections_response(
-                all_sections, updated_progress_map, discussion_gate_passed, skippable_ids
+                all_sections, updated_progress_map, skippable_ids
             ),
         ),
     )
@@ -496,7 +529,6 @@ def complete_section(
 def _build_sections_response(
     sections: list[GsLmsContentSection],
     progress_map: dict[int, bool],
-    discussion_gate_passed: bool,
     skippable_ids: set[int] | None = None,
 ) -> list[GsLmsContentSectionOut]:
     """Build the section list response with updated lock states.
@@ -506,7 +538,7 @@ def _build_sections_response(
             level and discussion match percentage. Defaults to empty set.
     """
     skip = skippable_ids or set()
-    section_states = _compute_lock_states(sections, progress_map, discussion_gate_passed)
+    section_states = _compute_lock_states(sections, progress_map, skip)
     sections_out: list[GsLmsContentSectionOut] = []
     for state in section_states:
         section: GsLmsContentSection = state["section"]

@@ -3,8 +3,8 @@
 # Aggregates all GS LMS sub-routers (syllabus, content, PYQ, practice,
 # discussion, progress, planner, PDF, onboarding, video) under a single
 # APIRouter that is mounted at /api/v1/gs-lms in app.main. Every route in
-# this package is auth-gated via the existing authentication dependency
-# (app.api.dependencies).
+# this package is auth-gated and, when GS_LMS_ENFORCE_ACCESS is enabled,
+# cohort-access-gated for the private beta.
 #
 # Multi-subject routing (Requirement 9.1, 9.2): all subject-specific routes
 # are mounted under /{subject_slug}/ prefix. The subject_slug path parameter
@@ -16,19 +16,19 @@
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_current_user
+from app.api.v1.gs_lms.access import require_gs_lms_access
 from app.api.v1.gs_lms import syllabus
 from app.api.v1.gs_lms import content
 from app.api.v1.gs_lms import pyqs
 from app.api.v1.gs_lms import practice
 from app.api.v1.gs_lms import discussion
 from app.api.v1.gs_lms import progress
+from app.api.v1.gs_lms import readiness
 from app.api.v1.gs_lms import planner
 from app.api.v1.gs_lms import pdf
 from app.api.v1.gs_lms import onboarding
 from app.api.v1.gs_lms import video
 from app.api.v1.gs_lms import revisit
-from app.api.v1.gs_lms import preview
 from app.api.v1.gs_lms import recall_gate
 from app.api.v1.gs_lms import retro
 from app.api.v1.gs_lms import answers
@@ -40,10 +40,13 @@ from app.api.v1.gs_lms import mains
 from app.api.v1.gs_lms import growth
 from app.api.v1.gs_lms import subjects
 
-# All GS LMS routes require authentication. Declaring the dependency at the
-# aggregate level enforces auth-gating uniformly across every sub-router
-# (Requirement 10.2 / design Property 23).
-router = APIRouter(dependencies=[Depends(get_current_user)])
+# All GS LMS routes require authentication AND cohort access. Declaring the
+# dependencies at the aggregate level enforces them uniformly across every
+# sub-router (Requirement 10.2 / design Property 23). `require_gs_lms_access`
+# depends on `get_current_user`, so unauthenticated calls still receive 401.
+# When `GS_LMS_ENFORCE_ACCESS` is disabled (local/dev default), authenticated
+# users pass without a cohort grant.
+router = APIRouter(dependencies=[Depends(require_gs_lms_access)])
 
 # Not subject-specific: lists the subjects and whether students can open them.
 router.include_router(subjects.router, tags=["gs-lms"])
@@ -57,6 +60,7 @@ router.include_router(pyqs.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(practice.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(discussion.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(progress.router, prefix="/{subject_slug}", tags=["gs-lms"])
+router.include_router(readiness.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(planner.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(pdf.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(onboarding.router, prefix="/{subject_slug}", tags=["gs-lms"])
@@ -71,7 +75,3 @@ router.include_router(recall.router, prefix="/{subject_slug}", tags=["gs-lms-fun
 router.include_router(mcq_lab.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(mains.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(growth.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
-
-# Preview routes are NOT subject-specific — they serve dev/preview content
-# without auth or subject resolution.
-router.include_router(preview.router, tags=["gs-lms-preview"])

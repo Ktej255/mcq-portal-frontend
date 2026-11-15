@@ -35,7 +35,11 @@ export function SubjectTrackRoom({ plan, initialDay }: { plan: SubjectSprintPlan
     initialDay && Number.isFinite(initialDay) ? Math.min(Math.max(initialDay, 1), plan.sessions.length) : undefined;
   useEffect(() => {
     if (!isLoaded) return;
-    setLearnerLevel(readStudentProfile()?.level ?? "beginner");
+    const profileTimer = window.setTimeout(
+      () => setLearnerLevel(readStudentProfile()?.level ?? "beginner"),
+      0,
+    );
+    return () => window.clearTimeout(profileTimer);
   }, [isLoaded]);
 
   const readinessSnapshot = buildSubjectReadinessSnapshot(plan, progress, learnerLevel);

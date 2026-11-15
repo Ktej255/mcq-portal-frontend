@@ -81,7 +81,6 @@ export function ZenDashboard() {
   const {
     isLoaded,
     profile,
-    draft,
     setDraft,
     saveProfile,
     isWelcomeVideoCompleted,
@@ -94,7 +93,6 @@ export function ZenDashboard() {
     activeMissionReadiness,
     activeMissionHref,
     activeMissionProgress,
-    meTimeDone,
     saveMeTimeCheck,
     streakCount,
   } = useDashboardData();

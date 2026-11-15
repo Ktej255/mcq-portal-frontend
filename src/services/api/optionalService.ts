@@ -525,6 +525,11 @@ export interface RecallTurnResultOut {
   transcript: string;
   stt_confidence: number;
   stt_low_confidence: boolean;
+  /** Immediate provenance; null on reload for legacy rows without persisted metadata. */
+  stt_provider?: string | null;
+  stt_is_mock?: boolean | null;
+  recall_provider?: string | null;
+  recall_is_mock?: boolean | null;
   recall_score: number;
   recall_percent: number;
   matched: RecallMatchedConceptOut[];
@@ -543,6 +548,49 @@ export interface RecallSessionStateOut {
   recall_percent: number;
   turns: RecallTurnResultOut[];
 }
+
+interface RecallUnavailableDetail {
+  code: 'RECALL_PROVIDER_UNAVAILABLE';
+  message: string;
+  retryable: true;
+  provider: string;
+  operation: string;
+}
+
+export class RecallProviderUnavailableError extends Error {
+  readonly code = 'RECALL_PROVIDER_UNAVAILABLE';
+  readonly retryable = true;
+
+  constructor(
+    message: string,
+    readonly provider: string,
+    readonly operation: string,
+  ) {
+    super(message);
+    this.name = 'RecallProviderUnavailableError';
+  }
+}
+
+const parseRecallUnavailable = (error: unknown): RecallProviderUnavailableError | null => {
+  if (!error || typeof error !== 'object') return null;
+  const response = (error as { response?: { status?: number; data?: unknown } }).response;
+  if (response?.status !== 503 || !response.data || typeof response.data !== 'object') return null;
+  const detail = (response.data as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object') return null;
+  const candidate = detail as Partial<RecallUnavailableDetail>;
+  if (
+    candidate.code !== 'RECALL_PROVIDER_UNAVAILABLE' ||
+    candidate.retryable !== true ||
+    typeof candidate.message !== 'string' ||
+    typeof candidate.provider !== 'string' ||
+    typeof candidate.operation !== 'string'
+  ) return null;
+  return new RecallProviderUnavailableError(
+    candidate.message,
+    candidate.provider,
+    candidate.operation,
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Subject selection + entitlement types (spec task 13 — R1.3 / R15 / R16)
@@ -818,8 +866,9 @@ export const optionalService = {
    * The response carries `low_confidence` (`confidence < threshold`): when true
    * the caller MUST route the student through a review/correct step before the
    * transcript fills the answer segment (R8.4 / R20.3), rather than committing
-   * it silently. Real transcription requires a configured Whisper backend; the
-   * deterministic mock provider is the dev/test default.
+   * it silently. Real transcription uses the explicitly selected Gemini or
+   * Whisper backend. Deterministic mock output is available only under the
+   * backend's explicit non-production selection + enable policy.
    */
   transcribeAudio: async (
     slug: string,
@@ -849,8 +898,9 @@ export const optionalService = {
    * the caller MUST inform the student and offer a fallback (review/correct,
    * type instead, or re-upload) before the text fills the answer (R9.3 /
    * R20.1), rather than committing a shaky extraction silently. Real OCR
-   * requires a configured Gemini-Vision backend (routed through the shared
-   * inference gateway); the deterministic mock provider is the dev/test default.
+   * uses the explicitly selected Gemini-Vision backend through the shared
+   * inference gateway. Deterministic mock output is available only under the
+   * backend's explicit non-production selection + enable policy.
    */
   extractHandwriting: async (
     slug: string,
@@ -953,10 +1003,16 @@ export const optionalService = {
   ): Promise<RecallTurnResultOut> => {
     const form = new FormData();
     form.append('audio', audio, options.filename ?? audioUploadName(audio, 'recall'));
-    const response = await apiClient.post(`optional/segments/${segmentId}/recall`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return unwrap<RecallTurnResultOut>(response.data);
+    try {
+      const response = await apiClient.post(`optional/segments/${segmentId}/recall`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return unwrap<RecallTurnResultOut>(response.data);
+    } catch (error) {
+      const unavailable = parseRecallUnavailable(error);
+      if (unavailable) throw unavailable;
+      throw error;
+    }
   },
 
   /**
@@ -970,10 +1026,16 @@ export const optionalService = {
   ): Promise<RecallTurnResultOut> => {
     const form = new FormData();
     form.append('audio', audio, options.filename ?? audioUploadName(audio, 'recall'));
-    const response = await apiClient.post(`optional/recall/${sessionId}/respond`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return unwrap<RecallTurnResultOut>(response.data);
+    try {
+      const response = await apiClient.post(`optional/recall/${sessionId}/respond`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return unwrap<RecallTurnResultOut>(response.data);
+    } catch (error) {
+      const unavailable = parseRecallUnavailable(error);
+      if (unavailable) throw unavailable;
+      throw error;
+    }
   },
 
   /** Fetch a recall session's state + ordered turns (reload-on-return, R15). */

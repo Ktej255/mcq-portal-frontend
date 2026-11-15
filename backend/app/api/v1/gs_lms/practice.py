@@ -45,7 +45,7 @@ from app.core.gs_lms.mcq_scoring import (
     compute_type_accuracy,
 )
 from app.core.gs_lms.coverage import create_gap_snapshot
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsPracticeStartIn,
     GsLmsPracticeSessionOut,
@@ -65,14 +65,19 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 def _get_session_owned_by(
-    db: Session, session_id: int, student_id: int
+    db: Session, session_id: int, student_id: int, subject_id: int
 ) -> GsLmsPracticeSession:
-    """Retrieve a practice session owned by the student, or raise 404."""
+    """Retrieve a student's practice session under the requested subject."""
     session = (
         db.query(GsLmsPracticeSession)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsPracticeSession.syllabus_node_id,
+        )
         .filter(
             GsLmsPracticeSession.id == session_id,
             GsLmsPracticeSession.student_id == student_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
         )
         .one_or_none()
     )
@@ -120,6 +125,76 @@ def _question_to_out(question: GsLmsMcqQuestion) -> GsLmsMcqQuestionOut:
     )
 
 
+def _build_practice_result(
+    db: Session, practice_session: GsLmsPracticeSession
+) -> GsLmsPracticeResultOut:
+    """Rebuild the authoritative result for a completed practice session."""
+    attempts_db = (
+        db.query(GsLmsPracticeAttempt)
+        .filter(GsLmsPracticeAttempt.session_id == practice_session.id)
+        .all()
+    )
+    questions = _get_questions_for_session(db, practice_session.syllabus_node_id)
+    question_map = {q.id: q for q in questions}
+
+    scoring_attempts = [
+        Attempt(
+            question_id=a.question_id,
+            question_type=a.question_type,
+            chosen_answer=a.chosen_answer,
+            correct_answer=question_map.get(a.question_id).correct_option
+            if question_map.get(a.question_id)
+            else "",
+            is_correct=a.is_correct,
+            time_taken_seconds=a.time_taken_seconds,
+        )
+        for a in attempts_db
+    ]
+    score = compute_score(scoring_attempts)
+    type_accuracies = compute_type_accuracy(scoring_attempts)
+
+    attempts_out = []
+    for attempt in attempts_db:
+        question = question_map.get(attempt.question_id)
+        question_type = (
+            attempt.question_type.value
+            if attempt.question_type and hasattr(attempt.question_type, "value")
+            else str(attempt.question_type) if attempt.question_type else ""
+        )
+        attempts_out.append(
+            GsLmsPracticeAttemptResultOut(
+                question_id=attempt.question_id,
+                chosen_answer=attempt.chosen_answer,
+                correct_answer=question.correct_option if question else "",
+                is_correct=attempt.is_correct,
+                question_type=question_type,
+                explanation=question.explanation if question else None,
+                time_taken_seconds=attempt.time_taken_seconds,
+            )
+        )
+
+    type_accuracy_out = [
+        GsLmsQuestionTypeAccuracyOut(
+            question_type=accuracy.question_type.value,
+            total=accuracy.total,
+            correct=accuracy.correct,
+            accuracy=accuracy.accuracy,
+        )
+        for accuracy in type_accuracies
+    ]
+    submitted_at = practice_session.submitted_at or datetime.now(timezone.utc)
+
+    return GsLmsPracticeResultOut(
+        session_id=practice_session.id,
+        total_questions=practice_session.total_questions,
+        correct_count=sum(1 for attempt in attempts_db if attempt.is_correct is True),
+        score=score,
+        attempts=attempts_out,
+        type_accuracy=type_accuracy_out,
+        submitted_at=submitted_at.isoformat(),
+    )
+
+
 def _build_session_out(
     session: GsLmsPracticeSession,
     current_question: GsLmsMcqQuestion | None,
@@ -160,7 +235,9 @@ def get_practice_session(
 
     Raises 404 if session not found, not owned by student, or already SUBMITTED.
     """
-    practice_session = _get_session_owned_by(db, session_id, current_user.id)
+    practice_session = _get_session_owned_by(
+        db, session_id, current_user.id, subject.id
+    )
 
     # Don't expose submitted sessions — they are finalized
     if practice_session.status == GsLmsPracticeSessionStatusEnum.SUBMITTED:
@@ -206,6 +283,7 @@ def start_practice_session(
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.id == body.syllabus_node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
@@ -215,6 +293,7 @@ def start_practice_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found",
         )
+    ensure_beta_topic(db, subject.id, node.id)
 
     # Get REVIEWED questions for the topic
     questions = _get_questions_for_session(db, body.syllabus_node_id)
@@ -264,7 +343,9 @@ def answer_question(
     Raises 409 if session is already SUBMITTED.
     Raises 422 if session is already COMPLETED (all questions traversed).
     """
-    practice_session = _get_session_owned_by(db, session_id, current_user.id)
+    practice_session = _get_session_owned_by(
+        db, session_id, current_user.id, subject.id
+    )
 
     # Check session status
     if practice_session.status == GsLmsPracticeSessionStatusEnum.SUBMITTED:
@@ -366,7 +447,9 @@ def skip_question(
     Raises 409 if session is already SUBMITTED.
     Raises 422 if session is already COMPLETED.
     """
-    practice_session = _get_session_owned_by(db, session_id, current_user.id)
+    practice_session = _get_session_owned_by(
+        db, session_id, current_user.id, subject.id
+    )
 
     # Check session status
     if practice_session.status == GsLmsPracticeSessionStatusEnum.SUBMITTED:
@@ -443,19 +526,23 @@ def submit_session(
 
     Only works if session status is COMPLETED (all questions traversed).
     Scores the session using the mcq_scoring engine, returns results with
-    per-type accuracy breakdown.
+    per-type accuracy breakdown. Repeated calls replay the persisted result.
 
     Raises 404 if session not found or not owned by student.
-    Raises 409 if session already SUBMITTED.
     Raises 422 if not all questions have been answered/skipped yet.
     """
-    practice_session = _get_session_owned_by(db, session_id, current_user.id)
+    practice_session = _get_session_owned_by(
+        db, session_id, current_user.id, subject.id
+    )
 
-    # Check session status
+    # A committed submission may be retried after a lost response or a
+    # post-commit side-effect failure. Rebuild the persisted result instead of
+    # turning an already-authoritative submission into a terminal conflict.
     if practice_session.status == GsLmsPracticeSessionStatusEnum.SUBMITTED:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session already submitted",
+        return StandardResponse(
+            success=True,
+            message="Session already submitted; result replayed",
+            data=_build_practice_result(db, practice_session),
         )
 
     if practice_session.status == GsLmsPracticeSessionStatusEnum.IN_PROGRESS:
@@ -464,39 +551,9 @@ def submit_session(
             detail="Not all questions have been answered or skipped",
         )
 
-    # Get all attempts for this session
-    attempts_db = (
-        db.query(GsLmsPracticeAttempt)
-        .filter(GsLmsPracticeAttempt.session_id == practice_session.id)
-        .all()
-    )
-
-    # Get questions for explanation data
-    questions = _get_questions_for_session(db, practice_session.syllabus_node_id)
-    question_map = {q.id: q for q in questions}
-
-    # Convert DB attempts to scoring DTOs
-    scoring_attempts = []
-    for a in attempts_db:
-        question = question_map.get(a.question_id)
-        correct_answer = question.correct_option if question else ""
-        q_type = a.question_type
-        scoring_attempts.append(
-            Attempt(
-                question_id=a.question_id,
-                question_type=q_type,
-                chosen_answer=a.chosen_answer,
-                correct_answer=correct_answer,
-                is_correct=a.is_correct,
-                time_taken_seconds=a.time_taken_seconds,
-            )
-        )
-
-    # Compute scores using the scoring engine
-    score = compute_score(scoring_attempts)
-    type_accuracies = compute_type_accuracy(scoring_attempts)
-
-    # Mark session as SUBMITTED
+    # Mark session as SUBMITTED before the downstream gap update. If the
+    # downstream update fails after this commit, a retry can still replay the
+    # authoritative result through the branch above.
     now = datetime.now(timezone.utc)
     practice_session.status = GsLmsPracticeSessionStatusEnum.SUBMITTED
     practice_session.submitted_at = now
@@ -507,52 +564,8 @@ def submit_session(
     create_gap_snapshot(db, current_user.id)
     db.commit()
 
-    # Build attempt results output
-    attempts_out = []
-    for a in attempts_db:
-        question = question_map.get(a.question_id)
-        q_type_val = (
-            a.question_type.value
-            if a.question_type and hasattr(a.question_type, "value")
-            else str(a.question_type) if a.question_type else ""
-        )
-        attempts_out.append(
-            GsLmsPracticeAttemptResultOut(
-                question_id=a.question_id,
-                chosen_answer=a.chosen_answer,
-                correct_answer=question.correct_option if question else "",
-                is_correct=a.is_correct,
-                question_type=q_type_val,
-                explanation=question.explanation if question else None,
-                time_taken_seconds=a.time_taken_seconds,
-            )
-        )
-
-    # Build type accuracy output
-    type_accuracy_out = [
-        GsLmsQuestionTypeAccuracyOut(
-            question_type=ta.question_type.value,
-            total=ta.total,
-            correct=ta.correct,
-            accuracy=ta.accuracy,
-        )
-        for ta in type_accuracies
-    ]
-
-    correct_count = sum(1 for a in attempts_db if a.is_correct is True)
-
-    result = GsLmsPracticeResultOut(
-        session_id=practice_session.id,
-        total_questions=practice_session.total_questions,
-        correct_count=correct_count,
-        score=score,
-        attempts=attempts_out,
-        type_accuracy=type_accuracy_out,
-        submitted_at=now.isoformat(),
-    )
-
     return StandardResponse(
         success=True,
         message="Session submitted and scored",
-        data=result,
+        data=_build_practice_result(db, practice_session),
     )

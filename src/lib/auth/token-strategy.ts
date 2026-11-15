@@ -4,30 +4,51 @@ import { readLocalMockToken } from '@/lib/auth/local-testing';
 
 const authDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
+interface ClerkSession {
+  getToken(options: { skipCache: boolean }): Promise<string | null | undefined>;
+}
+
+interface ClerkWindow {
+  Clerk?: {
+    session?: ClerkSession;
+  };
+}
+
 /**
  * Unified token resolution strategy for the UPSC Command portal.
- * Handles Firebase tokens and MOCK_TOKEN bypass for dev/mock sessions.
+ * Keeps each provider's credential authoritative for its configured mode.
  */
 export async function resolveToken(forceRefresh = false): Promise<string | null> {
-  // 1. Check for MOCK_TOKEN bypass (Priority for dev/validator scenarios)
-  const mockToken = readLocalMockToken();
-  if (mockToken) {
-    if (authDebug) console.info("AUTH | TOKEN_STRATEGY | Using local MOCK_TOKEN bypass");
+  if (activeAuthProvider === 'mock') {
+    const mockToken = readLocalMockToken();
+    if (mockToken && authDebug) {
+      console.info("AUTH | TOKEN_STRATEGY | Using gated local mock authentication");
+    }
     return mockToken;
   }
 
-  // 2. Clerk Authentication
+  if (activeAuthProvider === 'supabase') {
+    try {
+      if (!supabase) return null;
+      if (forceRefresh) await supabase.auth.refreshSession();
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token ?? null;
+    } catch {
+      console.error("AUTH | TOKEN_STRATEGY | Supabase token retrieval failed");
+    }
+  }
+
   if (activeAuthProvider === 'clerk') {
     try {
       if (typeof window !== 'undefined') {
-        const clerkObj = (window as any).Clerk;
-        if (clerkObj && clerkObj.session) {
-          const token = await clerkObj.session.getToken();
+        const clerkObj = (window as unknown as ClerkWindow).Clerk;
+        if (clerkObj?.session) {
+          const token = await clerkObj.session.getToken({ skipCache: forceRefresh });
           return token ?? null;
         }
       }
-    } catch (err) {
-      console.error("FORENSIC | TOKEN_STRATEGY | Clerk token retrieval failed:", err);
+    } catch {
+      console.error("AUTH | TOKEN_STRATEGY | Clerk token retrieval failed");
     }
   }
 
@@ -36,7 +57,7 @@ export async function resolveToken(forceRefresh = false): Promise<string | null>
 
 /**
  * Polling version of token resolution for use in request interceptors
- * where we might need to wait for Firebase to initialize.
+ * where a provider session may still be hydrating in the browser.
  */
 export async function waitForToken(maxRetries = 50): Promise<string | null> {
   for (let i = 0; i < maxRetries; i++) {

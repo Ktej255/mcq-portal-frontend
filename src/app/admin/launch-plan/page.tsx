@@ -117,7 +117,7 @@ export default function AdminLaunchPlanPage() {
             Geography Pilot <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            href="/upsc/geography/pilot"
+            href="/upsc/geography/lms"
             className="inline-flex h-10 items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-950"
           >
             Student Pilot <ArrowRight className="h-4 w-4" />

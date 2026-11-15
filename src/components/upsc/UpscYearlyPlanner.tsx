@@ -4,75 +4,32 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   ArrowRight,
-  BadgeIndianRupee,
   BookOpenCheck,
   BrainCircuit,
   CalendarDays,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   FileText,
-  Gauge,
   Layers3,
-  LibraryBig,
+  Lock,
   Route,
-  Sparkles,
-  Target,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
   coreSubjectBlueprints,
-  officialUpscSourceLinks,
   optionalSubjects,
-  productEngineFeatures,
   productPricingPlans,
-  threeDayLaunchItems,
-  yearlyPlannerBlocks,
   getDynamicYearlyPlannerBlocks,
 } from "@/lib/upsc/yearlyPlanner";
-import { getOptionalSourcePack, syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
-import {
-  prelims2027Priorities,
-  strategyReallocationPlan,
-  strategySprintCalendar,
-} from "@/lib/upsc/prelims2027Strategy";
+import { OPTIONAL_SUBJECTS } from "@/lib/upsc/optionalSubjectsCatalog";
+import { getOptionalSourcePack } from "@/lib/upsc/syllabusPyqRegistry";
+import { isOperatorRoute, lockedSubjectNavItems } from "@/lib/navigation/studentNav";
+import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { useDashboardData } from "@/hooks/useDashboardData";
-
-function statusTone(status: string) {
-  if (status === "ready") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
-  if (status === "building") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
-  return "border-[#dcd5c7] bg-[#f8f2e8] text-[#34453b]";
-}
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
-}
-
-const priorityRank: Record<(typeof prelims2027Priorities)[number]["priority"], number> = {
-  Critical: 1,
-  High: 2,
-  Medium: 3,
-  Low: 4,
-  Minimal: 5,
-};
-
-const strategyOverlayRows = prelims2027Priorities
-  .map((priority) => ({
-    ...priority,
-    reallocation: strategyReallocationPlan.find((item) => item.priorityId === priority.id),
-  }))
-  .sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority]);
-
-/**********************************************************************************
- * Priority Color Tone Helper
- **********************************************************************************/
-function priorityTone(priority: (typeof prelims2027Priorities)[number]["priority"]) {
-  if (priority === "Critical") return "border-[#d95f43] bg-[#fff0ec] text-[#9d3824]";
-  if (priority === "High") return "border-[#ef9f27] bg-[#fff4df] text-[#6f4a12]";
-  if (priority === "Medium") return "border-[#1f5d8f] bg-[#eef5ff] text-[#1f5d8f]";
-  if (priority === "Low") return "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]";
-  return "border-[#dcd5c7] bg-[#f7f4ee] text-[#5d675f]";
 }
 
 /**********************************************************************************
@@ -85,14 +42,12 @@ export function UpscYearlyPlanner() {
     groups[subject.group] = (groups[subject.group] ?? 0) + 1;
     return groups;
   }, {});
+  const liveOptionalCount = OPTIONAL_SUBJECTS.filter((subject) => subject.status === "available").length;
+  const lockedRoutes = new Set(lockedSubjectNavItems.map((item) => item.href));
 
   // Collapsible section states for a minimalist dashboard
-  const [isStrategyOpen, setIsStrategyOpen] = useState(false);
   const [isBlueprintsOpen, setIsBlueprintsOpen] = useState(false);
-  const [isEngineOpen, setIsEngineOpen] = useState(false);
   const [isOptionalsOpen, setIsOptionalsOpen] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [isLaunchOpen, setIsLaunchOpen] = useState(false);
 
   const currentPlanId = profile?.subscriptionPlanId ?? "foundation";
   const currentPlanCycle = profile?.billingCycle ?? "monthly";
@@ -109,7 +64,9 @@ export function UpscYearlyPlanner() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">
-                Active Subscription status
+                {publicCommerceLaunchBoundary.readyForPayment
+                  ? "Active Subscription status"
+                  : "Selected plan (pilot)"}
               </p>
               <h2 className="mt-1 text-2xl font-black text-[#13251d] capitalize">
                 {currentPlanId} Plan
@@ -118,7 +75,10 @@ export function UpscYearlyPlanner() {
                 </span>
               </h2>
               <p className="mt-1 text-xs font-semibold text-[#49675e]">
-                Pilot pricing of {money(activePlanPrice)} active. Includes: {currentPlanId === "ultimate" ? "Unlimited AI hours" : currentPlanId === "pro" ? "6 hours AI" : currentPlanId === "plus" ? "3 hours AI" : "1 hour daily AI interaction"}.
+                {publicCommerceLaunchBoundary.readyForPayment
+                  ? "Pilot pricing of "
+                  : "Plan intent recorded. No payment has been collected. Pilot rate of "}
+                {money(activePlanPrice)} reserved.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -126,7 +86,7 @@ export function UpscYearlyPlanner() {
                 href="/upsc/pricing"
                 className="rounded-lg border border-[#1a3a2a] bg-white px-4 py-2 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition"
               >
-                Manage / Upgrade Subscription
+                {publicCommerceLaunchBoundary.readyForPayment ? "Manage / Upgrade Subscription" : "Review pilot plans"}
               </Link>
             </div>
           </div>
@@ -140,24 +100,26 @@ export function UpscYearlyPlanner() {
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
-                UPSC yearly command
+                UPSC yearly map
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-[#13251d] md:text-5xl">
-                One path, one price ladder, one student loop.
+                One sequence, one open beta, one revision loop.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                The product plan binds the yearly subject sequence, PYQ preload target, optional-subject catalog,
-                pricing, gap analysis, revision, reports, and AI discussion loop into one visible operating map.
+                This is the target subject sequence for the full GS syllabus, in the order the
+                product plans to cover it. Only Geography is open in this beta; every other
+                window is marked In preparation and unlocks as reviewed content ships. Today&apos;s
+                plan turns the sequence into the next action.
               </p>
-              <Link href="/upsc/pricing" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
-                Open pricing command <ArrowRight className="ml-2 h-4 w-4" />
+              <Link href="/upsc/geography/lms/planner" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
+                Open Today&apos;s plan <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
-                ["GS subjects", coreSubjectBlueprints.length],
-                ["Optional pages", optionalSubjects.length],
-                ["Current Plan Price", money(activePlanPrice)],
+                ["GS sequence", plannerBlocks.length - 1],
+                ["Optional catalogued", OPTIONAL_SUBJECTS.length],
+                ["Live optional workspaces", liveOptionalCount],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
@@ -173,139 +135,103 @@ export function UpscYearlyPlanner() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Yearly planner</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">Subject sequence from June to revision command</h2>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">Target subject sequence and revision command</h2>
+              <p className="mt-1 text-xs font-semibold text-[#5d675f]">
+                Windows are a planning target. Only blocks marked Open in beta contain authored study content today.
+              </p>
             </div>
             <CalendarDays className="h-6 w-6 text-[#1a3a2a]" />
           </div>
           <div className="grid gap-3">
-            {plannerBlocks.map((block, index) => (
-              <Link
-                key={`${block.window}-${block.title}`}
-                href={block.route}
-                className="grid gap-3 rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 transition hover:border-[#1d9e75] md:grid-cols-[0.7fr_1fr_1.1fr_auto] md:items-center"
-              >
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
-                    {String(index + 1).padStart(2, "0")} / {block.window}
-                  </p>
-                  <h3 className="mt-1 text-lg font-black">{block.title}</h3>
-                  <p className="text-xs font-bold text-[#746f66]">{block.days}</p>
+            {plannerBlocks.map((block, index) => {
+              const isOpen = !lockedRoutes.has(block.route) && !isOperatorRoute(block.route);
+              const cardContent = (
+                <>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">
+                      {String(index + 1).padStart(2, "0")} / {block.window}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black">{block.title}</h3>
+                    <p className="text-xs font-bold text-[#746f66]">{block.days}</p>
+                    <span
+                      className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] ${
+                        isOpen
+                          ? "bg-[#e7f5ee] text-[#085041]"
+                          : "border border-[#dcd5c7] bg-[#faf6ee] text-[#8a7a52]"
+                      }`}
+                    >
+                      {isOpen ? "Open in beta" : <><Lock className="h-2.5 w-2.5" /> In preparation</>}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold leading-6 text-[#49675e]">{block.focus}</p>
+                  <p className="text-sm font-semibold leading-6 text-[#31443a]">{block.output}</p>
+                  {isOpen ? (
+                    <ArrowRight className="hidden h-5 w-5 text-[#1a3a2a] md:block" />
+                  ) : (
+                    <Lock className="hidden h-5 w-5 text-[#b8ae98] md:block" />
+                  )}
+                </>
+              );
+
+              return isOpen ? (
+                <Link
+                  key={`${block.window}-${block.title}`}
+                  href={block.route}
+                  className="grid gap-3 rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 transition hover:border-[#1d9e75] md:grid-cols-[0.7fr_1fr_1.1fr_auto] md:items-center"
+                >
+                  {cardContent}
+                </Link>
+              ) : (
+                <div
+                  key={`${block.window}-${block.title}`}
+                  aria-disabled="true"
+                  className="grid gap-3 rounded-lg border border-[#e8e2d5] bg-[#f7f4ee] p-4 md:grid-cols-[0.7fr_1fr_1.1fr_auto] md:items-center"
+                >
+                  {cardContent}
                 </div>
-                <p className="text-sm font-semibold leading-6 text-[#49675e]">{block.focus}</p>
-                <p className="text-sm font-semibold leading-6 text-[#31443a]">{block.output}</p>
-                <ArrowRight className="hidden h-5 w-5 text-[#1a3a2a] md:block" />
-              </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
 
-        {/* Collapsible Section 1: 2027 Strategy Overlay */}
-        <section
-          id="upsc-2027-strategy-overlay"
-          data-testid="upsc-2027-strategy-overlay"
-          data-priority-count={strategyOverlayRows.length}
-          data-sprint-count={strategySprintCalendar.length}
-          className="rounded-lg border border-[#b9d9cd] bg-[#fffdf8] p-4 shadow-sm"
-        >
-          <button
-            type="button"
-            onClick={() => setIsStrategyOpen(!isStrategyOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
-          >
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">2027 correction overlay</p>
-              <h3 className="text-lg">2027 Strategic Reallocations & Sprints ({isStrategyOpen ? "Hide" : "Show"})</h3>
-            </div>
-            {isStrategyOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </button>
-
-          {isStrategyOpen && (
-            <div className="mt-5 border-t border-[#e8e2d5] pt-5">
-              <p className="text-sm font-semibold leading-6 text-[#5d675f] mb-4">
-                This layer marks course corrections: build IR and new-domain S&T first, patch legal-current, 
-                keep Economy in maintenance, and cap Medieval expansion. Proof locked under official source anchors.
+        {/* Where progress actually lives (server-backed LMS) */}
+        <section data-testid="upsc-student-recent-progress" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+          <div className="mb-5">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Progress</p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">What you have done and what is due</h2>
+            <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-[#5d675f]">
+              This page is the yearly sequence. Completed topics, due Day 3/7/21 revisits, and
+              the next action are recorded on the server-backed LMS pages, not in this static map.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/upsc/geography/lms/planner"
+              className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 transition hover:border-[#1d9e75]"
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#085041]">Today&apos;s plan</p>
+              <h3 className="mt-1 text-base font-black text-[#13251d]">Sequence and due revisits</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#49675e]">
+                See the next topic action, Day 3/7/21 revisits, and topics currently due for repair.
               </p>
-              
-              <div className="grid gap-3 md:grid-cols-4 mb-5">
-                {[
-                  ["Critical rebuilds", strategyOverlayRows.filter((row) => row.priority === "Critical").length],
-                  ["High-priority patch", strategyOverlayRows.filter((row) => row.priority === "High").length],
-                  ["12-week sprints", strategySprintCalendar.length],
-                  ["Release gate", "Proof locked"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">{label}</p>
-                    <p className="mt-0.5 text-xl font-black text-[#13251d]">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="grid gap-3">
-                  {strategyOverlayRows.map((row) => (
-                    <article
-                      key={row.id}
-                      data-testid="upsc-2027-strategy-priority-row"
-                      data-priority-id={row.id}
-                      data-priority={row.priority}
-                      data-decision={row.reallocation?.decision ?? "Plan"}
-                      className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#746f66]">
-                            {row.window}
-                          </p>
-                          <h4 className="mt-0.5 text-base font-black tracking-tight text-[#13251d]">{row.subject}</h4>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] ${priorityTone(row.priority)}`}>
-                            {row.priority}
-                          </span>
-                          <span className="rounded border border-[#dcd5c7] bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#31443a]">
-                            {row.reallocation?.decision ?? "Plan"}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">{row.action}</p>
-                      <div className="mt-2 grid gap-2 md:grid-cols-2">
-                        <p className="rounded border border-[#dcd5c7] bg-white p-2.5 text-[11px] font-bold text-[#31443a]">
-                          <span className="font-black text-[#13251d]">Shift:</span> {row.reallocation?.allocation ?? row.evidence}
-                        </p>
-                        <p className="rounded border border-[#dcd5c7] bg-white p-2.5 text-[11px] font-bold text-[#31443a]">
-                          <span className="font-black text-[#13251d]">Target:</span> {row.reallocation?.mcqTarget ?? row.action}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <h4 className="text-base font-black text-[#13251d]">12-week Sprint Phase Order</h4>
-                    <Gauge className="h-4 w-4 text-[#1a3a2a]" />
-                  </div>
-                  <div className="grid gap-2">
-                    {strategySprintCalendar.map((sprint) => (
-                      <Link
-                        key={sprint.id}
-                        href={sprint.route}
-                        data-testid="upsc-2027-strategy-sprint-row"
-                        data-sprint-id={sprint.id}
-                        className="rounded-lg border border-[#dcd5c7] bg-white p-3 transition hover:border-[#1d9e75]"
-                      >
-                        <p className="text-[9px] font-black uppercase text-[#1d9e75]">
-                          {sprint.window} / {sprint.phase}
-                        </p>
-                        <h5 className="mt-0.5 text-xs font-black text-[#13251d]">{sprint.title}</h5>
-                        <p className="mt-1 text-[11px] font-semibold text-[#5d675f]">{sprint.focus}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#085041]">
+                Open plan <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </Link>
+            <Link
+              href="/upsc/geography/lms/gaps"
+              className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4 transition hover:border-[#1d9e75]"
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">Readiness</p>
+              <h3 className="mt-1 text-base font-black text-[#13251d]">Demand-weighted gaps</h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">
+                See what UPSC asks, what you have covered, and the tested topics that need another pass.
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1a3a2a]">
+                Open readiness <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </Link>
+          </div>
         </section>
 
         {/* Collapsible Section 2: GS Coverage Subject Blueprints */}
@@ -324,7 +250,9 @@ export function UpscYearlyPlanner() {
 
           {isBlueprintsOpen && (
             <div className="mt-5 grid gap-3 xl:grid-cols-2 border-t border-[#e8e2d5] pt-5">
-              {coreSubjectBlueprints.map((subject) => (
+              {coreSubjectBlueprints.map((subject) => {
+                const blueprintIsOpen = !lockedRoutes.has(subject.route) && !isOperatorRoute(subject.route);
+                return (
                 <article key={subject.slug} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -334,9 +262,18 @@ export function UpscYearlyPlanner() {
                       <h4 className="mt-0.5 text-base font-black">{subject.title}</h4>
                       <p className="text-[10px] font-black uppercase text-[#746f66]">{subject.primaryPaper}</p>
                     </div>
-                    <Link href={subject.route} className="inline-flex min-h-8 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] transition">
-                      Open
-                    </Link>
+                    {blueprintIsOpen ? (
+                      <Link href={subject.route} className="inline-flex min-h-8 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] transition">
+                        Open
+                      </Link>
+                    ) : (
+                      <span
+                        aria-disabled="true"
+                        className="inline-flex min-h-8 items-center gap-1 rounded-md border border-[#dcd5c7] bg-[#faf6ee] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7a52]"
+                      >
+                        <Lock className="h-3 w-3" /> In preparation
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">{subject.syllabusDemand}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -347,45 +284,8 @@ export function UpscYearlyPlanner() {
                     ))}
                   </div>
                 </article>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Collapsible Section 3: Product Platform Engine Roadmap */}
-        <section data-testid="upsc-product-engine" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setIsEngineOpen(!isEngineOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
-          >
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Product engine</p>
-              <h3 className="text-lg">Feature Roadmap & Readiness Logs ({isEngineOpen ? "Hide" : "Show"})</h3>
-            </div>
-            {isEngineOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </button>
-
-          {isEngineOpen && (
-            <div className="mt-5 grid gap-3 md:grid-cols-3 border-t border-[#e8e2d5] pt-5">
-              {productEngineFeatures.map((feature) => (
-                <article
-                  key={feature.title}
-                  data-testid="upsc-product-engine-feature"
-                  data-feature-title={feature.title}
-                  data-feature-status={feature.status}
-                  data-owner-surface={feature.ownerSurface}
-                  className={`rounded-lg border p-4 ${statusTone(feature.status)}`}
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    <span className="text-[9px] font-black uppercase tracking-wider">{feature.status}</span>
-                  </div>
-                  <h4 className="text-sm font-black tracking-tight">{feature.title}</h4>
-                  <p className="mt-1 text-[10px] font-semibold opacity-75">{feature.ownerSurface}</p>
-                  <p className="mt-2 text-xs font-semibold leading-relaxed opacity-90">{feature.studentOutcome}</p>
-                </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -399,7 +299,7 @@ export function UpscYearlyPlanner() {
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Optional subjects</p>
-              <h3 className="text-lg">All Optional Subject Seed Catalogs ({isOptionalsOpen ? "Hide" : "Show"})</h3>
+              <h3 className="text-lg">Optional subject catalog ({isOptionalsOpen ? "Hide" : "Show"})</h3>
             </div>
             {isOptionalsOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </button>
@@ -407,10 +307,15 @@ export function UpscYearlyPlanner() {
           {isOptionalsOpen && (
             <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr] border-t border-[#e8e2d5] pt-5">
               <div>
-                <h4 className="text-base font-black">All Optional Seeds Are Configured</h4>
+                <h4 className="text-base font-black">
+                  {OPTIONAL_SUBJECTS.length} subjects catalogued, {liveOptionalCount} with reviewed
+                  content
+                </h4>
                 <p className="mt-2 text-xs font-semibold leading-relaxed text-[#5d675f]">
-                  Each subject holds a direct route for Paper I, Paper II, syllabus requirements, trend mapping, 
-                  and discussion portals.
+                  Geography is the only optional with reviewed syllabus notes, PYQs and practice
+                  today. The remaining {OPTIONAL_SUBJECTS.length - liveOptionalCount} — Anthropology
+                  and Sociology included — are catalogued with an honest coming-soon status and
+                  unlock as their material is authored and reviewed.
                 </p>
                 <Link href="/upsc/optional-subjects" className="mt-4 inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
                   Open Optional catalog <ArrowRight className="ml-2 h-4 w-4" />
@@ -428,71 +333,6 @@ export function UpscYearlyPlanner() {
           )}
         </section>
 
-        {/* Collapsible Section 5: Syllabus & PYQ Preload Ledger */}
-        <section data-testid="upsc-source-library-link" className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setIsLibraryOpen(!isLibraryOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#085041]"
-          >
-            <span className="flex items-center gap-2">
-              <LibraryBig className="h-4 w-4" />
-              Syllabus and PYQ Preload Registry Ledger ({isLibraryOpen ? "Hide" : "Show"})
-            </span>
-            {isLibraryOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </button>
-
-          {isLibraryOpen && (
-            <div className="mt-5 border-t border-[#b9d9cd] pt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between text-[#13251d]">
-              <div>
-                <h4 className="text-base font-black">Official Source Rows Are Preloaded</h4>
-                <p className="mt-2 text-xs font-semibold leading-relaxed text-[#49675e]">
-                  {syllabusPyqRegistrySummary.gsPyqRows} GS rows and {syllabusPyqRegistrySummary.optionalPyqRows} optional 
-                  Paper I/II rows are seeded against official UPSC anchors.
-                </p>
-              </div>
-              <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
-                Open source library <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </div>
-          )}
-        </section>
-
-        {/* Collapsible Section 6: Launch Milestones */}
-        <section data-testid="upsc-three-day-launch" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setIsLaunchOpen(!isLaunchOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#1d9e75]" />
-              Platform Milestone & Proof Log Checklist ({isLaunchOpen ? "Hide" : "Show"})
-            </span>
-            {isLaunchOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </button>
-
-          {isLaunchOpen && (
-            <div className="mt-5 grid gap-3 lg:grid-cols-3 border-t border-[#e8e2d5] pt-5">
-              {threeDayLaunchItems.map((item) => (
-                <article key={item.day} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-[9px] font-black uppercase text-[#1d9e75]">{item.day}</span>
-                    <h4 className="text-sm font-black tracking-tight">{item.title}</h4>
-                  </div>
-                  <ul className="space-y-1">
-                    {item.mustShip.map((task) => (
-                      <li key={task} className="flex gap-2 text-xs font-semibold leading-relaxed text-[#49675e]">
-                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1d9e75]" />
-                        <span>{task}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
       </div>
     </main>
   );
@@ -509,7 +349,9 @@ export function OptionalSubjectsCatalog() {
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional catalog</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">Optional subject command pages</h1>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-            Each subject is seeded as a paper-wise page for syllabus, PYQs, trend, answer-writing themes, and future AI discussion flow.
+            Only Geography has reviewed optional content today. The other 24 — Anthropology and
+            Sociology included — are catalogued with an honest coming-soon status; the live catalog
+            at /upsc/optional-subjects is the entry point.
           </p>
         </section>
         <section data-testid="upsc-optional-catalog" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

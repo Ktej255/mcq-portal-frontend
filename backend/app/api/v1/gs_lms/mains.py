@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
+from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsAnswerAttempt,
@@ -71,9 +72,16 @@ class EvaluationReportOut(BaseModel):
 
 
 class MainsEvalStatusOut(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     job_id: str
     status: str
     report: Optional[EvaluationReportOut] = None
+    # Reference material is revealed only once the attempt is settled, so the
+    # learner cannot preview the model answer while still writing. The outline
+    # is a structure guide, not an examiner's verdict.
+    model_answer: Optional[str] = None
+    explanation: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -178,11 +186,20 @@ def submit_mains_answer(
     """Submit a structured Mains answer and start background evaluation."""
     _node_or_404(db, node_id, subject.id)
 
+    if body.mode.upper() != GsLmsAnswerModeEnum.TYPED.value:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This Mains route currently accepts typed answers only",
+        )
+
     pyq = (
         db.query(GsLmsPyq)
         .filter(
             GsLmsPyq.id == body.question_id,
+            GsLmsPyq.subject_id == subject.id,
+            GsLmsPyq.syllabus_node_id == node_id,
             GsLmsPyq.exam_type == GsLmsExamTypeEnum.MAINS,
+            GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
     )
@@ -222,7 +239,17 @@ def submit_mains_answer(
     db.add(attempt)
     db.flush()
 
-    eval_service.evaluate_attempt_job(db, attempt)
+    try:
+        eval_service.evaluate_attempt_job(db, attempt)
+    except EvaluationProviderUnavailableError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+                "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+            },
+        ) from exc
     db.commit()
     db.refresh(attempt)
 
@@ -245,9 +272,14 @@ def poll_mains_evaluation(
 
     attempt = (
         db.query(GsLmsAnswerAttempt)
+        .join(GsLmsPyq, GsLmsAnswerAttempt.pyq_id == GsLmsPyq.id)
         .filter(
             GsLmsAnswerAttempt.id == attempt_id,
             GsLmsAnswerAttempt.student_id == current_user.id,
+            GsLmsPyq.subject_id == subject.id,
+            GsLmsPyq.syllabus_node_id == node_id,
+            GsLmsPyq.exam_type == GsLmsExamTypeEnum.MAINS,
+            GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
     )
@@ -261,8 +293,15 @@ def poll_mains_evaluation(
         .one_or_none()
     )
     status_label = _job_status_label(job.status) if job else "PENDING"
+    # Reference material is revealed only once the attempt is settled, so the
+    # learner cannot preview the model answer while still writing. A failed
+    # evaluation still reveals it: the learner wrote the answer and needs the
+    # reference even when automated scoring did not produce a report.
+    reference = attempt.pyq if (report is not None or status_label in {"COMPLETED", "DEGRADED", "FAILED"}) else None
     return MainsEvalStatusOut(
         job_id=job_id,
         status=status_label,
         report=_report_out(report) if report else None,
+        model_answer=(reference.answer_text or None) if reference else None,
+        explanation=(reference.explanation or None) if reference else None,
     )

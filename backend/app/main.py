@@ -10,16 +10,41 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from app.core.config import settings
-from app.core.gs_lms.gemini_discussion_provider import register_discussion_provider
-
-# Wire up the real Gemini discussion provider (falls back to mock if no API key)
-register_discussion_provider()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown logic."""
     # --- Startup ---
+    # Private-beta guardrail: authentication alone must not open the GS LMS in
+    # production. Refuse to start instead of serving a paid cohort where any
+    # signed-in account can read every topic, practice set, and plan.
+    if (
+        settings.APP_ENVIRONMENT == "production"
+        and not settings.GS_LMS_ENFORCE_ACCESS
+    ):
+        raise RuntimeError(
+            "GS LMS cohort access enforcement must be enabled in production. "
+            "Set GS_LMS_ENFORCE_ACCESS=true before starting the API."
+        )
+
+    # Paid-beta scope: the cohort is sold a set of loop-ready topics. Serving
+    # an unscoped curriculum would offer topics that dead-end at a missing
+    # MCQ Lab. Production refuses to start unless the scope is enforced.
+    if (
+        settings.APP_ENVIRONMENT == "production"
+        and not settings.GS_LMS_BETA_SCOPE
+    ):
+        raise RuntimeError(
+            "GS LMS paid-beta topic scope must be enforced in production. "
+            "Set GS_LMS_BETA_SCOPE=true before starting the API."
+        )
+
+    # Provider registration belongs to application lifecycle, never import time.
+    from app.core.gs_lms.gemini_discussion_provider import register_discussion_provider
+
+    register_discussion_provider()
+
     # Register Cashfree payment service
     from app.core.payments.config import cashfree_config
 
@@ -57,14 +82,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS
-cors_origins = settings.BACKEND_CORS_ORIGINS
-if isinstance(cors_origins, str):
-    cors_origins = ["*"] if cors_origins == "*" else [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
-
+# Configure credentialed CORS from the explicit, validated origin allowlist.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     # Only this project's own Vercel preview deployments, not every *.vercel.app site.
     allow_origin_regex=r"https://[a-z0-9-]+-ktej255-gmailcoms-projects\.vercel\.app",
     allow_credentials=True,
@@ -78,6 +99,8 @@ app.add_middleware(
 from app.api.v1 import auth, admin_legacy, tests, reports, dashboard, revision, attempts, simulation, mains_upload
 from app.api.v1 import optional
 from app.api.v1 import gs_lms
+from app.api.v1.gs_lms import access_admin as gs_lms_access_admin
+from app.api.v1.gs_lms import content_coverage_admin as gs_lms_content_coverage
 from app.api.v1 import profile
 from app.api.v1 import payments
 from app.api.v1 import engagement
@@ -97,9 +120,38 @@ app.include_router(mains_upload.router, prefix="/api/v1/mains-upload", tags=["ma
 app.include_router(optional.router, prefix="/api/v1/optional", tags=["optional"], dependencies=[Depends(require_access("optional_subjects"))])
 app.include_router(gs_lms.router, prefix="/api/v1/gs-lms", tags=["gs-lms"], dependencies=[Depends(require_access())])
 
-# Dev preview route (no auth) for GS LMS content preview
-from app.api.v1.gs_lms.preview import router as gs_lms_preview_router
-app.include_router(gs_lms_preview_router, prefix="/api/v1/gs-lms", tags=["gs-lms-preview"])
+# Beta cohort access administration. Kept under /admin so it can never be
+# confused with the public /gs-lms/{subject_slug} surface. Admin-gated at the
+# router level; see app/api/v1/gs_lms/access_admin.py.
+app.include_router(
+    gs_lms_access_admin.router,
+    prefix="/api/v1/admin/gs-lms/beta-access",
+    tags=["gs-lms-admin"],
+)
+
+# Read-only operator coverage audit: the exact review gates the learner hits,
+# expressed per topic so a coverage gap can be traced to a missing asset.
+app.include_router(
+    gs_lms_content_coverage.router,
+    prefix="/api/v1/admin/gs-lms/content-coverage",
+    tags=["gs-lms-admin"],
+)
+
+# Internal content preview is omitted unless explicitly enabled and remains
+# admin-only even in an enabled development environment.
+if (
+    settings.APP_ENVIRONMENT in {"development", "test", "local"}
+    and settings.ENABLE_DEV_PREVIEW_ROUTES
+):
+    from app.api.dependencies import get_current_admin
+    from app.api.v1.gs_lms.preview import router as gs_lms_preview_router
+
+    app.include_router(
+        gs_lms_preview_router,
+        prefix="/api/v1/gs-lms",
+        tags=["gs-lms-preview"],
+        dependencies=[Depends(get_current_admin)],
+    )
 app.include_router(profile.router, prefix="/api/v1/student", tags=["student-profile"])
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(engagement.router, prefix="/api/v1/engagement", tags=["engagement"])

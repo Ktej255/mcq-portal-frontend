@@ -15,6 +15,7 @@ import {
   Newspaper,
   PieChart,
   PlayCircle,
+  RotateCw,
   ScrollText,
   Users,
 } from "lucide-react";
@@ -73,6 +74,12 @@ const SUBJECTS_WITH_MAPPING = new Set<string>(["geography"]);
  * shown only for these subjects. Sociology is the only one today; this set is
  * the graceful static fallback that carries `["thinkers"]` while the DB-backed
  * config loads or if its fetch fails, mirroring SUBJECTS_WITH_MAPPING.
+ *
+ * The Thinkers button renders inside the `status === "available"` affordance
+ * group, so while Sociology is a `coming-soon` catalog entry (founder decision
+ * 2026-10-31: it has 69 unreviewed nodes and no reviewed content) the
+ * affordance stays unreachable. It returns automatically when Sociology is
+ * reviewed and flipped back to `available`.
  */
 const SUBJECTS_WITH_THINKERS = new Set<string>(["sociology"]);
 
@@ -115,45 +122,63 @@ function ResolvedSubjectShell({
   status: "available" | "coming-soon";
 }) {
   const structure = useMemo(() => getSubjectStructure(slug), [slug]);
+  // Static authored fallback is reserved for subjects the catalog marks
+  // available, i.e. reviewed content behind the workspace. Anthropology and
+  // Sociology keep their hand-authored syllabus structure for layout, but as
+  // `coming-soon` entries they must not light up the fallback: their notes are
+  // not reviewed (Sociology has 69 unreviewed nodes, Anthropology has no
+  // backend row), so they default to unauthored until the backend tree reports
+  // reviewed ContentUnits.
   const authored = status === "available" && hasBespokeStructure(slug);
 
-  // Live authoring status (R5.4 / R17.3, design Property 8): drive each topic
-  // row's Read/Not-yet-authored state from the backend syllabus tree's real
-  // `authored` flag rather than the static structure heuristic alone. This
-  // stays graceful — while the tree loads or if the fetch fails we fall back to
-  // the static `authored` flag, never crashing the shell.
+  // Live authoring status (R5.4 / R17.3, design Property 8): each topic row's
+  // Read / not-yet-authored state comes from the backend syllabus tree's real
+  // `authored` flag.
+  //
+  // Honest-availability rule (founder decision, 2026-10-31): when that read
+  // fails the rows are marked **unknown**, not authored. The shell used to fall
+  // back to the static structure heuristic in that case, which lit up a Read
+  // button for every topic of an available subject precisely when the backend
+  // could not be reached — asserting an availability it did not have.
   const { isLoaded, isSignedIn } = useApiConfig();
   const [authoredByTopic, setAuthoredByTopic] = useState<Map<string, boolean> | null>(null);
-  const [treeReady, setTreeReady] = useState(false);
+  const [treeStatus, setTreeStatus] = useState<AvailabilityStatus>("loading");
+  const [treeNonce, setTreeNonce] = useState(0);
 
   useEffect(() => {
     if (status !== "available" || !isLoaded || !isSignedIn) return;
     let cancelled = false;
-    optionalService
-      .getSyllabusTree(slug)
-      .then((tree) => {
-        if (cancelled) return;
-        const map = new Map<string, boolean>();
-        for (const paper of tree.papers) {
-          for (const section of paper.sections) {
-            for (const node of section.nodes) {
-              map.set(normalizeTitle(node.title), node.authored);
+    // Deferred (0ms) so no state update happens synchronously in the effect body.
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setTreeStatus("loading");
+      optionalService
+        .getSyllabusTree(slug)
+        .then((tree) => {
+          if (cancelled) return;
+          const map = new Map<string, boolean>();
+          for (const paper of tree.papers) {
+            for (const section of paper.sections) {
+              for (const node of section.nodes) {
+                map.set(normalizeTitle(node.title), node.authored);
+              }
             }
           }
-        }
-        setAuthoredByTopic(map);
-        setTreeReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Graceful fallback: keep static behavior, do not crash.
-        setAuthoredByTopic(null);
-        setTreeReady(false);
-      });
+          setAuthoredByTopic(map);
+          setTreeStatus("loaded");
+        })
+        .catch(() => {
+          // Unknown availability: no Read affordances are claimed for any topic.
+          if (cancelled) return;
+          setAuthoredByTopic(null);
+          setTreeStatus("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
-  }, [slug, status, isLoaded, isSignedIn]);
+  }, [slug, status, isLoaded, isSignedIn, treeNonce]);
 
   const [activePaper, setActivePaper] = useState<PaperId>("paper-1");
   const [activeSection, setActiveSection] = useState<SectionId>("section-a");
@@ -479,8 +504,9 @@ function ResolvedSubjectShell({
               data-testid="subject-completeness-note"
               className="mt-4 rounded-xl border border-[#e6dcc2] bg-[#faf6ee] px-4 py-3 text-xs font-semibold leading-6 text-[#8a7a52]"
             >
-              {SUBJECT_STATUS_META[status].description} The Paper I / Paper II structure below is
-              ready; topic content is authored in a later step.
+              {SUBJECT_STATUS_META[status].description} The Paper I / Paper II frame below is the
+              official exam structure; the topic rows show what is published, and nothing here is
+              presented as reviewed content.
             </p>
           ) : null}
           {status === "available" ? <SubjectCompletenessLine slug={slug} /> : null}
@@ -556,7 +582,8 @@ function ResolvedSubjectShell({
               section={activeSectionData}
               authored={authored}
               authoredByTopic={authoredByTopic}
-              treeReady={treeReady}
+              treeStatus={treeStatus}
+              onRetryAvailability={() => setTreeNonce((n) => n + 1)}
               onOpenRead={status === "available" ? setReadTopic : undefined}
             />
           </section>
@@ -581,7 +608,8 @@ function ResolvedSubjectShell({
               topics={structure.paperTwo.topics}
               authored={authored}
               authoredByTopic={authoredByTopic}
-              treeReady={treeReady}
+              treeStatus={treeStatus}
+              onRetryAvailability={() => setTreeNonce((n) => n + 1)}
               onOpenRead={status === "available" ? setReadTopic : undefined}
             />
           </section>
@@ -634,17 +662,32 @@ function PaperTab({
   );
 }
 
+/**
+ * Backend read state for the syllabus tree that drives each topic row's
+ * availability. `error` means the read failed, so availability is unknown.
+ */
+type AvailabilityStatus = "loading" | "loaded" | "error";
+
+/**
+ * Availability of a topic's reviewed notes, as far as we actually know it.
+ * `unknown` is a real state: the backend could not be reached, so no Read
+ * affordance may be claimed for any topic.
+ */
+type TopicAvailability = "known" | "loading" | "unknown";
+
 function SectionPanel({
   section,
   authored,
   authoredByTopic,
-  treeReady,
+  treeStatus,
+  onRetryAvailability,
   onOpenRead,
 }: {
   section: SubjectSection;
   authored: boolean;
   authoredByTopic: Map<string, boolean> | null;
-  treeReady: boolean;
+  treeStatus: AvailabilityStatus;
+  onRetryAvailability?: () => void;
   onOpenRead?: (topic: string) => void;
 }) {
   return (
@@ -665,7 +708,8 @@ function SectionPanel({
         topics={section.topics}
         authored={authored}
         authoredByTopic={authoredByTopic}
-        treeReady={treeReady}
+        treeStatus={treeStatus}
+        onRetryAvailability={onRetryAvailability}
         onOpenRead={onOpenRead}
       />
     </div>
@@ -677,26 +721,41 @@ function SectionPanel({
  * driven by the **live** syllabus-tree `authored` flag for that topic (R5.4 /
  * R17.3, design Property 8): a topic whose backend node is authored + reviewed
  * shows a usable "Read" affordance; everything else shows an honest
- * {@link NotYetAuthoredBadge}. While the tree is still loading, or if the fetch
- * failed, each row falls back to the static subject-level `authored` flag so
- * the shell stays graceful and never crashes. When no topics exist at all it
- * shows the shared {@link NotYetAuthored} panel rather than fabricated content.
+ * {@link NotYetAuthoredBadge}.
+ *
+ * Honest-availability rule (founder decision, 2026-10-31): while the tree is
+ * loading the rows keep the static subject-level flag, but when the read has
+ * **failed** the rows are marked `data-authored="unknown"` with no Read button
+ * and an explicit "not verified" line. A failed backend read used to fall back
+ * to the static heuristic, which offered Read for every topic of an available
+ * subject precisely when nothing about their published state was known. When no
+ * topics exist at all it shows the shared {@link NotYetAuthored} panel rather
+ * than fabricated content.
  */
 function TopicList({
   topics,
   authored,
   authoredByTopic,
-  treeReady,
+  treeStatus,
+  onRetryAvailability,
   testid,
   onOpenRead,
 }: {
   topics: readonly string[];
   authored: boolean;
   authoredByTopic: Map<string, boolean> | null;
-  treeReady: boolean;
+  treeStatus: AvailabilityStatus;
+  onRetryAvailability?: () => void;
   testid: string;
   onOpenRead?: (topic: string) => void;
 }) {
+  const availability: TopicAvailability =
+    treeStatus === "loaded"
+      ? "known"
+      : treeStatus === "error"
+        ? "unknown"
+        : "loading";
+
   if (topics.length === 0) {
     return (
       <div className="mt-3">
@@ -709,42 +768,81 @@ function TopicList({
   }
 
   return (
-    <ul data-testid={testid} className="mt-3 flex flex-col gap-2">
-      {topics.map((topic) => {
-        // Live flag wins once the tree has loaded; otherwise fall back to the
-        // static subject-level flag (graceful while loading / on fetch error).
-        const liveAuthored =
-          treeReady && authoredByTopic
-            ? authoredByTopic.get(normalizeTitle(topic)) === true
-            : null;
-        const isAuthored = liveAuthored ?? authored;
-        const canRead = isAuthored && Boolean(onOpenRead);
+    <>
+      {availability === "unknown" ? (
+        <div
+          data-testid={`${testid}-availability-unknown`}
+          data-tree-status={treeStatus}
+          className="mt-3 rounded-xl border border-[#dcd5c7] bg-[#faf6ee] px-4 py-3"
+        >
+          <p className="text-xs font-semibold leading-6 text-[#5d675f]">
+            <span className="font-black uppercase tracking-[0.1em] text-[#8a7a52]">
+              Availability not verified
+            </span>
+            {" · "}The published-content check for this subject could not be
+            reached, so the rows below show the official syllabus structure only
+            — none of them is claimed to have reviewed notes right now.
+          </p>
+          {onRetryAvailability ? (
+            <button
+              type="button"
+              data-testid={`${testid}-availability-retry`}
+              onClick={onRetryAvailability}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#8a7a52] bg-[#fffdf8] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#8a7a52] transition-colors hover:bg-[#8a7a52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a7a52]/40"
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+              Check availability again
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <ul data-testid={testid} className="mt-3 flex flex-col gap-2">
+        {topics.map((topic) => {
+          // The live backend flag wins once the tree has loaded. Before that the
+          // static subject-level flag is used; after a failed read availability
+          // is unknown and no Read affordance is offered.
+          const liveAuthored =
+            availability === "known" && authoredByTopic
+              ? authoredByTopic.get(normalizeTitle(topic)) === true
+              : null;
+          const isAuthored = availability === "unknown" ? false : (liveAuthored ?? authored);
+          const canRead = isAuthored && Boolean(onOpenRead);
 
-        return (
-          <li
-            key={topic}
-            data-testid={`${testid}-item`}
-            data-authored={isAuthored ? "true" : "false"}
-            className="flex items-center justify-between gap-3 rounded-lg border border-[#e6dcc2] bg-[#fffdf8] px-4 py-3"
-          >
-            <span className="text-sm font-bold text-[#13251d]">{topic}</span>
-            {canRead ? (
-              <button
-                type="button"
-                data-testid={`${testid}-read`}
-                onClick={() => onOpenRead?.(topic)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                Read
-              </button>
-            ) : (
-              <NotYetAuthoredBadge testid={`${testid}-not-authored`} />
-            )}
-          </li>
-        );
-      })}
-    </ul>
+          return (
+            <li
+              key={topic}
+              data-testid={`${testid}-item`}
+              data-authored={
+                availability === "unknown" ? "unknown" : isAuthored ? "true" : "false"
+              }
+              className="flex items-center justify-between gap-3 rounded-lg border border-[#e6dcc2] bg-[#fffdf8] px-4 py-3"
+            >
+              <span className="text-sm font-bold text-[#13251d]">{topic}</span>
+              {canRead ? (
+                <button
+                  type="button"
+                  data-testid={`${testid}-read`}
+                  onClick={() => onOpenRead?.(topic)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Read
+                </button>
+              ) : availability === "unknown" ? (
+                <span
+                  data-testid={`${testid}-availability-badge`}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#dcd5c7] bg-[#faf6ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7a52]"
+                >
+                  Not verified
+                </span>
+              ) : (
+                <NotYetAuthoredBadge testid={`${testid}-not-authored`} />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -752,27 +850,67 @@ function TopicList({
 // Backend-driven completeness surface (task 16.2 — R3.5 / R19.3)
 // ---------------------------------------------------------------------------
 
+/**
+ * Backend-driven completeness line.
+ *
+ * Honest-failure rule (founder decision, 2026-10-31): when the completeness
+ * read fails the line says "Not verified" rather than disappearing. Silence was
+ * a defect because the surrounding copy then claimed whatever it liked about the
+ * subject while the reviewed counts the backend actually holds stayed unknown.
+ */
 function SubjectCompletenessLine({ slug }: { slug: string }) {
   const { isLoaded, isSignedIn } = useApiConfig();
-  const [data, setData] = useState<SubjectCompletenessOut | null>(null);
+  const [request, setRequest] = useState<{
+    slug: string;
+    status: "loading" | "loaded" | "error";
+    data: SubjectCompletenessOut | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    optionalService
-      .getSubjectCompleteness(slug)
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {
-        /* graceful: no completeness line if it can't load */
-      });
+    // Deferred (0ms) so no state update happens synchronously in the effect body.
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setRequest({ slug, status: "loading", data: null });
+      optionalService
+        .getSubjectCompleteness(slug)
+        .then((d) => {
+          if (cancelled) return;
+          setRequest({ slug, status: "loaded", data: d });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setRequest({ slug, status: "error", data: null });
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
   }, [slug, isLoaded, isSignedIn]);
 
-  if (!data) return null;
+  // Ignore a response belonging to a subject the learner has already left.
+  if (request?.slug !== slug) return null;
+
+  if (request.status === "error") {
+    return (
+      <p
+        data-testid="subject-completeness-status"
+        data-status-label="Not verified"
+        className="mt-4 rounded-xl border px-4 py-3 text-xs font-semibold leading-6"
+        style={{ borderColor: "#dcd5c7", backgroundColor: "#faf6ee", color: "#5d675f" }}
+      >
+        <span className="font-black uppercase tracking-[0.1em]">Not verified</span>
+        {" · "}
+        The published-content check for this subject couldn&apos;t be reached, so
+        no reviewed topic or PYQ count is claimed here.
+      </p>
+    );
+  }
+
+  if (request.status !== "loaded" || !request.data) return null;
+  const data = request.data;
   const live = data.features.filter((f) => f.available).map((f) => f.feature);
   return (
     <p

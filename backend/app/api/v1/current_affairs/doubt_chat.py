@@ -9,9 +9,9 @@ Requirements: Enhancement 4 (AI Q&A Doubt Clearing)
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,10 @@ from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import ai_rate_limit, get_current_user
 from app.core.current_affairs.ca_models import CAItem, CADoubtChat
+from app.core.current_affairs.doubt_chat_provider import (
+    DoubtChatProviderUnavailableError,
+    get_doubt_chat_provider,
+)
 
 router = APIRouter()
 
@@ -35,6 +39,8 @@ class ChatMessageOut(BaseModel):
     role: str  # "student" or "ai"
     content: str
     timestamp: str
+    provider: Optional[str] = None
+    is_mock: Optional[bool] = None
 
 
 class ChatSessionOut(BaseModel):
@@ -42,6 +48,17 @@ class ChatSessionOut(BaseModel):
     item_title: str
     messages: List[ChatMessageOut]
     total_messages: int
+
+
+def _message_out(message: dict) -> ChatMessageOut:
+    """Expose provenance when present while preserving historical JSON rows."""
+    return ChatMessageOut(
+        role=message["role"],
+        content=message["content"],
+        timestamp=message.get("timestamp", ""),
+        provider=message.get("provider"),
+        is_mock=message.get("is_mock"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -73,10 +90,7 @@ def get_doubt_chat(
     return ChatSessionOut(
         item_id=item_id,
         item_title=item.title,
-        messages=[
-            ChatMessageOut(role=m["role"], content=m["content"], timestamp=m.get("timestamp", ""))
-            for m in messages
-        ],
+        messages=[_message_out(message) for message in messages],
         total_messages=len(messages),
     )
 
@@ -88,11 +102,7 @@ def send_doubt_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Send a doubt question and get AI response.
-
-    The AI is context-aware — it knows the article content and responds
-    with UPSC-relevant explanations.
-    """
+    """Persist the student and real provider messages as one successful unit."""
     item = db.query(CAItem).filter(
         CAItem.id == item_id,
         CAItem.review_status == "PUBLISHED",
@@ -101,101 +111,74 @@ def send_doubt_message(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    now = datetime.now(timezone.utc)
-
-    # Get or create chat session
     chat = db.query(CADoubtChat).filter(
         CADoubtChat.student_id == current_user.id,
         CADoubtChat.ca_item_id == item_id,
     ).first()
-
-    if not chat:
-        chat = CADoubtChat(
-            student_id=current_user.id,
-            ca_item_id=item_id,
-            messages=[],
-            total_messages=0,
-        )
-        db.add(chat)
-        db.flush()
-
-    # Add student message
-    messages = list(chat.messages or [])
-    messages.append({
+    prior_messages = list(chat.messages or []) if chat else []
+    now = datetime.now(timezone.utc)
+    student_message = {
         "role": "student",
         "content": body.message,
         "timestamp": now.isoformat(),
-    })
+    }
+    pending_history = [*prior_messages, student_message]
 
-    # Generate AI response (context-aware based on item content)
-    ai_response = _generate_doubt_response(item, body.message, messages)
-    messages.append({
+    try:
+        provider = get_doubt_chat_provider()
+        generated = provider.generate(
+            {
+                "title": item.title,
+                "subject": item.subject,
+                "gs_paper": item.gs_paper,
+                "content_blocks": item.content_blocks,
+                "so_what_analysis": item.so_what_analysis,
+            },
+            body.message,
+            pending_history,
+        )
+    except DoubtChatProviderUnavailableError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "CA_DOUBT_CHAT_PROVIDER_UNAVAILABLE",
+                "message": "AI doubt chat is temporarily unavailable. Please retry.",
+                "retryable": True,
+                "provider": exc.provider,
+            },
+        ) from exc
+
+    ai_message = {
         "role": "ai",
-        "content": ai_response,
-        "timestamp": now.isoformat(),
-    })
+        "content": generated.text,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "provider": generated.provider,
+        "is_mock": generated.is_mock,
+    }
+    messages = [*pending_history, ai_message]
 
-    # Update chat
-    chat.messages = messages
-    chat.total_messages = len(messages)
-    chat.last_message_at = now
-    db.commit()
+    try:
+        if chat is None:
+            chat = CADoubtChat(
+                student_id=current_user.id,
+                ca_item_id=item_id,
+                messages=messages,
+                total_messages=len(messages),
+            )
+            db.add(chat)
+        else:
+            chat.messages = messages
+            chat.total_messages = len(messages)
+        chat.last_message_at = now
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return ChatSessionOut(
         item_id=item_id,
         item_title=item.title,
-        messages=[
-            ChatMessageOut(role=m["role"], content=m["content"], timestamp=m.get("timestamp", ""))
-            for m in messages
-        ],
+        messages=[_message_out(message) for message in messages],
         total_messages=len(messages),
     )
-
-
-# ---------------------------------------------------------------------------
-# AI Response Generation (Mock — production would use LLM)
-# ---------------------------------------------------------------------------
-
-def _generate_doubt_response(item: CAItem, question: str, history: list) -> str:
-    """Generate a context-aware AI response for the student's doubt.
-
-    In production, this would call the LLM with:
-    - System prompt: "You are a UPSC preparation AI. Answer doubts about this news item."
-    - Context: item.title, item.content_blocks, item.so_what_analysis
-    - Conversation history
-    - Student's question
-
-    For now, returns a structured mock response.
-    """
-    # Extract context from item
-    subject = item.subject or "current affairs"
-    gs_paper = item.gs_paper or "GS"
-    title = item.title or "this topic"
-
-    # Mock contextual response
-    response_parts = [
-        f"Regarding your question about '{title}':",
-        "",
-        f"This topic is relevant for {gs_paper} and connects to the {subject} domain.",
-    ]
-
-    # Add UPSC-specific context if available
-    if item.so_what_analysis:
-        analysis = item.so_what_analysis
-        if isinstance(analysis, dict):
-            if analysis.get("upsc_angle"):
-                response_parts.append(f"\nUPSC Angle: {analysis['upsc_angle']}")
-            if analysis.get("connected_static_topic"):
-                response_parts.append(f"\nConnected to: {analysis['connected_static_topic']}")
-
-    response_parts.extend([
-        "",
-        "For the exam, focus on:",
-        "1. The factual accuracy of key terms and entities",
-        "2. How this connects to the broader syllabus topic",
-        "3. Potential question framing in Prelims (statement-based) and Mains (analytical)",
-        "",
-        "Would you like me to elaborate on any specific aspect?"
-    ])
-
-    return "\n".join(response_parts)

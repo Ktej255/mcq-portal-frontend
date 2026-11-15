@@ -7,13 +7,11 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
-  BrainCircuit,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   Gauge,
   Layers3,
-  PlayCircle,
   RefreshCcw,
   ShieldCheck,
   Target,
@@ -103,6 +101,7 @@ const globalModules = [
   { title: "Student Weekly and Monthly Reports", href: "/reports", status: "Ready" },
   { title: "Prelims 2027 Strategy Command", href: "/upsc/prelims-2027-strategy", status: "Ready" },
   { title: "Content Command Center", href: "/upsc/content-command", status: "Ready" },
+  { title: "Content Coverage (database gates)", href: "/upsc/content-coverage", status: "Ready" },
   { title: "MCQ Command Center", href: "/upsc/mcq-command", status: "Ready" },
   { title: "Custom MCQ Question Bank", href: "/upsc/question-bank", status: "Ready" },
   { title: "Revision Command Center", href: "/upsc/revision-command", status: "Ready" },
@@ -216,7 +215,11 @@ export function UpscReadinessAuditCenter() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  // Audit rows come from browser storage, which is not reactive. `refreshTick`
+  // is therefore an invalidation key rather than an input, and the `void` read
+  // documents that for the hook linter.
   const subjectAudits = useMemo<SubjectAudit[]>(() => {
+    void refreshTick;
     if (!isLoaded) {
       return auditSubjects.map((subject) => ({
         ...subject,
@@ -313,18 +316,20 @@ export function UpscReadinessAuditCenter() {
       reflectionPercent: totalDays ? Math.round((reflected / totalDays) * 100) : 0,
     };
   }, [subjectAudits]);
-  const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(10) : []), [isLoaded, refreshTick, subjectAudits]);
-  const strategyOpsQueue = useMemo(
-    () => (isLoaded ? buildPrelims2027OperationalQueue(4) : []),
-    [isLoaded, refreshTick]
-  );
-  const strategyOpsTotals = useMemo(
-    () =>
-      isLoaded
-        ? buildPrelims2027OperationalTotals()
-        : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 },
-    [isLoaded, refreshTick]
-  );
+  const actionQueue = useMemo(() => {
+    void refreshTick;
+    return isLoaded ? buildUpscActionQueue(10) : [];
+  }, [isLoaded, refreshTick]);
+  const strategyOpsQueue = useMemo(() => {
+    void refreshTick;
+    return isLoaded ? buildPrelims2027OperationalQueue(4) : [];
+  }, [isLoaded, refreshTick]);
+  const strategyOpsTotals = useMemo(() => {
+    void refreshTick;
+    return isLoaded
+      ? buildPrelims2027OperationalTotals()
+      : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 };
+  }, [isLoaded, refreshTick]);
   const publicSafeRows = prelimsLaunchMatrix.filter((row) => row.status === "Public safe").length;
   const proofLockedRows = prelimsLaunchMatrix.filter((row) => row.status === "Proof locked").length;
   const measuredRows = prelimsLaunchMatrix.filter(

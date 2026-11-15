@@ -50,6 +50,27 @@ function isPublicSecretLeak() {
   );
 }
 
+function effectiveAuthProvider() {
+  if (envValue("NEXT_PUBLIC_USE_MOCK_AUTH") === "true") return "mock";
+  return envValue("NEXT_PUBLIC_AUTH_PROVIDER") || "clerk";
+}
+
+function hasBrowserAuthConfig(provider: string) {
+  if (provider === "mock") return true;
+  if (provider === "clerk") return hasEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
+  if (provider === "supabase") {
+    return hasEnv("NEXT_PUBLIC_SUPABASE_URL") && hasEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  }
+  return false;
+}
+
+function hasServerAuthConfig(provider: string) {
+  if (provider === "mock") return true;
+  if (provider === "clerk") return hasEnv("CLERK_SECRET_KEY");
+  if (provider === "supabase") return hasEnv("SUPABASE_SECRET_KEY") || hasEnv("SUPABASE_SERVICE_ROLE_KEY");
+  return false;
+}
+
 function hasVercelProjectLink() {
   if (exists(".vercel/project.json")) return true;
 
@@ -71,8 +92,9 @@ function check(input: LaunchEnvironmentCheck): LaunchEnvironmentCheck {
 }
 
 export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
+  const authProvider = effectiveAuthProvider();
+  const supportedAuthProvider = ["mock", "supabase", "clerk"].includes(authProvider);
   const publicSecretExposure = isPublicSecretLeak();
-  const hasServerFirebaseSecret = hasEnv("FIREBASE_SERVICE_ACCOUNT_JSON") || hasEnv("GOOGLE_APPLICATION_CREDENTIALS") || hasEnv("FIREBASE_PROJECT_ID");
   const checks = [
     check({
       id: "env-template",
@@ -85,11 +107,11 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
     }),
     check({
       id: "auth-provider",
-      title: "Firebase auth provider selected",
+      title: "Supported auth provider selected",
       group: "local-config",
-      status: (envValue("NEXT_PUBLIC_AUTH_PROVIDER") === "firebase" || envValue("NEXT_PUBLIC_AUTH_PROVIDER") === "mock") ? "pass" : "pending",
-      proof: "NEXT_PUBLIC_AUTH_PROVIDER is configured for Firebase or Mock Auth.",
-      nextAction: "Set NEXT_PUBLIC_AUTH_PROVIDER=firebase (or mock in local dev).",
+      status: supportedAuthProvider ? "pass" : "fail",
+      proof: "The configured frontend auth provider is one of mock, Supabase, or Clerk.",
+      nextAction: "Set NEXT_PUBLIC_AUTH_PROVIDER to clerk, supabase, or mock; use mock only for local/preview validation.",
       publicSafe: true,
     }),
     check({
@@ -102,12 +124,12 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       publicSafe: true,
     }),
     check({
-      id: "browser-firebase-key",
-      title: "Browser Firebase API key configured",
+      id: "browser-auth-config",
+      title: "Browser auth configuration matches provider",
       group: "local-config",
-      status: hasEnv("NEXT_PUBLIC_FIREBASE_API_KEY") ? "pass" : "pending",
-      proof: "Firebase API key is present.",
-      nextAction: "Add NEXT_PUBLIC_FIREBASE_API_KEY to local and production env.",
+      status: hasBrowserAuthConfig(authProvider) ? "pass" : "pending",
+      proof: "The selected provider has the browser-safe public configuration it needs.",
+      nextAction: "Provide the selected provider's public browser variables before launch.",
       publicSafe: true,
     }),
     check({
@@ -129,12 +151,12 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       publicSafe: true,
     }),
     check({
-      id: "server-firebase-secret",
-      title: "Server-only Firebase secret configured",
+      id: "server-auth-config",
+      title: "Server-only auth configuration matches provider",
       group: "server-secret",
-      status: hasServerFirebaseSecret ? "pass" : "pending",
-      proof: "Firebase service credentials checked as present.",
-      nextAction: "Add Firebase config variables on backend server.",
+      status: hasServerAuthConfig(authProvider) ? "pass" : "pending",
+      proof: "The selected provider's server-only credential is checked without printing its value.",
+      nextAction: "Configure the selected provider's server-only credential in the approved runtime secret store.",
       publicSafe: true,
     }),
     check({
@@ -177,9 +199,9 @@ export function getLaunchEnvironmentBoundary(): LaunchEnvironmentBoundary {
       id: "live-sql-receipt",
       title: "Live SQL apply receipt recorded",
       group: "live-receipt",
-      status: "pass", // DB is already migrated to head in RDS
-      proof: "RDS database is verified migrated to head (b4e7f2a1c9d3).",
-      nextAction: "None",
+      status: "pending",
+      proof: "No local source-only check can prove that a persistent database is migrated to the approved head.",
+      nextAction: "Record an approved staging/production migration receipt after backup, rehearsal, and rollback verification.",
       publicSafe: true,
     }),
     check({

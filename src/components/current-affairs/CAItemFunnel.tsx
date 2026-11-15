@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, BookOpen, MessageSquare, Target, PenLine, CheckCircle2, Lock } from 'lucide-react';
-import { caService, CAItemDetailOut, CAFunnelStateOut } from '@/services/api/caService';
-import { McqLabStep } from '@/components/gs-lms/McqLabStep';
-import { MainsPracticeStep } from '@/components/gs-lms/MainsPracticeStep';
+import { caService, CAItemDetailOut, CAFunnelStateOut, CAMcqOut, CAMcqResultOut, CAMainsQuestionOut } from '@/services/api/caService';
+import type { ContentBlock } from '@/services/api/gsLmsService';
 import { RichBlocks } from '@/components/gs-lms/RichBlockRenderer';
 
 /**
@@ -31,19 +30,71 @@ const FUNNEL_STEPS = [
 export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
   const [state, setState] = useState<CAFunnelStateOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [completingStep, setCompletingStep] = useState<number | null>(null);
+  const [completionError, setCompletionError] = useState("");
+  const [failedStep, setFailedStep] = useState<number | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     caService.getFunnelState(itemId)
-      .then(setState)
-      .finally(() => setLoading(false));
-  }, [itemId]);
+      .then((nextState) => {
+        if (cancelled) return;
+        setState(nextState);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId, loadAttempt]);
+
+  const retryLoad = useCallback(() => {
+    setLoadFailed(false);
+    setLoading(true);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, []);
 
   const completeStep = useCallback(async (step: number) => {
+    if (completingStep !== null) return;
+
+    setCompletionError("");
+    setFailedStep(null);
+    setCompletingStep(step);
     try {
       const newState = await caService.completeFunnelStep(itemId, step);
       setState(newState);
-    } catch { /* handled by UI */ }
-  }, [itemId]);
+    } catch {
+      setFailedStep(step);
+      setCompletionError("This step could not be saved. Your current funnel state is unchanged; retry when the connection is available.");
+    } finally {
+      setCompletingStep(null);
+    }
+  }, [completingStep, itemId]);
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="rounded-2xl border border-[#ef9f27]/50 bg-[#fff4df] p-5">
+        <p className="text-sm font-black text-[#7a5410]">Funnel progress could not be loaded.</p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[#7a5410]/80">
+          No step has been marked complete. Check the connection and retry.
+        </p>
+        <button
+          type="button"
+          onClick={retryLoad}
+          className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410]"
+        >
+          Retry load
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !state) {
     return <div className="animate-pulse h-64 bg-[#e7f5ee] rounded-2xl" />;
@@ -82,6 +133,20 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
         })}
       </div>
 
+      {completionError && failedStep !== null ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-bold leading-5 text-[#7a5410]">{completionError}</p>
+          <button
+            type="button"
+            onClick={() => void completeStep(failedStep)}
+            disabled={completingStep !== null}
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {completingStep === failedStep ? "Retrying..." : "Retry save"}
+          </button>
+        </div>
+      ) : null}
+
       {/* Completion celebration */}
       {is_completed && (
         <motion.div
@@ -90,7 +155,7 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
           className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-6 text-center text-white"
         >
           <h2 className="text-lg font-black">✅ Item Complete!</h2>
-          <p className="text-sm opacity-80 mt-1">You've covered this current affairs item.</p>
+          <p className="text-sm opacity-80 mt-1">You&apos;ve covered this current affairs item.</p>
         </motion.div>
       )}
 
@@ -128,7 +193,7 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
             <div className="space-y-4">
               <h3 className="text-sm font-black text-[#1a3a2a]">Read the Content</h3>
               <div className="rounded-xl border border-[#dcd5c7] bg-white p-5">
-                <RichBlocks blocks={item.content_blocks as any} />
+                <RichBlocks blocks={item.content_blocks as unknown as ContentBlock[]} />
               </div>
 
               {/* UPSC Statement Frames */}
@@ -166,27 +231,28 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
                 onClick={() => completeStep(2)}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
               >
-                I've Read This → Continue to Discussion
+                I&apos;ve Read This → Continue to Discussion
               </button>
             </div>
           )}
 
-          {/* Step 3: AI Discussion */}
+          {/* Step 3: Discussion */}
           {current_step === 3 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-black text-[#1a3a2a]">AI Discussion</h3>
+              <h3 className="text-sm font-black text-[#1a3a2a]">Discussion</h3>
               <p className="text-xs text-[#5d675f]">
-                Discuss this news item. Think about the UPSC angle, which GS paper it connects to, and the underlying static concept.
+                The Ask a Doubt chat at the bottom of this page is where to discuss the
+                item: the UPSC angle, the GS paper it connects to, and the underlying
+                static concept. Replies are labelled when a mock provider is in use.
               </p>
-              {/* In full implementation, this uses DiscussionOverlay with CA-specific prompts */}
               <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-center">
                 <MessageSquare className="h-8 w-8 text-[#1d9e75] mx-auto mb-2" />
-                <p className="text-xs text-[#49675e]">Discussion mode — think about the UPSC implications</p>
+                <p className="text-xs text-[#49675e]">Discussion is voluntary and never locks the rest of the funnel.</p>
                 <button
                   onClick={() => completeStep(3)}
                   className="mt-3 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black"
                 >
-                  Complete Discussion →
+                  Mark Discussion Reviewed →
                 </button>
               </div>
             </div>
@@ -202,17 +268,14 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
           )}
 
           {/* Step 5: Mains Practice (optional) */}
-          {current_step === 5 && !is_completed && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-black text-[#1a3a2a]">Mains Practice (Optional)</h3>
-              <p className="text-xs text-[#5d675f]">Practice writing a structured answer for this topic.</p>
-              <button
-                onClick={() => completeStep(5)}
-                className="w-full py-3 rounded-xl border border-[#dcd5c7] text-xs font-black text-[#5d675f]"
-              >
-                Skip Mains → Complete Item
-              </button>
-            </div>
+          {current_step === 5 && (
+            <CAMainsSection
+              itemId={itemId}
+              item={item}
+              isCompleted={is_completed}
+              mainsReviewed={completed_steps.includes(5)}
+              onComplete={() => completeStep(5)}
+            />
           )}
         </motion.div>
       </AnimatePresence>
@@ -220,18 +283,149 @@ export function CAItemFunnel({ itemId, item }: CAItemFunnelProps) {
   );
 }
 
-// Simple MCQ sub-component for CA items
-function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () => void }) {
-  const [mcqs, setMcqs] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [result, setResult] = useState<any>(null);
+// Optional Mains step for CA items. Prompts are shown for practice; this
+// funnel never scores a written answer, and says so.
+function CAMainsSection({
+  itemId,
+  item,
+  isCompleted,
+  mainsReviewed,
+  onComplete,
+}: {
+  itemId: number;
+  item: CAItemDetailOut;
+  isCompleted: boolean;
+  mainsReviewed: boolean;
+  onComplete: () => void;
+}) {
+  const [questions, setQuestions] = useState<CAMainsQuestionOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
-    caService.getCaMcqs(itemId).then(setMcqs).finally(() => setLoading(false));
+    caService.getCaMainsQuestions(itemId)
+      .then(setQuestions)
+      .catch(() => setLoadFailed(true))
+      .finally(() => setLoading(false));
   }, [itemId]);
 
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-black text-[#1a3a2a]">Mains Practice (Optional)</h3>
+      <p className="text-xs text-[#5d675f]">
+        This Current Affairs funnel does not score written answers. Write the prompt on
+        paper, then use the connected GS topic&apos;s Mains step for structured practice
+        and evaluation.
+      </p>
+
+      {loading ? (
+        <div className="animate-pulse h-20 bg-[#e7f5ee] rounded-xl" />
+      ) : loadFailed ? (
+        <p className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-xs font-semibold text-[#49675e]">
+          Mains prompts could not be loaded. The rest of the funnel is unaffected; reload to retry.
+        </p>
+      ) : questions.length > 0 ? (
+        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4">
+          <h4 className="text-[10px] font-black uppercase tracking-wide text-[#49675e]">Practice prompts</h4>
+          <ul className="mt-2 space-y-3">
+            {questions.map((q) => (
+              <li key={q.id}>
+                <p className="text-xs font-semibold text-[#1f2e26]">{q.question_text}</p>
+                <p className="mt-1 text-[10px] font-bold text-[#5d675f]">
+                  {q.gs_paper} · {q.marks} marks · {q.word_limit} words
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-xs font-semibold text-[#49675e]">
+          No Mains prompts are attached to this item yet.
+        </p>
+      )}
+
+      {item.syllabus_links.length > 0 && (
+        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4">
+          <h4 className="text-[10px] font-black uppercase tracking-wide text-[#49675e]">Connected GS topics</h4>
+          <ul className="mt-1.5 space-y-1">
+            {item.syllabus_links.map((link, i) => (
+              <li key={`${link.node_id}-${i}`} className="text-xs text-[#1f2e26]">
+                {link.topic_title}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mainsReviewed ? (
+        <p className="text-center text-[10px] font-bold uppercase tracking-wide text-[#49675e]">
+          Mains step reviewed
+        </p>
+      ) : (
+        <button
+          onClick={onComplete}
+          className="w-full py-3 rounded-xl border border-[#dcd5c7] text-xs font-black text-[#5d675f]"
+        >
+          {isCompleted ? "Mark Mains step reviewed →" : "Continue without Mains practice → Complete Item"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Simple MCQ sub-component for CA items
+function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () => void }) {
+  const [mcqs, setMcqs] = useState<CAMcqOut[]>([]);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [result, setResult] = useState<CAMcqResultOut | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    caService.getCaMcqs(itemId)
+      .then((nextMcqs) => {
+        if (cancelled) return;
+        setMcqs(nextMcqs);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId, loadAttempt]);
+
+  const retryLoad = () => {
+    setLoadFailed(false);
+    setLoading(true);
+    setLoadAttempt((attempt) => attempt + 1);
+  };
+
   if (loading) return <div className="animate-pulse h-32 bg-[#e7f5ee] rounded-xl" />;
+  if (loadFailed) {
+    return (
+      <div role="alert" className="space-y-3">
+        <p className="rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 text-xs font-bold leading-5 text-[#7a5410]">
+          MCQs could not be loaded, so nothing has been scored. Check the connection and retry.
+        </p>
+        <button
+          type="button"
+          onClick={retryLoad}
+          className="w-full py-3 rounded-xl border border-[#9a6a16] text-xs font-black text-[#7a5410]"
+        >
+          Retry load
+        </button>
+      </div>
+    );
+  }
   if (mcqs.length === 0) {
     return (
       <div className="text-center py-4">
@@ -244,8 +438,17 @@ function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () =
   const allAnswered = Object.keys(answers).length === mcqs.length;
 
   const handleSubmit = async () => {
-    const res = await caService.submitCaMcqs(itemId, answers);
-    setResult(res);
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await caService.submitCaMcqs(itemId, answers);
+      setResult(res);
+    } catch {
+      setSubmitError("Your answers were not scored. They are kept below, so you can submit again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (result) {
@@ -268,7 +471,7 @@ function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () =
         <div key={mcq.id} className="rounded-lg border border-[#dcd5c7] bg-white p-3 space-y-2">
           <p className="text-xs font-semibold text-[#1f2e26]">Q{idx + 1}. {mcq.question_text}</p>
           <div className="space-y-1.5">
-            {(mcq.options || []).map((opt: any) => (
+            {(mcq.options || []).map((opt) => (
               <button
                 key={opt.label}
                 onClick={() => setAnswers(prev => ({ ...prev, [mcq.id]: opt.label }))}
@@ -282,14 +485,19 @@ function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () =
           </div>
         </div>
       ))}
+      {submitError ? (
+        <p role="alert" className="rounded-lg border border-[#ef9f27]/50 bg-[#fff4df] p-3 text-[11px] font-bold leading-5 text-[#7a5410]">
+          {submitError}
+        </p>
+      ) : null}
       <button
         onClick={handleSubmit}
-        disabled={!allAnswered}
+        disabled={!allAnswered || submitting}
         className={`w-full py-3 rounded-xl text-sm font-black ${
-          allAnswered ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white' : 'bg-[#dcd5c7] text-[#5d675f]'
+          allAnswered && !submitting ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white' : 'bg-[#dcd5c7] text-[#5d675f]'
         }`}
       >
-        Submit All ({Object.keys(answers).length}/{mcqs.length})
+        {submitting ? "Scoring…" : `Submit All (${Object.keys(answers).length}/${mcqs.length})`}
       </button>
     </div>
   );

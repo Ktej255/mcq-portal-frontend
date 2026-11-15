@@ -70,7 +70,7 @@ export function buildArchiveCandidatesForQuestion(
   sourceArchive: SourceArchiveIntakeResponse | null,
   options: { useFallback?: boolean } = {}
 ): Prelims2026ArchiveCandidates {
-  if (!sourceArchive?.rootExists) {
+  if (!sourceArchive?.rootExists || !sourceArchive.ok || !sourceArchive.scanComplete) {
     return { tracks: [], files: [] };
   }
 
@@ -136,9 +136,13 @@ export function buildPrelims2026ArchiveProofReadiness(
     .slice()
     .sort((left, right) => right.hitCount - left.hitCount)[0];
 
+  const sourceConnected = Boolean(
+    sourceArchive?.rootExists && sourceArchive.ok && sourceArchive.scanComplete,
+  );
+
   return {
-    sourceStatus: sourceArchive?.rootExists ? "ready" : "error",
-    sourceConnected: Boolean(sourceArchive?.rootExists),
+    sourceStatus: !sourceArchive?.rootExists ? "error" : sourceConnected ? "ready" : "partial",
+    sourceConnected,
     totalQuestions: questions.length,
     candidateQuestions: candidateRows.length,
     needsProofWithCandidates: candidateRows.filter((row) => row.decision === "Needs proof").length,

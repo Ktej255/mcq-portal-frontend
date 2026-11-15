@@ -13,7 +13,6 @@ import {
 } from '@/lib/navigation/studentNav';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { isLocalMockMasterSession, isMasterEmail } from '@/lib/auth/master-access';
 import { activateUpscMasterPass } from '@/lib/upsc/masterPass';
 import { gsLmsService } from '@/services/api/gsLmsService';
 
@@ -28,7 +27,9 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   const router = useRouter();
   const currentSearchParams = useSearchParams();
   const { user, logout } = useAuth();
-  const hasMasterAccess = isAdmin || isMasterEmail(user?.email) || isLocalMockMasterSession();
+  // `isAdmin` is supplied by the server-role-aware layouts; never inferred
+  // from the email address here.
+  const hasMasterAccess = isAdmin;
   const currentTab = currentSearchParams.get('tab');
   const openSubjectSlugs = useOpenSubjectSlugs(!isAdmin && !!user);
   const subjectSlug = (item: StudentNavItem) => item.href.split('/').pop() ?? '';

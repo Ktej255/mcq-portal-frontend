@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen, GraduationCap, AlertTriangle, Newspaper,
@@ -45,13 +46,6 @@ function Callout({ icon, title, children, tone = "green" }: { icon: React.ReactN
 
 // ─── SVG: Earth Cross-Section Diagram ────────────────────────────────────────
 function EarthCrossSectionDiagram() {
-  const layers = [
-    { r: 120, color: "#c0392b", label: "Inner Core", sublabel: "Solid Fe-Ni | 5000°C | 1221 km radius" },
-    { r: 165, color: "#e74c3c", label: "Outer Core", sublabel: "Liquid Fe-Ni | 2900–5100 km" },
-    { r: 210, color: "#27ae60", label: "Lower Mantle", sublabel: "670–2900 km" },
-    { r: 245, color: "#2ecc71", label: "Upper Mantle", sublabel: "Incl. Asthenosphere" },
-    { r: 260, color: "#f39c12", label: "Crust", sublabel: "5–70 km" },
-  ];
   return (
     <div className="my-6 rounded-2xl border border-[#b9d9cd] bg-gradient-to-br from-[#f0fdf4] to-[#e7f5ee] p-4">
       <p className="text-xs font-black uppercase text-[#085041] text-center mb-3">Earth&apos;s Internal Structure — Cross Section</p>
@@ -438,7 +432,6 @@ function McqTab() {
 function MainsTab() {
   const [activeQ, setActiveQ] = useState(0);
   const [drafts, setDrafts] = useState<Record<number,{intro:string;body:string;conclusion:string}>>({0:{intro:"",body:"",conclusion:""},1:{intro:"",body:"",conclusion:""}});
-  const [evaluating, setEvaluating] = useState(false);
   const questions = [
     { id:0, paper:"GS-1 • 2020", marks:"15 Marks • 250 Words", text:"How do seismic waves help us understand the internal structure of Earth? Discuss the significance of seismic discontinuities.", framework:["Intro: Seismology as the primary tool for understanding inaccessible Earth interior","Body: P-waves (all media) vs S-waves (solids only) — differential behaviour reveals composition","Body: Shadow zones — P (103°–143°): refraction proves density contrast at core boundary; S (103°–180°): absorption proves liquid outer core","Body: Discontinuities — Moho (1909): crust-mantle, P-wave speed jump to 8 km/s; Gutenberg (1914): 2900 km, S-waves stop; Lehmann (1936): 5100 km, solid inner core","Body: Modern seismic tomography — 3D mapping, reveals LLSVPs, mantle plumes, subducted slabs","Conclusion: Seismology reveals what no drill can reach — connects to resource exploration, earthquake prediction, understanding plate tectonics"] },
     { id:1, paper:"GS-1 • 2016", marks:"10 Marks • 150 Words", text:"Describe the composition and characteristics of Earth's core and mantle.", framework:["Intro: Differentiation created the layered Earth — core and mantle account for ~99% of Earth's volume","Body: Mantle — 70–2900 km, 84% volume, silicate (olivine-pyroxene), upper mantle includes lithosphere + asthenosphere; lower mantle rigid","Body: Outer Core — 2900–5100 km, liquid iron-nickel (~10–12 g/cm³), convection generates geodynamo and Earth's magnetic field","Body: Inner Core — 5100–6371 km, solid Fe-Ni despite ~5000°C (360 GPa pressure raises melting point), radius 1221 km, density 13 g/cm³","Conclusion: The core's liquid-solid structure is fundamental to Earth's habitability — magnetic field shields atmosphere; mantle convection drives plate tectonics"] },
@@ -471,12 +464,12 @@ function MainsTab() {
           </div>
         ))}
         <div className="flex items-center gap-3 pt-2 border-t border-[#e8e2d5]">
-          <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.98}} onClick={()=>{setEvaluating(true);setTimeout(()=>setEvaluating(false),2000);}} disabled={wordCount<10||evaluating} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0f766e] to-[#1d9e75] px-5 py-3 text-sm font-black text-white shadow-md disabled:opacity-40">
-            {evaluating?"Evaluating…":"🎯 Evaluate Your Mains Answer"}
-          </motion.button>
-          <label className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#99f6e4] px-4 py-2.5 text-xs font-black text-[#0f766e] cursor-pointer hover:bg-[#f0fdfa]">
-            📷 Upload Handwritten<input type="file" accept="image/*" className="hidden" />
-          </label>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8e2d5]/60 px-5 py-3 text-sm font-black text-[#5d675f]" aria-disabled="true">
+            Evaluation available in the authenticated Mains workspace
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#dcd5c7] px-4 py-2.5 text-xs font-black text-[#5d675f]" aria-disabled="true">
+            Handwritten upload available in the authenticated workspace
+          </span>
         </div>
       </div>
     </motion.div>
@@ -521,7 +514,11 @@ function ProgressIndicator({current,total}:{current:number;total:number}) {
 export default function EarthInteriorPage() {
   const [activeTab, setActiveTab] = useState<TabId>("learn");
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set(["learn"]));
-  useEffect(()=>{ setVisitedTabs(prev=>new Set([...prev,activeTab])); },[activeTab]);
+
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => new Set([...prev, tab]));
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5] text-[#13251d]">
@@ -538,14 +535,14 @@ export default function EarthInteriorPage() {
           <p className="mt-1.5 text-sm font-semibold text-[#5d675f]">Earth&apos;s Origin and Interior › Geomorphology</p>
           <div className="mt-3 flex items-center gap-3">
             <div className="flex-1"><ProgressIndicator current={visitedTabs.size} total={TABS.length} /></div>
-            <button
-              onClick={() => alert("PDF download coming soon! This chapter will be available as a formatted PDF for offline study.")}
-              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/40 hover:text-[#1d9e75] transition-all shadow-sm shrink-0"
+            <div
+              role="status"
+              aria-label="PDF coming soon"
+              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] shadow-sm shrink-0 opacity-70 cursor-default"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </button>
+              <span>PDF coming soon</span>
+            </div>
           </div>
         </motion.div>
 
@@ -553,7 +550,7 @@ export default function EarthInteriorPage() {
           {TABS.map(tab=>{
             const Icon=tab.icon; const isActive=activeTab===tab.id; const isVisited=visitedTabs.has(tab.id);
             return (
-              <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+              <button key={tab.id} onClick={()=>handleTabChange(tab.id)}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 whitespace-nowrap ${isActive?"bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md scale-[1.02]":isVisited?"text-[#1d9e75] hover:bg-[#e7f5ee]":"text-[#5d675f] hover:bg-[#f7f4ee]"}`}>
                 <Icon className="h-3.5 w-3.5" />{tab.label}
                 {isVisited&&!isActive&&<CheckCircle2 className="h-3 w-3 text-[#1d9e75]" />}
@@ -582,11 +579,11 @@ export default function EarthInteriorPage() {
           return (
             <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:0.3}}
               className="mt-8 rounded-2xl border border-[#dcd5c7] bg-white/70 backdrop-blur-sm p-3 shadow-sm flex items-center justify-between gap-2">
-              <a href="/upsc/content-preview/earth-origin" className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
+              <Link href="/upsc/content-preview/earth-origin" className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
                 <ArrowLeft className="h-3.5 w-3.5" /><span className="hidden sm:inline">2.1 Earth Origin</span><span className="sm:hidden">Prev</span>
-              </a>
+              </Link>
               {nextTab?(
-                <button onClick={()=>setActiveTab(nextTab.id)} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-4 py-2.5 text-xs font-black text-white shadow-md hover:scale-[1.02] transition-all">
+                <button onClick={()=>handleTabChange(nextTab.id)} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-4 py-2.5 text-xs font-black text-white shadow-md hover:scale-[1.02] transition-all">
                   <span>Next: {nextTab.label}</span><ArrowRight className="h-3.5 w-3.5" />
                 </button>
               ):(
@@ -594,9 +591,9 @@ export default function EarthInteriorPage() {
                   <CheckCircle2 className="h-3.5 w-3.5" /> All Sections Done
                 </span>
               )}
-              <a href="/upsc/content-preview/geomagnetism" className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
+              <Link href="/upsc/content-preview/geomagnetism" className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
                 <span className="hidden sm:inline">2.3 Geomagnetism</span><span className="sm:hidden">Next</span><ArrowRight className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </motion.div>
           );
         })()}

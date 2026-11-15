@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { resolveToken } from "@/lib/auth/token-strategy";
 import {
   buildPrelims2026ShowcaseEvidence,
   type ShowcaseQuestionEvidence,
@@ -873,7 +874,11 @@ export function UpscPrelims2027StrategyCommand() {
   }, []);
 
   useEffect(() => {
-    void refreshPublicProofFeedApi();
+    const timer = window.setTimeout(() => {
+      void refreshPublicProofFeedApi();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -887,7 +892,9 @@ export function UpscPrelims2027StrategyCommand() {
         if (cancelled) return;
 
         setSourceArchive(payload);
-        setSourceArchiveStatus(response.ok && payload.rootExists ? "ready" : "error");
+        setSourceArchiveStatus(
+          response.ok && payload.ok && payload.rootExists && payload.scanComplete ? "ready" : "error",
+        );
       } catch {
         if (cancelled) return;
         setSourceArchive(null);
@@ -1868,7 +1875,7 @@ export function UpscPrelims2027StrategyCommand() {
     writeQuestionProofPackets(nextPackets);
   };
 
-  const useArchiveCandidateForProof = (file: SourceArchiveFileHit) => {
+  const archiveCandidateForProof = (file: SourceArchiveFileHit) => {
     if (!selectedProofRow) return;
 
     updateProofPacket(selectedProofRow.question.number, {
@@ -2003,7 +2010,7 @@ export function UpscPrelims2027StrategyCommand() {
     setFeedApiMessage("Publishing approved proof feed to the API...");
 
     try {
-      const token = window.localStorage.getItem("MOCK_TOKEN");
+      const token = await resolveToken();
       const dryRun = window.localStorage.getItem("sarit-upsc-public-proof-feed-dry-run") === "true";
       const response = await fetch("/api/upsc/prelims-2026/public-proof-feed", {
         method: "POST",
@@ -2717,7 +2724,7 @@ export function UpscPrelims2027StrategyCommand() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Evidence ledger</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">Make every 2027 change defensible before it becomes a public claim</h2>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                This layer converts the PDF's findings into proof rules: what the paper exposed, how our coverage should
+                This layer converts the PDF&apos;s findings into proof rules: what the paper exposed, how our coverage should
                 be read, what source standard is required, and which software action must happen before release.
               </p>
             </div>
@@ -4755,7 +4762,7 @@ export function UpscPrelims2027StrategyCommand() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => useArchiveCandidateForProof(file)}
+                            onClick={() => archiveCandidateForProof(file)}
                             className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
                           >
                             Use source
@@ -5387,8 +5394,8 @@ export function UpscPrelims2027StrategyCommand() {
                 <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${Math.min(100, simulator.score)}%` }} />
               </div>
               <p className="mt-4 text-sm font-semibold leading-6 text-[#5d675f]">
-                This is a planning score, not an exam prediction. It estimates whether the student's completed modules
-                cover the PDF's known 2027 risk areas.
+                This is a planning score, not an exam prediction. It estimates whether the student&apos;s completed modules
+                cover the PDF&apos;s known 2027 risk areas.
               </p>
               <div className="mt-4 rounded-md bg-white p-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6f4a12]">Top exposure if unchanged</p>

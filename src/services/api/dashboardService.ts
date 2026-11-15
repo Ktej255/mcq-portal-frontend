@@ -27,7 +27,9 @@ export interface PerformanceReport {
   attemptId?: string;
   totalScore: number;
   accuracy: number;
-  percentile: number;
+  // No percentile field: a peer percentile needs a real cohort comparison. The
+  // backend computes none today, and deriving one from the learner's own
+  // accuracy would invent a rank against aspirants we never measured.
   correctCount: number;
   incorrectCount: number;
   unattemptedCount: number;
@@ -189,7 +191,6 @@ export const dashboardService = {
       attemptId: String(payload.attemptId ?? payload.attempt_id ?? attemptId ?? ''),
       totalScore,
       accuracy,
-      percentile: asNumber(payload.percentile, Math.max(5, Math.min(99, Math.round(accuracy * 0.9 + 10)))),
       correctCount: strictReport.correctCount,
       incorrectCount: strictReport.incorrectCount,
       unattemptedCount: strictReport.unattemptedCount,

@@ -1,7 +1,7 @@
 """add gs_lms_video_watches table
 
 Revision ID: c5d6e7f8a9b0
-Revises: b4e7f2a1c9d3
+Revises: c1d2e3f4a5b6
 Create Date: 2026-07-01 10:00:00.000000
 
 Creates the ``gs_lms_video_watches`` table for tracking student video

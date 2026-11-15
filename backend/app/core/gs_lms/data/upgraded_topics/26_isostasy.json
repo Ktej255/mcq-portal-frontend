@@ -31,31 +31,124 @@
       "display_order": 1,
       "authored": true,
       "blocks": [
-        {"type": "callout", "tone": "hook", "title": "Start Here", "text": "Why doesn't the Himalaya sink into the Earth under its own immense weight? Why is the ground beneath Scandinavia still quietly rising — centuries after the last Ice Age ended? The answer is isostasy: the Earth's crust 'floats' on the mantle just as an iceberg floats on ocean water. The higher the mountain, the deeper its root. The heavier the glacier, the more the crust sags. Remove the load, and the crust bounces back. This single principle — crustal buoyancy — underpins mountain building, ocean basin formation, post-glacial landscapes, and gravity measurements from space."},
-        {"type": "statgrid", "items": [
-          {"value": ">70 km", "label": "Himalayan crustal root depth"},
-          {"value": "~1 cm/yr", "label": "Scandinavia post-glacial uplift rate"},
-          {"value": "~120 km", "label": "Typical compensation depth"},
-          {"value": "1855", "label": "Year both Airy & Pratt models proposed"}
-        ]},
-        {"type": "heading", "text": "What Is Isostasy?"},
-        {"type": "para", "text": "**Isostasy** (from Greek: isos = equal, stasis = standing) is the state of **gravitational equilibrium** in which the Earth's lithosphere 'floats' on the denser, viscous **asthenosphere**, much like wood floating in water. Each column of rock, from the surface down to a fixed **compensation depth**, must exert the same pressure at that depth. Where crust is thick or low-density (mountains, continents), it floats higher and has a deeper root. Where crust is thin or high-density (ocean floors, rifts), it sits lower. The **Himalayas** — towering 8 km above sea level — exist only because their crust extends more than **70 km deep** into the mantle, providing the buoyancy needed to support that height."},
-        {"type": "analogy", "text": "Think of an iceberg: the taller the visible part above water, the deeper the submerged root below. A mountain range is Earth's iceberg — for every kilometre above the surface, there is a proportionally deeper root below. A plain has little root; a deep ocean floor has the least. Remove the mountain by erosion, and just as a melting iceberg bobs upward, the crust rebounds — this is post-glacial (isostatic) uplift."},
-        {"type": "para", "text": "The concept of isostasy was first articulated in **1855** — almost simultaneously — by two British scientists approaching the problem from different angles. **George Biddell Airy** was Astronomer Royal, and **John Henry Pratt** was a mathematician and Archdeacon of Calcutta. Both were trying to explain a puzzling anomaly in the **Great Trigonometrical Survey of India**: why did the plumb bob near the **Himalayas** deflect less than expected toward the mountain mass? The answer, they independently concluded, was that the mountains were compensated at depth — there was less dense material below the mountains than under the plains, reducing the net gravitational pull. Their contrasting explanations of how this compensation worked became the two foundational models of isostasy."},
-        {"type": "para", "text": "The **Indo-Gangetic Plain** is itself a consequence of isostasy. As the Indian Plate collides with Eurasia and the Himalayas rise, the enormous weight of the mountain belt depresses the Indian Plate ahead of it, forming a **foreland basin** — a long, shallow trough that fills with Himalayan sediments washed down by rivers. The Ganga, Yamuna, Brahmaputra and their tributaries are filling this isostatic depression, building the most fertile floodplain in the world. The plain is not flat because rivers deposited sediment; it is flat because isostatic depression and sediment infill are in dynamic equilibrium."},
-        {"type": "heading", "text": "The Two Models — Airy vs Pratt"},
-        {"type": "compare", "title": "Airy Model vs Pratt Model", "left": {"label": "Airy Model (1855)", "items": ["All crustal columns have the SAME density", "Mountains float higher because they have DEEPER ROOTS extending into mantle", "Root thickness proportional to surface height", "Like icebergs: same material, different sizes", "Favoured for: continental mountain belts (Himalayas, Alps, Andes)", "Compensation = variation in crustal thickness"]}, "right": {"label": "Pratt Model (1855)", "items": ["All crustal columns reach the SAME depth of compensation", "Mountains are elevated because they are made of LOWER DENSITY material", "Higher column = less dense; lower column = more dense", "Like floating blocks of different materials (wood vs steel)", "Favoured for: ocean ridges, volcanic plateaux with different rock types", "Compensation = variation in crustal density"]}},
-        {"type": "heading", "text": "Key Terms"},
-        {"type": "keyterms", "terms": [
-          {"term": "Isostasy", "definition": "State of gravitational equilibrium where crustal blocks 'float' on the denser mantle asthenosphere. Each crustal column exerts equal pressure at the **compensation depth**."},
-          {"term": "Compensation depth", "definition": "The depth below which pressure is equal in all adjacent vertical columns. Above it, density/thickness differences exist; below it, pressure is hydrostatically equal. Typically ~100-120 km."},
-          {"term": "Airy model", "definition": "Isostasy achieved by **varying crustal thickness** (root depth) at constant density. Mountains have deep roots; plains have shallow roots."},
-          {"term": "Pratt model", "definition": "Isostasy achieved by **varying crustal density** at constant compensation depth. Mountains = low-density crust; ocean floors = high-density crust."},
-          {"term": "Post-glacial rebound (isostatic uplift)", "definition": "Slow rise of land after removal of glacial ice load, as crust returns to isostatic equilibrium. Scandinavia rising ~1 cm/yr; total rebound since LGM ~300 m."},
-          {"term": "Geoid", "definition": "Equipotential surface of Earth's gravity field corresponding to mean sea level. Deviations from geoid (geoid undulations) reflect internal mass distributions and isostatic anomalies."},
-          {"term": "Lithostatic pressure", "definition": "Pressure at any depth due to the weight of overlying rock column. Isostasy requires equal lithostatic pressure at the compensation depth across all adjacent columns."},
-          {"term": "Foreland basin", "definition": "A crustal depression formed by **flexural isostasy** in front of a mountain belt; the Indian-Gangetic Plain is the classic example, formed by Himalayan loading of the Indian Plate."}
-        ]}
+        {
+          "type": "callout",
+          "tone": "hook",
+          "title": "Start Here",
+          "text": "Why doesn't the Himalaya sink into the Earth under its own immense weight? Why is the ground beneath Scandinavia still quietly rising — centuries after the last Ice Age ended? The answer is isostasy: the Earth's crust 'floats' on the mantle just as an iceberg floats on ocean water. The higher the mountain, the deeper its root. The heavier the glacier, the more the crust sags. Remove the load, and the crust bounces back. This single principle — crustal buoyancy — underpins mountain building, ocean basin formation, post-glacial landscapes, and gravity measurements from space."
+        },
+        {
+          "type": "statgrid",
+          "items": [
+            {
+              "value": ">70 km",
+              "label": "Himalayan crustal root depth"
+            },
+            {
+              "value": "~1 cm/yr",
+              "label": "Scandinavia post-glacial uplift rate"
+            },
+            {
+              "value": "~120 km",
+              "label": "Typical compensation depth"
+            },
+            {
+              "value": "1855",
+              "label": "Year both Airy & Pratt models proposed"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "What Is Isostasy?"
+        },
+        {
+          "type": "para",
+          "text": "**Isostasy** (from Greek: isos = equal, stasis = standing) is the state of **gravitational equilibrium** in which the Earth's lithosphere 'floats' on the denser, viscous **asthenosphere**, much like wood floating in water. Each column of rock, from the surface down to a fixed **compensation depth**, must exert the same pressure at that depth. Where crust is thick or low-density (mountains, continents), it floats higher and has a deeper root. Where crust is thin or high-density (ocean floors, rifts), it sits lower. The **Himalayas** — towering 8 km above sea level — exist only because their crust extends more than **70 km deep** into the mantle, providing the buoyancy needed to support that height."
+        },
+        {
+          "type": "analogy",
+          "text": "Think of an iceberg: the taller the visible part above water, the deeper the submerged root below. A mountain range is Earth's iceberg — for every kilometre above the surface, there is a proportionally deeper root below. A plain has little root; a deep ocean floor has the least. Remove the mountain by erosion, and just as a melting iceberg bobs upward, the crust rebounds — this is post-glacial (isostatic) uplift."
+        },
+        {
+          "type": "para",
+          "text": "The concept of isostasy was first articulated in **1855** — almost simultaneously — by two British scientists approaching the problem from different angles. **George Biddell Airy** was Astronomer Royal, and **John Henry Pratt** was a mathematician and Archdeacon of Calcutta. Both were trying to explain a puzzling anomaly in the **Great Trigonometrical Survey of India**: why did the plumb bob near the **Himalayas** deflect less than expected toward the mountain mass? The answer, they independently concluded, was that the mountains were compensated at depth — there was less dense material below the mountains than under the plains, reducing the net gravitational pull. Their contrasting explanations of how this compensation worked became the two foundational models of isostasy."
+        },
+        {
+          "type": "para",
+          "text": "The **Indo-Gangetic Plain** is itself a consequence of isostasy. As the Indian Plate collides with Eurasia and the Himalayas rise, the enormous weight of the mountain belt depresses the Indian Plate ahead of it, forming a **foreland basin** — a long, shallow trough that fills with Himalayan sediments washed down by rivers. The Ganga, Yamuna, Brahmaputra and their tributaries are filling this isostatic depression, building the most fertile floodplain in the world. The plain is not flat because rivers deposited sediment; it is flat because isostatic depression and sediment infill are in dynamic equilibrium."
+        },
+        {
+          "type": "heading",
+          "text": "The Two Models — Airy vs Pratt"
+        },
+        {
+          "type": "compare",
+          "title": "Airy Model vs Pratt Model",
+          "left": {
+            "label": "Airy Model (1855)",
+            "items": [
+              "All crustal columns have the SAME density",
+              "Mountains float higher because they have DEEPER ROOTS extending into mantle",
+              "Root thickness proportional to surface height",
+              "Like icebergs: same material, different sizes",
+              "Favoured for: continental mountain belts (Himalayas, Alps, Andes)",
+              "Compensation = variation in crustal thickness"
+            ]
+          },
+          "right": {
+            "label": "Pratt Model (1855)",
+            "items": [
+              "All crustal columns reach the SAME depth of compensation",
+              "Mountains are elevated because they are made of LOWER DENSITY material",
+              "Higher column = less dense; lower column = more dense",
+              "Like floating blocks of different materials (wood vs steel)",
+              "Favoured for: ocean ridges, volcanic plateaux with different rock types",
+              "Compensation = variation in crustal density"
+            ]
+          }
+        },
+        {
+          "type": "heading",
+          "text": "Key Terms"
+        },
+        {
+          "type": "keyterms",
+          "terms": [
+            {
+              "term": "Isostasy",
+              "definition": "State of gravitational equilibrium where crustal blocks 'float' on the denser mantle asthenosphere. Each crustal column exerts equal pressure at the **compensation depth**."
+            },
+            {
+              "term": "Compensation depth",
+              "definition": "The depth below which pressure is equal in all adjacent vertical columns. Above it, density/thickness differences exist; below it, pressure is hydrostatically equal. Typically ~100-120 km."
+            },
+            {
+              "term": "Airy model",
+              "definition": "Isostasy achieved by **varying crustal thickness** (root depth) at constant density. Mountains have deep roots; plains have shallow roots."
+            },
+            {
+              "term": "Pratt model",
+              "definition": "Isostasy achieved by **varying crustal density** at constant compensation depth. Mountains = low-density crust; ocean floors = high-density crust."
+            },
+            {
+              "term": "Post-glacial rebound (isostatic uplift)",
+              "definition": "Slow rise of land after removal of glacial ice load, as crust returns to isostatic equilibrium. Scandinavia rising ~1 cm/yr; total rebound since LGM ~300 m."
+            },
+            {
+              "term": "Geoid",
+              "definition": "Equipotential surface of Earth's gravity field corresponding to mean sea level. Deviations from geoid (geoid undulations) reflect internal mass distributions and isostatic anomalies."
+            },
+            {
+              "term": "Lithostatic pressure",
+              "definition": "Pressure at any depth due to the weight of overlying rock column. Isostasy requires equal lithostatic pressure at the compensation depth across all adjacent columns."
+            },
+            {
+              "term": "Foreland basin",
+              "definition": "A crustal depression formed by **flexural isostasy** in front of a mountain belt; the Indian-Gangetic Plain is the classic example, formed by Himalayan loading of the Indian Plate."
+            }
+          ]
+        }
       ]
     },
     {
@@ -64,20 +157,66 @@
       "display_order": 2,
       "authored": true,
       "blocks": [
-        {"type": "ncert_reference", "book": "Fundamentals of Physical Geography", "class": "11", "chapter": "3", "page_start": 28, "page_end": 37, "external_url": "https://ncert.nic.in/textbook/pdf/kegy203.pdf", "text": "Chapter 3 'Interior of the Earth' introduces the concept of isostasy in the context of crustal structure and introduces Airy and Pratt models.", "key_facts": ["Isostasy discussed as the mechanism by which the crust maintains gravitational equilibrium on the mantle", "Airy model: equal density, varying root depth", "Pratt model: equal compensation depth, varying density", "Himalayan roots as the Indian field example of isostatic compensation", "Post-glacial rebound cited as evidence for isostasy in action"]},
-        {"type": "ncert_reference", "book": "Fundamentals of Physical Geography", "class": "11", "chapter": "7", "page_start": 72, "page_end": 80, "external_url": "https://ncert.nic.in/textbook/pdf/kegy107.pdf", "text": "Chapter 7 'Landforms and their Evolution' discusses geomorphic processes including isostatic adjustments related to denudation and mountain evolution.", "key_facts": ["Denudation (erosion) triggers isostatic uplift", "Mountains are sustained by isostatic rebound even as their peaks are worn down", "Continental shields represent deeply eroded cratons in isostatic equilibrium", "River systems reflect isostatic adjustments through rejuvenation"]},
-        {"type": "heading", "text": "NCERT Key Points — Isostasy"},
-        {"type": "points", "title": "Core NCERT Concepts on Isostasy", "items": [
-          "**Isostasy** maintains that the lithosphere is in gravitational equilibrium, floating on the plastic asthenosphere.",
-          "**Airy hypothesis**: mountains have deep roots; plains have shallow roots; same density throughout the crust.",
-          "**Pratt hypothesis**: all crustal columns reach the same compensation depth; high ground = less dense material.",
-          "**Evidence from India**: the Great Trigonometrical Survey plumb-bob anomaly near the Himalayas was the original motivation for both models.",
-          "**Post-glacial rebound** is the most direct observable evidence that isostatic adjustment is an ongoing, measurable process.",
-          "**Erosion-isostasy feedback**: as mountains are eroded, crust rebounds isostatically, explaining why ancient mountain roots are preserved deep in cratons.",
-          "NCERT emphasises that **neither model alone explains all observations** — Vening Meinesz's regional/flexural model better accounts for the width of compensation zones."
-        ]},
-        {"type": "para", "text": "NCERT Class 11 Chapter 3 places isostasy within the study of crustal structure, linking it to the **Moho discontinuity** and the concept of the **lithosphere floating on the asthenosphere**. Chapter 7 extends this to geomorphic consequences: how **denudation** triggers isostatic uplift, why ancient mountain belts (like the Aravallis) have been reduced to peneplains yet retain deep metamorphic roots, and how the **Indo-Gangetic Plain** represents a dynamic isostatic system in which Himalayan erosion products fill a subsiding foreland basin. UPSC often connects these two NCERT chapters in the same question."},
-        {"type": "callout", "tone": "tip", "title": "NCERT Exam Focus", "text": "UPSC most commonly asks: (1) Distinguish between Airy and Pratt models of isostasy, (2) Explain post-glacial rebound with an example, (3) How does the Indo-Gangetic Plain illustrate isostasy? (4) Why are gravity anomalies negative over mountains? All four are directly covered across NCERT Ch. 3 and Ch. 7. Know the plumb-bob anomaly story — it is a favourite UPSC Prelims hook."}
+        {
+          "type": "ncert_reference",
+          "book": "Fundamentals of Physical Geography",
+          "class": "11",
+          "chapter": "3",
+          "page_start": 28,
+          "page_end": 37,
+          "external_url": "https://ncert.nic.in/textbook/pdf/kegy203.pdf",
+          "text": "Chapter 3 'Interior of the Earth' introduces the concept of isostasy in the context of crustal structure and introduces Airy and Pratt models.",
+          "key_facts": [
+            "Isostasy discussed as the mechanism by which the crust maintains gravitational equilibrium on the mantle",
+            "Airy model: equal density, varying root depth",
+            "Pratt model: equal compensation depth, varying density",
+            "Himalayan roots as the Indian field example of isostatic compensation",
+            "Post-glacial rebound cited as evidence for isostasy in action"
+          ]
+        },
+        {
+          "type": "ncert_reference",
+          "book": "Fundamentals of Physical Geography",
+          "class": "11",
+          "chapter": "7",
+          "page_start": 72,
+          "page_end": 80,
+          "external_url": "https://ncert.nic.in/textbook/pdf/kegy107.pdf",
+          "text": "Chapter 7 'Landforms and their Evolution' discusses geomorphic processes including isostatic adjustments related to denudation and mountain evolution.",
+          "key_facts": [
+            "Denudation (erosion) triggers isostatic uplift",
+            "Mountains are sustained by isostatic rebound even as their peaks are worn down",
+            "Continental shields represent deeply eroded cratons in isostatic equilibrium",
+            "River systems reflect isostatic adjustments through rejuvenation"
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "NCERT Key Points — Isostasy"
+        },
+        {
+          "type": "points",
+          "title": "Core NCERT Concepts on Isostasy",
+          "items": [
+            "**Isostasy** maintains that the lithosphere is in gravitational equilibrium, floating on the plastic asthenosphere.",
+            "**Airy hypothesis**: mountains have deep roots; plains have shallow roots; same density throughout the crust.",
+            "**Pratt hypothesis**: all crustal columns reach the same compensation depth; high ground = less dense material.",
+            "**Evidence from India**: the Great Trigonometrical Survey plumb-bob anomaly near the Himalayas was the original motivation for both models.",
+            "**Post-glacial rebound** is the most direct observable evidence that isostatic adjustment is an ongoing, measurable process.",
+            "**Erosion-isostasy feedback**: as mountains are eroded, crust rebounds isostatically, explaining why ancient mountain roots are preserved deep in cratons.",
+            "NCERT emphasises that **neither model alone explains all observations** — Vening Meinesz's regional/flexural model better accounts for the width of compensation zones."
+          ]
+        },
+        {
+          "type": "para",
+          "text": "NCERT Class 11 Chapter 3 places isostasy within the study of crustal structure, linking it to the **Moho discontinuity** and the concept of the **lithosphere floating on the asthenosphere**. Chapter 7 extends this to geomorphic consequences: how **denudation** triggers isostatic uplift, why ancient mountain belts (like the Aravallis) have been reduced to peneplains yet retain deep metamorphic roots, and how the **Indo-Gangetic Plain** represents a dynamic isostatic system in which Himalayan erosion products fill a subsiding foreland basin. UPSC often connects these two NCERT chapters in the same question."
+        },
+        {
+          "type": "callout",
+          "tone": "tip",
+          "title": "NCERT Exam Focus",
+          "text": "UPSC most commonly asks: (1) Distinguish between Airy and Pratt models of isostasy, (2) Explain post-glacial rebound with an example, (3) How does the Indo-Gangetic Plain illustrate isostasy? (4) Why are gravity anomalies negative over mountains? All four are directly covered across NCERT Ch. 3 and Ch. 7. Know the plumb-bob anomaly story — it is a favourite UPSC Prelims hook."
+        }
       ]
     },
     {
@@ -86,17 +225,51 @@
       "display_order": 3,
       "authored": true,
       "blocks": [
-        {"type": "heading", "text": "Vening Meinesz and Flexural (Regional) Isostasy"},
-        {"type": "para", "text": "Both Airy and Pratt models assume **local isostasy** — each crustal column independently achieves equilibrium. Dutch geophysicist **Felix Andries Vening Meinesz** (1930s) demonstrated from submarine gravity measurements that compensation is often **regional**: the lithosphere has significant **elastic rigidity** and bends as a continuous plate rather than responding as isolated columns. Under a surface load (mountain, ice sheet, volcanic island), the lithosphere flexes downward across a zone much **wider** than the load itself — creating a peripheral **forebulge** beyond the depression zone. This **flexural isostasy** model (elastic plate model) better explains: (1) the width of the Indo-Gangetic foreland basin (400-500 km wide, yet Himalayan load is concentrated), (2) oceanic trenches adjacent to subducting slabs, (3) the broad peripheral raised rims (forebulges) seen around sedimentary basins."},
-        {"type": "heading", "text": "Gravity Anomalies and Isostatic State"},
-        {"type": "para", "text": "**Gravity anomalies** are the difference between observed gravity and theoretically predicted gravity for a given latitude and elevation. **Bouguer anomaly** (corrects for topography and elevation) is the standard measure of isostatic state: A **positive Bouguer anomaly** means observed gravity exceeds the theoretical value — indicating a local **mass excess** relative to surroundings, implying thin crust or high-density material at depth. This is typical of **ocean floors** (thin, dense oceanic crust) and **rift valleys** (thinned crust). A **negative Bouguer anomaly** means observed gravity is less than predicted — indicating a local **mass deficit**, implying a deep, low-density crustal root beneath the surface. The **Himalayas** exhibit strongly negative Bouguer anomalies (as low as −500 mGal), confirming deep crustal roots >70 km — exactly as Airy's model predicts. **Isostatically compensated** regions (in perfect isostatic balance) show near-zero **isostatic anomaly** (a refined correction beyond Bouguer). Persistent non-zero isostatic anomalies reveal regions that are NOT in equilibrium — actively rising or sinking."},
-        {"type": "heading", "text": "Post-Glacial Rebound — Scandinavia and Antarctica"},
-        {"type": "para", "text": "The most dramatic modern example of isostasy in action is **post-glacial rebound** (also called **glacio-isostatic adjustment, GIA**). During the last glacial maximum (~20,000 years ago), the Fennoscandian ice sheet (up to 3 km thick) depressed the lithosphere beneath Scandinavia by up to **800 m**. As the ice melted (~10,000 BCE), the crustal depression began to recover. Scandinavia is still rising at **~1 cm/year** at its centre (Gulf of Bothnia), and has rebounded approximately **300 m** since deglaciation — with another 100-200 m of rebound expected before it reaches equilibrium. **Antarctica** and **Greenland** are undergoing the same process beneath their present ice sheets: the crust below Antarctica is currently depressed by up to **2 km** by the ice load. Were the Antarctic ice sheet to melt, land currently below sea level in West Antarctica would eventually rebound above sea level — a process taking **10,000-100,000 years** given the asthenosphere's high viscosity."},
-        {"type": "heading", "text": "India — Himalayan Deep Roots and the Indo-Gangetic Basin"},
-        {"type": "para", "text": "India provides two textbook isostasy examples. First, the **Himalayas**: geodetic and seismic studies show that the Indian crust thickens from ~35 km under the plains to **>70 km** under the High Himalayas — the deepest continental crustal root on Earth. This massive root provides the buoyancy to support peaks like Everest (8,849 m). The crust is still thickening as the India-Eurasia collision continues at ~5 cm/year. Second, the **Indo-Gangetic Plain**: as the Indian Plate underthrusts Eurasia, the leading edge of the Indian lithosphere is **flexurally depressed** forming the Himalayan foreland basin. This 2,400-km-long trough, filled with up to **5 km of Quaternary alluvial sediments**, is a direct consequence of Vening Meinesz-style flexural loading. The subsidence rate of the basin matches predicted values from elastic plate models of the Indian lithosphere's rigidity."},
-        {"type": "heading", "text": "Isostasy and the Erosion-Uplift Feedback"},
-        {"type": "para", "text": "A crucial UPSC-relevant insight: mountains do not simply erode down and disappear. As erosion removes mass from peaks, the crustal load decreases, and **isostatic rebound** raises the remaining crust. This creates a self-sustaining cycle: **erosion → mass reduction → isostatic uplift → continued erosion at higher elevations → deeper crustal rocks exposed**. For every 1 km eroded off a mountain, ~0.8 km of isostatic uplift occurs. This means the **total erosion** required to reduce a mountain belt to sea level is 5-7 times the original height. The **Aravallis** (one of the world's oldest fold mountains, ~2.5 billion years) are now mere low hills (~900 m), yet their metamorphic rocks were once 25-30 km deep — all exhumed through this erosion-isostasy cycling over billions of years. Modern Himalayan rivers export ~1 billion tonnes of sediment per year, yet the Himalayas continue to rise — because isostatic rebound outpaces erosion."},
-        {"type": "collapsible", "title": "Advanced: Geoid Undulations and Isostasy", "content": "The geoid (the equipotential surface matching mean sea level) is not a perfect ellipsoid — it has undulations (bumps and hollows) up to ±100 m caused by internal mass variations. Isostatic compensation directly shapes the geoid: mountain roots (mass deficit) pull the geoid downward locally; high-density oceanic crust pulls it upward. The Indian Ocean geoid low (a depression of ~100 m centered southwest of India) is partly attributed to a cold, dense subducted slab remnant in the lower mantle beneath. GRACE satellite data has mapped these geoid undulations at 300 km resolution globally — detecting ice mass loss, groundwater depletion, and post-glacial rebound simultaneously. The Indian Ocean geoid low remains one of the largest unexplained geoid features on Earth, and isostatic adjustment is one of the competing hypotheses."}
+        {
+          "type": "heading",
+          "text": "Vening Meinesz and Flexural (Regional) Isostasy"
+        },
+        {
+          "type": "para",
+          "text": "Both Airy and Pratt models assume **local isostasy** — each crustal column independently achieves equilibrium. Dutch geophysicist **Felix Andries Vening Meinesz** (1930s) demonstrated from submarine gravity measurements that compensation is often **regional**: the lithosphere has significant **elastic rigidity** and bends as a continuous plate rather than responding as isolated columns. Under a surface load (mountain, ice sheet, volcanic island), the lithosphere flexes downward across a zone much **wider** than the load itself — creating a peripheral **forebulge** beyond the depression zone. This **flexural isostasy** model (elastic plate model) better explains: (1) the width of the Indo-Gangetic foreland basin (400-500 km wide, yet Himalayan load is concentrated), (2) oceanic trenches adjacent to subducting slabs, (3) the broad peripheral raised rims (forebulges) seen around sedimentary basins."
+        },
+        {
+          "type": "heading",
+          "text": "Gravity Anomalies and Isostatic State"
+        },
+        {
+          "type": "para",
+          "text": "**Gravity anomalies** are the difference between observed gravity and theoretically predicted gravity for a given latitude and elevation. **Bouguer anomaly** (corrects for topography and elevation) is the standard measure of isostatic state: A **positive Bouguer anomaly** means observed gravity exceeds the theoretical value — indicating a local **mass excess** relative to surroundings, implying thin crust or high-density material at depth. This is typical of **ocean floors** (thin, dense oceanic crust) and **rift valleys** (thinned crust). A **negative Bouguer anomaly** means observed gravity is less than predicted — indicating a local **mass deficit**, implying a deep, low-density crustal root beneath the surface. The **Himalayas** exhibit strongly negative Bouguer anomalies (as low as −500 mGal), confirming deep crustal roots >70 km — exactly as Airy's model predicts. **Isostatically compensated** regions (in perfect isostatic balance) show near-zero **isostatic anomaly** (a refined correction beyond Bouguer). Persistent non-zero isostatic anomalies reveal regions that are NOT in equilibrium — actively rising or sinking."
+        },
+        {
+          "type": "heading",
+          "text": "Post-Glacial Rebound — Scandinavia and Antarctica"
+        },
+        {
+          "type": "para",
+          "text": "The most dramatic modern example of isostasy in action is **post-glacial rebound** (also called **glacio-isostatic adjustment, GIA**). During the last glacial maximum (~20,000 years ago), the Fennoscandian ice sheet (up to 3 km thick) depressed the lithosphere beneath Scandinavia by up to **800 m**. As the ice melted (~10,000 BCE), the crustal depression began to recover. Scandinavia is still rising at **~1 cm/year** at its centre (Gulf of Bothnia), and has rebounded approximately **300 m** since deglaciation — with another 100-200 m of rebound expected before it reaches equilibrium. **Antarctica** and **Greenland** are undergoing the same process beneath their present ice sheets: the crust below Antarctica is currently depressed by up to **2 km** by the ice load. Were the Antarctic ice sheet to melt, land currently below sea level in West Antarctica would eventually rebound above sea level — a process taking **10,000-100,000 years** given the asthenosphere's high viscosity."
+        },
+        {
+          "type": "heading",
+          "text": "India — Himalayan Deep Roots and the Indo-Gangetic Basin"
+        },
+        {
+          "type": "para",
+          "text": "India provides two textbook isostasy examples. First, the **Himalayas**: geodetic and seismic studies show that the Indian crust thickens from ~35 km under the plains to **>70 km** under the High Himalayas — the deepest continental crustal root on Earth. This massive root provides the buoyancy to support peaks like Everest (8,849 m). The crust is still thickening as the India-Eurasia collision continues at ~5 cm/year. Second, the **Indo-Gangetic Plain**: as the Indian Plate underthrusts Eurasia, the leading edge of the Indian lithosphere is **flexurally depressed** forming the Himalayan foreland basin. This 2,400-km-long trough, filled with up to **5 km of Quaternary alluvial sediments**, is a direct consequence of Vening Meinesz-style flexural loading. The subsidence rate of the basin matches predicted values from elastic plate models of the Indian lithosphere's rigidity."
+        },
+        {
+          "type": "heading",
+          "text": "Isostasy and the Erosion-Uplift Feedback"
+        },
+        {
+          "type": "para",
+          "text": "A crucial UPSC-relevant insight: mountains do not simply erode down and disappear. As erosion removes mass from peaks, the crustal load decreases, and **isostatic rebound** raises the remaining crust. This creates a self-sustaining cycle: **erosion → mass reduction → isostatic uplift → continued erosion at higher elevations → deeper crustal rocks exposed**. For every 1 km eroded off a mountain, ~0.8 km of isostatic uplift occurs. This means the **total erosion** required to reduce a mountain belt to sea level is 5-7 times the original height. The **Aravallis** (one of the world's oldest fold mountains, ~2.5 billion years) are now mere low hills (~900 m), yet their metamorphic rocks were once 25-30 km deep — all exhumed through this erosion-isostasy cycling over billions of years. Modern Himalayan rivers export ~1 billion tonnes of sediment per year, yet the Himalayas continue to rise — because isostatic rebound outpaces erosion."
+        },
+        {
+          "type": "collapsible",
+          "title": "Advanced: Geoid Undulations and Isostasy",
+          "content": "The geoid (the equipotential surface matching mean sea level) is not a perfect ellipsoid — it has undulations (bumps and hollows) up to ±100 m caused by internal mass variations. Isostatic compensation directly shapes the geoid: mountain roots (mass deficit) pull the geoid downward locally; high-density oceanic crust pulls it upward. The Indian Ocean geoid low (a depression of ~100 m centered southwest of India) is partly attributed to a cold, dense subducted slab remnant in the lower mantle beneath. GRACE satellite data has mapped these geoid undulations at 300 km resolution globally — detecting ice mass loss, groundwater depletion, and post-glacial rebound simultaneously. The Indian Ocean geoid low remains one of the largest unexplained geoid features on Earth, and isostatic adjustment is one of the competing hypotheses."
+        }
       ]
     },
     {
@@ -105,12 +278,40 @@
       "display_order": 4,
       "authored": true,
       "blocks": [
-        {"type": "heading", "text": "Recent Developments (2023-2026)"},
-        {"type": "callout", "tone": "note", "title": "GPS Measurement of Post-Glacial Rebound (Scandinavia & Antarctica)", "text": "Continuous GPS networks in Scandinavia (BIFROST project) and Antarctica (POLENET) now measure **glacio-isostatic adjustment (GIA)** in real time with millimetre accuracy. Scandinavia's uplift rate of **~1 cm/year** at the Gulf of Bothnia is one of the best-quantified isostatic signals on Earth. In Antarctica, GPS stations beneath ice detect crustal response to ongoing ice mass loss from the West Antarctic Ice Sheet — uplift rates of up to **4 cm/year** have been measured in the Antarctic Peninsula (faster than expected, indicating a less viscous mantle). These measurements are critical for **correcting sea-level rise estimates**: raw tide gauge data must subtract the local land-level change (GIA component) to obtain the true ocean volume change. UPSC may frame this as: 'Why might tide gauges overestimate sea-level rise in some regions and underestimate it in others?'"},
-        {"type": "callout", "tone": "note", "title": "GRACE Satellite Gravity Anomaly Mapping — India Focus", "text": "The **GRACE** (Gravity Recovery and Climate Experiment) and its successor **GRACE-FO** satellites (NASA/DLR) measure Earth's gravity field monthly by tracking the distance between two co-orbiting satellites. Changes in this distance reveal mass redistribution beneath the surface. For India, GRACE data has shown: (1) **Himalayan crustal root** dynamics — the negative gravity anomaly over the Himalayas is one of the strongest on Earth, confirming >70 km crustal roots; (2) **Indo-Gangetic Plain groundwater depletion** — GRACE detected massive groundwater loss (~54 km³/year in the Indo-Gangetic Aquifer, 2002-2016), detected as a positive gravity anomaly change; (3) **Post-monsoon recharge signals** across the Deccan and peninsular India. ISRO's **NavIC** geodetic network complements GRACE by providing surface positioning, enabling isostatic uplift detection at centimetre scale across India."},
-        {"type": "callout", "tone": "note", "title": "Isostatic Rebound and Sea-Level Measurement Complexity", "text": "A major contemporary scientific debate concerns **relative vs absolute sea-level rise**. Absolute sea-level rise (ocean volume expansion + ice melt water input) is ~3.6 mm/year globally. However, what people experience is **relative sea-level change** = absolute rise ± vertical land movement. In post-glacially rebounding regions (Scandinavia, northern Canada), land rises faster than sea level, so relative sea level is **falling** despite global warming. In regions where crust is subsiding (Jakarta, Bangladesh delta, US Gulf Coast), relative sea level rises faster than the global average. Properly correcting tide gauge and satellite altimetry records for **GIA (isostatic component)** requires global models of mantle viscosity — a major source of uncertainty in IPCC sea-level projections."},
-        {"type": "callout", "tone": "note", "title": "ISRO Geodesy and Crustal Movement Surveys in India", "text": "India's **National Centre for Earth Science Studies (NCESS)** and **ISRO's Space Applications Centre** operate continuous GPS/GNSS networks that detect millimetre-level crustal movements across the Indian subcontinent. Results confirm: (1) The Indian Plate is moving **~5 cm/year** northward into Eurasia; (2) The Himalayas are rising by **~5 mm/year** (net, after erosion); (3) The Kutch region (Gujarat) shows residual crustal stress from the 2001 Bhuj earthquake; (4) Subsidence of ~5-10 mm/year in parts of the Ganga delta from sediment compaction and groundwater extraction (not isostatic). These surveys distinguish tectonic motion from isostatic adjustment — both affect land elevation but have different timescales and spatial patterns."},
-        {"type": "callout", "tone": "note", "title": "Reservoir-Induced Seismicity and Local Isostatic Loading", "text": "Large dams impound water that adds a significant **surface mass load** on the crust — an artificial isostatic perturbation. The weight of reservoir water can flex the crust downward by centimetres and increase pore-water pressure in faults, potentially triggering earthquakes (**reservoir-induced seismicity**). India's **Koyna Dam** (Maharashtra) is one of the world's most studied cases: the Koyna–Warna reservoir has triggered thousands of earthquakes since 1962, including the devastating **M6.3 Koyna earthquake (1967)**. The Ministry of Earth Sciences' proposed **Koyna deep drilling project** aims to study this phenomenon — drilling into active fault zones to directly measure stress and fluid pressure changes. Understanding isostatic loading from reservoir impoundment is directly relevant to dam safety assessment and EIA requirements for large infrastructure projects in seismically active regions."}
+        {
+          "type": "heading",
+          "text": "Recent Developments (2023-2026)"
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "title": "GPS Measurement of Post-Glacial Rebound (Scandinavia & Antarctica)",
+          "text": "Continuous GPS networks in Scandinavia (BIFROST project) and Antarctica (POLENET) now measure **glacio-isostatic adjustment (GIA)** in real time with millimetre accuracy. Scandinavia's uplift rate of **~1 cm/year** at the Gulf of Bothnia is one of the best-quantified isostatic signals on Earth. In Antarctica, GPS stations beneath ice detect crustal response to ongoing ice mass loss from the West Antarctic Ice Sheet — uplift rates of up to **4 cm/year** have been measured in the Antarctic Peninsula (faster than expected, indicating a less viscous mantle). These measurements are critical for **correcting sea-level rise estimates**: raw tide gauge data must subtract the local land-level change (GIA component) to obtain the true ocean volume change. UPSC may frame this as: 'Why might tide gauges overestimate sea-level rise in some regions and underestimate it in others?'"
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "title": "GRACE Satellite Gravity Anomaly Mapping — India Focus",
+          "text": "The **GRACE** (Gravity Recovery and Climate Experiment) and its successor **GRACE-FO** satellites (NASA/DLR) measure Earth's gravity field monthly by tracking the distance between two co-orbiting satellites. Changes in this distance reveal mass redistribution beneath the surface. For India, GRACE data has shown: (1) **Himalayan crustal root** dynamics — the negative gravity anomaly over the Himalayas is one of the strongest on Earth, confirming >70 km crustal roots; (2) **Indo-Gangetic Plain groundwater depletion** — GRACE detected massive groundwater loss (~54 km³/year in the Indo-Gangetic Aquifer, 2002-2016), detected as a positive gravity anomaly change; (3) **Post-monsoon recharge signals** across the Deccan and peninsular India. ISRO's **NavIC** geodetic network complements GRACE by providing surface positioning, enabling isostatic uplift detection at centimetre scale across India."
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "title": "Isostatic Rebound and Sea-Level Measurement Complexity",
+          "text": "A major contemporary scientific debate concerns **relative vs absolute sea-level rise**. Absolute sea-level rise (ocean volume expansion + ice melt water input) is ~3.6 mm/year globally. However, what people experience is **relative sea-level change** = absolute rise ± vertical land movement. In post-glacially rebounding regions (Scandinavia, northern Canada), land rises faster than sea level, so relative sea level is **falling** despite global warming. In regions where crust is subsiding (Jakarta, Bangladesh delta, US Gulf Coast), relative sea level rises faster than the global average. Properly correcting tide gauge and satellite altimetry records for **GIA (isostatic component)** requires global models of mantle viscosity — a major source of uncertainty in IPCC sea-level projections."
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "title": "ISRO Geodesy and Crustal Movement Surveys in India",
+          "text": "India's **National Centre for Earth Science Studies (NCESS)** and **ISRO's Space Applications Centre** operate continuous GPS/GNSS networks that detect millimetre-level crustal movements across the Indian subcontinent. Results confirm: (1) The Indian Plate is moving **~5 cm/year** northward into Eurasia; (2) The Himalayas are rising by **~5 mm/year** (net, after erosion); (3) The Kutch region (Gujarat) shows residual crustal stress from the 2001 Bhuj earthquake; (4) Subsidence of ~5-10 mm/year in parts of the Ganga delta from sediment compaction and groundwater extraction (not isostatic). These surveys distinguish tectonic motion from isostatic adjustment — both affect land elevation but have different timescales and spatial patterns."
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "title": "Reservoir-Induced Seismicity and Local Isostatic Loading",
+          "text": "Large dams impound water that adds a significant **surface mass load** on the crust — an artificial isostatic perturbation. The weight of reservoir water can flex the crust downward by centimetres and increase pore-water pressure in faults, potentially triggering earthquakes (**reservoir-induced seismicity**). India's **Koyna Dam** (Maharashtra) is one of the world's most studied cases: the Koyna–Warna reservoir has triggered thousands of earthquakes since 1962, including the devastating **M6.3 Koyna earthquake (1967)**. The Ministry of Earth Sciences' proposed **Koyna deep drilling project** aims to study this phenomenon — drilling into active fault zones to directly measure stress and fluid pressure changes. Understanding isostatic loading from reservoir impoundment is directly relevant to dam safety assessment and EIA requirements for large infrastructure projects in seismically active regions."
+        }
       ]
     },
     {
@@ -119,15 +320,49 @@
       "display_order": 5,
       "authored": true,
       "blocks": [
-        {"type": "heading", "text": "Common Misconceptions UPSC Tests"},
-        {"type": "trap", "wrong": "In the Airy model, higher mountains have lower-density rock compared to plains (i.e., confusing Airy with Pratt)", "correct": "In the AIRY model, all crustal rocks have the SAME density — height differences are compensated by ROOT DEPTH differences (deeper root under mountains). It is the PRATT model that uses density variation. This Airy-vs-Pratt confusion is the single most common UPSC mistake on isostasy."},
-        {"type": "trap", "wrong": "In the Pratt model, mountains have deeper roots into the mantle", "correct": "In the PRATT model, ALL crustal columns reach the SAME compensation depth — there are NO differential roots. Instead, mountain columns are made of LESS DENSE material (lower density = same depth, but still floats higher). Deep roots are exclusively the Airy model concept."},
-        {"type": "trap", "wrong": "A positive Bouguer gravity anomaly over a mountain range indicates thick crust and deep roots", "correct": "A NEGATIVE Bouguer anomaly indicates thick crust / deep roots (mass deficit due to low-density root). A POSITIVE Bouguer anomaly indicates thin crust / mass excess. The Himalayas have strongly NEGATIVE Bouguer anomalies (~−500 mGal). Positive anomalies are typical of ocean basins and rift zones (thin, dense crust)."},
-        {"type": "trap", "wrong": "Post-glacial rebound means sea level falls after an ice age ends because water is released onto the land", "correct": "Post-glacial rebound refers to the CRUSTAL UPLIFT (land rising) after the ice load is removed — it is an isostatic process, not a sea-level process. Sea level actually RISES after ice melts (more water in oceans). In rebounding regions like Scandinavia, RELATIVE sea level falls because the land rises faster than the sea, but ABSOLUTE sea level rises globally."},
-        {"type": "trap", "wrong": "The Indo-Gangetic Plain is flat because rivers deposited alluvium on a pre-existing flat surface", "correct": "The Indo-Gangetic Plain is a FORELAND BASIN created by FLEXURAL ISOSTASY — the weight of the Himalayas depresses the Indian Plate ahead of the collision zone, forming a crustal trough. Rivers subsequently fill this isostatically-created depression with sediments. The plain's flatness is a consequence of isostatic subsidence + sediment infill, not a primary surface."},
-        {"type": "trap", "wrong": "Isostasy guarantees that the crust is always in perfect isostatic equilibrium", "correct": "Isostasy is the TENDENCY toward equilibrium, not a state of permanent equilibrium. Actively rising mountain belts, regions undergoing glaciation/deglaciation, subsiding sedimentary basins, and regions above subducting slabs are all in ISOSTATIC DISEQUILIBRIUM — the crust adjusts toward equilibrium over geological time (thousands to millions of years, depending on mantle viscosity)."},
-        {"type": "trap", "wrong": "Vening Meinesz's model is simply a combination of Airy and Pratt models", "correct": "Vening Meinesz proposed a fundamentally DIFFERENT mechanism: REGIONAL (FLEXURAL) isostasy. He argued that the lithosphere has ELASTIC RIGIDITY and bends as a plate, distributing the load laterally. This is neither Airy (local density compensation) nor Pratt (local density variation) — it explains features like the WIDTH of foreland basins and forebulges that neither local model can account for."},
-        {"type": "memory", "text": "AIRY = All same density, varies Root depth (A = Analogous to icebergs — same ice, different size) | PRATT = same comPensation depth, varies densiTy (P = Plates of different materials — wood vs metal) | Mnemonic: 'AIRY heights come from DEEP roots; PRATT heights come from LIGHT rocks' | POST-GLACIAL REBOUND = Remove Ice, Rise Up (RIRU) | BOUGUER: Mountains = MINUS (negative); Oceans = PLUS (positive)"}
+        {
+          "type": "heading",
+          "text": "Common Misconceptions UPSC Tests"
+        },
+        {
+          "type": "trap",
+          "wrong": "In the Airy model, higher mountains have lower-density rock compared to plains (i.e., confusing Airy with Pratt)",
+          "correct": "In the AIRY model, all crustal rocks have the SAME density — height differences are compensated by ROOT DEPTH differences (deeper root under mountains). It is the PRATT model that uses density variation. This Airy-vs-Pratt confusion is the single most common UPSC mistake on isostasy."
+        },
+        {
+          "type": "trap",
+          "wrong": "In the Pratt model, mountains have deeper roots into the mantle",
+          "correct": "In the PRATT model, ALL crustal columns reach the SAME compensation depth — there are NO differential roots. Instead, mountain columns are made of LESS DENSE material (lower density = same depth, but still floats higher). Deep roots are exclusively the Airy model concept."
+        },
+        {
+          "type": "trap",
+          "wrong": "A positive Bouguer gravity anomaly over a mountain range indicates thick crust and deep roots",
+          "correct": "A NEGATIVE Bouguer anomaly indicates thick crust / deep roots (mass deficit due to low-density root). A POSITIVE Bouguer anomaly indicates thin crust / mass excess. The Himalayas have strongly NEGATIVE Bouguer anomalies (~−500 mGal). Positive anomalies are typical of ocean basins and rift zones (thin, dense crust)."
+        },
+        {
+          "type": "trap",
+          "wrong": "Post-glacial rebound means sea level falls after an ice age ends because water is released onto the land",
+          "correct": "Post-glacial rebound refers to the CRUSTAL UPLIFT (land rising) after the ice load is removed — it is an isostatic process, not a sea-level process. Sea level actually RISES after ice melts (more water in oceans). In rebounding regions like Scandinavia, RELATIVE sea level falls because the land rises faster than the sea, but ABSOLUTE sea level rises globally."
+        },
+        {
+          "type": "trap",
+          "wrong": "The Indo-Gangetic Plain is flat because rivers deposited alluvium on a pre-existing flat surface",
+          "correct": "The Indo-Gangetic Plain is a FORELAND BASIN created by FLEXURAL ISOSTASY — the weight of the Himalayas depresses the Indian Plate ahead of the collision zone, forming a crustal trough. Rivers subsequently fill this isostatically-created depression with sediments. The plain's flatness is a consequence of isostatic subsidence + sediment infill, not a primary surface."
+        },
+        {
+          "type": "trap",
+          "wrong": "Isostasy guarantees that the crust is always in perfect isostatic equilibrium",
+          "correct": "Isostasy is the TENDENCY toward equilibrium, not a state of permanent equilibrium. Actively rising mountain belts, regions undergoing glaciation/deglaciation, subsiding sedimentary basins, and regions above subducting slabs are all in ISOSTATIC DISEQUILIBRIUM — the crust adjusts toward equilibrium over geological time (thousands to millions of years, depending on mantle viscosity)."
+        },
+        {
+          "type": "trap",
+          "wrong": "Vening Meinesz's model is simply a combination of Airy and Pratt models",
+          "correct": "Vening Meinesz proposed a fundamentally DIFFERENT mechanism: REGIONAL (FLEXURAL) isostasy. He argued that the lithosphere has ELASTIC RIGIDITY and bends as a plate, distributing the load laterally. This is neither Airy (local density compensation) nor Pratt (local density variation) — it explains features like the WIDTH of foreland basins and forebulges that neither local model can account for."
+        },
+        {
+          "type": "memory",
+          "text": "AIRY = All same density, varies Root depth (A = Analogous to icebergs — same ice, different size) | PRATT = same comPensation depth, varies densiTy (P = Plates of different materials — wood vs metal) | Mnemonic: 'AIRY heights come from DEEP roots; PRATT heights come from LIGHT rocks' | POST-GLACIAL REBOUND = Remove Ice, Rise Up (RIRU) | BOUGUER: Mountains = MINUS (negative); Oceans = PLUS (positive)"
+        }
       ]
     }
   ],
@@ -160,6 +395,398 @@
       "explanation": "Key Mains answer structure: define isostasy → distinguish Airy vs Pratt with mechanism and analogy → apply Airy to Himalayan deep roots (cite >70 km, negative Bouguer anomaly) → apply flexural isostasy to Indo-Gangetic foreland basin (cite Vening Meinesz, sediment fill) → conclude with ongoing nature: India-Eurasia collision still thickening the crust and depressing the basin.",
       "question_type": "STATEMENT_BASED",
       "marks": 15,
+      "review_status": "REVIEWED"
+    }
+  ],
+  "mcq_questions": [
+    {
+      "question_text": "Consider the following statements regarding the Airy model of isostasy:\n1. Crustal blocks of varying elevations have the same uniform density throughout.\n2. Higher mountains are supported by proportionally deeper crustal roots extending into the denser mantle.\n3. The mechanism of compensation is analogous to icebergs floating in water.\nWhich of the statements given above are correct?",
+      "options": [
+        {
+          "label": "A",
+          "text": "1 and 2 only"
+        },
+        {
+          "label": "B",
+          "text": "2 and 3 only"
+        },
+        {
+          "label": "C",
+          "text": "1 and 3 only"
+        },
+        {
+          "label": "D",
+          "text": "1, 2 and 3"
+        }
+      ],
+      "correct_option": "D",
+      "explanation": "All three statements are correct. In Airy's model (1855), continental crust has uniform density (typically ~2.7 g/cm³), and topographical differences are compensated by differences in crustal thickness—mountains have deep roots (crustal roots exceeding 70 km under the Himalayas), exactly like icebergs floating in water.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 1,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "With reference to the Pratt model of isostasy, consider the following statements:\n1. All crustal columns reach a uniform depth of compensation.\n2. Higher topographic blocks have lower rock densities compared to lower blocks.\n3. Mountain belts are compensated by deep crustal roots projecting into the asthenosphere.\nWhich of the statements given above is/are correct?",
+      "options": [
+        {
+          "label": "A",
+          "text": "1 and 2 only"
+        },
+        {
+          "label": "B",
+          "text": "2 only"
+        },
+        {
+          "label": "C",
+          "text": "1 and 3 only"
+        },
+        {
+          "label": "D",
+          "text": "1, 2 and 3"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "Statements 1 and 2 are correct. In Pratt's model (1855), isostatic equilibrium is achieved by lateral density variations: higher topography is composed of lower-density rock, and all columns terminate at the same depth of compensation. Statement 3 is WRONG because deep roots are the defining feature of the Airy model, not Pratt.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 2,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Why do the Himalayas exhibit strongly negative Bouguer gravity anomalies (reaching up to −500 mGal)?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Due to the absence of the asthenosphere beneath northern India"
+        },
+        {
+          "label": "B",
+          "text": "Due to a massive mass deficit caused by thick, low-density crustal roots displacing denser mantle material"
+        },
+        {
+          "label": "C",
+          "text": "Because the Himalayas are composed predominantly of ultra-dense basaltic lava"
+        },
+        {
+          "label": "D",
+          "text": "Due to gravitational interference from the Tibetan Plateau's volcanic lakes"
+        }
+      ],
+      "correct_option": "B",
+      "explanation": "A negative Bouguer anomaly signifies a mass deficit beneath the landform. The Himalayas possess a crustal root extending >70 km deep. Because continental crustal rock (~2.7 g/cm³) is significantly less dense than the mantle rock (~3.3 g/cm³) it displaces, there is a net mass deficiency beneath the mountains, producing a large negative Bouguer anomaly.",
+      "question_type": "FACTUAL",
+      "display_order": 3,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "The Indo-Gangetic Plain is geomorphologically classified as an isostatic foreland basin. Which mechanism best accounts for its formation?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Rifting of the Eurasian plate during the Triassic period"
+        },
+        {
+          "label": "B",
+          "text": "Thermal contraction of ancient volcanic calderas across north India"
+        },
+        {
+          "label": "C",
+          "text": "Downward flexure of the rigid Indian lithosphere under the colossal tectonic load of the rising Himalayan orogen"
+        },
+        {
+          "label": "D",
+          "text": "Massive glacial scour during the Pleistocene epoch followed by marine transgression"
+        }
+      ],
+      "correct_option": "C",
+      "explanation": "Under Vening Meinesz's flexural isostasy theory, the lithosphere acts as an elastic plate. The immense tectonic load of the Himalayas causes the Indian lithospheric plate to bend downward ahead of the mountain belt, forming an asymmetrical flexural depression (foreland basin) which rivers filled with alluvium.",
+      "question_type": "FACTUAL",
+      "display_order": 4,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Consider the following statements regarding 'post-glacial rebound' (isostatic uplift):\n1. It is the slow, continuous rise of land masses following the melting of massive Pleistocene ice sheets.\n2. Scandinavia and parts of Canada are currently undergoing measurable isostatic uplift at rates of up to 1 cm/year.\n3. The rate of rebound is controlled primarily by the viscoelastic flow of the underlying asthenosphere.\nHow many of the above statements are correct?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Only one"
+        },
+        {
+          "label": "B",
+          "text": "Only two"
+        },
+        {
+          "label": "C",
+          "text": "All three"
+        },
+        {
+          "label": "D",
+          "text": "None"
+        }
+      ],
+      "correct_option": "C",
+      "explanation": "All three statements are correct. When ice sheets melt, the removal of the downward surface load causes the lithosphere to rebound towards gravitational equilibrium. Scandinavia is uplifting at ~1 cm/year, and this recovery rate directly reflects the viscoelastic viscosity of the asthenosphere.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 5,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "What historical discrepancy in the Great Trigonometrical Survey of India led Sir George Airy and Archdeacon Pratt to formulate the theories of isostasy?",
+      "options": [
+        {
+          "label": "A",
+          "text": "The deflection of the plumb-line towards the Himalayas was substantially less than calculated from the visible mass of the mountains"
+        },
+        {
+          "label": "B",
+          "text": "The speed of sound measured across the Gangetic plain deviated from atmospheric models"
+        },
+        {
+          "label": "C",
+          "text": "The measured circumference of the Earth across the Indian peninsula exceeded theoretical geoid values by 10%"
+        },
+        {
+          "label": "D",
+          "text": "The magnetic declination at Madras showed reverse polarity relative to Greenwich"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "During triangulation measurements between Kaliana and Kalianpur near the Himalayan foothills, the plumb-line's gravitational deflection toward the Himalayas was far less than expected from their colossal visible mass. This proved that a mass deficiency existed beneath the mountains compensating their weight.",
+      "question_type": "FACTUAL",
+      "display_order": 6,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "In isostasy, the 'depth of compensation' is best defined as:",
+      "options": [
+        {
+          "label": "A",
+          "text": "The boundary between the outer core and the lower mantle"
+        },
+        {
+          "label": "B",
+          "text": "The maximum depth to which seismic S-waves can penetrate the continental crust"
+        },
+        {
+          "label": "C",
+          "text": "The horizontal level beneath which the total lithostatic pressure exerted by overlying columns of rocks becomes equal"
+        },
+        {
+          "label": "D",
+          "text": "The shallowest focal depth at which deep-focus earthquakes occur"
+        }
+      ],
+      "correct_option": "C",
+      "explanation": "The depth of compensation (typically ~100–120 km in continental regions) is the theoretical horizontal surface below which all vertical columns of rock exert equal hydrostatic pressure, maintaining gravitational balance across the planet.",
+      "question_type": "FACTUAL",
+      "display_order": 7,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "How does Vening Meinesz's model of regional isostasy differ fundamentally from the classical Airy and Pratt models?",
+      "options": [
+        {
+          "label": "A",
+          "text": "It assumes that the Earth's crust is entirely fluid without any solid mantle"
+        },
+        {
+          "label": "B",
+          "text": "It treats the lithosphere as an elastic plate that distributes topographical loads regionally through flexural rigidity, rather than purely local vertical columns"
+        },
+        {
+          "label": "C",
+          "text": "It denies that gravity plays any role in crustal equilibrium"
+        },
+        {
+          "label": "D",
+          "text": "It applies exclusively to oceanic trenches and excludes continental landmasses"
+        }
+      ],
+      "correct_option": "B",
+      "explanation": "Airy and Pratt models assume local compensation (individual free vertical columns). Vening Meinesz introduced regional or flexural isostasy, where the lithosphere possesses flexural rigidity and behaves like an elastic sheet that bends under load, spreading compensation over broad regional wavelengths.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 8,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Consider the following statements regarding the feedback loop between isostasy and mountain erosion:\n1. As weathering and erosion remove mass from the summit of a mountain range, the crust rebounds upward isostatically.\n2. Isostatic rebound can restore approximately 80% of the elevation lost to erosion.\n3. This rebound process facilitates the continuous exhumation of deep metamorphic rocks to the surface.\nWhich of the statements given above are correct?",
+      "options": [
+        {
+          "label": "A",
+          "text": "1 and 2 only"
+        },
+        {
+          "label": "B",
+          "text": "2 and 3 only"
+        },
+        {
+          "label": "C",
+          "text": "1 and 3 only"
+        },
+        {
+          "label": "D",
+          "text": "1, 2 and 3"
+        }
+      ],
+      "correct_option": "D",
+      "explanation": "All three statements are correct. When erosion strips rock mass from a mountain (density ~2.7 g/cm³), the buoyancy of the mantle (~3.3 g/cm³) pushes the root upward, recovering ~80% (2.7/3.3) of the eroded thickness. This prolonged isostatic uplift prolongs mountain longevity and brings deep metamorphic granulites and migmatites to the surface.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 9,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Which of the following oceanographic features is best explained by thermal isostasy (a Pratt-like density variation)?",
+      "options": [
+        {
+          "label": "A",
+          "text": "The subsidence of oceanic crust as it moves away from mid-oceanic ridges, cools, and becomes denser"
+        },
+        {
+          "label": "B",
+          "text": "The formation of submarine canyons by turbidity currents"
+        },
+        {
+          "label": "C",
+          "text": "The occurrence of tsunamis at transform fault boundaries"
+        },
+        {
+          "label": "D",
+          "text": "The deposition of calcareous ooze below the Carbonate Compensation Depth (CCD)"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "At mid-ocean ridges, hot asthenosphere upwells; the young oceanic lithosphere is warm and low in density, floating high. As it moves away, it cools conductively, thickens, and densifies, subsiding isostatically into deeper abyssal plains. This is the primary example of thermal isostasy in modern geophysics.",
+      "question_type": "FACTUAL",
+      "display_order": 10,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "An area characterized by a strong positive isostatic gravity anomaly indicates which of the following?",
+      "options": [
+        {
+          "label": "A",
+          "text": "The region has completely achieved static isostatic equilibrium"
+        },
+        {
+          "label": "B",
+          "text": "There is excess mass supported dynamically by tectonic forces, with a tendency for the crust to subside when stresses relax"
+        },
+        {
+          "label": "C",
+          "text": "The crust has an excessively deep root extending to the core-mantle boundary"
+        },
+        {
+          "label": "D",
+          "text": "The underlying mantle has zero viscosity"
+        }
+      ],
+      "correct_option": "B",
+      "explanation": "A positive isostatic anomaly indicates that measured gravity exceeds theoretical compensated gravity—meaning there is excess mass held up by tectonic or dynamic forces. Such areas are in disequilibrium and tend to subside when tectonic compression ceases.",
+      "question_type": "STATEMENT_BASED",
+      "display_order": 11,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Consider the following statements:\nAssertion (A): High mountain ranges like the Alps and Himalayas do not sink into the asthenosphere.\nReason (R): Low-density crustal roots displace denser mantle rock, generating an upward buoyant force equal to the mountain's weight.\nIn the context of the statements above, which one of the following is correct?",
+      "options": [
+        {
+          "label": "A",
+          "text": "Both A and R are true and R is the correct explanation of A"
+        },
+        {
+          "label": "B",
+          "text": "Both A and R are true but R is NOT the correct explanation of A"
+        },
+        {
+          "label": "C",
+          "text": "A is true but R is false"
+        },
+        {
+          "label": "D",
+          "text": "A is false but R is true"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "Both A and R are true, and R explains A. Mountain belts achieve hydrostatic balance in accordance with Archimedes' principle: their deep sialic roots displace denser simatic mantle material, providing the hydrostatic buoyancy needed to support high topography.",
+      "question_type": "ASSERTION_REASON",
+      "display_order": 12,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "During an ice age, what is the isostatic response of a continental landmass when covered by an ice sheet several kilometers thick?",
+      "options": [
+        {
+          "label": "A",
+          "text": "The crust immediately uplifts due to increased atmospheric pressure"
+        },
+        {
+          "label": "B",
+          "text": "The crust sags and subsides into the asthenosphere, causing outward lateral displacement of mantle material"
+        },
+        {
+          "label": "C",
+          "text": "The Moho boundary completely dissolves under the thermal blanket of ice"
+        },
+        {
+          "label": "D",
+          "text": "The continental plate fractures permanently into oceanic crust"
+        }
+      ],
+      "correct_option": "B",
+      "explanation": "Under the load of an ice sheet (such as in Greenland and Antarctica today), glacial loading depresses the lithosphere by hundreds of meters. The underlying asthenospheric mantle material flows laterally away from the depression, creating peripheral forebulges.",
+      "question_type": "FACTUAL",
+      "display_order": 13,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Which modern satellite mission has been extensively used by geophysicists to map temporal changes in Earth's gravity field caused by post-glacial isostatic rebound and ice sheet mass loss?",
+      "options": [
+        {
+          "label": "A",
+          "text": "GRACE (Gravity Recovery and Climate Experiment)"
+        },
+        {
+          "label": "B",
+          "text": "Hubble Space Telescope"
+        },
+        {
+          "label": "C",
+          "text": "Mars Reconnaissance Orbiter"
+        },
+        {
+          "label": "D",
+          "text": "INSAT-3DR"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "NASA-DLR's GRACE and GRACE-FO twin satellite missions measure minute fluctuations in Earth's gravity field caused by groundwater movement, melting glaciers, and post-glacial isostatic rebound across Fennoscandia and North America.",
+      "question_type": "FACTUAL",
+      "display_order": 14,
+      "review_status": "REVIEWED"
+    },
+    {
+      "question_text": "Arrange the following crustal environments in increasing order of typical crustal thickness (from thinnest to thickest):\n1. Continental shield/craton\n2. Oceanic basin crust\n3. Orogenic mountain belt (e.g., High Himalayas)\n4. Continental rift valley\nSelect the correct sequence:",
+      "options": [
+        {
+          "label": "A",
+          "text": "2 → 4 → 1 → 3"
+        },
+        {
+          "label": "B",
+          "text": "4 → 2 → 1 → 3"
+        },
+        {
+          "label": "C",
+          "text": "2 → 1 → 4 → 3"
+        },
+        {
+          "label": "D",
+          "text": "1 → 2 → 4 → 3"
+        }
+      ],
+      "correct_option": "A",
+      "explanation": "Oceanic crust is the thinnest (~5–8 km), followed by stretched continental crust in rift valleys (~20–25 km), stable continental shields/cratons (~35–40 km), and collision mountain belts like the Himalayas (>70 km thick due to deep crustal roots). Hence: 2 → 4 → 1 → 3.",
+      "question_type": "CHRONOLOGICAL",
+      "display_order": 15,
       "review_status": "REVIEWED"
     }
   ]

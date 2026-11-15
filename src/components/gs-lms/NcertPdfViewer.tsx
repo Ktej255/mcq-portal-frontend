@@ -18,6 +18,7 @@ interface NcertPdfViewerProps {
 
 export function NcertPdfViewer({ url, pageStart, bookTitle, chapter, onClose }: NcertPdfViewerProps) {
   const [iframeError, setIframeError] = useState(false);
+  const hasDocumentUrl = url.trim().length > 0;
 
   // Try direct URL first, with page anchor
   const directUrl = pageStart ? `${url}#page=${pageStart}` : url;
@@ -61,14 +62,37 @@ export function NcertPdfViewer({ url, pageStart, bookTitle, chapter, onClose }: 
 
         {/* PDF Viewer */}
         <div className="flex-1 relative">
-          <iframe
-            src={displayUrl}
-            className="w-full h-full border-0"
-            title={`NCERT - ${bookTitle}`}
-            onError={() => setIframeError(true)}
-          />
+          {hasDocumentUrl ? (
+            <iframe
+              src={displayUrl}
+              className="w-full h-full border-0"
+              title={`NCERT - ${bookTitle}`}
+              onError={() => setIframeError(true)}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-6 text-center" role="status">
+              <p className="max-w-md text-sm font-semibold text-[#5d675f]">
+                No NCERT document is available to preview. Please use a valid document link or close this window.
+              </p>
+            </div>
+          )}
+
+          {/* An iframe mount does not confirm that the external PDF rendered. */}
+          <div
+            className="absolute bottom-3 left-3 max-w-[min(75%,32rem)] rounded-md border border-[#dcd5c7] bg-white/95 px-2 py-1.5 text-[10px] text-[#5d675f]"
+            role="status"
+            aria-live="polite"
+            aria-busy={hasDocumentUrl && !iframeError}
+          >
+            {!hasDocumentUrl
+              ? 'Document unavailable: no PDF URL was provided.'
+              : iframeError
+                ? 'The direct PDF preview is unavailable. Google Docs Viewer fallback is shown, but PDF availability is not confirmed.'
+                : 'Loading PDF preview… The document is not confirmed as loaded until it is visible.'}
+          </div>
+
           {/* If iframe fails silently (no onError for X-Frame-Options), show fallback after 3s */}
-          {!iframeError && (
+          {!iframeError && hasDocumentUrl && (
             <div className="absolute bottom-3 right-3">
               <button
                 onClick={() => setIframeError(true)}

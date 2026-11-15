@@ -1,12 +1,4 @@
-import { InternalSecuritySocietyTalkRoute } from "@/components/upsc/InternalSecuritySocietySubjectRoutes";
-
-export default async function InternalSecuritySocietyTalkPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ day?: string }>;
-}) {
-  const params = await searchParams;
-  const day = Number(params?.day ?? "1");
-
-  return <InternalSecuritySocietyTalkRoute initialDay={Number.isFinite(day) ? day : 1} />;
+import { redirect } from "next/navigation";
+export default function InternalSecuritySocietyTalkPage() {
+  redirect("/upsc/internal-security-society/lms");
 }

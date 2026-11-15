@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
@@ -13,6 +13,21 @@ if _is_sqlite:
         connect_args={"check_same_thread": False},
         pool_pre_ping=True,
     )
+
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        """SQLite ignores FK constraints unless enabled per connection.
+
+        Without this, deleting a syllabus node silently orphaned learner
+        progress rows (the June 2026 destructive reseed did exactly that).
+        PostgreSQL enforces FKs natively; this brings local SQLite in line so
+        a broken delete fails loudly instead of corrupting history.
+        """
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 else:
     # Serverless-safe PostgreSQL pool: NullPool avoids holding connections
     # across Lambda/Vercel invocations which would exhaust the DB.

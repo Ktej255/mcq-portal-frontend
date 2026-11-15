@@ -171,3 +171,41 @@ def test_analytics_anomaly_detection_flags_contradictions():
         "total_score": 3,
     })
     assert {item["type"] for item in anomalies} >= {"COUNT_CONTRADICTION", "ACCURACY_RANGE", "IMPOSSIBLE_TIMING"}
+
+
+def test_save_answer_rejects_question_from_another_test(db):
+    user, test, q1, _ = seed_exam(db)
+    other_test = Test(
+        title="Other Test",
+        subject_id=test.subject_id,
+        correct_marks=1,
+        negative_marking_value=0.33,
+        duration_minutes=30,
+    )
+    db.add(other_test)
+    db.commit()
+    other_question = Question(
+        test_id=other_test.id,
+        topic_id=q1.topic_id,
+        text_en="Unrelated question",
+        options_en={"A": "One", "B": "Two"},
+        correct_option="A",
+    )
+    db.add(other_question)
+    db.commit()
+
+    attempt = start_attempt(db, user.id, StartAttemptRequest(test_id=test.id))
+    with pytest.raises(HTTPException) as exc:
+        save_answer(
+            db,
+            attempt.id,
+            user.id,
+            SaveAnswerRequest(
+                question_id=other_question.id,
+                selected_option="A",
+                time_taken_seconds=5,
+            ),
+        )
+
+    assert exc.value.status_code == 404
+    assert db.query(AttemptAnswer).filter_by(attempt_id=attempt.id).count() == 0

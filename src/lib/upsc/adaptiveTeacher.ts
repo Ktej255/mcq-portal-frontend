@@ -67,7 +67,22 @@ export const ADAPTIVE_TEACHER_MAX_REQUEST_BYTES = 32768;
 export const ADAPTIVE_TEACHER_PROMPT_VERSION = "2.0";
 export const ADAPTIVE_TEACHER_RUBRIC_VERSION = "2.0";
 
-export function getAdaptiveTeacherLevelInstruction(level: string) {
+type AdaptiveTeacherRecord = Record<string, unknown>;
+
+type AdaptiveTeacherSubjectPlan = {
+  title: string;
+  sessions: typeof geographySessions;
+};
+
+interface AdaptiveTeacherBuildOptions {
+  providerConfigured?: unknown;
+}
+
+function isAdaptiveTeacherRecord(value: unknown): value is AdaptiveTeacherRecord {
+  return typeof value === "object" && value !== null;
+}
+
+export function getAdaptiveTeacherLevelInstruction() {
   return {
     role: "Mentor",
     diagnosisFrame: "Analyze core gaps.",
@@ -75,30 +90,33 @@ export function getAdaptiveTeacherLevelInstruction(level: string) {
   };
 }
 
-export function parseAdaptiveTeacherCoach(raw: any): AdaptiveTeacherCoach | null {
-  if (!raw || typeof raw !== "object") return null;
+export function parseAdaptiveTeacherCoach(raw: unknown): AdaptiveTeacherCoach | null {
+  if (!isAdaptiveTeacherRecord(raw)) return null;
+  const doubtDiagnosis = isAdaptiveTeacherRecord(raw.doubtDiagnosis) ? raw.doubtDiagnosis : {};
   return {
     summary: String(raw.summary || ""),
     nextPrompt: String(raw.nextPrompt || ""),
-    focusConcepts: Array.isArray(raw.focusConcepts) ? raw.focusConcepts.map(String) : [],
+    focusConcepts: Array.isArray(raw.focusConcepts)
+      ? raw.focusConcepts.map((concept) => String(concept))
+      : [],
     doubtDiagnosis: {
-      category: String(raw.doubtDiagnosis?.category || "Mastery"),
-      reason: String(raw.doubtDiagnosis?.reason || ""),
-      repairAction: String(raw.doubtDiagnosis?.repairAction || ""),
-      masteryCheck: String(raw.doubtDiagnosis?.masteryCheck || "")
+      category: String(doubtDiagnosis.category || "Mastery"),
+      reason: String(doubtDiagnosis.reason || ""),
+      repairAction: String(doubtDiagnosis.repairAction || ""),
+      masteryCheck: String(doubtDiagnosis.masteryCheck || "")
     },
     providerScore: typeof raw.providerScore === "number" ? raw.providerScore : undefined
   };
 }
 
-export function parseAdaptiveTeacherRequest(raw: any): AdaptiveTeacherRequest | null {
-  if (!raw || typeof raw !== "object") return null;
+export function parseAdaptiveTeacherRequest(raw: unknown): AdaptiveTeacherRequest | null {
+  if (!isAdaptiveTeacherRecord(raw)) return null;
   return {
     subjectSlug: String(raw.subjectSlug || ""),
     day: Number(raw.day || 1),
     answer: String(raw.answer || ""),
     challengeAnswer: raw.challengeAnswer ? String(raw.challengeAnswer) : undefined,
-    learnerLevel: (raw.learnerLevel || "beginner") as any
+    learnerLevel: (raw.learnerLevel || "beginner") as AdaptiveTeacherRequest["learnerLevel"]
   };
 }
 
@@ -110,7 +128,7 @@ export function resolveAdaptiveTeacherSubject(slug: string) {
       recallTarget: 95
     };
   }
-  const plan = (subjectPlans as any)[slug];
+  const plan = (subjectPlans as Record<string, AdaptiveTeacherSubjectPlan>)[slug];
   if (!plan) return null;
   return {
     title: plan.title,
@@ -119,7 +137,10 @@ export function resolveAdaptiveTeacherSubject(slug: string) {
   };
 }
 
-export function buildLocalAdaptiveTeacherResponse(request: AdaptiveTeacherRequest, options?: any) {
+export function buildLocalAdaptiveTeacherResponse(
+  request: AdaptiveTeacherRequest,
+  options?: AdaptiveTeacherBuildOptions
+) {
   return {
     mode: "local-fallback",
     providerConfigured: Boolean(options?.providerConfigured),
@@ -151,7 +172,7 @@ export function buildLocalAdaptiveTeacherResponse(request: AdaptiveTeacherReques
   };
 }
 
-export function parseAdaptiveTeacherResponse(raw: any): AdaptiveTeacherResponse | null {
-  if (!raw || typeof raw !== "object") return null;
-  return raw as AdaptiveTeacherResponse;
+export function parseAdaptiveTeacherResponse(raw: unknown): AdaptiveTeacherResponse | null {
+  if (!isAdaptiveTeacherRecord(raw)) return null;
+  return raw as unknown as AdaptiveTeacherResponse;
 }

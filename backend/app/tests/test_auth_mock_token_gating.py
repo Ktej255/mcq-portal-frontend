@@ -38,6 +38,17 @@ from app.core.optional import models as optional_models  # noqa: F401
 from app.core.optional import student_models as optional_student_models  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def _pin_non_production_environment(monkeypatch):
+    """The bypass also requires a dev/test/local ``APP_ENVIRONMENT``.
+
+    Pin it here so the suite proves the flag contract itself instead of
+    inheriting whatever the developer's local ``.env`` declares (a local
+    ``.env`` that says ``production`` correctly refuses every mock token).
+    """
+    monkeypatch.setattr(settings, "APP_ENVIRONMENT", "test")
+
+
 @pytest.fixture()
 def client_and_session():
     engine = create_engine(
@@ -102,14 +113,12 @@ def test_mock_token_works_when_enabled(client_and_session, monkeypatch):
 
     resp = client.get("/whoami", headers={"Authorization": "Bearer MOCK_TOKEN"})
     assert resp.status_code == 200, resp.text
-    # The default branch provisions the dev validator account.
-    assert resp.json()["email"] == "validator@upsc.local"
+    # The default branch provisions the dev validator account. The address must
+    # stay within a domain EmailStr accepts, or /auth/me cannot serialise it.
+    assert resp.json()["email"] == "validator@example.com"
 
 
 def test_mock_token_persona_resolves_when_enabled(client_and_session, monkeypatch):
-    # When enabled, a persona-scoped token is honored (resolves to *some* user).
-    # NOTE: this only asserts the bypass is active (status 200) — the exact uid
-    # extraction is pre-existing behavior and out of scope for this gate test.
     client, SessionLocal = client_and_session
     monkeypatch.setattr(settings, "ALLOW_MOCK_AUTH", True)
 
@@ -121,6 +130,25 @@ def test_mock_token_persona_resolves_when_enabled(client_and_session, monkeypatc
 
     resp = client.get("/whoami", headers={"Authorization": "Bearer MOCK_TOKEN_persona-uid"})
     assert resp.status_code == 200, resp.text
+    assert resp.json() == {"email": "persona@upsc.local", "role": "RoleEnum.STUDENT"}
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["MOCK_TOKEN_unknown-persona", "MOCK_TOKEN_", "MOCK_TOKENmalformed"],
+)
+def test_unknown_or_malformed_mock_persona_cannot_fall_back_to_admin(
+    client_and_session, monkeypatch, token
+):
+    client, SessionLocal = client_and_session
+    monkeypatch.setattr(settings, "ALLOW_MOCK_AUTH", True)
+
+    resp = client.get("/whoami", headers={"Authorization": f"Bearer {token}"})
+
+    assert resp.status_code == 401, resp.text
+    db = SessionLocal()
+    assert db.query(User).count() == 0
+    db.close()
 
 
 def test_no_token_is_401_regardless_of_flag(client_and_session, monkeypatch):

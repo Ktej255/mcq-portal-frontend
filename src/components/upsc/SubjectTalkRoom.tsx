@@ -45,7 +45,6 @@ import {
 } from "@/lib/upsc/subjectLearning";
 import { getSubjectLabProofCompletion, getSubjectWatchCompletion } from "@/lib/upsc/subjectProgressGates";
 import { getSubjectThemeStyle } from "@/lib/upsc/subjectTheme";
-import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import {
   type SubjectConfidence,
@@ -140,6 +139,25 @@ type SpeechState = "idle" | "listening" | "recording" | "unsupported" | "blocked
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
+type SubjectTalkProgressPatch = {
+  confidence?: SubjectConfidence;
+  mentorMode?: SubjectMentorMode;
+  reflection?: string;
+  challengeResponse?: string;
+  revisitQueued?: boolean;
+  assessment?: SubjectAssessment | null;
+  discussion?: SubjectMaicDiscussion | null;
+  discussionStep?: SubjectTalkDiscussionStep;
+  classroomStage?: SubjectTalkClassroomStage;
+  nextRoute?: string;
+  nextActionLabel?: string;
+  preliminaryScore?: number;
+  teacherStatus?: SubjectTalkTeacherStatus;
+  teacherTurnCount?: number;
+  teacherFollowUpAnswer?: string;
+  incrementSavedCount?: boolean;
+};
+
 function getSpeechRecognitionConstructor() {
   if (typeof window === "undefined") return null;
   const speechWindow = window as typeof window & {
@@ -227,7 +245,7 @@ function readSavedDoubtDiagnosis(progress?: SubjectDayProgress): AdaptiveTeacher
 
 export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan; initialDay?: number }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { role } = useAuth();
   const { getDayProgress, isLoaded, saveDayProgress } = useSubjectProgress(plan.slug, plan.sessions);
   const [activeDay, setActiveDay] = useState(initialDay ?? 1);
   const [mentorMode, setMentorMode] = useState<SubjectMentorMode>("Cause-effect");
@@ -239,6 +257,8 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const [assessment, setAssessment] = useState<SubjectAssessment | null>(null);
   const [maicDiscussion, setMaicDiscussion] = useState<SubjectMaicDiscussion | null>(null);
   const [savedReflection, setSavedReflection] = useState(false);
+  const [talkSaveState, setTalkSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [talkSaveError, setTalkSaveError] = useState("");
   const [revisionQueued, setRevisionQueued] = useState(false);
   const [hydratedDay, setHydratedDay] = useState<number | null>(null);
   const [learnerLevel, setLearnerLevel] = useState<StudentLevel>("beginner");
@@ -253,6 +273,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const [teacherCoach, setTeacherCoach] = useState<AdaptiveTeacherCoach | null>(null);
   const [teacherConnection, setTeacherConnection] = useState<"idle" | "checking" | "ready" | "local" | "unavailable">("idle");
   const teacherRequestId = useRef(0);
+  const retryTalkSaveRef = useRef<(() => void) | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const speechManualStopRef = useRef(false);
@@ -287,7 +308,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     () => (plan.slug === "history" ? getHistoryLearningPack(activeSession) : null),
     [activeSession, plan.slug]
   );
-  const hasMasterAccess = isMasterEmail(user?.email) || isLocalMockMasterSession();
+  const hasMasterAccess = role === "ADMIN" || role === "EDUCATOR";
   const learningPack =
     environmentPack ??
     economyPack ??
@@ -315,64 +336,83 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
   const labProofCompletion = getSubjectLabProofCompletion(activeProgress);
   const isWatchComplete = watchCompletion.complete;
   const unlockStage = assessment ? getSubjectTalkUnlockStage(assessment) : null;
+  const isTalkSaveConfirmed = !assessment || talkSaveState === "saved";
+  // A retry is available while a save is in flight or after it failed. This is
+  // derived from the persisted save state instead of reading the retry handler
+  // ref, which must never be inspected during render.
+  const isTalkSaveRetryable = talkSaveState === "saving" || talkSaveState === "failed";
   const isChallengePending = Boolean(assessment && maicDiscussion && discussionStep === "challenge");
-  const isLabUnlocked = unlockStage === "lab" || unlockStage === "mcq";
-  const isMcqScoreReady = unlockStage === "mcq";
+  const isLabUnlocked = isTalkSaveConfirmed && (unlockStage === "lab" || unlockStage === "mcq");
+  const isMcqScoreReady = isTalkSaveConfirmed && unlockStage === "mcq";
   const isMcqUnlocked = isMcqScoreReady;
   const watchHref = `${basePath}/watch?day=${activeSession.day}`;
-  const shouldOpenWatchAfterTalk = Boolean(assessment && !isChallengePending && !isWatchComplete);
+  const shouldOpenWatchAfterTalk = Boolean(assessment && isTalkSaveConfirmed && !isChallengePending && !isWatchComplete);
   const routeGateTitle = !assessment
     ? "Awaiting MAIC oral check"
-    : isChallengePending
-      ? "Peer challenge pending"
-    : shouldOpenWatchAfterTalk
-      ? "Watch the exact gap"
-    : unlockStage === "mcq"
-      ? "Practice open"
-      : unlockStage === "lab"
-        ? "Recall support"
-        : unlockStage === "retry"
-          ? "Retry talk after compressed recap"
-          : "Revisit required";
+    : !isTalkSaveConfirmed
+      ? "Talk save needs confirmation"
+      : isChallengePending
+        ? "Peer challenge pending"
+        : shouldOpenWatchAfterTalk
+          ? "Watch the exact gap"
+          : unlockStage === "mcq"
+            ? "Practice open"
+            : unlockStage === "lab"
+              ? "Recall support"
+              : unlockStage === "retry"
+                ? "Retry talk after compressed recap"
+                : "Revisit required";
   const routeGateDetail = !assessment
     ? "The student must explain the topic in their own words before the next room opens."
-    : isChallengePending
-      ? "The AI teacher has created the counter-question. The student must answer the peer challenge before the final examiner verdict opens the next room."
-    : shouldOpenWatchAfterTalk
-      ? `Your recall is saved at ${assessment?.score ?? 0}%. Now use the class only to repair the missing concepts before returning to Talk.`
-    : unlockStage === "mcq"
-      ? `Teacher, peer challenger, and examiner checks reached the ${SUBJECT_RECALL_TARGET}% recall target. Fresh practice can open now; Visual Lab stays optional support.`
-      : unlockStage === "lab"
-        ? `The explanation crossed the 70 percent floor but is below ${SUBJECT_RECALL_TARGET}%. Use the Visual Lab as support or retry Talk until MCQ opens. Current lab support: ${labProofCompletion.completed}/${labProofCompletion.target} proofs.`
-        : unlockStage === "retry"
-          ? "The answer has partial logic, but it needs a compressed recap and another oral attempt before forward movement."
-          : "The explanation is below the required floor. Send the student to compressed recap, then bring them back for another oral check.";
+    : !isTalkSaveConfirmed
+      ? "Your answer and assessment remain a local draft until the canonical subject-progress save is accepted. Retry the save before opening another room."
+      : isChallengePending
+        ? "The AI teacher has created the counter-question. The student must answer the peer challenge before the final examiner verdict opens the next room."
+        : shouldOpenWatchAfterTalk
+          ? `Your recall is saved at ${assessment?.score ?? 0}%. Now use the class only to repair the missing concepts before returning to Talk.`
+          : unlockStage === "mcq"
+            ? `Teacher, peer challenger, and examiner checks reached the ${SUBJECT_RECALL_TARGET}% recall target. Fresh practice can open now; Visual Lab stays optional support.`
+            : unlockStage === "lab"
+              ? `The explanation crossed the 70 percent floor but is below ${SUBJECT_RECALL_TARGET}%. Use the Visual Lab as support or retry Talk until MCQ opens. Current lab support: ${labProofCompletion.completed}/${labProofCompletion.target} proofs.`
+              : unlockStage === "retry"
+                ? "The answer has partial logic, but it needs a compressed recap and another oral attempt before forward movement."
+                : "The explanation is below the required floor. Send the student to compressed recap, then bring them back for another oral check.";
   const routeGateStudentLine = !assessment
     ? "Write your explanation, then assess it."
-    : isChallengePending
-      ? "Answer the counter-question."
+    : !isTalkSaveConfirmed
+      ? talkSaveState === "saving"
+        ? "Confirming Talk save..."
+        : "Retry the Talk save before moving forward."
+      : isChallengePending
+        ? "Answer the counter-question."
+        : shouldOpenWatchAfterTalk
+          ? "Open the class for the missing pieces."
+          : unlockStage === "mcq"
+            ? "Practice is open."
+            : unlockStage === "lab"
+              ? "Use support, then explain again."
+              : "Revise, then try again.";
+  const routeGateTone = !assessment ? "neutral" : !isTalkSaveConfirmed || isChallengePending ? "locked" : shouldOpenWatchAfterTalk || isLabUnlocked ? "unlocked" : "locked";
+  const primaryRouteHref = !isTalkSaveConfirmed
+    ? `${basePath}/talk?day=${activeSession.day}`
     : shouldOpenWatchAfterTalk
-      ? "Open the class for the missing pieces."
-    : unlockStage === "mcq"
-        ? "Practice is open."
-        : unlockStage === "lab"
-          ? "Use support, then explain again."
-          : "Revise, then try again.";
-  const routeGateTone = !assessment ? "neutral" : isChallengePending ? "locked" : shouldOpenWatchAfterTalk || isLabUnlocked ? "unlocked" : "locked";
-  const primaryRouteHref = shouldOpenWatchAfterTalk
-    ? watchHref
-    : isMcqUnlocked
-      ? mcqHref
-      : isLabUnlocked
-        ? labHref
-        : revisitHref;
-  const primaryRouteLabel = shouldOpenWatchAfterTalk
-    ? "Open class"
-    : isMcqUnlocked
-      ? "Open practice"
-      : isLabUnlocked
-        ? "Use visual support"
-        : "Open compressed recap";
+      ? watchHref
+      : isMcqUnlocked
+        ? mcqHref
+        : isLabUnlocked
+          ? labHref
+          : revisitHref;
+  const primaryRouteLabel = !isTalkSaveConfirmed
+    ? talkSaveState === "saving"
+      ? "Confirming save..."
+      : "Retry Talk save"
+    : shouldOpenWatchAfterTalk
+      ? "Open class"
+      : isMcqUnlocked
+        ? "Open practice"
+        : isLabUnlocked
+          ? "Use visual support"
+          : "Open compressed recap";
   const talkClassroomStage: SubjectTalkClassroomStage = assessment
     ? isChallengePending
       ? "peer-challenge"
@@ -380,12 +420,14 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     : answerDraft.trim().length > 0
       ? "student-explain"
       : "teacher-brief";
-  const talkNextRoute = !assessment || isChallengePending ? `${basePath}/talk?day=${activeSession.day}` : primaryRouteHref;
+  const talkNextRoute = !assessment || isChallengePending || !isTalkSaveConfirmed ? `${basePath}/talk?day=${activeSession.day}` : primaryRouteHref;
   const talkNextActionLabel = !assessment
     ? "Assess explanation first"
-    : isChallengePending
-      ? "Answer peer challenge"
-      : primaryRouteLabel;
+    : !isTalkSaveConfirmed
+      ? "Retry Talk save"
+      : isChallengePending
+        ? "Answer peer challenge"
+        : primaryRouteLabel;
   const teacherPromptLabel = isChallengePending ? "Repair check" : "AI teacher question";
   const teacherPromptTitle = isChallengePending
     ? "Answer one counter-question"
@@ -570,6 +612,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       setRevisionQueued(saved?.revisitQueued ?? false);
       setActivePromptIndex(savedPromptIndex >= 0 ? savedPromptIndex : 0);
       setSavedReflection(false);
+      setTalkSaveState(savedAssessment ? "saved" : "idle");
+      setTalkSaveError("");
+      retryTalkSaveRef.current = null;
       setHydratedDay(activeDay);
     }, 0);
 
@@ -639,6 +684,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     setTeacherConnection("idle");
     teacherRequestId.current += 1;
     setSavedReflection(false);
+    setTalkSaveState("idle");
+    setTalkSaveError("");
+    retryTalkSaveRef.current = null;
     setRevisionQueued(false);
     setSubmittedInCurrentVisit(false);
     setSpeechRecognition(null);
@@ -649,26 +697,9 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     router.replace(`${basePath}/talk?day=${boundedDay}`, { scroll: false });
   };
 
-  const persistCurrentState = (patch: {
-    confidence?: SubjectConfidence;
-    mentorMode?: SubjectMentorMode;
-    reflection?: string;
-    challengeResponse?: string;
-    revisitQueued?: boolean;
-    assessment?: SubjectAssessment | null;
-    discussion?: SubjectMaicDiscussion | null;
-    discussionStep?: SubjectTalkDiscussionStep;
-    classroomStage?: SubjectTalkClassroomStage;
-    nextRoute?: string;
-    nextActionLabel?: string;
-    preliminaryScore?: number;
-    teacherStatus?: SubjectTalkTeacherStatus;
-    teacherTurnCount?: number;
-    teacherFollowUpAnswer?: string;
-    incrementSavedCount?: boolean;
-  } = {}) => {
+  const persistCurrentState = async (patch: SubjectTalkProgressPatch = {}): Promise<boolean> => {
     const existing = getDayProgress(activeSession.day);
-    saveDayProgress(activeSession.day, {
+    return saveDayProgress(activeSession.day, {
       confidence: patch.confidence ?? confidence,
       mentorMode: patch.mentorMode ?? mentorMode,
       reflection: patch.reflection ?? answerDraft,
@@ -693,7 +724,7 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
     });
   };
 
-  const assessCurrentAnswer = (includeChallenge = false, overrideAnswer?: string) => {
+  const assessCurrentAnswer = async (includeChallenge = false, overrideAnswer?: string) => {
     const answerForAssessment = overrideAnswer ?? answerDraft;
     const assessmentText = [answerForAssessment, includeChallenge ? challengeDraft : ""]
       .map((part) => part.trim())
@@ -772,14 +803,18 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       nextUnlockStage === "mcq" ? "Command" : nextUnlockStage === "revisit" ? "Shaky" : "Working";
     const nextRevisionQueued = isWatchComplete && (nextUnlockStage === "revisit" || nextUnlockStage === "retry");
 
+    setTalkSaveState("saving");
+    setTalkSaveError("");
+    setSavedReflection(false);
+    retryTalkSaveRef.current = () => {
+      void assessCurrentAnswer(includeChallenge, answerForAssessment);
+    };
     setAssessment(nextAssessment);
     setMaicDiscussion(nextDiscussion);
     setConfidence(nextConfidence);
     setRevisionQueued(nextRevisionQueued);
     setDiscussionStep(nextDiscussionStep);
-    setSavedReflection(true);
-    setSubmittedInCurrentVisit(true);
-    persistCurrentState({
+    const persisted = await persistCurrentState({
       confidence: nextConfidence,
       reflection: answerForAssessment,
       challengeResponse: challengeDraft,
@@ -796,6 +831,19 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
       teacherFollowUpAnswer: includeChallenge ? challengeDraft.trim() : undefined,
       incrementSavedCount: true,
     });
+
+    if (!persisted) {
+      setTalkSaveState("failed");
+      setTalkSaveError("Talk progress could not be confirmed. Your answer remains a local draft; retry the save before moving forward.");
+      setSavedReflection(false);
+      return;
+    }
+
+    setTalkSaveState("saved");
+    setTalkSaveError("");
+    setSavedReflection(true);
+    setSubmittedInCurrentVisit(true);
+    retryTalkSaveRef.current = null;
 
     if (nextAssessment && nextAssessment.score >= SUBJECT_RECALL_TARGET) {
       try {
@@ -851,6 +899,23 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
         setTeacherCoach(null);
         setTeacherConnection("unavailable");
       });
+  };
+
+  const saveTalkDraft = async (patch: SubjectTalkProgressPatch = { incrementSavedCount: true }) => {
+    setTalkSaveState("saving");
+    setTalkSaveError("");
+    setSavedReflection(false);
+    const persisted = await persistCurrentState(patch);
+    if (!persisted) {
+      setTalkSaveState("failed");
+      setTalkSaveError("Talk draft could not be confirmed. The draft is still local; retry the save when the connection is available.");
+      return;
+    }
+
+    setTalkSaveState("saved");
+    setTalkSaveError("");
+    setSavedReflection(true);
+    retryTalkSaveRef.current = null;
   };
 
   const runMasterOnePassCheck = () => {
@@ -1333,12 +1398,26 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
             </>
           )}
 
-          {savedReflection && (
+          {savedReflection && talkSaveState === "saved" && (
             <div className="mt-4 flex items-start gap-3 rounded-md bg-[#e7f5ee] p-3">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1d9e75]" />
               <p className="text-sm font-bold leading-6 text-[#085041]">Saved for this day.</p>
             </div>
           )}
+
+          {talkSaveError ? (
+            <div role="alert" className="mt-4 flex flex-col gap-3 rounded-md border border-[#ef9f27]/50 bg-[#fff4df] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-bold leading-6 text-[#7a5410]">{talkSaveError}</p>
+              <button
+                type="button"
+                onClick={() => retryTalkSaveRef.current?.()}
+                disabled={!isTalkSaveRetryable}
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCcw className="h-3.5 w-3.5" /> Retry save
+              </button>
+            </div>
+          ) : null}
 
           {assessment && !isChallengePending && (
             <div
@@ -1515,19 +1594,32 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                   <summary className="cursor-pointer text-xs font-black text-[#1a3a2a]">Why this gate?</summary>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#49675e]">{routeGateDetail}</p>
                 </details>
-                <Link
-                  data-testid="talk-primary-route"
-                  data-next-action-route={primaryRouteHref}
-                  data-next-action-label={primaryRouteLabel}
-                  data-recall-target={SUBJECT_RECALL_TARGET}
-                  data-score={assessment.score}
-                  data-mcq-ready={mcqReady ? "true" : "false"}
-                  href={primaryRouteHref}
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
-                >
-                  {primaryRouteLabel}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                {isTalkSaveConfirmed ? (
+                  <Link
+                    data-testid="talk-primary-route"
+                    data-next-action-route={primaryRouteHref}
+                    data-next-action-label={primaryRouteLabel}
+                    data-recall-target={SUBJECT_RECALL_TARGET}
+                    data-score={assessment.score}
+                    data-mcq-ready={mcqReady ? "true" : "false"}
+                    href={primaryRouteHref}
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-black text-white transition hover:bg-[#10291d]"
+                  >
+                    {primaryRouteLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="talk-primary-route-retry"
+                    onClick={() => retryTalkSaveRef.current?.()}
+                    disabled={!isTalkSaveRetryable}
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#9a6a16] px-3 text-sm font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {talkSaveState === "saving" ? "Confirming save..." : "Retry Talk save"}
+                    <RefreshCcw className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1645,12 +1737,16 @@ export function SubjectTalkRoom({ plan, initialDay }: { plan: SubjectSprintPlan;
                 <button
                   type="button"
                   onClick={() => {
-                    persistCurrentState({ incrementSavedCount: true });
-                    setSavedReflection(true);
+                    const draftPatch: SubjectTalkProgressPatch = { incrementSavedCount: true };
+                    retryTalkSaveRef.current = () => {
+                      void saveTalkDraft(draftPatch);
+                    };
+                    void saveTalkDraft(draftPatch);
                   }}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] sm:w-auto"
+                  disabled={talkSaveState === "saving"}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                 >
-                  <Save className="h-4 w-4" /> Save draft
+                  <Save className="h-4 w-4" /> {talkSaveState === "saving" ? "Saving draft..." : "Save draft"}
                 </button>
                 <button
                   type="button"

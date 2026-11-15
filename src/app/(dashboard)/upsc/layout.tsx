@@ -25,6 +25,14 @@ export default function UpscLayout({ children }: { children: React.ReactNode }) 
     return <>{children}</>;
   }
 
+  // GS LMS routes own their gate: sign-in, first-run onboarding and the beta
+  // entitlement check live in the LMS layout. Wrapping them in the profile
+  // gate made its "Start setup" link point at an onboarding page the gate
+  // itself replaced, so the learner could never reach the wizard.
+  if (pathname.split("/").includes("lms")) {
+    return <>{children}</>;
+  }
+
   // All other routes (including GS subject routes like /upsc/polity-governance,
   // /upsc/economy, etc.) are student-accessible behind the profile gate.
   // Those pages render "Coming Soon" states at the page-component level.
