@@ -1,5 +1,5 @@
 import {
-  Activity,
+  ClipboardList,
   BadgeIndianRupee,
   BarChart3,
   CalendarCheck,
@@ -14,12 +14,10 @@ import {
   GraduationCap,
   LayoutDashboard,
   LibraryBig,
-  ListChecks,
   Mail,
   Newspaper,
   RefreshCcw,
   Route,
-  ShieldAlert,
   UploadCloud,
   type LucideIcon,
 } from "lucide-react";
@@ -210,7 +208,6 @@ export const studentNavSections: StudentNavSection[] = [
 /** Admin/operator navigation (unchanged behaviour, centralised here). */
 export const adminNavItems: StudentNavItem[] = [
   { name: "Admin Console", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Launch Plan", href: "/admin/launch-plan", icon: CalendarCheck },
   { name: "Yearly Planner", href: "/upsc/yearly-planner", icon: FolderTree },
   { name: "Pricing", href: "/upsc/pricing", icon: BadgeIndianRupee },
   { name: "Syllabus/PYQ", href: "/upsc/source-library", icon: LibraryBig },
@@ -220,11 +217,9 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "2026 Showcase", href: "/upsc/prelims-2026-showcase", icon: BarChart3 },
   { name: "PYQ Import", href: "/admin/pyq-import", icon: FileInput },
   { name: "Current Affairs", href: "/upsc/current-affairs", icon: Newspaper },
-  { name: "Feature Inventory", href: "/admin/feature-inventory", icon: ListChecks },
   { name: "Prelims V2", href: "/admin/prelims-audit-v2", icon: FileSearch },
-  { name: "Founder Review", href: "/admin/founder", icon: Activity },
+  { name: "Tests", href: "/admin/tests", icon: ClipboardList },
   { name: "Question Bank", href: "/admin/questions", icon: Database },
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
-  { name: "Integrity Logs", href: "/admin/integrity", icon: ShieldAlert },
   { name: "Leads", href: "/admin/leads", icon: Mail },
 ];

@@ -36,7 +36,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
 
   const openMasterPass = () => {
     activateUpscMasterPass(user?.email, { notify: true });
-    router.push('/admin/feature-inventory');
+    router.push('/admin/dashboard');
     onClose?.();
   };
 

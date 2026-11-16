@@ -258,21 +258,45 @@ def update_test(
     test = crud_admin.update_test(db=db, test_id=test_id, obj_in=test_in)
     return StandardResponse(success=True, message="Test updated successfully", data=test)
 
-@router.post("/recalibrate-batches")
-def recalibrate_batches(
+@router.get("/overview")
+def get_overview(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin)
-):
-    """
-    Priority 3: Batch Calibration.
-    Recalculates batch difficulty and student alignment based on latest performance data.
-    """
-    if current_admin.role != 'ADMIN':
-        raise HTTPException(status_code=403, detail="Admin access required")
-        
-    # Logic to iterate through batches and update their metadata
-    # For now, we simulate a heavy background job
-    return {"status": "CALIBRATION_STARTED", "job_id": "batch-recal-123", "target": "ALL_BATCHES"}
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    """Live counts for the operator dashboard, read from the database."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func
+
+    from app.core.leads.models import MarketingLead
+    from app.models.domain import Attempt, AttemptStatusEnum, RoleEnum, Test
+
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    live_questions = db.query(Question).filter(Question.is_deleted.is_(False))
+    attempts = db.query(Attempt).filter(Attempt.is_deleted.is_(False))
+    data = {
+        "students": db.query(func.count(User.id)).filter(User.role == RoleEnum.STUDENT).scalar() or 0,
+        "tests": db.query(func.count(Test.id)).filter(Test.is_active.is_(True)).scalar() or 0,
+        "questions_published": live_questions.filter(
+            Question.status == WorkflowStatusEnum.PUBLISHED
+        ).count(),
+        "questions_draft": live_questions.filter(
+            Question.status != WorkflowStatusEnum.PUBLISHED
+        ).count(),
+        "attempts_submitted": attempts.filter(
+            Attempt.status == AttemptStatusEnum.SUBMITTED
+        ).count(),
+        "attempts_in_progress": attempts.filter(
+            Attempt.status == AttemptStatusEnum.IN_PROGRESS
+        ).count(),
+        "attempts_last_7_days": attempts.filter(Attempt.start_time >= week_ago).count(),
+        "leads": db.query(func.count(MarketingLead.id)).scalar() or 0,
+        "leads_last_7_days": db.query(func.count(MarketingLead.id))
+        .filter(MarketingLead.created_at >= week_ago)
+        .scalar()
+        or 0,
+    }
+    return StandardResponse(success=True, message="Overview retrieved", data=data)
 
 @router.get("/pipeline-observability")
 def get_pipeline_observability(

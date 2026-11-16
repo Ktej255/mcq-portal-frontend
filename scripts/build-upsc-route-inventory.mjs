@@ -17,9 +17,6 @@ const operatorRoutes = new Set([
 ]);
 
 const isolatedRoutes = new Set([
-  "/admin/analytics",
-  "/admin/observability",
-  "/admin/tests",
   "/exam/demo",
   "/simulation/lobby",
 ]);

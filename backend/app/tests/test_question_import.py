@@ -280,3 +280,19 @@ def test_a_student_can_sit_and_be_scored_on_an_uploaded_test(api):
     report = api.client.post(f"/api/v1/attempts/{attempt['attempt_id']}/submit").json()["data"]
 
     assert (report["correct_count"], report["incorrect_count"]) == (2, 1)
+
+
+def test_overview_counts_come_from_the_database(api):
+    assert do_import(api, [row(1), row(2)], dry_run=False, publish=True)["saved"]
+    assert do_import(api, [row(3)], dry_run=False)["saved"]
+
+    data = api.client.get(f"{ADMIN}/overview").json()["data"]
+    assert data["students"] == 1
+    assert data["tests"] == 1
+    assert data["questions_published"] == 2
+    assert data["questions_draft"] == 1
+    assert data["attempts_submitted"] == 0
+    assert data["leads"] == 0
+
+    api.as_user("student")
+    assert api.client.get(f"{ADMIN}/overview").status_code == 403

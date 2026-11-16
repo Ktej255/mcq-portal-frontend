@@ -75,7 +75,7 @@ export default function AdminLeadsPage() {
           </Badge>
           <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
           <p className="text-muted-foreground">
-            People who finished the free diagnostic. {total} saved, newest first.
+            People who finished the free diagnostic or wrote through the contact page. {total} saved, newest first.
           </p>
         </div>
         <Button variant="outline" onClick={refresh} disabled={loading}>
@@ -88,7 +88,7 @@ export default function AdminLeadsPage() {
       ) : null}
 
       <section className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-zinc-50 text-left text-xs uppercase tracking-wider text-zinc-500 dark:bg-zinc-950">
             <tr>
               <th className="p-3">Date</th>
@@ -100,6 +100,8 @@ export default function AdminLeadsPage() {
               <th className="p-3">Hours/day</th>
               <th className="p-3">Optional</th>
               <th className="p-3">Focus</th>
+              <th className="p-3">From</th>
+              <th className="p-3">Message</th>
             </tr>
           </thead>
           <tbody>
@@ -116,12 +118,14 @@ export default function AdminLeadsPage() {
                 <td className="p-3">{answer(lead, "hours")}</td>
                 <td className="p-3">{answer(lead, "optional")}</td>
                 <td className="p-3">{answer(lead, "subjects")}</td>
+                <td className="p-3">{lead.source === "contact" ? "Contact form" : "Diagnostic"}</td>
+                <td className="max-w-md whitespace-pre-wrap p-3">{answer(lead, "message")}</td>
               </tr>
             ))}
             {!loading && leads.length === 0 && !error ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">
-                  No leads yet. They appear here when someone finishes the diagnostic on the home page.
+                <td colSpan={11} className="p-8 text-center text-zinc-500">
+                  No leads yet. They appear here when someone finishes the diagnostic or sends a note from the contact page.
                 </td>
               </tr>
             ) : null}

@@ -13,6 +13,7 @@ type LeadPayload = {
   optional?: string;
   subjects?: string[];
   source?: string;
+  message?: string;
 };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -29,7 +30,7 @@ function isLeadPayload(value: unknown): value is LeadPayload {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 
   const payload = value as Record<string, unknown>;
-  const stringFields = ["name", "email", "phone", "year", "stage", "hours", "optional", "source"];
+  const stringFields = ["name", "email", "phone", "year", "stage", "hours", "optional", "source", "message"];
   if (stringFields.some((field) => payload[field] !== undefined && typeof payload[field] !== "string")) {
     return false;
   }
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
     );
   }
 
+  const message = data.message?.trim().slice(0, 2000) ?? "";
+
   let stored = false;
   try {
     const res = await fetch(backendLeadsUrl(), {
@@ -90,6 +93,7 @@ export async function POST(request: Request) {
           hours: data.hours,
           optional: data.optional,
           subjects: data.subjects ?? [],
+          ...(message ? { message } : {}),
         },
       }),
       signal: AbortSignal.timeout(8000),
@@ -119,12 +123,13 @@ export async function POST(request: Request) {
         `Optional: ${data.optional?.trim() || "-"}`,
         `Focus areas: ${(data.subjects ?? []).join(", ") || "-"}`,
         `Source: ${data.source?.trim() || "diagnostic"}`,
+        ...(message ? ["", "Message:", message] : []),
       ].join("\n");
 
       const { error } = await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL || "Sarit Classes <leads@upsccommand.com>",
         to: [notify],
-        subject: `New UPSC lead: ${data.name?.trim() || email}`,
+        subject: `${message ? "Contact form" : "New UPSC lead"}: ${data.name?.trim() || email}`,
         text: summary,
       });
       if (error) throw new Error("Lead notification failed");

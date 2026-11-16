@@ -30,6 +30,8 @@ router = APIRouter()
 # too few to fill the table with junk.
 LEAD_LIMIT_PER_HOUR = 10
 _DEDUPE_WINDOW = timedelta(hours=24)
+# A note typed into the contact form; every other answer is a short choice.
+_MESSAGE_LIMIT = 2000
 _lock = threading.Lock()
 _hits: "defaultdict[str, deque[float]]" = defaultdict(deque)
 
@@ -88,7 +90,8 @@ def _clean_answers(answers: Dict[str, Any]) -> Dict[str, Any]:
     for key, value in list(answers.items())[:20]:
         key = str(key)[:40]
         if isinstance(value, (str, int, float, bool)) or value is None:
-            clean[key] = value if not isinstance(value, str) else value[:200]
+            limit = _MESSAGE_LIMIT if key == "message" else 200
+            clean[key] = value if not isinstance(value, str) else value[:limit]
         elif isinstance(value, list):
             clean[key] = [str(v)[:80] for v in value[:20]]
     return clean

@@ -1,5 +1,6 @@
 import { Mail, MessageSquare, MapPin } from "lucide-react";
 
+import { ContactForm } from "@/components/marketing/ContactForm";
 import { PageShell, PageHero } from "@/components/marketing/PageShell";
 import { pageMeta } from "@/lib/seo";
 
@@ -56,42 +57,9 @@ export default function ContactPage() {
         <div className="mt-10 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-6 shadow-sm">
           <h2 className="text-lg font-black tracking-tight text-[#13251d]">Send us a note</h2>
           <p className="mt-1 text-sm font-semibold text-[#536259]">
-            Prefer email? Click below and your mail app will open with our address pre-filled.
+            Write to us here and we will reply by email.
           </p>
-          <form className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">Name</label>
-              <input
-                type="text"
-                placeholder="Your name"
-                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">Email</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-xs font-black uppercase tracking-wide text-[#8c5d14]">Message</label>
-              <textarea
-                rows={4}
-                placeholder="How can we help?"
-                className="rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <a
-                href="mailto:support@saritlearn.com"
-                className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-6 text-sm font-black text-white transition hover:bg-[#10291d]"
-              >
-                Email us
-              </a>
-            </div>
-          </form>
+          <ContactForm supportEmail="support@saritlearn.com" />
         </div>
       </section>
     </PageShell>

@@ -56,3 +56,26 @@ test("free diagnostic shows a plan and saves the lead", async ({ page, request }
     })
     .toMatchObject({ name: "Asha Test", source: "diagnostic" });
 });
+
+test("contact form saves the note where the team reads it", async ({ page, request }) => {
+  const email = `contact-${Date.now()}@example.com`;
+  const note = "Please tell me when Environment content will open.";
+  await page.goto("/contact");
+
+  await page.getByLabel("Name").fill("Ravi Test");
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Message").fill(note);
+  await page.getByRole("button", { name: "Send note" }).click();
+
+  await expect(page.getByTestId("contact-sent")).toContainText(email);
+
+  await expect
+    .poll(async () => {
+      const res = await request.get(`${BACKEND_URL}/api/v1/leads?page_size=200`, {
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      });
+      const body = await res.json();
+      return body.items?.find((lead: { email: string }) => lead.email === email) ?? null;
+    })
+    .toMatchObject({ name: "Ravi Test", source: "contact", answers: { message: note } });
+});
