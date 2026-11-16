@@ -28,6 +28,41 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./ci-test.db
 
+  backend-migrations:
+    name: Database migrations (Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mcq_portal_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mcq_portal_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      # The tests run on SQLite, production runs on Postgres. Build an empty
+      # Postgres database from the migrations, then confirm it has every table
+      # and column the code expects.
+      - run: python -m alembic upgrade head
+      - run: python scripts/verify_schema.py
+
   frontend-typecheck:
     name: Frontend typecheck
     runs-on: ubuntu-latest
@@ -39,6 +74,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npx eslint src e2e
 
   e2e:
     name: Browser tests (student flows)

@@ -34,7 +34,18 @@ test("a timed test keeps its clock and answers across a reload, then submits its
   await saved;
   await page.waitForTimeout(4_000);
 
+  // Moving on records the time spent on the question that was just left.
+  const timed = page.waitForRequest((request) => {
+    if (!request.url().includes("/answers/bulk")) return false;
+    const answers: Array<{ time_taken_seconds?: number }> = request.postDataJSON()?.answers ?? [];
+    return answers.some((answer) => (answer.time_taken_seconds ?? 0) >= 3);
+  });
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await timed;
+
   // Come back as if on another device: nothing kept in this browser but the sign-in.
+  // Leave the exam first, because leaving it writes the time spent to this browser.
+  await page.goto("/pricing");
   await page.evaluate(() => {
     window.localStorage.removeItem("mcq-exam-storage");
     window.localStorage.removeItem("mcq-timer-storage");

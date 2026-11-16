@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useExamStore, ConfidenceLevel } from '@/lib/store/useExamStore';
 import { useTimerStore } from '@/lib/store/useTimerStore';
 import { useAutoSave } from '@/lib/hooks/useAutoSave';
+import { useQuestionTimer } from '@/lib/hooks/useQuestionTimer';
 import { useSessionRecovery } from '@/lib/hooks/useSessionRecovery';
 import { ExamHeader } from '@/components/exam/ExamHeader';
 import { QuestionPalette } from '@/components/exam/QuestionPalette';
@@ -211,6 +212,9 @@ function ExamInterface() {
     }
   }, [question?.id, visitQuestion]);
 
+  // Time on the question in view. Stops once the attempt is being submitted.
+  const flushQuestionTime = useQuestionTimer(question?.id, Boolean(reportProcessingAttemptId));
+
   if (loading) return (
     <div className="flex flex-col h-screen items-center justify-center space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -270,7 +274,8 @@ function ExamInterface() {
         setReportProcessingStatus(timeUp ? 'Time is up. Submitting your answers' : 'Final answer sync in progress');
         setReportProcessingError(null);
         try {
-          await examService.saveAnswers(attemptId, Object.values(answers));
+          flushQuestionTime();
+          await examService.saveAnswers(attemptId, Object.values(useExamStore.getState().answers));
         } catch (saveErr) {
           // The attempt is already over on the server (time ran out a while
           // ago, or it was submitted elsewhere). Submitting still works and

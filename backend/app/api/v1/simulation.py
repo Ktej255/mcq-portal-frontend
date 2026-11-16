@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import Test, Attempt, AttemptStatusEnum, ExamEvent
 from app.api.dependencies import get_current_user
-from app.services.test_engine_service import count_published_questions
+from app.services.attempt_lock_manager import AttemptLockManager
+from app.services.test_engine_service import close_expired_attempt, count_published_questions
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -35,6 +36,12 @@ async def start_simulation(
         Attempt.status == AttemptStatusEnum.IN_PROGRESS,
         Attempt.is_simulation == True,
     ).first()
+
+    if existing and AttemptLockManager.is_timer_expired(existing, db):
+        # Its clock ran out while the student was away. Close it with whatever
+        # was saved, so it gets a report, and start a fresh simulation.
+        close_expired_attempt(db, existing)
+        existing = None
 
     if existing:
         return {

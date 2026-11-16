@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import { SignIn } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowRight, BookOpenCheck, CheckCircle2, Mail } from "lucide-react";
@@ -19,6 +19,11 @@ const isStudentPreviewRoute = (path: string) => {
   return studentPreviewRoutes.some((route) => path === route || path.startsWith(`${route}/`));
 };
 
+// The host is only known in the browser. Reading it this way gives the server
+// render and the first browser render the same answer (false), then the real one.
+const subscribeToNothing = () => () => {};
+const notOnServer = () => false;
+
 function safeRedirectPath(path: string) {
   return path.startsWith("/") && !path.startsWith("//") ? path : "/dashboard";
 }
@@ -28,21 +33,14 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectPath = safeRedirectPath(searchParams.get("redirect") || "/dashboard");
   const masterPreviewRequested = searchParams.get("master") === "1";
-  const [previewMode, setPreviewMode] = useState(false);
-  const [localTestingHost, setLocalTestingHost] = useState(false);
+  const localTestingHost = useSyncExternalStore(subscribeToNothing, isLocalTestingHost, notOnServer);
+  const fallbackAvailable = useSyncExternalStore(subscribeToNothing, canUsePreviewAuth, notOnServer);
+  const previewMode = localTestingHost && !masterPreviewRequested && isStudentPreviewRoute(redirectPath);
   const [googleChecking, setGoogleChecking] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [email, setEmail] = useState("");
   const [emailNotice, setEmailNotice] = useState("");
   const [authIssue, setAuthIssue] = useState("");
-  const [fallbackAvailable, setFallbackAvailable] = useState(false);
-
-  useEffect(() => {
-    const isLocalHost = isLocalTestingHost();
-    setLocalTestingHost(isLocalHost);
-    setPreviewMode(isLocalHost && !masterPreviewRequested && isStudentPreviewRoute(redirectPath));
-    setFallbackAvailable(canUsePreviewAuth());
-  }, [masterPreviewRequested, redirectPath]);
 
   useEffect(() => {
     if (masterPreviewRequested && isLocalTestingHost() && !user) {

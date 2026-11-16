@@ -370,3 +370,24 @@ def test_answers_cannot_change_after_submit(client, exam, session_factory):
     stored = db.query(AttemptAnswer).filter_by(attempt_id=attempt_id, question_id=q1).one()
     db.close()
     assert stored.selected_option == "A"
+
+
+def test_simulation_left_past_its_time_is_closed_and_the_next_start_is_fresh(client, exam, session_factory):
+    first = client.post(f"/api/v1/simulation/start/{exam['test']}").json()
+    assert first["status"] == "STARTED"
+
+    # Still inside its time: the same simulation is resumed.
+    again = client.post(f"/api/v1/simulation/start/{exam['test']}").json()
+    assert (again["status"], again["attempt_id"]) == ("RESUMED", first["attempt_id"])
+
+    _rewind(session_factory, first["attempt_id"], minutes=DURATION_MINUTES + 30)
+    fresh = client.post(f"/api/v1/simulation/start/{exam['test']}").json()
+
+    assert fresh["status"] == "STARTED" and fresh["attempt_id"] != first["attempt_id"]
+    db = session_factory()
+    try:
+        old = db.get(Attempt, first["attempt_id"])
+        assert old.status != AttemptStatusEnum.IN_PROGRESS
+        assert db.query(Report).filter(Report.attempt_id == old.id).count() == 1
+    finally:
+        db.close()
