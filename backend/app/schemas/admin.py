@@ -127,6 +127,42 @@ class QuestionOut(BaseModel):
 class BulkQuestionCreate(BaseModel):
     questions: List[QuestionCreate]
 
+
+class QuestionImportRequest(BaseModel):
+    """An upload of questions for one test. Rows are checked one by one on the
+    server, so they are accepted here as plain records."""
+
+    test_id: int
+    questions: List[Dict[str, Any]] = Field(..., min_length=1, max_length=500)
+    # True checks the upload and reports what would happen, saving nothing.
+    dry_run: bool = True
+    # Topic for rows that name none.
+    default_topic_id: Optional[int] = None
+    # Students only see published questions.
+    publish: bool = False
+    create_missing_topics: bool = False
+
+
+class QuestionImportRow(BaseModel):
+    row: int
+    outcome: str
+    problems: List[str] = []
+    question_number: Optional[int] = None
+    question_id: Optional[int] = None
+    text: str = ""
+
+
+class QuestionImportOut(BaseModel):
+    dry_run: bool
+    saved: bool
+    total: int
+    ready: int
+    created: int
+    duplicates: int
+    invalid: int
+    topics_created: List[str] = []
+    rows: List[QuestionImportRow]
+
 # Test Schemas
 class TestCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)

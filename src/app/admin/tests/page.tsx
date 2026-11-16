@@ -1,14 +1,15 @@
-import { IsolatedAdminSurface } from "@/components/admin/IsolatedAdminSurface";
+import { TestBuilder } from "@/components/admin/TestBuilder";
 
 export default function AdminTests() {
   return (
-    <IsolatedAdminSurface
-      title="Legacy Test Management"
-      eyebrow="Legacy test management is not exposed for the Geography pilot"
-      detail="The original MCQ portal test-management route remains available for internal review only. The June Geography path uses day-specific fresh MCQ readiness and quality gates instead of the legacy batch workflow."
-      dependency="A founder decision on whether the legacy exam backend belongs in the public UPSC product."
-      retainedFor="Internal inspection while the fresh UPSC MCQ command path becomes the student-facing standard."
-      testId="admin-tests-isolated"
-    />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-black tracking-tight text-zinc-950">Tests and questions</h1>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-600">
+          Create a test, upload its questions from a spreadsheet, and publish it for students.
+        </p>
+      </div>
+      <TestBuilder />
+    </div>
   );
 }

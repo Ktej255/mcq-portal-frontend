@@ -48,6 +48,12 @@ const actionStatusLabels: Record<DeliveryStatus, string> = {
 
 const operatorLinks = [
   {
+    href: "/admin/tests",
+    title: "Tests and Questions",
+    detail: "Create a test, upload its questions from a spreadsheet with a check first, and publish it for students.",
+    icon: ClipboardList,
+  },
+  {
     href: "/admin/launch-plan",
     title: "Launch Plan",
     detail: "Daily work log, next actions, controlled tester gate, and stop-sharing rules.",
