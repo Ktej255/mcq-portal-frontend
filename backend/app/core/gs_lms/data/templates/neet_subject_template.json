@@ -1,0 +1,542 @@
+{
+  "_readme": "Template for one NEET subject (Biology style). Copy it, set subject_slug (NEET slugs are prefixed: neet-biology, neet-physics, neet-chemistry) and add mega-topics > sub-topics > leaf topics. \"exam\": \"neet\" selects the NEET profile: a leaf needs the 4 NEET sections (BASIC, NCERT_LEVEL, ADVANCED, EXAMINER_TRAPS; no CURRENT_AFFAIRS), 2-8 concepts, 15 MCQs and at least one PYQ with exam_type NEET to be 'ready'. MCQ question types: FACTUAL, ASSERTION_REASON, STATEMENT_BASED, MATCH_THE_FOLLOWING. The sample content below is original and for illustration; the PYQ is a clearly marked SAMPLE with a placeholder year of 0: replace it with a verified question before publishing. See docs/EXAMS.md.",
+  "exam": "neet",
+  "subject_slug": "neet-biology",
+  "tree": [
+    {
+      "title": "Cell: Structure and Function",
+      "node_type": "MEGA_TOPIC",
+      "weight": 1.0,
+      "display_order": 1,
+      "children": [
+        {
+          "title": "Cell: The Unit of Life",
+          "node_type": "SUB_TOPIC",
+          "weight": 1.0,
+          "display_order": 1,
+          "children": [
+            {
+              "title": "Cell Theory and Types of Cells",
+              "node_type": "LEAF_TOPIC",
+              "weight": 1.0,
+              "display_order": 1,
+              "ordering_justification": "Every later Biology topic assumes you know what a cell is and how prokaryotic and eukaryotic cells differ.",
+              "video_url": null,
+              "concept_checklist": [
+                "Discovery of the cell and the cell theory",
+                "Prokaryotic versus eukaryotic cells",
+                "Plant versus animal cells",
+                "Main organelles and their functions"
+              ],
+              "concepts": [
+                {
+                  "title": "Cell theory and who proposed it",
+                  "key_points": [
+                    "Robert Hooke named cells in 1665 from cork; Leeuwenhoek saw living cells in 1674",
+                    "Schleiden (plants, 1838) and Schwann (animals, 1839) proposed that all organisms are made of cells",
+                    "Virchow (1855) added that new cells arise from pre-existing cells"
+                  ],
+                  "misconceptions": [
+                    "Hooke saw living cells in cork; in fact the cork cells were dead and only their walls remained"
+                  ]
+                },
+                {
+                  "title": "Prokaryotic and eukaryotic cells",
+                  "key_points": [
+                    "Prokaryotes have no membrane-bound nucleus; DNA lies free in the nucleoid",
+                    "Prokaryotes have 70S ribosomes and no membrane-bound organelles",
+                    "Eukaryotes have a nucleus with an envelope, 80S ribosomes and membrane-bound organelles"
+                  ],
+                  "misconceptions": [
+                    "Mitochondria and chloroplasts have 80S ribosomes like the rest of the eukaryotic cell; they have 70S"
+                  ]
+                },
+                {
+                  "title": "Plant and animal cells compared",
+                  "key_points": [
+                    "Plant cells have a cellulose cell wall, plastids and a large central vacuole",
+                    "Animal cells have no cell wall and have centrioles, which higher plants lack"
+                  ],
+                  "misconceptions": [
+                    "Only plant cells have vacuoles; animal cells have small vacuoles too"
+                  ]
+                }
+              ],
+              "content_sections": [
+                {
+                  "section_label": "BASIC",
+                  "title": "Foundation Understanding",
+                  "display_order": 1,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "callout",
+                      "tone": "hook",
+                      "title": "Start Here",
+                      "text": "The cell is the smallest unit that can carry out all the activities of life. Everything alive, from a bacterium to a blue whale, is made of one or more cells."
+                    },
+                    {
+                      "type": "para",
+                      "text": "The **cell theory** says that (1) all organisms are made of cells, (2) the cell is the basic unit of structure and function, and (3) new cells come only from existing cells."
+                    },
+                    {
+                      "type": "para",
+                      "text": "Cells are of two kinds. **Prokaryotic** cells (bacteria, cyanobacteria) have no nuclear envelope. **Eukaryotic** cells (protists, fungi, plants, animals) have a true nucleus and membrane-bound organelles."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "NCERT_LEVEL",
+                  "title": "NCERT Reference: Cell, the Unit of Life",
+                  "display_order": 2,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "ncert_reference",
+                      "book": "Biology",
+                      "class": "11",
+                      "chapter": "8",
+                      "key_facts": [
+                        "Mycoplasmas are the smallest cells (about 0.3 micrometre)",
+                        "The egg of an ostrich is the largest isolated single cell",
+                        "Prokaryotic ribosomes are 70S; eukaryotic ribosomes are 80S",
+                        "The chapter number depends on the NCERT edition you use; check it before publishing"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "section_label": "ADVANCED",
+                  "title": "Beyond the Textbook: Why the Two Cell Types Differ",
+                  "display_order": 3,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "heading",
+                      "text": "Compartments make eukaryotes efficient"
+                    },
+                    {
+                      "type": "para",
+                      "text": "Membrane-bound organelles let a eukaryotic cell run chemical reactions that need different conditions in separate compartments, for example digestive enzymes in lysosomes away from the rest of the cytoplasm. Mitochondria and chloroplasts carry their own circular DNA and 70S ribosomes, which supports the idea that they arose from once free-living prokaryotes (endosymbiotic theory)."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "EXAMINER_TRAPS",
+                  "title": "Examiner Traps",
+                  "display_order": 4,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "trap",
+                      "wrong": "All bacteria have a cell wall.",
+                      "correct": "Mycoplasma has no cell wall at all."
+                    },
+                    {
+                      "type": "trap",
+                      "wrong": "Mitochondria have 80S ribosomes.",
+                      "correct": "Mitochondria and chloroplasts have 70S ribosomes, like prokaryotes."
+                    },
+                    {
+                      "type": "trap",
+                      "wrong": "Hooke observed living cells in cork.",
+                      "correct": "The cork cells were dead; Leeuwenhoek was the first to observe living cells."
+                    }
+                  ]
+                }
+              ],
+              "pyqs": [
+                {
+                  "exam_type": "NEET",
+                  "year": 0,
+                  "question_text": "[SAMPLE, replace with a verified NEET PYQ and its real year] Which of the following is the smallest known cell?\n(1) Bacillus\n(2) Mycoplasma\n(3) Chlamydomonas\n(4) Yeast",
+                  "answer_text": "2",
+                  "explanation": "Sample entry showing the PYQ format for NEET. Mycoplasma is the smallest known cell.",
+                  "question_type": "FACTUAL",
+                  "marks": 4
+                }
+              ],
+              "mcq_questions": [
+                {
+                  "question_text": "Who first used the term 'cell' after observing a thin slice of cork under a microscope?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Robert Brown"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Robert Hooke"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Anton van Leeuwenhoek"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Matthias Schleiden"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Robert Hooke (1665) saw box-like compartments in cork and called them cells. Leeuwenhoek was the first to see living cells (1674) and Robert Brown discovered the nucleus (1831).",
+                  "question_type": "FACTUAL",
+                  "display_order": 1
+                },
+                {
+                  "question_text": "The cell theory was put forward by",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Schleiden and Schwann"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Hooke and Brown"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Virchow and Pasteur"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Watson and Crick"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Matthias Schleiden (1838, plants) and Theodor Schwann (1839, animals) proposed that all living things are made of cells. Rudolf Virchow (1855) later added that new cells arise from pre-existing cells.",
+                  "question_type": "FACTUAL",
+                  "display_order": 2
+                },
+                {
+                  "question_text": "The statement 'omnis cellula-e cellula' (every cell arises from a pre-existing cell) is credited to",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Theodor Schwann"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Matthias Schleiden"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Rudolf Virchow"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Robert Brown"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Rudolf Virchow (1855) modified the cell theory with this statement, ruling out the idea that cells form from non-living matter.",
+                  "question_type": "FACTUAL",
+                  "display_order": 3
+                },
+                {
+                  "question_text": "The nucleus of the cell was discovered by",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Camillo Golgi"
+                    },
+                    {
+                      "label": "B",
+                      "text": "George Palade"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Robert Hooke"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Robert Brown"
+                    }
+                  ],
+                  "correct_option": "D",
+                  "explanation": "Robert Brown described the nucleus in 1831. Golgi described the Golgi apparatus (1898) and Palade observed ribosomes with the electron microscope.",
+                  "question_type": "FACTUAL",
+                  "display_order": 4
+                },
+                {
+                  "question_text": "Which of the following is the smallest known living cell, about 0.3 micrometre in length?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Bacillus"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Mycoplasma"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Chlamydomonas"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Yeast"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Mycoplasmas (PPLO) are the smallest cells and have no cell wall. The ostrich egg is the largest isolated single cell.",
+                  "question_type": "FACTUAL",
+                  "display_order": 5
+                },
+                {
+                  "question_text": "The ribosomes of a prokaryotic cell are of which type?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "80S"
+                    },
+                    {
+                      "label": "B",
+                      "text": "70S"
+                    },
+                    {
+                      "label": "C",
+                      "text": "60S"
+                    },
+                    {
+                      "label": "D",
+                      "text": "40S"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Prokaryotic ribosomes are 70S (50S + 30S subunits). Eukaryotic cytoplasmic ribosomes are 80S (60S + 40S).",
+                  "question_type": "FACTUAL",
+                  "display_order": 6
+                },
+                {
+                  "question_text": "The main site of ATP production in a eukaryotic cell is the",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Golgi apparatus"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Lysosome"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Mitochondrion"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Ribosome"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Mitochondria make most of the cell's ATP by oxidative phosphorylation on the inner membrane (cristae), so they are called the 'powerhouses' of the cell.",
+                  "question_type": "FACTUAL",
+                  "display_order": 7
+                },
+                {
+                  "question_text": "Consider the following statements about prokaryotic cells.\n(i) They lack a membrane-bound nucleus.\n(ii) Their genetic material is a naked, circular DNA lying in the nucleoid.\n(iii) They contain membrane-bound mitochondria.\nWhich statements are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "(i) and (ii) only"
+                    },
+                    {
+                      "label": "B",
+                      "text": "(i) and (iii) only"
+                    },
+                    {
+                      "label": "C",
+                      "text": "(ii) and (iii) only"
+                    },
+                    {
+                      "label": "D",
+                      "text": "(i), (ii) and (iii)"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Prokaryotes have no nuclear envelope and no membrane-bound organelles such as mitochondria. Their DNA is a single circular molecule in the nucleoid, often with extra small circular plasmids.",
+                  "question_type": "STATEMENT_BASED",
+                  "display_order": 8
+                },
+                {
+                  "question_text": "Consider the following statements about the cell theory.\n(i) All living organisms are composed of cells and the products of cells.\n(ii) The cell is the basic structural and functional unit of life.\n(iii) The cell theory explains how the very first cell originated.\nWhich statements are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "(i) only"
+                    },
+                    {
+                      "label": "B",
+                      "text": "(i) and (ii) only"
+                    },
+                    {
+                      "label": "C",
+                      "text": "(ii) and (iii) only"
+                    },
+                    {
+                      "label": "D",
+                      "text": "(i), (ii) and (iii)"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Statements (i) and (ii) are parts of the cell theory. The theory (with Virchow's addition) says cells come from pre-existing cells; it does not explain the origin of the first cell.",
+                  "question_type": "STATEMENT_BASED",
+                  "display_order": 9
+                },
+                {
+                  "question_text": "Consider the following statements about plant and animal cells.\n(i) A cell wall is present in plant cells but absent in animal cells.\n(ii) Centrioles are present in animal cells but absent in the cells of higher plants.\n(iii) A large central vacuole is a typical feature of animal cells.\nWhich statements are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "(i) only"
+                    },
+                    {
+                      "label": "B",
+                      "text": "(i) and (iii) only"
+                    },
+                    {
+                      "label": "C",
+                      "text": "(i) and (ii) only"
+                    },
+                    {
+                      "label": "D",
+                      "text": "(ii) and (iii) only"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Plant cells have a cellulose cell wall, plastids and a large central vacuole. Animal cells lack a cell wall and have centrioles, which higher plants lack. So (iii) is wrong.",
+                  "question_type": "STATEMENT_BASED",
+                  "display_order": 10
+                },
+                {
+                  "question_text": "Assertion (A): Mitochondria are called semi-autonomous organelles.\nReason (R): They contain their own circular DNA and 70S ribosomes.",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Both Assertion and Reason are true, and the Reason is the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Both Assertion and Reason are true, but the Reason is not the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Assertion is true, but Reason is false"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Assertion is false, but Reason is true"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Because mitochondria have their own DNA and 70S ribosomes, they can make some of their own proteins and divide on their own. Many other proteins still come from the nuclear genome, hence 'semi'-autonomous.",
+                  "question_type": "ASSERTION_REASON",
+                  "display_order": 11
+                },
+                {
+                  "question_text": "Assertion (A): Ribosomes are found in both prokaryotic and eukaryotic cells.\nReason (R): Ribosomes were first observed by George Palade using the electron microscope.",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Both Assertion and Reason are true, and the Reason is the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Both Assertion and Reason are true, but the Reason is not the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Assertion is true, but Reason is false"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Assertion is false, but Reason is true"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "Both statements are true, but the Reason is only a historical fact about their discovery. Ribosomes are present in all cells because every cell must make proteins.",
+                  "question_type": "ASSERTION_REASON",
+                  "display_order": 12
+                },
+                {
+                  "question_text": "Assertion (A): Mycoplasma can survive without a cell wall.\nReason (R): The cell wall of Mycoplasma is made of peptidoglycan.",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Both Assertion and Reason are true, and the Reason is the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Both Assertion and Reason are true, but the Reason is not the correct explanation of the Assertion"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Assertion is true, but Reason is false"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Assertion is false, but Reason is true"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Mycoplasma completely lacks a cell wall, which is why it is pleomorphic and can pass through bacterial filters. So the Assertion is true and the Reason is false.",
+                  "question_type": "ASSERTION_REASON",
+                  "display_order": 13
+                },
+                {
+                  "question_text": "Match the organelle in Column I with its function in Column II.\nColumn I: P. Ribosome  Q. Lysosome  R. Golgi apparatus  S. Nucleolus\nColumn II: 1. Intracellular digestion  2. Packaging and modification of proteins  3. Protein synthesis  4. Synthesis of rRNA",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "P-1, Q-3, R-2, S-4"
+                    },
+                    {
+                      "label": "B",
+                      "text": "P-3, Q-1, R-4, S-2"
+                    },
+                    {
+                      "label": "C",
+                      "text": "P-2, Q-1, R-3, S-4"
+                    },
+                    {
+                      "label": "D",
+                      "text": "P-3, Q-1, R-2, S-4"
+                    }
+                  ],
+                  "correct_option": "D",
+                  "explanation": "Ribosomes make proteins, lysosomes digest materials with hydrolytic enzymes, the Golgi apparatus modifies and packages proteins, and the nucleolus makes rRNA and assembles ribosome subunits.",
+                  "question_type": "MATCH_THE_FOLLOWING",
+                  "display_order": 14
+                },
+                {
+                  "question_text": "Match the scientist in Column I with the contribution in Column II.\nColumn I: P. Robert Brown  Q. Rudolf Virchow  R. Singer and Nicolson  S. Anton van Leeuwenhoek\nColumn II: 1. Fluid mosaic model of the plasma membrane  2. First observation of living cells  3. Discovery of the nucleus  4. Cells arise from pre-existing cells",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "P-3, Q-1, R-4, S-2"
+                    },
+                    {
+                      "label": "B",
+                      "text": "P-4, Q-3, R-1, S-2"
+                    },
+                    {
+                      "label": "C",
+                      "text": "P-3, Q-4, R-1, S-2"
+                    },
+                    {
+                      "label": "D",
+                      "text": "P-2, Q-4, R-1, S-3"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Brown found the nucleus (1831), Virchow stated that cells arise from cells (1855), Singer and Nicolson proposed the fluid mosaic model (1972), and Leeuwenhoek first saw living cells (1674).",
+                  "question_type": "MATCH_THE_FOLLOWING",
+                  "display_order": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

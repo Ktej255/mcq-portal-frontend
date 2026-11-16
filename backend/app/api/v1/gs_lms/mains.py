@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
@@ -36,7 +36,7 @@ from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
 )
 from app.core.gs_lms.evaluation import service as eval_service
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
 router = APIRouter()
 
@@ -149,6 +149,7 @@ def get_mains_questions(
 ) -> Any:
     """Return MAINS PYQs for this topic as writing prompts."""
     _node_or_404(db, node_id, subject.id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     pyqs = (
         db.query(GsLmsPyq)
         .filter(
@@ -175,7 +176,7 @@ def get_mains_questions(
     return out
 
 
-@router.post("/funnel/{node_id}/mains/submit")
+@router.post("/funnel/{node_id}/mains/submit", dependencies=[Depends(ai_rate_limit)])
 def submit_mains_answer(
     node_id: int,
     body: MainsSubmitIn,
@@ -185,6 +186,7 @@ def submit_mains_answer(
 ) -> Any:
     """Submit a structured Mains answer and start background evaluation."""
     _node_or_404(db, node_id, subject.id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     if body.mode.upper() != GsLmsAnswerModeEnum.TYPED.value:
         raise HTTPException(

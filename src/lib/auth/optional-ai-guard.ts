@@ -4,7 +4,7 @@ import { auth as clerkAuth } from "@clerk/nextjs/server";
 
 import { activeAuthProvider } from "@/env";
 import { backendBaseUrl } from "@/lib/auth/internal-api-access";
-import { hasLearnerApiAccess } from "@/lib/auth/learner-api-access";
+import { getLearnerId } from "@/lib/auth/learner-api-access";
 import { consumeAdaptiveTeacherRateLimit } from "@/lib/auth/request-rate-limit";
 
 // Longest text we forward to Gemini per field; anything longer is cut, not rejected.
@@ -59,11 +59,12 @@ async function consumeDailyAiAllowance(request: NextRequest): Promise<Allowance>
  * request may go on.
  */
 export async function guardOptionalAiRequest(request: NextRequest): Promise<NextResponse | null> {
-  if (!(await hasLearnerApiAccess(request))) {
+  const learnerId = await getLearnerId(request);
+  if (!learnerId) {
     return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
   }
 
-  const rate = consumeAdaptiveTeacherRateLimit(request);
+  const rate = consumeAdaptiveTeacherRateLimit(request, Date.now(), learnerId);
   if (!rate.allowed) {
     return NextResponse.json(
       { ok: false, reason: "rate-limited" },

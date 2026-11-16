@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { gsLmsService } from "@/services/api/gsLmsService";
+import { gsLmsService, getGateError } from "@/services/api/gsLmsService";
 import { BETA_LOCKED_ERROR_FRAGMENT } from "@/services/api/gsLmsService";
 import type {
   ReadinessTopicOut,
@@ -25,6 +25,9 @@ import { PdfDownloadButton } from "../PdfDownloadButton";
 import { PrelimsPyqPanel } from "../PrelimsPyqPanel";
 import { useSubjectLms } from "../SubjectLmsContext";
 import { parsePositiveRouteId } from "@/lib/gsLmsRoutePolicy";
+import { LockedTopicScreen } from "../LockedTopicScreen";
+import { TopicConcepts } from "../TopicConcepts";
+import { MasteryNotice } from "../MasteryNotice";
 
 const REVISIT_LABELS: Record<string, string> = {
   day_3: "Day 3 recall",
@@ -48,6 +51,24 @@ interface DueRevisit {
   revisit_type: string;
   due_date: string;
   overdue: boolean;
+}
+
+/** The server's reason the current step can't be completed yet (HTTP 409). */
+function StepGateMessage({ message }: { message: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [message]);
+  return (
+    <div
+      ref={ref}
+      role="alert"
+      data-testid="step-gate-message"
+      className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+    >
+      {message}
+    </div>
+  );
 }
 
 export function TopicPage() {
@@ -107,6 +128,8 @@ export function TopicPage() {
         if (requestId === revisitSeq.current) setDueRevisit(null);
       });
   }, [nodeId, subject]);
+  // Set when the server answers 423: the topic isn't open to this student yet.
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
 
   const fetchSections = useCallback(() => {
     const requestId = ++fetchSeq.current;
@@ -121,12 +144,18 @@ export function TopicPage() {
     gsLmsService
       .getTopicSections(subject, nodeId)
       .then((sections) => {
-        if (requestId === fetchSeq.current) setData(sections);
+        if (requestId !== fetchSeq.current) return;
+        setLockedReason(null);
+        setData(sections);
       })
       .catch((err) => {
-        if (requestId === fetchSeq.current) {
-          setError(apiErrorMessage(err, "Failed to load topic"));
+        if (requestId !== fetchSeq.current) return;
+        const gate = getGateError(err);
+        if (gate?.status === 423) {
+          setLockedReason(gate.detail);
+          return;
         }
+        setError(apiErrorMessage(err, "Failed to load topic"));
       })
       .finally(() => {
         if (requestId === fetchSeq.current) setLoading(false);
@@ -209,6 +238,10 @@ export function TopicPage() {
         <LmsLoadingSkeleton variant="content" />
       </div>
     );
+  }
+
+  if (lockedReason) {
+    return <LockedTopicScreen reason={lockedReason} nodeId={nodeId} />;
   }
 
   if (error) {
@@ -431,7 +464,7 @@ export function TopicPage() {
       )}
 
       <FunnelOrchestrator nodeId={nodeId} subject={subject}>
-        {({ currentStep, completeStep: advanceStep, displayTab }) => {
+        {({ currentStep, completeStep: advanceStep, gateMessage, displayTab }) => {
 
           const getActiveSectionLabel = (): string => {
             if (displayTab === 'ncert') return 'NCERT_LEVEL';
@@ -515,6 +548,8 @@ export function TopicPage() {
 
           return (
           <>
+            {gateMessage && <StepGateMessage message={gateMessage} />}
+
             {(displayTab === 'learn' || displayTab === 'ncert' || displayTab === 'current' || displayTab === 'traps') && (
               <div className="space-y-6">
                 {data.video_url && displayTab === 'learn' && (
@@ -566,6 +601,8 @@ export function TopicPage() {
                     <p className="text-sm text-[#5d675f]">Content for this section is not available.</p>
                   </div>
                 )}
+
+                {displayTab === 'learn' && <TopicConcepts nodeId={nodeId} subject={subject} />}
 
                 <ExternalResourceCards nodeId={nodeId} subject={subject} />
 
@@ -716,6 +753,7 @@ export function TopicPage() {
                 {showCompletedReport && (
                   <GrowthReportStep nodeId={nodeId} subject={subject} />
                 )}
+                <MasteryNotice nodeId={nodeId} />
               </div>
             )}
           </>

@@ -19,6 +19,8 @@ from fastapi import APIRouter, Depends
 from app.api.v1.gs_lms.access import require_gs_lms_access
 from app.api.v1.gs_lms import syllabus
 from app.api.v1.gs_lms import content
+from app.api.v1.gs_lms import concepts
+from app.api.v1.gs_lms import concept_versions
 from app.api.v1.gs_lms import pyqs
 from app.api.v1.gs_lms import practice
 from app.api.v1.gs_lms import discussion
@@ -39,6 +41,10 @@ from app.api.v1.gs_lms import mcq_lab
 from app.api.v1.gs_lms import mains
 from app.api.v1.gs_lms import growth
 from app.api.v1.gs_lms import subjects
+from app.api.v1.gs_lms import progression
+from app.api.v1.gs_lms import study
+from app.api.v1.gs_lms import retention
+from app.api.v1.gs_lms import wellbeing
 
 # All GS LMS routes require authentication AND cohort access. Declaring the
 # dependencies at the aggregate level enforces them uniformly across every
@@ -50,12 +56,24 @@ router = APIRouter(dependencies=[Depends(require_gs_lms_access)])
 
 # Not subject-specific: lists the subjects and whether students can open them.
 router.include_router(subjects.router, tags=["gs-lms"])
+# Learner profile and books are per-student / cross-subject, so also not under a slug.
+router.include_router(concept_versions.global_router, tags=["gs-lms"])
+# Book chapter progress and retention checks (/books/{book_id}/progress, /books/chapters/..., /books/reviews/due).
+router.include_router(retention.router, tags=["gs-lms"])
+# Opt-in handwriting trend, visible only to the student (/wellbeing/handwriting).
+router.include_router(wellbeing.router, tags=["gs-lms"])
+
+# Study flow (search -> card -> explain -> next) lives under /study. It MUST be
+# registered before the /{subject_slug} routers so "study" never reads as a slug.
+router.include_router(study.router, tags=["gs-lms-study"])
 
 # Subject-specific routes are mounted under /{subject_slug}/ prefix.
 # The subject_slug is a path parameter resolved in each endpoint via the
 # resolve_subject dependency (e.g., "geography" -> GsSubject record).
 router.include_router(syllabus.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(content.router, prefix="/{subject_slug}", tags=["gs-lms"])
+router.include_router(concepts.router, prefix="/{subject_slug}", tags=["gs-lms"])
+router.include_router(concept_versions.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(pyqs.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(practice.router, prefix="/{subject_slug}", tags=["gs-lms"])
 router.include_router(discussion.router, prefix="/{subject_slug}", tags=["gs-lms"])
@@ -75,3 +93,4 @@ router.include_router(recall.router, prefix="/{subject_slug}", tags=["gs-lms-fun
 router.include_router(mcq_lab.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(mains.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
 router.include_router(growth.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])
+router.include_router(progression.router, prefix="/{subject_slug}", tags=["gs-lms-funnel"])

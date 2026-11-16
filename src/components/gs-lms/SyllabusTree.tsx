@@ -7,9 +7,10 @@ import { SyllabusNodeRow } from "./SyllabusNodeRow";
 interface SyllabusTreeProps {
   tree: SyllabusNodeOut[];
   onLeafClick: (nodeId: number) => void;
+  reviewTestHref?: string;
 }
 
-export function SyllabusTree({ tree, onLeafClick }: SyllabusTreeProps) {
+export function SyllabusTree({ tree, onLeafClick, reviewTestHref }: SyllabusTreeProps) {
   // Mega-topics start collapsed, others start expanded
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => {
     const initial = new Set<number>();
@@ -48,6 +49,7 @@ export function SyllabusTree({ tree, onLeafClick }: SyllabusTreeProps) {
             expanded={isExpanded}
             onToggle={() => toggleNode(node.node_id)}
             onLeafClick={onLeafClick}
+            reviewTestHref={reviewTestHref}
           />
           {isExpanded && node.children.length > 0 && (
             <div>{renderNodes(node.children, depth + 1)}</div>

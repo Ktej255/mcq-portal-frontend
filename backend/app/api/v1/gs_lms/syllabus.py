@@ -39,6 +39,7 @@ from app.core.gs_lms.student_models import (
     GsLmsDiscussionStatusEnum,
 )
 from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
+from app.core.gs_lms.progression import LeafState, compute_progression, is_order_exempt
 from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.content import (
     _compute_skippable_section_ids,
@@ -240,6 +241,8 @@ def _build_node_out(
     mcq_counts: dict[int, int],
     beta_ready_ids: set[int] | None = None,
     pyq_counts: dict[int, tuple[int, int]] | None = None,
+    leaf_states: dict[int, LeafState] | None = None,
+    exempt: bool = True,
 ) -> GsLmsSyllabusNodeOut:
     """Recursively build a GsLmsSyllabusNodeOut from a reviewed node.
 
@@ -252,7 +255,7 @@ def _build_node_out(
     )
     children_out = [
         _build_node_out(
-            c, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+            c, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts, leaf_states, exempt
         )
         for c in reviewed_children
     ]
@@ -269,6 +272,7 @@ def _build_node_out(
         pyq_counts.get(node.id, (0, 0)) if pyq_counts else (0, 0)
     )
 
+    leaf = (leaf_states or {}).get(node.id)
     return GsLmsSyllabusNodeOut(
         node_id=node.id,
         title=node.title,
@@ -282,6 +286,9 @@ def _build_node_out(
         prelims_pyq_count=prelims_pyqs,
         mains_pyq_count=mains_pyqs,
         beta_ready=beta_ready,
+        mastered=leaf.mastered if leaf is not None else None,
+        locked=bool(leaf is not None and leaf.locked and not exempt),
+        lock_reason=leaf.lock_reason if leaf is not None and leaf.locked and not exempt else None,
         day_lesson_id=node.day_lesson_id,
         ordering_justification=node.ordering_justification,
         children=children_out,
@@ -334,9 +341,11 @@ def get_syllabus_tree(
         compute_loop_ready_ids(db, subject.id) if beta_scope_enabled() else None
     )
 
+    leaf_states = compute_progression(db, current_user.id, subject.id).by_id
+    exempt = is_order_exempt(current_user)
     tree = [
         _build_node_out(
-            node, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+            node, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts, leaf_states, exempt
         )
         for node in root_nodes
     ]
@@ -390,8 +399,15 @@ def get_syllabus_node(
     beta_ready_ids = (
         compute_loop_ready_ids(db, subject.id) if beta_scope_enabled() else None
     )
+    leaf_states = compute_progression(db, current_user.id, subject.id).by_id
     data = _build_node_out(
-        node, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+        node,
+        completed_leaf_ids,
+        mcq_counts,
+        beta_ready_ids,
+        pyq_counts,
+        leaf_states,
+        is_order_exempt(current_user),
     )
 
     return StandardResponse(

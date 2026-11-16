@@ -46,6 +46,7 @@ def mains_client():
             "gs_lms_answer_attempts",
             "gs_lms_evaluation_reports",
             "job_execution_registry",
+            "daily_usage",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)

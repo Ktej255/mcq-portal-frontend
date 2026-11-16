@@ -73,7 +73,8 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
             # can never fall through to this ADMIN account.
             user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
             if not user:
-                user = User(
+                user = _create_user_once(
+                    db,
                     google_uid="dev-validator-id",
                     # Reserved documentation domain: clearly fictitious, and the
                     # only kind of address UserResponse's EmailStr will serialise
@@ -82,15 +83,6 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
                     full_name="Institutional Validator",
                     role=RoleEnum.ADMIN,
                 )
-                db.add(user)
-                try:
-                    db.commit()
-                    db.refresh(user)
-                except IntegrityError:
-                    db.rollback()
-                    user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
-                    if not user:
-                        raise credentials_exception
             return user
 
         decoded_token = verify_token(token_cred)
@@ -196,6 +188,23 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
             return refresh_mutable_fields(concurrent_user)
         raise reconciliation_required()
 
+def _create_user_once(db: Session, **fields) -> User:
+    """Create a user on first sign-in. Two first requests can race; the loser
+    rolls back and reads the row the winner created instead of failing."""
+    user = User(**fields)
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(User).filter(User.google_uid == fields["google_uid"]).first()
+        if existing is None:
+            raise
+        return existing
+    db.refresh(user)
+    return user
+
+
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     logger.info("Admin authorization check for local user id=%s role=%s", current_user.id, current_user.role)
     if current_user.role != "ADMIN" and current_user.role != RoleEnum.ADMIN:
@@ -291,6 +300,43 @@ def ai_rate_limit(
             detail="Daily AI limit reached. It resets at midnight India time.",
             headers={"Retry-After": str(_seconds_until_india_midnight())},
         )
+
+
+# ---------------------------------------------------------------------------
+# AI readiness guards. The OCR / evaluation providers default to a mock that
+# returns fake text and scores, so endpoints that need them answer 503 instead
+# unless a real provider is configured (or settings.ALLOW_MOCK_AI is on).
+# ---------------------------------------------------------------------------
+
+def _ai_not_set_up() -> HTTPException:
+    from app.core.evaluation.providers import readiness
+
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=readiness.NOT_SET_UP_DETAIL,
+    )
+
+
+def require_ocr_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.ocr_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_gs_evaluation_available() -> None:
+    from app.core.evaluation.providers import readiness
+    from app.core.evaluation.providers.config import active_provider_key
+
+    if not readiness.is_available(active_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_optional_evaluation_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.optional_evaluation_provider_key()):
+        raise _ai_not_set_up()
 
 
 # ---------------------------------------------------------------------------

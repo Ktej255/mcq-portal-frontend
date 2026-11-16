@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useApiConfig } from "@/lib/hooks/useApi";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
@@ -8,6 +9,7 @@ import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
 import { UpgradePrompt } from "@/components/shared/UpgradePrompt";
+import { examBrandName } from "@/lib/exams/examRoutes";
 
 export default function DashboardLayout({
   children,
@@ -16,12 +18,13 @@ export default function DashboardLayout({
 }) {
   const { isLoaded } = useApiConfig();
   const { role } = useAuth();
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isAdminShell = role === "ADMIN";
 
   if (!isLoaded) return (
     <div className="flex h-screen items-center justify-center bg-[#f7f4ee]">
-      <UpscLoader message="Initializing UPSC Command..." />
+      <UpscLoader message={`Initializing ${examBrandName(pathname)}...`} />
     </div>
   );
 

@@ -26,6 +26,9 @@ from typing import Protocol
 
 from sqlalchemy.orm import Session
 
+from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs_lms.mastery import record_attempt
+from app.core.gs_lms.understanding import grade_explanation
 from app.core.gs_lms.student_models import (
     GsLmsDiscussionSession,
     GsLmsDiscussionStatusEnum,
@@ -169,9 +172,11 @@ def extract_matched_concepts(
 ) -> tuple[list[str], list[str]]:
     """Match student messages against a topic's concept checklist.
 
-    Uses case-insensitive substring matching. A concept is considered
-    "matched" if any student message contains the concept string (or a
-    close variant — trailing 's' is stripped for fuzzy plural matching).
+    Each checklist item (a phrase or a whole sentence) is treated as one key
+    point and graded with ``understanding.grade_explanation`` over all the
+    student's messages together: the item is matched when the student used
+    enough of its meaningful words (paraphrases and plurals count; a year in
+    the item must appear exactly).
 
     This is a LOCAL implementation — does NOT call Gemini. Keeps matching
     fast and deterministic for gate evaluation.
@@ -185,37 +190,11 @@ def extract_matched_concepts(
 
     Requirements traced: 2.1, 2.3
     """
-    if not concept_checklist:
+    items = [c for c in (concept_checklist or []) if isinstance(c, str) and c.strip()]
+    if not items:
         return [], []
-
-    # Combine all student text into one lowercased corpus for efficient matching
-    combined_text = " ".join(msg.lower() for msg in student_messages)
-
-    matched: list[str] = []
-    missed: list[str] = []
-
-    for concept in concept_checklist:
-        concept_lower = concept.lower().strip()
-        if not concept_lower:
-            continue
-
-        # Check exact substring match
-        if concept_lower in combined_text:
-            matched.append(concept)
-            continue
-
-        # Fuzzy variant: strip trailing 's' for plural matching
-        # e.g. "plate tectonics" matches "plate tectonic" and vice versa
-        concept_stripped = concept_lower.rstrip("s")
-        # Also check if student used the plural when concept is singular
-        concept_plural = concept_lower + "s"
-
-        if concept_stripped in combined_text or concept_plural in combined_text:
-            matched.append(concept)
-        else:
-            missed.append(concept)
-
-    return matched, missed
+    grade = grade_explanation(" ".join(student_messages), items)
+    return grade.covered, grade.missed
 
 
 def compute_concept_match_percentage(
@@ -333,6 +312,42 @@ def get_topic_concept_checklist(session: "GsLmsDiscussionSession") -> list[str] 
     except Exception:
         pass
     return None
+
+
+def get_topic_concepts(session: "GsLmsDiscussionSession") -> list:
+    """REVIEWED concepts of the session's topic, in display order (may be empty)."""
+    try:
+        node = session.syllabus_node
+        if node is None:
+            return []
+        return [
+            c for c in node.concepts
+            if c.review_status == GsReviewStatusEnum.REVIEWED
+        ]
+    except Exception:
+        return []
+
+
+def grade_concepts(student_messages: list[str], concepts: list) -> dict:
+    """Grade the student's messages against each concept's key points.
+
+    The gate unit is the key point: ``percentage`` is the share (0-100) of all
+    key points, across all concepts, that the student covered. ``matched`` and
+    ``missed`` list those key points. ``scores`` maps concept id to that
+    concept's own coverage (0..1).
+    """
+    text = " ".join(student_messages)
+    matched: list[str] = []
+    missed: list[str] = []
+    scores: dict[int, float] = {}
+    for concept in concepts:
+        grade = grade_explanation(text, concept.key_points)
+        matched.extend(grade.covered)
+        missed.extend(grade.missed)
+        scores[concept.id] = grade.score
+    total = len(matched) + len(missed)
+    percentage = len(matched) / total * 100.0 if total else 0.0
+    return {"matched": matched, "missed": missed, "percentage": percentage, "scores": scores}
 
 
 # ---------------------------------------------------------------------------
@@ -608,6 +623,7 @@ def complete_session(
     session.status = GsLmsDiscussionStatusEnum.COMPLETED
     session.completed_at = datetime.now(timezone.utc)
     db.flush()
+    _record_concept_mastery(db, session)
     return session
 
 
@@ -740,14 +756,24 @@ def process_turn_concepts(
 
     Requirements traced: 2.1, 2.3, 2.4, 2.5
     """
+    # Student messages feed both modes.
+    student_messages = get_student_messages_from_transcript(transcript)
+
+    # Concepts (graded key points) take precedence over the sentence checklist.
+    concepts = get_topic_concepts(session)
+    if concepts:
+        graded = grade_concepts(student_messages, concepts)
+        update_session_concepts(
+            session, graded["matched"], graded["missed"], graded["percentage"]
+        )
+        db.flush()
+        return True, graded["missed"], graded["percentage"]
+
     concept_checklist = get_topic_concept_checklist(session)
 
     if concept_checklist is None:
-        # No concept checklist — caller uses turn-count fallback
+        # No concepts or checklist — caller uses turn-count fallback
         return False, None, None
-
-    # Extract student messages from transcript
-    student_messages = get_student_messages_from_transcript(transcript)
 
     # Compute concept matching
     turn_count = len(transcript)
@@ -765,6 +791,17 @@ def process_turn_concepts(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _record_concept_mastery(db: Session, session: GsLmsDiscussionSession) -> None:
+    """After a passed gate, record each concept's own coverage as a mastery attempt."""
+    concepts = get_topic_concepts(session)
+    if not concepts:
+        return
+    transcript = get_session_transcript(db, session.id)
+    graded = grade_concepts(get_student_messages_from_transcript(transcript), concepts)
+    for concept in concepts:
+        record_attempt(db, session.student_id, concept.id, graded["scores"][concept.id])
+
 
 def _get_next_turn_order(db: Session, session_id: int) -> int:
     """Get the next turn order number for a session."""
@@ -823,6 +860,8 @@ __all__ = [
     "update_session_concepts",
     "get_student_messages_from_transcript",
     "get_topic_concept_checklist",
+    "get_topic_concepts",
+    "grade_concepts",
     "process_turn_concepts",
     # Session lifecycle
     "create_session",

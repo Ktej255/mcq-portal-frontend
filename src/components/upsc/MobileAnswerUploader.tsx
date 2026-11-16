@@ -13,9 +13,9 @@
  * No glassmorphism. No external heavy dependencies.
  */
 
+import axios from "axios";
 import { useRef, useState, useCallback, useEffect } from "react";
-import { activeAuthProvider, env } from "@/env";
-import { resolveToken } from "@/lib/auth/token-strategy";
+import { apiClient } from "@/services/api/client";
 import {
   ArrowLeft,
   Camera,
@@ -426,38 +426,6 @@ export function MobileAnswerUploader({
     if (pages.length === 0) return;
     setUploadState({ status: "uploading", progress: 0 });
 
-    // Resolve the configured provider's token first. Supabase local storage is
-    // retained only for explicit Supabase-auth mode; Clerk must use its session.
-    const providerToken = await resolveToken();
-    let authToken = providerToken;
-
-    if (!authToken && activeAuthProvider === "supabase") {
-      const tokenKey = Object.keys(localStorage).find((k) =>
-        k.startsWith("sb-") && k.endsWith("-auth-token")
-      );
-      if (tokenKey) {
-        try {
-          const parsed = JSON.parse(localStorage.getItem(tokenKey) ?? "{}");
-          authToken = typeof parsed?.access_token === "string" ? parsed.access_token : null;
-        } catch {
-          authToken = null;
-        }
-      }
-    }
-
-    if (!authToken) {
-      setUploadState({
-        status: "error",
-        message: "Your session is not ready. Please sign in again and retry the upload.",
-      });
-      return;
-    }
-
-    const apiBase = env.NEXT_PUBLIC_API_BASE_URL
-      .replace(/\/api\/v1\/?$/, "")
-      .replace(/\/+$/, "");
-    const url = `${apiBase}/api/v1/mains-upload/assemble-pdf`;
-
     const formData = new FormData();
     formData.append("subject", subject);
     formData.append("question_hint", questionHint);
@@ -465,58 +433,45 @@ export function MobileAnswerUploader({
       formData.append("files", page.file, page.file.name);
     });
 
-    // XHR for progress tracking (fetch doesn't give upload progress)
-    await new Promise<void>((resolve) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", url, true);
-      xhr.setRequestHeader("Authorization", `Bearer ${authToken}`);
-
-      xhr.upload.onprogress = (ev) => {
-        if (ev.lengthComputable) {
-          const pct = Math.round((ev.loaded / ev.total) * 90); // cap at 90 while server processes
-          setUploadState({ status: "uploading", progress: pct });
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          setUploadState({ status: "uploading", progress: 100 });
-
-          // Build a blob URL for in-browser preview/download
-          const blob = new Blob([xhr.response], { type: "application/pdf" });
-          const pdfUrl = URL.createObjectURL(blob);
-          const pageCount = parseInt(xhr.getResponseHeader("X-Page-Count") ?? "0", 10) || pages.length;
-          const rawDisp = xhr.getResponseHeader("Content-Disposition") ?? "";
-          const fnMatch = rawDisp.match(/filename="([^"]+)"/);
-          const filename = fnMatch?.[1] ?? `mains_${subject}.pdf`;
-
-          setUploadState({ status: "success", filename, pageCount, pdfUrl });
-          onUploadComplete?.(pdfUrl, pageCount);
-          resolve();
-        } else {
-          let errMsg = `Server error ${xhr.status}`;
-          try {
-            const body = JSON.parse(xhr.responseText);
-            errMsg = body?.detail ?? errMsg;
-          } catch {
-            // ignore
+    // Shared apiClient attaches the Clerk token; onUploadProgress drives the bar.
+    try {
+      const res = await apiClient.post("mains-upload/assemble-pdf", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        responseType: "arraybuffer",
+        onUploadProgress: (ev) => {
+          if (ev.total) {
+            const pct = Math.round((ev.loaded / ev.total) * 90); // cap at 90 while server processes
+            setUploadState({ status: "uploading", progress: pct });
           }
-          setUploadState({ status: "error", message: errMsg });
-          resolve();
+        },
+      });
+      setUploadState({ status: "uploading", progress: 100 });
+
+      // Build a blob URL for in-browser preview/download
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const pdfUrl = URL.createObjectURL(blob);
+      const pageCount = parseInt(String(res.headers["x-page-count"] ?? "0"), 10) || pages.length;
+      const rawDisp = String(res.headers["content-disposition"] ?? "");
+      const fnMatch = rawDisp.match(/filename="([^"]+)"/);
+      const filename = fnMatch?.[1] ?? `mains_${subject}.pdf`;
+
+      setUploadState({ status: "success", filename, pageCount, pdfUrl });
+      onUploadComplete?.(pdfUrl, pageCount);
+    } catch (err) {
+      let message = "Network error — make sure the backend server is running.";
+      if (axios.isAxiosError(err) && err.response) {
+        message = `Server error ${err.response.status}`;
+        try {
+          const body = JSON.parse(new TextDecoder().decode(err.response.data as ArrayBuffer));
+          if (typeof body?.detail === "string") message = body.detail;
+        } catch {
+          // ignore non-JSON error bodies
         }
-      };
-
-      xhr.onerror = () => {
-        setUploadState({
-          status: "error",
-          message: "Network error — make sure the backend server is running.",
-        });
-        resolve();
-      };
-
-      xhr.responseType = "arraybuffer";
-      xhr.send(formData);
-    });
+      } else if (err instanceof Error && err.message.startsWith("Authentication required")) {
+        message = "Please sign in again to upload.";
+      }
+      setUploadState({ status: "error", message });
+    }
   };
 
   const handleReset = () => {

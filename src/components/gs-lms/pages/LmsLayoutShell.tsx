@@ -22,6 +22,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   planner: "Today",
   retro: "Retrospective",
   onboarding: "Onboarding",
+  checkpoint: "Review test",
 };
 
 // The workspace has to be traversable from every page. Without these links a

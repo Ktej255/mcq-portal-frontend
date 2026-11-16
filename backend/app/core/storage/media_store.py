@@ -61,6 +61,10 @@ class MediaStore(Protocol):
         owner_id: int,
     ) -> bytes: ...
 
+    def delete(self, key: str) -> None:
+        """Remove an object. Idempotent: a missing object is not an error."""
+        ...
+
 
 class InMemoryMediaStore:
     """Process-local store (tests / ephemeral dev)."""
@@ -93,6 +97,9 @@ class InMemoryMediaStore:
         if key not in self._objects:
             raise MediaStoreError(f"object not found: {key}")
         return self._objects[key]
+
+    def delete(self, key: str) -> None:
+        self._objects.pop(key, None)
 
 
 class LocalMediaStore:
@@ -139,6 +146,14 @@ class LocalMediaStore:
         if not path.exists():
             raise MediaStoreError(f"object not found: {key}")
         return path.read_bytes()
+
+    def delete(self, key: str) -> None:
+        try:
+            self._path(key).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise MediaStoreError(f"failed to delete object: {type(exc).__name__}") from exc
 
 
 __all__ = [

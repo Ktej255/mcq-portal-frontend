@@ -304,11 +304,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (typeof window !== "undefined") {
       const existingMockToken = readLocalMockToken();
-      if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
+      // Local preview sign-in starts on the sign-in page only. Elsewhere a
+      // signed-out visitor stays signed out, so protected pages send them to
+      // /login exactly as they would in production.
+      if (
+        mockAuthEnabled &&
+        isLocalTestingHost() &&
+        !existingMockToken &&
+        window.location.pathname.startsWith("/login")
+      ) {
         const params = new URLSearchParams(window.location.search);
         const redirectPath = params.get("redirect") || "/dashboard";
         window.setTimeout(() => {
-          devLogin("student@example.com", "local-dev-student", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
+          devLogin("student@example.com", "local-dev-student", redirectPath);
         }, 0);
         return;
       }

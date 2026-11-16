@@ -2,7 +2,12 @@ from typing import Optional
 
 from google.genai import types
 
-from .contracts import IInferenceProvider, InferenceRequest, InferenceResponse
+from .contracts import (
+    IInferenceProvider,
+    InferenceRequest,
+    InferenceResponse,
+    sniff_image_mime,
+)
 from .gemini_client import build_gemini_client, gemini_model
 
 
@@ -32,14 +37,21 @@ class GeminiProvider(IInferenceProvider):
                 )
             )
             provider = "google/gemini-audio"
-        elif request.image is not None:
-            # Image alongside the prompt, for example reading handwriting.
-            contents.append(
-                types.Part.from_bytes(
-                    data=request.image, mime_type=request.image_mime_type or "image/png"
+        else:
+            images = list(request.images or [])
+            if not images and request.image is not None:
+                images = [request.image]
+            # Images in order after the prompt: reading handwriting, or
+            # grading every page of an answer in one call.
+            for data in images:
+                contents.append(
+                    types.Part.from_bytes(
+                        data=data,
+                        mime_type=sniff_image_mime(data, request.image_mime_type or "image/png"),
+                    )
                 )
-            )
-            provider = "google/gemini-vision"
+            if images:
+                provider = "google/gemini-vision"
 
         response = self.client.models.generate_content(
             model=self.model_name,
