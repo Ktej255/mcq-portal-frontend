@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CalendarDays, ClipboardCheck, FileText, LibraryBig, Target } from "lucide-react";
 
 import { LmsProgressCard } from "@/components/upsc/LmsProgressCard";
-import { dashboardService, type PerformanceReport } from "@/services/api/dashboardService";
+import { dashboardService, type HistoryItem, type PerformanceReport } from "@/services/api/dashboardService";
+import { loadRemoteSubjectProgress, mergeProgressMaps } from "@/lib/upsc/learnerPersistence";
 import {
   buildDailyPlannerDecision,
   readLocalAutoSessionHandoff,
@@ -29,6 +30,8 @@ import {
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { practiceHrefFor } from "@/lib/navigation/studentNav";
 
 type DailyReportState = {
   subjectSlug: string;
@@ -77,6 +80,8 @@ function readStrategyPracticeHandoffs() {
 }
 
 export default function ReportsPage() {
+  const { role } = useAuth();
+  const isAdmin = role === "ADMIN";
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
   const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] =
     useState<StudentReportQuestionBankAttemptMap>({});
@@ -115,6 +120,51 @@ export default function ReportsPage() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Progress is saved to the student's account as well as this browser. Merge
+  // the account copy in so the report is the same on every device.
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      studentReportSubjects.map(async (subject) => {
+        try {
+          const remote = await loadRemoteSubjectProgress<{ updatedAt?: string }>(subject.slug);
+          return [subject.slug, remote] as const;
+        } catch {
+          return [subject.slug, null] as const;
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return;
+      setProgressBySubject((current) => {
+        const next = { ...current };
+        for (const [slug, remote] of entries) {
+          if (!remote || Object.keys(remote).length === 0) continue;
+          const local = (current[slug] ?? readLocalStudentReportProgress(slug)) as Record<string, { updatedAt?: string }>;
+          next[slug] = mergeProgressMaps(local, remote) as StudentReportProgressMap;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Past mock tests come from the account, so a student can reopen any report.
+  const [testHistory, setTestHistory] = useState<HistoryItem[] | null>(null);
+  const [testHistoryError, setTestHistoryError] = useState(false);
+  const loadTestHistory = useCallback(() => {
+    setTestHistoryError(false);
+    dashboardService
+      .getHistory()
+      .then((items) => setTestHistory(items))
+      .catch(() => setTestHistoryError(true));
+  }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(loadTestHistory, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTestHistory]);
 
   const attemptReportRequestRef = useRef(0);
 
@@ -176,6 +226,10 @@ export default function ReportsPage() {
       }).sessionReadiness,
     [activeReportDay, activeReportSubject.sessions, activeReportSubject.slug, progressBySubject, questionBankAttemptsBySubject]
   );
+  const showLegacyReport =
+    isAdmin ||
+    allSubjectReport.totals.startedDays > 0 ||
+    Object.values(questionBankAttemptsBySubject).some((attempts) => (attempts?.length ?? 0) > 0);
   const headline = allSubjectReport.totals.recoveryItems > 0
     ? `${allSubjectReport.totals.recoveryItems} recovery item${allSubjectReport.totals.recoveryItems === 1 ? "" : "s"} need attention`
     : allSubjectReport.totals.startedDays > 0
@@ -273,9 +327,9 @@ export default function ReportsPage() {
 
         {attemptReportId && (
           <section className="mt-5 rounded-lg border border-[#b9d9cd] bg-[#eef9f3] p-5 shadow-sm md:p-7" data-testid="attempt-report-source">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Persisted attempt report</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Test report</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight">Attempt {attemptReportId}</h2>
-            {attemptReportLoading && <p className="mt-3 text-sm font-semibold text-[#5d675f]">Loading the ownership-scoped report…</p>}
+            {attemptReportLoading && <p className="mt-3 text-sm font-semibold text-[#5d675f]">Loading your report…</p>}
             {attemptReportError && (
               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-[#9b2c2c]">
                 <p role="alert">{attemptReportError}</p>
@@ -373,6 +427,18 @@ export default function ReportsPage() {
           </section>
         )}
 
+        <MockTestHistory
+          items={testHistory}
+          error={testHistoryError}
+          activeAttemptId={attemptReportId}
+          onRetry={loadTestHistory}
+          onOpen={loadAttemptReport}
+        />
+
+        {/* These sections are built from the older subject rooms, which students can no longer open.
+            Students see them only if they have saved evidence there; otherwise they get a pointer to Readiness. */}
+        {showLegacyReport ? (
+        <>
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -506,6 +572,8 @@ export default function ReportsPage() {
           </div>
         </section>
 
+        {/* Built from the admin question bank and 2027 strategy board, which students can't open. */}
+        {isAdmin ? (
         <section
           data-testid="upsc-2027-audit-readiness-report"
           data-proof-rule="strategy-build-generated-practice-solved-attempt-readiness"
@@ -552,7 +620,7 @@ export default function ReportsPage() {
                 ))}
               </div>
               <Link
-                href="/upsc/question-bank"
+                href={practiceHrefFor(isAdmin, "geography", "/upsc/question-bank")}
                 data-testid="upsc-2027-audit-readiness-action"
                 className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
               >
@@ -564,7 +632,7 @@ export default function ReportsPage() {
               {strategyAuditReadiness.priorityRows.map((row) => (
                 <Link
                   key={row.priority.id}
-                  href={`/upsc/question-bank?subject=${row.subjectSlug}`}
+                  href={practiceHrefFor(isAdmin, row.subjectSlug)}
                   data-testid="upsc-2027-audit-readiness-row"
                   data-priority-id={row.priority.id}
                   data-subject-slug={row.subjectSlug}
@@ -605,6 +673,7 @@ export default function ReportsPage() {
             </div>
           </div>
         </section>
+        ) : null}
 
         <section
           data-testid="upsc-auto-session-report-bridge"
@@ -663,7 +732,7 @@ export default function ReportsPage() {
                   {autoSessionHandoff?.actionLabel ?? "Open Daily Command"} <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href={autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`}
+                  href={isAdmin ? (autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`) : practiceHrefFor(false, activeReportSubject.slug)}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/70 px-4 text-sm font-black text-[#085041] transition hover:bg-white"
                 >
                   MCQ bank <ArrowRight className="h-4 w-4" />
@@ -918,6 +987,10 @@ export default function ReportsPage() {
             </div>
           </div>
         </section>
+        </>
+        ) : (
+          <StudentGapsPointer />
+        )}
       </div>
     </div>
   );
@@ -999,3 +1072,128 @@ function AllSubjectReportWindowCard({
   );
 }
 
+
+function MockTestHistory({
+  items,
+  error,
+  activeAttemptId,
+  onRetry,
+  onOpen,
+}: {
+  items: HistoryItem[] | null;
+  error: boolean;
+  activeAttemptId: string | null;
+  onRetry: () => void;
+  onOpen: (attemptId: string) => void;
+}) {
+  const open = (attemptId: string) => {
+    window.history.replaceState(null, "", `/reports?attemptId=${encodeURIComponent(attemptId)}`);
+    onOpen(attemptId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <section
+      id="tests"
+      data-testid="reports-mock-test-history"
+      className="my-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Mock tests</p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight">Your test reports</h2>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+            Every timed test you finish is saved to your account. Open one to see the score and the questions you missed.
+          </p>
+        </div>
+        <Link
+          href="/simulation/lobby"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f1ece2]"
+        >
+          Take a timed test <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+      </div>
+
+      {error ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-semibold text-[#9b2c2c]">
+          <p role="alert">Your test history couldn&apos;t be loaded just now.</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex min-h-11 items-center rounded-md border border-[#c98f8f] px-4 py-2 text-xs font-black text-[#8c2424] transition hover:bg-white"
+          >
+            Retry
+          </button>
+        </div>
+      ) : items === null ? (
+        <p className="mt-4 text-sm font-semibold text-[#5d675f]">Loading your tests…</p>
+      ) : items.length === 0 ? (
+        <p className="mt-4 text-sm font-semibold text-[#5d675f]" data-testid="reports-mock-test-history-empty">
+          No tests yet. Your first timed test will show up here.
+        </p>
+      ) : (
+        <ul className="mt-4 divide-y divide-[#ece5d8] rounded-lg border border-[#ece5d8] bg-white">
+          {items.slice(0, 20).map((item) => {
+            const finished = item.status === "COMPLETED";
+            const isOpen = activeAttemptId === item.attemptId;
+            return (
+              <li key={item.attemptId} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-[#13251d]">{item.title}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#657066]">
+                    {new Date(item.date).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                    {finished && item.score !== null
+                      ? ` · ${item.score}/${item.maxScore} · ${item.accuracy}`
+                      : finished
+                        ? " · Report being prepared"
+                        : " · Not submitted"}
+                  </p>
+                </div>
+                {finished ? (
+                  <button
+                    type="button"
+                    onClick={() => open(item.attemptId)}
+                    disabled={isOpen}
+                    className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d] disabled:opacity-60"
+                  >
+                    {isOpen ? "Showing above" : "Open report"}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function StudentGapsPointer() {
+  return (
+    <section
+      data-testid="reports-student-gaps-pointer"
+      className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+    >
+      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Learning gaps</p>
+      <h2 className="mt-2 text-2xl font-black tracking-tight">Your gaps are measured topic by topic</h2>
+      <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+        Each Geography topic you study and practise adds to your readiness. Open Readiness to see which topics are
+        strong, which need revision and what to do next.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          href="/upsc/geography/lms/gaps"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+        >
+          Open Readiness <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+        <Link
+          href="/upsc/geography/lms/syllabus"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f1ece2]"
+        >
+          Go to the syllabus
+        </Link>
+      </div>
+    </section>
+  );
+}

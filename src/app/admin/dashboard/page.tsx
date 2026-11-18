@@ -7,6 +7,7 @@ import {
   Gauge,
   Mail,
   Newspaper,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -14,6 +15,12 @@ import { GeographyContentLoader } from "@/components/admin/GeographyContentLoade
 import { OperatorOverview } from "@/components/admin/OperatorOverview";
 
 const operatorLinks: { href: string; title: string; detail: string; icon: LucideIcon }[] = [
+  {
+    href: "/admin/beta-access",
+    title: "Beta Access",
+    detail: "Turn on GS course access for a student after they sign in once. Without it they are told to ask the program team.",
+    icon: UserCheck,
+  },
   {
     href: "/admin/tests",
     title: "Tests and Questions",

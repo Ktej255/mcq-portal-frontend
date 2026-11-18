@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -381,6 +382,8 @@ export function OptionalSubjectDetail({
     firstBuildAction: string;
   };
 }) {
+  const { role } = useAuth();
+  const isAdmin = role === "ADMIN";
   const sourcePack = getOptionalSourcePack(subject.slug);
   const yearRows = sourcePack?.yearRows ?? [];
   const paperSummaries = sourcePack?.paperSummary ?? [];
@@ -541,9 +544,12 @@ export function OptionalSubjectDetail({
                   {sourcePack.paperRows.length} Paper I/II source rows seeded across {sourcePack.yearRows.length} years
                 </h2>
               </div>
-              <Link href="/upsc/source-library" className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white">
-                Source library
-              </Link>
+              {/* The source library is an operator page; students were bounced to Today. */}
+              {isAdmin ? (
+                <Link href="/upsc/source-library" className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white">
+                  Source library
+                </Link>
+              ) : null}
             </div>
             <div className="grid gap-2">
               {yearRows.map((row) => (

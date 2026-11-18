@@ -75,7 +75,7 @@ const revisionSubjects: RevisionSubject[] = [
     title: "Geography",
     window: "June",
     href: "/upsc/geography",
-    trackHref: "/upsc/geography/track",
+    trackHref: lmsHrefForRoom("geography", "track"),
     sessions: geographySessions,
   },
   ...[

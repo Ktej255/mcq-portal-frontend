@@ -32,6 +32,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import { practiceHrefFor } from "@/lib/navigation/studentNav";
 import {
   AUTO_SESSION_HANDOFF_STORAGE_KEY,
   buildDailyPlannerDecision,
@@ -1905,7 +1906,7 @@ export function UpscDailyMissionControl() {
                     </button>
                   ) : (
                     <Link
-                      href={`/upsc/question-bank?subject=${activeSubject.slug}`}
+                      href={practiceHrefFor(isAdmin, activeSubject.slug)}
                       className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
                     >
                       Open PYQ practice lane <ArrowRight className="h-4 w-4" />
@@ -2060,6 +2061,8 @@ export function UpscDailyMissionControl() {
                       { label: "Readiness & Gaps", href: `/upsc/${activeSubject.slug}/lms/gaps`, gated: false },
                       { label: "Sunday Review", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
                       { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+                      // The timed mock-test lobby had no link anywhere.
+                      { label: "Timed Mock Test", href: "/simulation/lobby", gated: false },
                     ]
                 ).map((item) => {
                   const isLocked = item.gated && profile && !profile.inductionCompleted;

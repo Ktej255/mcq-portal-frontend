@@ -292,7 +292,9 @@ export const subjects: Subject[] = [
     category: "Optional",
     icon: Map,
     tagline: "Deep geography with strong GS overlap and map-based answers.",
-    status: "Planned",
+    // Open in the beta: syllabus map, full notes for the first Paper I topics,
+    // PYQs, practice and answer writing. Not every topic is written yet.
+    status: "Building",
   },
   {
     slug: "history-optional",

@@ -30,6 +30,7 @@ import {
   readLocalQuestionBankAttempts,
   readLocalQuestionBankProgress,
   saveLocalQuestionBankAttempt,
+  syncQuestionBankAttempts,
   selectCustomQuestionBankSet,
   selectQuestionBankSet,
   type QuestionBankAttempt,
@@ -109,7 +110,14 @@ function UpscQuestionBankBuilderContent({
       setPyqRecords(readLocalPyqImportRecords());
       setStrategyHandoffs(readLocalStrategyPracticeHandoffs());
     }, 0);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    void syncQuestionBankAttempts(subjectSlug).then((synced) => {
+      if (!cancelled) setAttempts(synced);
+    });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [subjectSlug]);
 
   const selectedSubject = useMemo(() => getQuestionBankSubject(subjectSlug), [subjectSlug]);

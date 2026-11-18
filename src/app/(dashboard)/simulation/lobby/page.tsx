@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,7 +105,17 @@ function SimulationLobbyContent() {
         </Card>
       ) : tests.length === 0 ? (
         <Card className="rounded-[3rem] border-none bg-zinc-900 text-white overflow-hidden shadow-2xl">
-          <CardContent className="p-12 text-center text-zinc-300">No active simulation sessions with published questions are available.</CardContent>
+          <CardContent className="p-12 text-center text-zinc-300" data-testid="simulation-lobby-empty">
+            <p>No timed test is open right now. New tests appear here as soon as they are published.</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link href="/upsc/current-affairs" className="inline-flex min-h-11 items-center rounded-full bg-white px-5 text-sm font-black text-zinc-900 hover:bg-zinc-200">
+                Try a current affairs quiz
+              </Link>
+              <Link href="/reports#tests" className="inline-flex min-h-11 items-center rounded-full border border-zinc-600 px-5 text-sm font-black text-white hover:bg-zinc-800">
+                See your past tests
+              </Link>
+            </div>
+          </CardContent>
         </Card>
       ) : (
         <div className="space-y-6">
