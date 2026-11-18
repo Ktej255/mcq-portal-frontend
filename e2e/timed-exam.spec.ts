@@ -62,6 +62,10 @@ test("a timed test keeps its clock and answers across a reload, then submits its
   await expect(page).toHaveURL(/\/reports\?attemptId=\d+/, { timeout: 100_000 });
   await expect(page.getByText(/Failed to submit/)).toHaveCount(0);
 
+  // The finished test is listed on Reports from the account, ready to reopen.
+  const history = page.getByTestId("reports-mock-test-history");
+  await expect(history.getByRole("button", { name: /Showing above|Open report/ }).first()).toBeVisible();
+
   // Opening the exam again goes to the report; the attempt cannot be reopened.
   await page.goto(examUrl);
   await expect(page).toHaveURL(/\/reports\?attemptId=\d+/);
