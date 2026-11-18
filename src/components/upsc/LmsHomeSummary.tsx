@@ -7,6 +7,7 @@ import { gsLmsService } from "@/services/api/gsLmsService";
 import { paymentService, type SubscriptionResponse } from "@/services/api/paymentService";
 import type { DailyPlanOut, PlanItemOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import { gsLmsAccessDenialMessage } from "@/lib/gs-lms/access-events";
 import {
   getSupportedGsLmsSubject,
   type SupportedGsLmsSubject,
@@ -50,6 +51,9 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // A refused cohort grant is not a sync failure: retrying cannot fix it, so
+  // it gets its own message instead of "sync unavailable" with a Retry button.
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSubject, setActiveSubject] = useState<SupportedGsLmsSubject | null>(null);
 
@@ -67,9 +71,12 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
 
       setLoading(true);
       setLoadError(false);
+      setAccessDenied(null);
       Promise.all([
-        gsLmsService.getTodayPlan(activeSubject).catch(() => {
-          setLoadError(true);
+        gsLmsService.getTodayPlan(activeSubject).catch((error: unknown) => {
+          const denial = gsLmsAccessDenialMessage(error);
+          if (denial) setAccessDenied(denial);
+          else setLoadError(true);
           return null;
         }),
         gsLmsService.checkRecallGate(activeSubject).catch(() => null),
@@ -93,6 +100,21 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
 
   // Honest surface: when the server read failed, explain rather than vanishing
   if (!plan && !recallGate) {
+    if (accessDenied) {
+      return (
+        <section
+          data-testid="lms-home-access-pending"
+          className="rounded-2xl border border-[#dcd5c7] bg-[#faf6ee] p-4 text-xs font-semibold text-[#5d675f]"
+        >
+          <p className="font-black uppercase tracking-[0.1em] text-[#8a7a52]">Course access pending</p>
+          <p className="mt-0.5 max-w-xl text-[#5d675f]">
+            Your account is signed in, but your GS course access has not been switched on yet. The program team
+            turns it on for each beta student; your daily plan appears here as soon as it is active. Current
+            affairs and the optional subjects stay open in the meantime.
+          </p>
+        </section>
+      );
+    }
     if (loadError) {
       return (
         <section className="rounded-2xl border border-[#dcd5c7] bg-[#faf6ee] p-4 text-xs font-semibold text-[#5d675f] flex flex-wrap items-center justify-between gap-3">

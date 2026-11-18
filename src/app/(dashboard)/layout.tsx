@@ -9,6 +9,7 @@ import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
 import { UpgradePrompt } from "@/components/shared/UpgradePrompt";
+import { GsAccessBoundary } from "@/components/gs-lms/GsAccessBoundary";
 import { examBrandName } from "@/lib/exams/examRoutes";
 
 export default function DashboardLayout({
@@ -45,7 +46,7 @@ export default function DashboardLayout({
           {/* Main Content */}
           <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
             <div className="mx-auto max-w-7xl">
-              {children}
+              <GsAccessBoundary>{children}</GsAccessBoundary>
             </div>
           </main>
         </div>
