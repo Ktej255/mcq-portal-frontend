@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.core.evaluation.cache import InMemoryReportCache, content_hash
 from app.core.evaluation.engine import EvaluationEngine, EvaluationInput
+from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.evaluation.schema import MarkingScheme
 from app.core.gs_lms.evaluation.rubric import GsPaperRubricStrategy
 from app.core.gs_lms.models import (
@@ -206,6 +207,10 @@ def evaluate_attempt_job(db: Session, attempt: GsLmsAnswerAttempt) -> JobExecuti
             "token_usage": attempt.token_usage,
             "is_complete": report.is_complete,
         }
+    except EvaluationProviderUnavailableError:
+        # Let production callers return a retryable response. No report is
+        # persisted; their rollback removes the in-flight job and report.
+        raise
     except Exception as exc:  # noqa: BLE001 - record failure, never leak content
         attempt.status = GsLmsAnswerAttemptStatusEnum.FAILED
         job.status = "FAILED"

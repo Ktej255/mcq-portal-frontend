@@ -27,6 +27,7 @@ from .ocr import (
 )
 from .evaluation import (
     EvaluationProvider,
+    EvaluationProviderUnavailableError,
     MockEvaluationProvider,
     GatewayEvaluationProvider,
     get_evaluation_provider,
@@ -58,6 +59,7 @@ __all__ = [
     "get_ocr_provider",
     # Evaluation
     "EvaluationProvider",
+    "EvaluationProviderUnavailableError",
     "MockEvaluationProvider",
     "GatewayEvaluationProvider",
     "get_evaluation_provider",

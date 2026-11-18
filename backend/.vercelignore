@@ -1,0 +1,8 @@
+tests/
+app/tests/
+.media_store/
+*.db
+*.sqlite3
+.env
+.env.*
+__pycache__/

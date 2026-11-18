@@ -11,8 +11,8 @@ Routes:
     Accepts an :class:`AnswerSubmitIn` draft (three-part typed composition
     and/or combined ``raw_text``, plus prompt context and any STT/OCR
     confidence). Builds a topic-aware rubric, runs the draft through the shared
-    :class:`EvaluationProvider` (mock by default; Gemini via the existing
-    inference gateway in production), persists an ``AnswerAttempt`` +
+    :class:`EvaluationProvider` (Gemini by default; deterministic mock only
+    under explicit non-production policy), persists an ``AnswerAttempt`` +
     ``EvaluationReport``, and returns the report (R9.2 / R9.5).
 
 * ``GET /answers/{attempt_id}/report``
@@ -37,6 +37,7 @@ references GS Geography (``/upsc/geography``) modules.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -48,8 +49,11 @@ from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.optional.models import (
     OptionalSubject,
+    Paper,
+    Section,
     SyllabusNode,
     ContentUnit,
+    Pyq,
     OptionalReviewStatusEnum,
 )
 from app.core.optional.student_models import (
@@ -58,7 +62,11 @@ from app.core.optional.student_models import (
     AnswerAttemptStatusEnum,
     EvaluationReport,
 )
-from app.core.optional.providers import EvaluationProvider, get_evaluation_provider
+from app.core.optional.providers import (
+    EvaluationProvider,
+    EvaluationProviderUnavailableError,
+    get_evaluation_provider,
+)
 from app.api.v1.optional.schemas import (
     ANSWER_MODES,
     ANSWER_MODE_SPOKEN,
@@ -72,6 +80,7 @@ from app.api.v1.optional.schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def get_evaluation_provider_dep() -> EvaluationProvider:
@@ -82,7 +91,22 @@ def get_evaluation_provider_dep() -> EvaluationProvider:
     provider (e.g. a forced all-incomplete stub) via ``dependency_overrides``
     without touching global env.
     """
-    return get_evaluation_provider()
+    try:
+        return get_evaluation_provider()
+    except EvaluationProviderUnavailableError as exc:
+        logger.warning(
+            "Optional evaluation provider unavailable provider=%s operation=%s error_type=%s",
+            exc.provider,
+            exc.operation,
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+                "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+            },
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -270,18 +294,62 @@ def submit_answer(
             detail="No answer text was provided to evaluate.",
         )
 
-    # Validate the topic node belongs to this subject when supplied.
+    # Validate a supplied topic through node -> section -> paper -> subject and
+    # require the same review gate used by student-facing syllabus content.
     if payload.topic_node_id is not None:
         node = (
             db.query(SyllabusNode)
-            .filter(SyllabusNode.id == payload.topic_node_id)
+            .join(Section, SyllabusNode.section_id == Section.id)
+            .join(Paper, Section.paper_id == Paper.id)
+            .filter(
+                SyllabusNode.id == payload.topic_node_id,
+                SyllabusNode.review_status == OptionalReviewStatusEnum.REVIEWED,
+                Paper.subject_id == subject.id,
+            )
             .one_or_none()
         )
         if node is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Syllabus node {payload.topic_node_id} not found",
+                detail=(
+                    f"Reviewed syllabus node {payload.topic_node_id} was not "
+                    "found for this subject"
+                ),
             )
+
+    authoritative_question_text = payload.question_text
+    pyq: Optional[Pyq] = None
+    if payload.pyq_id is not None:
+        pyq_query = db.query(Pyq).filter(
+            Pyq.id == payload.pyq_id,
+            Pyq.subject_id == subject.id,
+            Pyq.review_status == OptionalReviewStatusEnum.REVIEWED,
+        )
+        if hasattr(Pyq, "is_deleted"):
+            pyq_query = pyq_query.filter(Pyq.is_deleted.is_(False))
+        pyq = pyq_query.one_or_none()
+        if pyq is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Reviewed PYQ {payload.pyq_id} was not found for this subject",
+            )
+        if (
+            payload.topic_node_id is not None
+            and pyq.topic_node_id != payload.topic_node_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The supplied PYQ is not associated with the supplied topic.",
+            )
+        if (
+            payload.question_text is not None
+            and payload.question_text.strip() != pyq.question_text.strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="question_text conflicts with the reviewed PYQ.",
+            )
+        authoritative_question_text = pyq.question_text
 
     # Confidence gate (Property 7): refuse to auto-grade a shaky, unreviewed
     # spoken/handwritten input. Retain the draft so the student can review it.
@@ -292,7 +360,7 @@ def submit_answer(
             topic_node_id=payload.topic_node_id,
             mode=mode,
             status=AnswerAttemptStatusEnum.DRAFT,
-            question_text=payload.question_text,
+            question_text=authoritative_question_text,
             pyq_id=payload.pyq_id,
             raw_text=answer_text,
             intro_text=payload.intro_text,
@@ -328,11 +396,28 @@ def submit_answer(
     # Build the rubric and evaluate (always returns a schema-valid report — the
     # provider degrades honestly to all-incomplete on model/parse failure).
     rubric = _build_rubric(db, subject, payload.topic_node_id)
-    report_schema = provider.evaluate(
-        answer_text=answer_text,
-        rubric=rubric,
-        question=payload.question_text,
-    )
+    try:
+        report_schema = provider.evaluate(
+            answer_text=answer_text,
+            rubric=rubric,
+            question=authoritative_question_text,
+        )
+    except EvaluationProviderUnavailableError as exc:
+        # Do not persist a failed evaluation as an evaluated report. The
+        # provider exception is intentionally not returned to the client.
+        logger.warning(
+            "Optional evaluation provider unavailable provider=%s operation=%s error_type=%s",
+            exc.provider,
+            exc.operation,
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+                "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+            },
+        ) from exc
 
     # Persist the attempt + report (R9.5).
     attempt = AnswerAttempt(
@@ -341,7 +426,7 @@ def submit_answer(
         topic_node_id=payload.topic_node_id,
         mode=mode,
         status=AnswerAttemptStatusEnum.EVALUATED,
-        question_text=payload.question_text,
+        question_text=authoritative_question_text,
         pyq_id=payload.pyq_id,
         raw_text=answer_text,
         intro_text=payload.intro_text,
@@ -402,14 +487,13 @@ def get_answer_report(
     attempt belongs to the requesting student; otherwise 404 (no existence
     leak). 404 when the attempt has no report yet (e.g. a review-required DRAFT).
     """
-    attempt = (
-        db.query(AnswerAttempt)
-        .filter(
-            AnswerAttempt.id == attempt_id,
-            AnswerAttempt.student_id == current_user.id,
-        )
-        .one_or_none()
+    attempt_query = db.query(AnswerAttempt).filter(
+        AnswerAttempt.id == attempt_id,
+        AnswerAttempt.student_id == current_user.id,
     )
+    if hasattr(AnswerAttempt, "is_deleted"):
+        attempt_query = attempt_query.filter(AnswerAttempt.is_deleted.is_(False))
+    attempt = attempt_query.one_or_none()
     if attempt is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

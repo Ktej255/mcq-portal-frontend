@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { Upload, FileJson, CheckCircle2, XCircle, ArrowLeft, Download } from 'lucide-react';
+import { FileJson, CheckCircle2, XCircle, ArrowLeft, Download } from 'lucide-react';
 import { adminCmsService, BulkImportResult } from '@/services/api/adminCmsService';
 
 /**
@@ -72,13 +72,21 @@ export default function AdminBulkUploadPage() {
     try {
       const items = JSON.parse(jsonContent);
       if (!Array.isArray(items)) { errors.push('JSON must be an array of items'); return false; }
-      items.forEach((item: any, idx: number) => {
-        if (!item.title) errors.push(`Item ${idx + 1}: missing title`);
-        if (!item.publish_date) errors.push(`Item ${idx + 1}: missing publish_date`);
-        if (!item.subject) errors.push(`Item ${idx + 1}: missing subject`);
-        if (!item.gs_paper) errors.push(`Item ${idx + 1}: missing gs_paper`);
-        if (item.mcqs?.length > 10) errors.push(`Item ${idx + 1}: max 10 MCQs`);
-        if (item.mains_questions?.length > 3) errors.push(`Item ${idx + 1}: max 3 Mains questions`);
+      items.forEach((item: unknown, idx: number) => {
+        const candidate = item && typeof item === "object" ? item as {
+          title?: unknown;
+          publish_date?: unknown;
+          subject?: unknown;
+          gs_paper?: unknown;
+          mcqs?: unknown[];
+          mains_questions?: unknown[];
+        } : {};
+        if (!candidate.title) errors.push(`Item ${idx + 1}: missing title`);
+        if (!candidate.publish_date) errors.push(`Item ${idx + 1}: missing publish_date`);
+        if (!candidate.subject) errors.push(`Item ${idx + 1}: missing subject`);
+        if (!candidate.gs_paper) errors.push(`Item ${idx + 1}: missing gs_paper`);
+        if ((candidate.mcqs?.length ?? 0) > 10) errors.push(`Item ${idx + 1}: max 10 MCQs`);
+        if ((candidate.mains_questions?.length ?? 0) > 3) errors.push(`Item ${idx + 1}: max 3 Mains questions`);
       });
     } catch {
       errors.push('Invalid JSON format');
@@ -94,8 +102,10 @@ export default function AdminBulkUploadPage() {
       const items = JSON.parse(jsonContent);
       const res = await adminCmsService.bulkImport(items);
       setResult(res);
-    } catch (err: any) {
-      setValidationErrors([err?.message || 'Upload failed']);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: unknown } }; message?: unknown };
+      const detail = error.response?.data?.detail;
+      setValidationErrors([typeof detail === "string" ? detail : typeof error.message === "string" ? error.message : "Upload failed"]);
     } finally {
       setUploading(false);
     }

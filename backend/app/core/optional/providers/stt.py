@@ -16,8 +16,9 @@ Licensing note (R8.5 — commercially licensed STT only):
 
     A second production option is **Gemini** (:class:`GeminiSttProvider`), routed
     through the existing inference gateway's audio seam. This lets voice run on
-    the founder's free Gemini key with no Whisper install. Mock remains the
-    deterministic default; Whisper and Gemini are env-selected.
+    the founder's free Gemini key with no Whisper install. Gemini is the
+    fail-closed runtime default; deterministic mock selection is separately
+    gated to explicitly enabled development/test/local environments.
 
 Contract:
     ``transcribe(audio, *, vocabulary_hint=None) -> SttResult`` where
@@ -492,28 +493,41 @@ class GeminiSttProvider(SttProvider):
 
 
 # ---------------------------------------------------------------------------
-# Selector / factory (env-driven, like the inference gateway)
+# Selector / factory (explicit fail-closed runtime policy)
 # ---------------------------------------------------------------------------
 _PROVIDERS: dict = {}
 
 
 def get_stt_provider(name: Optional[str] = None) -> SttProvider:
-    """Return an :class:`SttProvider`, selected by ``name`` or environment.
+    """Return the explicitly selected STT provider.
 
-    Selection precedence:
-        1. explicit ``name`` argument
-        2. ``OPTIONAL_STT_PROVIDER`` environment variable
-        3. default → ``"mock"``
+    The real Gemini provider is the fail-closed default. ``whisper`` is also a
+    real, explicitly selectable backend. The deterministic ``mock`` is allowed
+    only when all three controls agree: a mock selection, an explicit enable
+    flag, and ``APP_ENVIRONMENT`` set to development/test/local. Production and
+    staging therefore never fall back to fabricated transcripts.
 
-    The mock is the safe default for test/dev (no model, deterministic), exactly
-    like the inference gateway defaults. Self-hosted ``whisper`` (MIT) and
-    gateway-routed ``gemini`` (the founder's free key, no Whisper install) are
-    both available. Providers are cached per-name so a model is loaded at most
-    once. ``ValueError`` is raised for unknown names.
+    ``name`` remains available for direct test/provider injection. Providers
+    are cached per resolved name, but policy is checked before cache access.
     """
     import os
 
-    resolved = (name or os.environ.get("OPTIONAL_STT_PROVIDER") or "mock").strip().lower()
+    from app.core.config import settings
+
+    resolved = (
+        name
+        or os.environ.get("OPTIONAL_STT_PROVIDER")
+        or settings.OPTIONAL_STT_PROVIDER
+    ).strip().lower()
+
+    if resolved == "mock" and (
+        settings.APP_ENVIRONMENT not in {"development", "test", "local"}
+        or not settings.ENABLE_OPTIONAL_STT_MOCK
+    ):
+        raise SttNotConfiguredError(
+            "Deterministic STT is disabled by runtime policy. Configure a real "
+            "speech provider, or use manual entry and retry later."
+        )
 
     if resolved in _PROVIDERS:
         return _PROVIDERS[resolved]

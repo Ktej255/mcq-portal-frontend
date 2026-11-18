@@ -34,6 +34,19 @@ class GsLmsSyllabusNodeOut(BaseModel):
     # Per-student completion percentage (0.0–100.0 for non-leaf, bool for leaf)
     completion_percent: Optional[float] = None
     completed: Optional[bool] = None
+    # Reviewed standalone MCQs available for a leaf topic. Practice can start
+    # only when this is greater than zero; a topic without questions is a
+    # coverage gap, not a learner failure.
+    mcq_count: int = 0
+    # Reviewed PYQ evidence mapped to this leaf. These are raw counts; the
+    # recency/weight-adjusted demand share stays on the topic strip and the
+    # readiness dashboard instead of being recomputed in the tree.
+    prelims_pyq_count: int = 0
+    mains_pyq_count: int = 0
+    # Paid-beta availability for a leaf topic. None for non-leaf nodes and when
+    # the scope is disabled. False means the topic is visible on the map but
+    # cannot be entered until its content, demand, and practice gates pass.
+    beta_ready: Optional[bool] = None
     # Bridge to existing day-lesson system
     day_lesson_id: Optional[int] = None
     ordering_justification: Optional[str] = None
@@ -67,7 +80,7 @@ class GsLmsContentSectionOut(BaseModel):
     match percentage.
     """
     section_id: int
-    section_label: str  # BASIC | ADVANCED | NCERT_LEVEL | EXAMINER_TRAPS
+    section_label: str  # BASIC | NCERT_LEVEL | ADVANCED | CURRENT_AFFAIRS | EXAMINER_TRAPS
     title: str
     display_order: int
     locked: bool
@@ -78,9 +91,10 @@ class GsLmsContentSectionOut(BaseModel):
 
 
 class GsLmsTopicSectionsOut(BaseModel):
-    """All four sections of a topic with lock/unlock state per student."""
+    """A topic's reviewed sections with lock/unlock state per student."""
     node_id: int
     title: str
+    # Optional knowledge-check completion. Diagnostic only; never a content lock.
     discussion_gate_passed: bool
     topic_completed: bool
     video_url: Optional[str] = None
@@ -245,6 +259,8 @@ class GsLmsDiscussionTurnResponseOut(BaseModel):
     student_turn: GsLmsDiscussionTurnOut
     ai_turn: GsLmsDiscussionTurnOut
     gate_passed: bool
+    provider: str
+    is_mock: bool
     # Concept matching info (present when topic has a concept_checklist)
     concepts_matched: Optional[list[str]] = None
     concepts_missed: Optional[list[str]] = None
@@ -329,6 +345,12 @@ class GsLmsPlanItemOut(BaseModel):
     revisit_id: Optional[int] = None
     revisit_type: Optional[str] = None  # "day_3" | "day_7" | "day_21"
     overdue: bool = False
+    # For topic items: where this topic sits in the plan-eligible sequence and
+    # the reviewed PYQ evidence that puts it in the curriculum.
+    sequence_position: Optional[int] = None
+    sequence_total: Optional[int] = None
+    prelims_pyq_count: Optional[int] = None
+    mains_pyq_count: Optional[int] = None
 
 
 class GsLmsDailyPlanOut(BaseModel):

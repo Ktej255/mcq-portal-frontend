@@ -24,13 +24,26 @@ from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
-from app.core.gs.models import GsSubject
-from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsNodeTypeEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.models import (
+    GsLmsContentSection,
+    GsLmsSyllabusNode,
+    GsLmsNodeTypeEnum,
+)
 from app.core.gs_lms.student_models import (
     GsLmsStudentSectionProgress,
     GsLmsRevisitSchedule,
 )
 from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.content import (
+    _compute_skippable_section_ids,
+    _compute_skippable_section_labels,
+    _get_latest_match_percentage,
+    _get_learner_level,
+    _get_reviewed_sections,
+    _get_student_progress,
+    _is_topic_completed,
+)
 
 router = APIRouter()
 
@@ -58,55 +71,70 @@ class RecallGateClearOut(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-_SECTIONS_PER_LEAF = 4
-
-
 def _find_most_recently_completed_topic(
     db: Session, student_id: int, subject_id: int
 ) -> Optional[GsLmsSyllabusNode]:
-    """Find the student's most recently completed topic for this subject.
+    """Find the most recently completed reviewed topic for this subject.
 
-    A topic is considered completed when all 4 sections have been marked
-    complete. We find the topic whose last section was completed most recently.
+    Completion uses the same learner-aware non-skippable-section policy as the
+    content endpoint. This keeps day-start recall aligned with topic completion
+    for intermediate and advanced learners while retaining legacy section sets.
     """
-    from sqlalchemy import and_
-
-    # Subquery: for each syllabus_node_id, count completed sections and find
-    # the latest completed_at timestamp.
+    # Count completed reviewed sections and retain the latest completion time.
+    # This query only orders possible candidates; the authoritative completion
+    # predicate below applies the same skip policy as content.py.
     completion_info = (
         db.query(
             GsLmsStudentSectionProgress.syllabus_node_id,
-            func.count(GsLmsStudentSectionProgress.id).label("completed_count"),
-            func.max(GsLmsStudentSectionProgress.completed_at).label("last_completed"),
+            func.max(GsLmsStudentSectionProgress.completed_at).label(
+                "last_completed"
+            ),
+        )
+        .join(
+            GsLmsContentSection,
+            GsLmsContentSection.id == GsLmsStudentSectionProgress.section_id,
         )
         .filter(
             GsLmsStudentSectionProgress.student_id == student_id,
             GsLmsStudentSectionProgress.completed == True,  # noqa: E712
+            GsLmsContentSection.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .group_by(GsLmsStudentSectionProgress.syllabus_node_id)
         .subquery()
     )
 
-    # Join with syllabus nodes to filter by subject and get only fully
-    # completed topics (4 sections done).
-    result = (
+    candidates = (
         db.query(GsLmsSyllabusNode)
         .join(
             completion_info,
-            and_(
-                GsLmsSyllabusNode.id == completion_info.c.syllabus_node_id,
-                completion_info.c.completed_count >= _SECTIONS_PER_LEAF,
-            ),
+            GsLmsSyllabusNode.id == completion_info.c.syllabus_node_id,
         )
         .filter(
             GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
+            GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .order_by(completion_info.c.last_completed.desc())
-        .first()
+        .all()
     )
 
-    return result
+    learner_level = _get_learner_level(db, student_id)
+    for topic in candidates:
+        sections = _get_reviewed_sections(db, topic.id)
+        section_ids = [section.id for section in sections]
+        match_percentage = _get_latest_match_percentage(db, student_id, topic.id)
+        skippable_labels = _compute_skippable_section_labels(
+            learner_level, match_percentage
+        )
+        skippable_ids = _compute_skippable_section_ids(
+            sections, skippable_labels
+        )
+        progress_map = _get_student_progress(db, student_id, section_ids)
+
+        if _is_topic_completed(progress_map, section_ids, skippable_ids):
+            return topic
+
+    return None
 
 
 def _was_completed_within_24h(
@@ -235,6 +263,24 @@ def clear_recall_gate(
 
     Requirements: 5.4
     """
+    # The topic ID is part of the mutation target, so bind it to the URL
+    # subject before reading or changing any student recall state. Without
+    # this check, a valid node from another subject could be addressed through
+    # the current subject's clear endpoint.
+    topic = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.id == body.topic_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
+        )
+        .first()
+    )
+    if topic is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Topic not found",
+        )
+
     today = date.today()
     now = datetime.now(timezone.utc)
 

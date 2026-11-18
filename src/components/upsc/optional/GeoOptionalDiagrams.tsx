@@ -349,7 +349,7 @@ function CoralReefTypes() {
       <path className="go-pencil go-pencil-fill-amber" d="M360 120 a40 16 0 1 0 0.1 0 Z" />
       <path className="go-pencil go-pencil-fill-blue" d="M385 120 a14 6 0 1 0 0.1 0 Z" />
       <text x="345" y="150" className="go-ink-label" fontSize="11">atoll (ring)</text>
-      <text x="60" y="185" className="go-ink-label go-hand" fontSize="15">Darwin's subsidence theory</text>
+      <text x="60" y="185" className="go-ink-label go-hand" fontSize="15">Darwin&apos;s subsidence theory</text>
     </svg>
   );
 }

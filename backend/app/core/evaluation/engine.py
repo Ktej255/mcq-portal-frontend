@@ -6,10 +6,12 @@ to decide behavior — the variation is supplied by the :class:`RubricStrategy`
 (R1.4). It resolves the model "brain" through the config-driven
 :class:`ProviderRegistry` (so a self-hosted OSS model is a config swap — R3), runs
 the call through the resilience guard with a unified retry loop (R4.4, R5),
-repairs/validates the model JSON (R4.2/R4.3), degrades honestly to an
-all-incomplete report on terminal failure (R4.5/R5.5, Property 1/3), and applies
-marks- and length-normalized, reference-grounded scoring (R7, R8). Identical
-report SHAPE regardless of strategy or provider (R1.5).
+repairs/validates the model JSON (R4.2/R4.3), and fails closed with a typed
+provider-unavailable outcome when the real provider cannot produce a trustworthy
+response. Explicit schema-valid all-incomplete results from injected providers
+remain valid evaluation outcomes. Applies marks- and length-normalized,
+reference-grounded scoring (R7, R8). Identical report SHAPE regardless of
+strategy or provider (R1.5).
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from typing import List, Optional
 from app.core.evaluation.cache import ReportCache, content_hash
 from app.core.evaluation.json_io import JsonRepair
 from app.core.evaluation.prompts import build_evaluation_request, parse_evaluation_report
-from app.core.evaluation.providers.evaluation import _all_incomplete
+from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.evaluation.providers.registry import ProviderRegistry, get_default_registry
 from app.core.evaluation.resilience import (
     CircuitOpenError,
@@ -78,8 +80,14 @@ class EvaluationEngine:
             marking_scheme=request.marking_scheme,
         )
 
+        # Resolve policy before consulting the cache. A cached report must not
+        # bypass the fail-closed built-in provider gate (for example, a cached
+        # result must not make an explicitly selected production ``mock`` look
+        # available).
+        config = self._registry.resolve_config(request.provider_key)
+
         # Cache check (R18.1 / Property 21).
-        cache_key = content_hash(
+        cache_key = f"{config.key}\x00" + content_hash(
             answer_text=request.answer_text,
             question=request.question,
             rubric=rubric,
@@ -90,7 +98,6 @@ class EvaluationEngine:
             if cached is not None:
                 return cached
 
-        config = self._registry.resolve_config(request.provider_key)
         schema = self._run_with_retries(request, rubric, required_sections)
 
         report = self._assemble_report(
@@ -114,8 +121,9 @@ class EvaluationEngine:
         """Unified retry loop spanning transient + unparseable-JSON failures.
 
         Issues exactly ``retry_limit + 1`` inference attempts in the worst case
-        (Property 4), degrading to an all-incomplete report on terminal failure
-        (Property 3).
+        (Property 4). Terminal provider-call and response-validation failures
+        raise :class:`EvaluationProviderUnavailableError`; a provider that
+        explicitly returns a valid all-incomplete schema is still assembled.
         """
         import time
 
@@ -140,21 +148,25 @@ class EvaluationEngine:
         for attempt in range(attempts):
             try:
                 response = guarded_call(provider, inf_request, config)
-            except CircuitOpenError:
+            except CircuitOpenError as exc:
                 # Breaker open — terminal, no point retrying (Property 3).
-                return _all_incomplete(required_sections)
+                raise EvaluationProviderUnavailableError(
+                    config.key, "provider_call"
+                ) from exc
             except Exception as exc:  # noqa: BLE001 - classified
                 record_failure(config)
                 if is_retriable(exc) and attempt < attempts - 1:
                     if self.backoff_base:
                         time.sleep(self.backoff_base * (2 ** attempt))
                     continue
-                return _all_incomplete(required_sections)
+                raise EvaluationProviderUnavailableError(
+                    config.key, "provider_call"
+                ) from exc
 
             # Parse + repair the model output.
             try:
                 return parse_evaluation_report(response)
-            except SchemaValidationError:
+            except SchemaValidationError as exc:
                 repaired = JsonRepair.extract_object(getattr(response, "text", "") or "")
                 if repaired is not None:
                     try:
@@ -167,9 +179,11 @@ class EvaluationEngine:
                     if self.backoff_base:
                         time.sleep(self.backoff_base * (2 ** attempt))
                     continue
-                return _all_incomplete(required_sections)
+                raise EvaluationProviderUnavailableError(
+                    config.key, "response_validation"
+                ) from exc
 
-        return _all_incomplete(required_sections)
+        raise EvaluationProviderUnavailableError(config.key, "provider_call")
 
     def _assemble_report(
         self,

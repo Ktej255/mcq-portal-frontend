@@ -6,14 +6,17 @@ Requirements: 4.4, 4.5, 4.6, 4.7
 """
 
 import math
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.api.v1.payments.schemas import SubscriptionResponse
-from app.core.payments.models import Subscription
+from app.core.payments.subscriptions import (
+    as_utc,
+    get_current_active_subscription,
+    utc_now,
+)
 from app.db.session import get_db
 from app.models.domain import User
 
@@ -31,29 +34,19 @@ def get_subscription(
     If found, returns full subscription details with remaining_days.
     If not found (no active subscription or expired), returns inactive status.
     """
-    now = datetime.now(timezone.utc)
-
-    subscription = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == current_user.google_uid,
-            Subscription.status == "active",
-            Subscription.end_date > now,
-        )
-        .order_by(Subscription.end_date.desc())
-        .first()
+    now = utc_now()
+    subscription = get_current_active_subscription(
+        db,
+        current_user.google_uid,
+        now=now,
     )
 
     if not subscription:
         return SubscriptionResponse(status="inactive", plan_tier=None)
 
-    # end_date is a timezone-less column (UTC), so the database returns naive
-    # datetimes; subtracting one from the aware `now` raised TypeError (500)
-    # for every active subscriber.
-    end_date = subscription.end_date
-    if end_date.tzinfo is None:
-        end_date = end_date.replace(tzinfo=timezone.utc)
-    remaining_days = math.ceil((end_date - now).total_seconds() / 86400)
+    remaining_days = math.ceil(
+        (as_utc(subscription.end_date) - now).total_seconds() / 86400
+    )
 
     return SubscriptionResponse(
         status="active",

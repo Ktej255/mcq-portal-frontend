@@ -106,6 +106,20 @@ function hasJsonContentType(request: NextRequest) {
   return request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
 
+function allowsLocalTeacherFallback(request: NextRequest) {
+  const hostname = request.nextUrl.hostname;
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+  const isLocalRuntime = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  return isLocalHost && isLocalRuntime;
+}
+
+function unavailableTeacherResponse() {
+  return noStoreJson(
+    { message: "Teacher service is temporarily unavailable. Configure a live provider and retry." },
+    { status: 503 }
+  );
+}
+
 type NvidiaTeacherCandidate = {
   apiKey: string;
   model: string;
@@ -274,7 +288,9 @@ export async function POST(request: NextRequest) {
     },
   ].filter((candidate) => candidate.apiKey);
   if (!providerCandidates.length) {
-    return noStoreJson(buildLocalAdaptiveTeacherResponse(teacherRequest));
+    return allowsLocalTeacherFallback(request)
+      ? noStoreJson(buildLocalAdaptiveTeacherResponse(teacherRequest))
+      : unavailableTeacherResponse();
   }
 
   const subject = resolveAdaptiveTeacherSubject(teacherRequest.subjectSlug);
@@ -283,7 +299,7 @@ export async function POST(request: NextRequest) {
   }
 
   const session = subject.sessions[teacherRequest.day - 1];
-  const levelInstruction = getAdaptiveTeacherLevelInstruction(teacherRequest.learnerLevel);
+  const levelInstruction = getAdaptiveTeacherLevelInstruction();
   const prompt = [
     `You are an expert UPSC ${subject.title} teacher.`,
     `The learner is ${teacherRequest.learnerLevel}; act as a ${levelInstruction.role}.`,
@@ -369,10 +385,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return noStoreJson(
-    buildLocalAdaptiveTeacherResponse(teacherRequest, {
-      providerConfigured: true,
-      fallbackReason: "provider-unavailable",
-    })
-  );
+  return allowsLocalTeacherFallback(request)
+    ? noStoreJson(
+        buildLocalAdaptiveTeacherResponse(teacherRequest, {
+          providerConfigured: true,
+        })
+      )
+    : unavailableTeacherResponse();
 }

@@ -3,7 +3,6 @@
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,41 +10,40 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
+  const { user, loading, role, roleLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  // Mock role for now - in production this comes from user metadata or backend
-  const isLocalHost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  const isAdmin = isMasterEmail(user?.email) || isLocalMockMasterSession() || isLocalHost;
-  const userRole = isAdmin ? 'ADMIN' : 'STUDENT';
+  // The role is assigned by the backend (/api/v1/auth/me). Email domains and
+  // local mock flags never elevate a session.
+  const rolePending = Boolean(requiredRole) && Boolean(user) && roleLoading;
 
   useEffect(() => {
-    if (!loading) {
-      let timeoutId: number | undefined;
-      if (!user) {
-        const search = window.location.search;
-        const redirectTarget = `${pathname}${search}`;
-        timeoutId = window.setTimeout(() => {
-          router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
-        }, 0);
-      } else if (requiredRole && userRole !== requiredRole) {
-        timeoutId = window.setTimeout(() => {
-          router.push('/dashboard'); // Unauthorized
-        }, 0);
-      }
+    if (loading || rolePending) return;
 
-      return () => {
-        if (timeoutId) window.clearTimeout(timeoutId);
-      };
+    let timeoutId: number | undefined;
+    if (!user) {
+      const search = window.location.search;
+      const redirectTarget = `${pathname}${search}`;
+      timeoutId = window.setTimeout(() => {
+        router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+      }, 0);
+    } else if (requiredRole && role !== requiredRole) {
+      timeoutId = window.setTimeout(() => {
+        router.push('/dashboard'); // Unauthorized
+      }, 0);
     }
-  }, [user, loading, router, pathname, requiredRole, userRole]);
 
-  if (loading) {
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [user, loading, role, rolePending, router, pathname, requiredRole]);
+
+  if (loading || rolePending) {
     return <div className="flex h-screen items-center justify-center">Loading session...</div>;
   }
 
-  if (!user || (requiredRole && userRole !== requiredRole)) {
+  if (!user || (requiredRole && role !== requiredRole)) {
     return null; // Will redirect
   }
 

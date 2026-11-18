@@ -7,9 +7,6 @@ import {
   BarChart3,
   RefreshCw,
   TrendingUp,
-  Users,
-  FileText,
-  Layers,
   Quote,
 } from "lucide-react";
 

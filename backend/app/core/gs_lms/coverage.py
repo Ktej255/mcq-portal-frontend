@@ -441,7 +441,13 @@ def get_latest_gap_snapshot(
     return (
         db.query(GsLmsGapSnapshot)
         .filter(GsLmsGapSnapshot.student_id == student_id)
-        .order_by(GsLmsGapSnapshot.computed_at.desc())
+        .order_by(
+            GsLmsGapSnapshot.computed_at.desc(),
+            # computed_at has second resolution on SQLite and can tie for two
+            # snapshots taken close together; id breaks the tie in creation
+            # order so "latest" never silently returns the older snapshot.
+            GsLmsGapSnapshot.id.desc(),
+        )
         .first()
     )
 

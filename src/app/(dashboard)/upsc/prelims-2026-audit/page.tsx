@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { isLocalMockMasterSession, isMasterEmail } from "@/lib/auth/master-access";
 import { useAuth } from "@/lib/contexts/AuthContext";
 
 type AuditStatus = "direct" | "partial" | "none";
@@ -270,16 +269,24 @@ export function PrelimsAuditPageClient({
   archiveNotice,
 }: PrelimsAuditPageClientProps) {
   const router = useRouter();
-  const { user, loading, getToken } = useAuth();
+  const { user, loading, role, roleLoading, getToken } = useAuth();
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [accessState, setAccessState] = useState<"checking" | "forbidden" | "error" | "ready">("checking");
   const [status, setStatus] = useState<AuditStatus | "all">("all");
   const [subject, setSubject] = useState("all");
   const [query, setQuery] = useState("");
-  const [reviewDecisions, setReviewDecisions] = useState<Record<string, AuditReviewState>>({});
+  const [reviewDecisions, setReviewDecisions] = useState<Record<string, AuditReviewState>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = window.localStorage.getItem(reviewStorageKey);
+      return saved ? JSON.parse(saved) as Record<string, AuditReviewState> : {};
+    } catch {
+      return {};
+    }
+  });
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || roleLoading) return;
     if (!user) {
       const redirect = window.setTimeout(() => {
         setAccessState("forbidden");
@@ -288,8 +295,7 @@ export function PrelimsAuditPageClient({
       return () => window.clearTimeout(redirect);
     }
 
-    const hasMasterAccess = isMasterEmail(user.email) || isLocalMockMasterSession();
-    if (!hasMasterAccess) {
+    if (role !== "ADMIN") {
       const redirect = window.setTimeout(() => {
         setAccessState("forbidden");
         router.replace("/dashboard");
@@ -322,18 +328,7 @@ export function PrelimsAuditPageClient({
     return () => {
       cancelled = true;
     };
-  }, [apiPath, getToken, loading, router, user]);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(reviewStorageKey);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as Record<string, AuditReviewState>;
-      setReviewDecisions(parsed);
-    } catch {
-      setReviewDecisions({});
-    }
-  }, []);
+  }, [apiPath, getToken, loading, role, roleLoading, router, user]);
 
   const persistReviewDecision = (questionNumber: number, patch: Partial<AuditReviewState>) => {
     setReviewDecisions((current) => {

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
-import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
+import { readStudentProfile } from "@/lib/upsc/studentProfile";
 
 /**
  * Persistent Coins + XP pills for the student section.
@@ -14,14 +14,17 @@ import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfi
  */
 export function UpscStudentStats({ className = "" }: { className?: string }) {
   const pathname = usePathname();
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [profileRefresh, setProfileRefresh] = useState(0);
+  // The profile is read from browser storage, so navigation and the
+  // profile-updated broadcast are invalidation keys, not inputs.
+  const profile = useMemo(() => {
+    void pathname;
+    void profileRefresh;
+    return readStudentProfile();
+  }, [pathname, profileRefresh]);
 
   useEffect(() => {
-    setProfile(readStudentProfile());
-  }, [pathname]);
-
-  useEffect(() => {
-    const refresh = () => setProfile(readStudentProfile());
+    const refresh = () => setProfileRefresh((value) => value + 1);
     window.addEventListener("sarit-upsc-profile-updated", refresh);
     window.addEventListener("storage", refresh);
     return () => {

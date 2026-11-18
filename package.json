@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "verify:api-base": "node scripts/verify-api-base-url.mjs",
     "verify:launch-env": "node scripts/verify-launch-env-boundary.mjs",
+    "verify:auth-role": "node scripts/validate-auth-role-hardening.mjs",
+    "verify:optional-honest-failure": "node scripts/validate-optional-honest-failure.mjs",
+    "verify:upsc-wiring": "node scripts/validate-upsc-feature-wiring.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

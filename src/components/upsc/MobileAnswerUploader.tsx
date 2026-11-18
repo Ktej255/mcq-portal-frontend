@@ -14,9 +14,10 @@
  */
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { activeAuthProvider, env } from "@/env";
+import { resolveToken } from "@/lib/auth/token-strategy";
 import {
   ArrowLeft,
-  ArrowRight,
   Camera,
   CheckCircle2,
   FileText,
@@ -171,6 +172,9 @@ function ThumbnailCard({
         }}
       >
         {thumbnailUrl ? (
+          // Local object URL for a just-captured answer sheet; next/image cannot
+          // optimise blob: sources, so a plain <img> is the correct element here.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbnailUrl}
             alt={page.label}
@@ -298,7 +302,7 @@ export function MobileAnswerUploader({
   const [subject, setSubject] = useState("general");
   const [questionHint, setQuestionHint] = useState("");
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [, setDragOverId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // ── File ingestion ──────────────────────────────────────────────────────────
@@ -422,8 +426,37 @@ export function MobileAnswerUploader({
     if (pages.length === 0) return;
     setUploadState({ status: "uploading", progress: 0 });
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const url = `${apiBase}/mains-upload/assemble-pdf`;
+    // Resolve the configured provider's token first. Supabase local storage is
+    // retained only for explicit Supabase-auth mode; Clerk must use its session.
+    const providerToken = await resolveToken();
+    let authToken = providerToken;
+
+    if (!authToken && activeAuthProvider === "supabase") {
+      const tokenKey = Object.keys(localStorage).find((k) =>
+        k.startsWith("sb-") && k.endsWith("-auth-token")
+      );
+      if (tokenKey) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(tokenKey) ?? "{}");
+          authToken = typeof parsed?.access_token === "string" ? parsed.access_token : null;
+        } catch {
+          authToken = null;
+        }
+      }
+    }
+
+    if (!authToken) {
+      setUploadState({
+        status: "error",
+        message: "Your session is not ready. Please sign in again and retry the upload.",
+      });
+      return;
+    }
+
+    const apiBase = env.NEXT_PUBLIC_API_BASE_URL
+      .replace(/\/api\/v1\/?$/, "")
+      .replace(/\/+$/, "");
+    const url = `${apiBase}/api/v1/mains-upload/assemble-pdf`;
 
     const formData = new FormData();
     formData.append("subject", subject);
@@ -436,20 +469,7 @@ export function MobileAnswerUploader({
     await new Promise<void>((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", url, true);
-
-      // Supabase auth token if available
-      const tokenKey = Object.keys(localStorage).find((k) =>
-        k.startsWith("sb-") && k.endsWith("-auth-token")
-      );
-      if (tokenKey) {
-        try {
-          const parsed = JSON.parse(localStorage.getItem(tokenKey) ?? "{}");
-          const token = parsed?.access_token;
-          if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        } catch {
-          // ignore parse errors
-        }
-      }
+      xhr.setRequestHeader("Authorization", `Bearer ${authToken}`);
 
       xhr.upload.onprogress = (ev) => {
         if (ev.lengthComputable) {
@@ -871,6 +891,8 @@ export function MobileAnswerUploader({
                   maxHeight: "26rem",
                 }}
               >
+                {/* Local object URL; next/image cannot optimise blob: sources. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbnails[selectedPage.id] ?? selectedPage.objectUrl}
                   alt={`Preview of ${selectedPage.label}`}
@@ -924,7 +946,7 @@ export function MobileAnswerUploader({
                 marginBottom: "0.75rem",
               }}
             >
-              Label & submit
+              Label &amp; assemble
             </h2>
 
             {/* Subject selector */}
@@ -1185,8 +1207,9 @@ export function MobileAnswerUploader({
             </h2>
             <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "#5d675f", marginBottom: "1.5rem" }}>
               {uploadState.pageCount} page{uploadState.pageCount !== 1 ? "s" : ""} assembled into{" "}
-              <strong style={{ color: "#13251d" }}>{uploadState.filename}</strong>. Your answer is
-              ready for AI evaluation.
+              <strong style={{ color: "#13251d" }}>{uploadState.filename}</strong>. Download the
+              PDF to review or share it. Scored typed practice stays in each topic&apos;s Mains
+              step.
             </p>
 
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
@@ -1234,7 +1257,7 @@ export function MobileAnswerUploader({
               No pages captured yet
             </p>
             <p style={{ fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.6 }}>
-              Tap <strong>"Open Camera"</strong> above to start photographing your
+              Tap <strong>&quot;Open Camera&quot;</strong> above to start photographing your
               answer sheet pages.
             </p>
           </div>

@@ -37,6 +37,8 @@ from app.core.gs_lms.models import (  # noqa: F401
     GsLmsNodeTypeEnum,
     GsLmsContentSection,
     GsLmsSectionLabelEnum,
+    GsLmsMcqQuestion,
+    GsLmsQuestionTypeEnum,
 )
 from app.core.gs_lms.student_models import GsLmsStudentSectionProgress  # noqa: F401
 
@@ -78,6 +80,10 @@ def seeded_engine():
             "gs_lms_syllabus_nodes",
             "gs_lms_content_sections",
             "gs_lms_student_section_progress",
+            "gs_lms_mcq_questions",
+            "gs_lms_pyqs",
+            "gs_lms_onboarding",
+            "gs_lms_discussion_sessions",
         )
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
@@ -95,9 +101,13 @@ def seeded_engine():
         )
         session.add(user)
 
-        # Create GS Geography subject
-        subject = GsSubject(id=1, slug="geography", name="GS Geography", display_order=1)
-        session.add(subject)
+        # Create GS subjects
+        session.add_all(
+            [
+                GsSubject(id=1, slug="geography", name="GS Geography", display_order=1),
+                GsSubject(id=2, slug="history", name="GS History", display_order=2),
+            ]
+        )
         session.flush()
 
         # --- Mega topic 1: Geomorphology (REVIEWED) ---
@@ -205,6 +215,20 @@ def seeded_engine():
         )
         session.add(oceanography)
 
+        # Reviewed node owned by another subject; it must not be addressable
+        # through the Geography single-node URL.
+        history_topic = GsLmsSyllabusNode(
+            id=50,
+            subject_id=2,
+            parent_id=None,
+            title="History Topic",
+            node_type=GsLmsNodeTypeEnum.LEAF_TOPIC,
+            weight=1.0,
+            display_order=1,
+            review_status=GsReviewStatusEnum.REVIEWED,
+        )
+        session.add(history_topic)
+
         # --- Content sections for Continental Drift (4 sections) ---
         for i, label in enumerate(
             [
@@ -266,6 +290,44 @@ def seeded_engine():
                 completed=True,
             )
             session.add(progress)
+
+        # --- Practice questions: two REVIEWED for Continental Drift, one
+        # UNREVIEWED for Sea Floor Spreading (must not be counted).
+        for i in (1, 2):
+            session.add(
+                GsLmsMcqQuestion(
+                    id=i,
+                    syllabus_node_id=30,
+                    question_text=f"Reviewed question {i}?",
+                    options=[
+                        {"label": "A", "text": "First"},
+                        {"label": "B", "text": "Second"},
+                        {"label": "C", "text": "Third"},
+                        {"label": "D", "text": "Fourth"},
+                    ],
+                    correct_option="A",
+                    question_type=GsLmsQuestionTypeEnum.FACTUAL,
+                    display_order=i,
+                    review_status=GsReviewStatusEnum.REVIEWED,
+                )
+            )
+        session.add(
+            GsLmsMcqQuestion(
+                id=3,
+                syllabus_node_id=31,
+                question_text="Unreviewed question?",
+                options=[
+                    {"label": "A", "text": "First"},
+                    {"label": "B", "text": "Second"},
+                    {"label": "C", "text": "Third"},
+                    {"label": "D", "text": "Fourth"},
+                ],
+                correct_option="B",
+                question_type=GsLmsQuestionTypeEnum.FACTUAL,
+                display_order=1,
+                review_status=GsReviewStatusEnum.UNREVIEWED,
+            )
+        )
 
         session.commit()
     finally:
@@ -380,6 +442,34 @@ def test_syllabus_tree_day_lesson_bridge(client):
     assert sf["day_lesson_id"] is None
 
 
+def test_syllabus_tree_exposes_reviewed_mcq_counts(client):
+    """Leaves carry the reviewed practice count; unreviewed items never count."""
+    resp = client.get("/api/v1/gs-lms/geography/syllabus")
+    data = resp.json()["data"]
+
+    geo = next(n for n in data["tree"] if n["title"] == "Geomorphology")
+    plate_tectonics = geo["children"][0]
+    cd = next(l for l in plate_tectonics["children"] if l["title"] == "Continental Drift")
+    sf = next(l for l in plate_tectonics["children"] if l["title"] == "Sea Floor Spreading")
+    climatology = next(n for n in data["tree"] if n["title"] == "Climatology")
+    atmosphere = climatology["children"][0]
+
+    assert cd["mcq_count"] == 2
+    assert sf["mcq_count"] == 0
+    assert atmosphere["mcq_count"] == 0
+    # Non-leaf nodes do not claim practice questions of their own.
+    assert plate_tectonics["mcq_count"] == 0
+
+
+def test_single_node_exposes_reviewed_mcq_count(client):
+    """The single-node route carries the same reviewed practice count."""
+    resp = client.get("/api/v1/gs-lms/geography/syllabus/30")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["title"] == "Continental Drift"
+    assert data["mcq_count"] == 2
+
+
 def test_syllabus_tree_total_nodes_count(client):
     """total_nodes reflects actual count of nodes in the tree."""
     resp = client.get("/api/v1/gs-lms/geography/syllabus")
@@ -442,6 +532,18 @@ def test_single_node_not_found_for_unreviewed(client):
 def test_single_node_not_found_for_nonexistent(client):
     """404 when node doesn't exist."""
     resp = client.get("/api/v1/gs-lms/geography/syllabus/9999")
+    assert resp.status_code == 404
+
+
+def test_single_node_not_found_for_another_subject(client):
+    """A Geography URL cannot read a reviewed History node."""
+    resp = client.get("/api/v1/gs-lms/geography/syllabus/50")
+    assert resp.status_code == 404
+
+
+def test_single_node_not_found_for_unknown_subject(client):
+    """An unknown URL subject is rejected before node lookup."""
+    resp = client.get("/api/v1/gs-lms/unknown/syllabus/10")
     assert resp.status_code == 404
 
 

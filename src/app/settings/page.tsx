@@ -32,11 +32,10 @@ const copy = {
 } as const;
 
 export default function SettingsPage() {
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [profile, setProfile] = useState<StudentProfile | null>(() => readStudentProfile());
 
   useEffect(() => {
     let cancelled = false;
-    setProfile(readStudentProfile());
     void readSyncedStudentProfile().then((syncedProfile) => {
       if (!cancelled) setProfile(syncedProfile);
     });

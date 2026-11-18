@@ -26,6 +26,7 @@ references GS Geography (``/upsc/geography``) modules.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from abc import ABC, abstractmethod
@@ -42,6 +43,18 @@ from app.core.optional.prompts import (
     parse_recall_match,
 )
 
+logger = logging.getLogger(__name__)
+
+
+class RecallProviderUnavailableError(RuntimeError):
+    """Typed retryable failure when recall scoring or hinting is unavailable."""
+
+    def __init__(self, provider: str, operation: str) -> None:
+        super().__init__("Recall provider is unavailable")
+        self.provider = provider
+        self.operation = operation
+        self.retryable = True
+
 
 # ---------------------------------------------------------------------------
 # Interface
@@ -50,6 +63,8 @@ class RecallProvider(ABC):
     """Abstract recall matcher + hinter."""
 
     name: str = "abstract"
+    provider_id: str = "abstract"
+    is_mock: bool = False
 
     @abstractmethod
     def match(
@@ -70,6 +85,14 @@ class RecallProvider(ABC):
     ) -> HintSchema:
         """Produce one adaptive Socratic hint toward a missed concept (R14.2/R14.4)."""
         raise NotImplementedError
+
+
+def recall_provider_provenance(provider: RecallProvider) -> tuple[str, bool]:
+    """Return the provider identifier and explicit deterministic-mock marker."""
+    identifier = getattr(provider, "provider_id", None) or getattr(
+        provider, "name", provider.__class__.__name__
+    )
+    return str(identifier), bool(getattr(provider, "is_mock", False))
 
 
 def _tokenize(text: str) -> List[str]:
@@ -94,6 +117,8 @@ class MockRecallProvider(RecallProvider):
     """
 
     name = "mock"
+    provider_id = "deterministic-mock"
+    is_mock = True
 
     # Overlap thresholds (fraction of a concept's tokens present in the transcript).
     _RECALLED_AT = 0.6
@@ -219,20 +244,16 @@ class MockRecallProvider(RecallProvider):
 # Gateway (Gemini) implementation — via the existing inference gateway
 # ---------------------------------------------------------------------------
 class GatewayRecallProvider(RecallProvider):
-    """Recall matcher/hinter routed through the EXISTING inference gateway.
+    """Recall matcher/hinter routed through the existing inference gateway.
 
-    Builds the strict-JSON requests with the prompt builders (LOW temperature,
-    determinism basis — Property 4) and validates responses with the parsers.
-    The gateway is imported lazily so importing this module never requires
-    credentials.
-
-    Honest degradation: if the gateway call fails or the output fails strict
-    validation, :meth:`match` returns an all-``missed`` classification (score 0,
-    an honest "could not assess" rather than a fabricated recall), and
-    :meth:`hint` falls back to a safe, non-revealing Socratic nudge.
+    Gateway, transport, and strict-schema failures are retryable unavailability.
+    They never become all-missed scores or deterministic hints, so no provider
+    outage is presented or persisted as a successful learner assessment.
     """
 
     name = "gemini"
+    provider_id = "gemini"
+    is_mock = False
 
     def __init__(self, provider_name: str = "gemini"):
         self.provider_name = provider_name
@@ -255,22 +276,15 @@ class GatewayRecallProvider(RecallProvider):
         try:
             response = self._generate(request)
             return parse_recall_match(response)
-        except (SchemaValidationError, Exception):
-            # Honest degradation: classify every concept as missed.
-            concepts = [
-                ConceptClassification(
-                    concept=str(item.get("concept", "")).strip(),
-                    classification="missed",
-                    evidence="",
-                )
-                for item in concept_checklist
-                if str(item.get("concept", "")).strip()
-            ]
-            if not concepts:
-                raise SchemaValidationError(
-                    "recall match requires a non-empty checklist"
-                )
-            return RecallMatchSchema(concepts=concepts)
+        except Exception as exc:
+            logger.error(
+                "Optional recall provider failed; provider=%s operation=match error_type=%s",
+                self.provider_id,
+                type(exc).__name__,
+            )
+            raise RecallProviderUnavailableError(
+                self.provider_id, "match"
+            ) from exc
 
     def hint(
         self,
@@ -281,26 +295,45 @@ class GatewayRecallProvider(RecallProvider):
         try:
             response = self._generate(request)
             return parse_hint(response)
-        except (SchemaValidationError, Exception):
-            return MockRecallProvider().hint(missed_concepts, prior_responses)
+        except Exception as exc:
+            logger.error(
+                "Optional recall provider failed; provider=%s operation=hint error_type=%s",
+                self.provider_id,
+                type(exc).__name__,
+            )
+            raise RecallProviderUnavailableError(
+                self.provider_id, "hint"
+            ) from exc
 
 
 # ---------------------------------------------------------------------------
-# Selector / factory (env-driven, like the inference gateway)
+# Selector / factory (explicit fail-closed runtime policy)
 # ---------------------------------------------------------------------------
 _PROVIDERS: dict = {}
 
 
 def get_recall_provider(name: Optional[str] = None) -> RecallProvider:
-    """Return a :class:`RecallProvider`, selected by ``name`` or environment.
+    """Return the explicitly selected, policy-approved recall provider.
 
-    Precedence: explicit ``name`` → ``OPTIONAL_RECALL_PROVIDER`` env → ``"mock"``.
-    The mock is the safe deterministic default for test/dev. Cached per-name;
-    ``ValueError`` for unknown names.
+    Gemini is the fail-closed runtime default. Deterministic recall is allowed
+    only when the environment is development/test/local, the provider is
+    explicitly selected as ``mock``, and its dedicated enable flag is true.
+    Policy is evaluated before cache access so a cached mock cannot cross into
+    production or staging. Tests may still inject provider instances directly.
     """
+    from app.core.config import settings
+
     resolved = (
-        name or os.environ.get("OPTIONAL_RECALL_PROVIDER") or "mock"
+        name
+        or os.environ.get("OPTIONAL_RECALL_PROVIDER")
+        or settings.OPTIONAL_RECALL_PROVIDER
     ).strip().lower()
+
+    if resolved == "mock" and (
+        settings.APP_ENVIRONMENT not in {"development", "test", "local"}
+        or not settings.ENABLE_OPTIONAL_RECALL_MOCK
+    ):
+        raise RecallProviderUnavailableError("deterministic-mock", "configuration")
 
     if resolved in _PROVIDERS:
         return _PROVIDERS[resolved]
@@ -318,7 +351,9 @@ def get_recall_provider(name: Optional[str] = None) -> RecallProvider:
 
 __all__ = [
     "RecallProvider",
+    "RecallProviderUnavailableError",
     "MockRecallProvider",
     "GatewayRecallProvider",
     "get_recall_provider",
+    "recall_provider_provenance",
 ]

@@ -24,11 +24,11 @@ transcript fills the answer segment — the backend never decides the transcript
 is "good enough" silently.
 
 Provider abstraction (R8.5 / R20.2): this endpoint depends only on the
-``SttProvider`` interface via :func:`get_stt_provider`. The deterministic mock
-is the default in dev/test (no model, offline, reproducible); a configured
-Whisper backend (env ``OPTIONAL_STT_PROVIDER=whisper``) powers real
-transcription in production. There is exactly one STT path — this route reuses
-the same abstraction the recall pipeline uses; it adds no second one.
+``SttProvider`` interface via :func:`get_stt_provider`. Gemini is the fail-closed
+real default and Whisper remains selectable. The deterministic mock requires an
+explicit development/test/local ``APP_ENVIRONMENT``, explicit ``mock`` provider
+selection, and explicit enable flag; production/staging never fall back to it.
+There is exactly one Optional FastAPI STT path here.
 
 Vocabulary biasing (R20.2): a small per-subject ``vocabulary_hint`` is derived
 from the subject name (plus any caller-supplied hint terms) and passed through
@@ -65,14 +65,19 @@ _MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
 
 def get_stt_provider_dep() -> SttProvider:
-    """FastAPI dependency wrapper around the env-driven STT factory.
+    """Resolve the policy-approved STT provider for the FastAPI route.
 
-    Wrapping the factory in a dependency keeps the route depending only on the
-    :class:`SttProvider` interface and lets tests inject a deterministic
-    provider (e.g. a forced low-confidence stub) via ``dependency_overrides``
-    without touching global env.
+    Tests can still inject a provider through ``dependency_overrides``. A
+    denied deterministic selection is translated into the same honest 503 path
+    used when a selected real backend is unavailable.
     """
-    return get_stt_provider()
+    try:
+        return get_stt_provider()
+    except SttNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
 
 def _vocabulary_hint(

@@ -22,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   contentKey,
-  defaultContentState,
   getContentState,
   isContentReady,
   readContentStates,
@@ -39,6 +38,7 @@ import {
 import { geographySessions } from "@/lib/upsc/plan";
 import { getSubjectBatchCode, subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { cn } from "@/lib/utils";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 
 type ContentSubject = {
   slug: string;
@@ -210,13 +210,13 @@ export function UpscContentCommandCenter({
   const sourceBuildTotals = useMemo(() => {
     const taskCount = sourceBuildRows.reduce((sum, row) => sum + row.tasks.length, 0);
     const completedCount = sourceBuildRows.reduce((sum, row) => sum + row.completedCount, 0);
-    const activeRows = sourceBuildRows.filter((row) => row.subjectSlug === activeSubject.slug);
+    const activeRows = sourceBuildRows.filter((row) => row.subjectSlug === activeSubjectSlug);
     const activeTaskCount = activeRows.reduce((sum, row) => sum + row.tasks.length, 0);
     const activeCompletedCount = activeRows.reduce((sum, row) => sum + row.completedCount, 0);
     const criticalCount = sourceBuildRows.filter((row) => row.priority.priority === "Critical").length;
 
     return { taskCount, completedCount, activeTaskCount, activeCompletedCount, criticalCount };
-  }, [activeSubject.slug, sourceBuildRows]);
+  }, [activeSubjectSlug, sourceBuildRows]);
 
   const totals = useMemo(() => {
     const totalClasses = contentSubjects.reduce((sum, subject) => sum + subject.sessions.length, 0);
@@ -342,6 +342,20 @@ export function UpscContentCommandCenter({
             >
               Local rehearsal state only. Staged locally never means founder-approved live lecture media or student-release approval.
             </div>
+
+            <Link
+              href="/upsc/content-coverage"
+              data-testid="content-coverage-link"
+              className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 text-sm font-bold leading-6 text-[#085041] transition hover:border-[#1d9e75]"
+            >
+              <span>
+                This board is a planning sheet, not evidence. See which topics learners can actually open,
+                and which gate is missing, in the database coverage view.
+              </span>
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-black">
+                Content coverage <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
 
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#f2eadc]">
               <div className="h-full rounded-full bg-[#1d9e75]" style={{ width: `${totals.completionPercent}%` }} />
@@ -802,19 +816,19 @@ export function UpscContentCommandCenter({
               <div className="grid gap-2 sm:grid-cols-3">
                 <Link
                   data-testid="content-watch-route"
-                  href={`/upsc/${activeSubject.slug}/watch?day=${activeSession.day}`}
+                  href={lmsHrefForRoom(activeSubject.slug, "watch")}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
                 >
                   <PlayCircle className="h-4 w-4" /> Watch
                 </Link>
                 <Link
-                  href={`/upsc/${activeSubject.slug}/talk?day=${activeSession.day}`}
+                  href={lmsHrefForRoom(activeSubject.slug, "talk")}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
                   <BrainCircuit className="h-4 w-4" /> Talk
                 </Link>
                 <Link
-                  href={`/upsc/${activeSubject.slug}/mcq-readiness?day=${activeSession.day}`}
+                  href={lmsHrefForRoom(activeSubject.slug, "mcq-readiness")}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
                   <ClipboardCheck className="h-4 w-4" /> MCQ

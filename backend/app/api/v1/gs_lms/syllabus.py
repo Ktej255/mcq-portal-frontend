@@ -15,9 +15,11 @@ Requirements traced: 1.1, 1.2, 1.3, 1.4, 9.1, 9.2, 10.3, 11.2
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -29,10 +31,22 @@ from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsNodeTypeEnum,
     GsLmsContentSection,
-    GsLmsSectionLabelEnum,
+    GsLmsMcqQuestion,
+    GsLmsPyq,
 )
-from app.core.gs_lms.student_models import GsLmsStudentSectionProgress
+from app.core.gs_lms.student_models import (
+    GsLmsDiscussionSession,
+    GsLmsDiscussionStatusEnum,
+)
+from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
 from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.content import (
+    _compute_skippable_section_ids,
+    _compute_skippable_section_labels,
+    _get_learner_level,
+    _get_student_progress,
+    _is_topic_completed,
+)
 from app.api.v1.gs_lms.schemas import (
     GsLmsSyllabusNodeOut,
     GsLmsSyllabusTreeOut,
@@ -40,70 +54,111 @@ from app.api.v1.gs_lms.schemas import (
 
 router = APIRouter()
 
-# The number of progressive-disclosure sections per leaf topic (BASIC,
-# ADVANCED, NCERT_LEVEL, EXAMINER_TRAPS).
-_SECTIONS_PER_LEAF = 4
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _build_completion_map(db: Session, student_id: int) -> dict[int, int]:
-    """Build a mapping of syllabus_node_id → count of completed sections.
+def _build_completed_leaf_ids(
+    db: Session, student_id: int, subject_id: int
+) -> set[int]:
+    """Return subject-scoped leaf topics completed under the canonical policy.
 
-    Returns a dict where keys are syllabus node IDs and values are the
-    number of sections completed by the student for that node.
+    Completion is based on reviewed content sections and excludes sections that
+    the learner may skip according to their level and latest discussion match.
+    The reviewed section and discussion state are batch-loaded for the subject
+    to avoid one query per syllabus leaf.
     """
-    rows = (
-        db.query(
-            GsLmsStudentSectionProgress.syllabus_node_id,
-        )
+    leaf_nodes = (
+        db.query(GsLmsSyllabusNode)
         .filter(
-            GsLmsStudentSectionProgress.student_id == student_id,
-            GsLmsStudentSectionProgress.completed == True,  # noqa: E712
+            GsLmsSyllabusNode.subject_id == subject_id,
+            GsLmsSyllabusNode.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC,
+            GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .all()
     )
-    completion_counts: dict[int, int] = {}
-    for (node_id,) in rows:
-        completion_counts[node_id] = completion_counts.get(node_id, 0) + 1
-    return completion_counts
+    leaf_ids = [node.id for node in leaf_nodes]
+    if not leaf_ids:
+        return set()
 
+    sections_by_node: dict[int, list[GsLmsContentSection]] = defaultdict(list)
+    reviewed_sections = (
+        db.query(GsLmsContentSection)
+        .filter(
+            GsLmsContentSection.syllabus_node_id.in_(leaf_ids),
+            GsLmsContentSection.review_status == GsReviewStatusEnum.REVIEWED,
+        )
+        .all()
+    )
+    for section in reviewed_sections:
+        sections_by_node[section.syllabus_node_id].append(section)
 
-def _is_leaf_completed(node_id: int, completion_map: dict[int, int]) -> bool:
-    """A leaf topic is completed when all 4 sections are marked complete."""
-    return completion_map.get(node_id, 0) >= _SECTIONS_PER_LEAF
+    all_section_ids = [
+        section.id
+        for sections in sections_by_node.values()
+        for section in sections
+    ]
+    progress_map = _get_student_progress(db, student_id, all_section_ids)
+    learner_level = _get_learner_level(db, student_id)
+
+    latest_match_by_node: dict[int, float | None] = {}
+    sessions = (
+        db.query(GsLmsDiscussionSession)
+        .filter(
+            GsLmsDiscussionSession.student_id == student_id,
+            GsLmsDiscussionSession.syllabus_node_id.in_(leaf_ids),
+            GsLmsDiscussionSession.status == GsLmsDiscussionStatusEnum.COMPLETED,
+        )
+        .order_by(GsLmsDiscussionSession.completed_at.desc())
+        .all()
+    )
+    for session in sessions:
+        latest_match_by_node.setdefault(
+            session.syllabus_node_id, session.match_percentage
+        )
+
+    completed_leaf_ids: set[int] = set()
+    for node_id, sections in sections_by_node.items():
+        section_ids = [section.id for section in sections]
+        skippable_labels = _compute_skippable_section_labels(
+            learner_level, latest_match_by_node.get(node_id)
+        )
+        skippable_ids = _compute_skippable_section_ids(
+            sections, skippable_labels
+        )
+        if _is_topic_completed(progress_map, section_ids, skippable_ids):
+            completed_leaf_ids.add(node_id)
+
+    return completed_leaf_ids
 
 
 def _compute_completion(
     node: GsLmsSyllabusNode,
     children_out: list[GsLmsSyllabusNodeOut],
-    completion_map: dict[int, int],
+    completed_leaf_ids: set[int],
 ) -> tuple[float | None, bool | None]:
-    """Compute completion metrics for a node.
+    """Compute completion using canonical leaf state and child rollups.
 
     Returns (completion_percent, completed_bool):
     - For leaf nodes: (None, bool)
     - For non-leaf nodes: (float 0-100, None)
     """
     if node.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC:
-        completed = _is_leaf_completed(node.id, completion_map)
-        return (None, completed)
-    else:
-        # Non-leaf: percentage = completed children / total children * 100
-        total_children = len(children_out)
-        if total_children == 0:
-            return (0.0, None)
-        completed_children = sum(
-            1
-            for child in children_out
-            if (child.completed is True)
-            or (child.completion_percent is not None and child.completion_percent >= 100.0)
-        )
-        percent = (completed_children / total_children) * 100.0
-        return (percent, None)
+        return (None, node.id in completed_leaf_ids)
+
+    # Non-leaf: percentage = completed children / total children * 100
+    total_children = len(children_out)
+    if total_children == 0:
+        return (0.0, None)
+    completed_children = sum(
+        1
+        for child in children_out
+        if (child.completed is True)
+        or (child.completion_percent is not None and child.completion_percent >= 100.0)
+    )
+    percent = (completed_children / total_children) * 100.0
+    return (percent, None)
 
 
 def _review_status_value(node: GsLmsSyllabusNode) -> str:
@@ -116,9 +171,75 @@ def _node_type_value(node: GsLmsSyllabusNode) -> str:
     return nt.value if hasattr(nt, "value") else str(nt)
 
 
+def _build_mcq_counts(db: Session, subject_id: int) -> dict[int, int]:
+    """Count REVIEWED standalone practice MCQs per syllabus node.
+
+    The practice selector must not offer a topic with zero questions: starting
+    such a session fails with 422. Surfacing the count in the tree lets the UI
+    present a coverage gap instead of a broken button.
+    """
+    rows = (
+        db.query(
+            GsLmsMcqQuestion.syllabus_node_id,
+            func.count(GsLmsMcqQuestion.id),
+        )
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsMcqQuestion.syllabus_node_id,
+        )
+        .filter(
+            GsLmsSyllabusNode.subject_id == subject_id,
+            GsLmsMcqQuestion.review_status == GsReviewStatusEnum.REVIEWED,
+        )
+        .group_by(GsLmsMcqQuestion.syllabus_node_id)
+        .all()
+    )
+    return {node_id: count for node_id, count in rows}
+
+
+def _build_pyq_counts(db: Session, subject_id: int) -> dict[int, tuple[int, int]]:
+    """Count REVIEWED Prelims and Mains PYQs per leaf in one query.
+
+    The tree shows the raw evidence behind demand ("3P · 2M"); the weighted
+    share stays on the topic strip and readiness dashboard. Locked leaves are
+    included because the map should still say whether a future topic is
+    demanded by UPSC, not hide the evidence until it opens.
+    """
+    counts: dict[int, tuple[int, int]] = defaultdict(lambda: (0, 0))
+    rows = (
+        db.query(
+            GsLmsPyq.syllabus_node_id,
+            GsLmsPyq.exam_type,
+            func.count(GsLmsPyq.id),
+        )
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsPyq.syllabus_node_id,
+        )
+        .filter(
+            GsLmsSyllabusNode.subject_id == subject_id,
+            GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
+        )
+        .group_by(GsLmsPyq.syllabus_node_id, GsLmsPyq.exam_type)
+        .all()
+    )
+    for node_id, exam_type, total in rows:
+        raw_type = exam_type.value if hasattr(exam_type, "value") else str(exam_type)
+        prelims, mains = counts[node_id]
+        if raw_type.upper() == "PRELIMS":
+            prelims += int(total)
+        else:
+            mains += int(total)
+        counts[node_id] = (prelims, mains)
+    return dict(counts)
+
+
 def _build_node_out(
     node: GsLmsSyllabusNode,
-    completion_map: dict[int, int],
+    completed_leaf_ids: set[int],
+    mcq_counts: dict[int, int],
+    beta_ready_ids: set[int] | None = None,
+    pyq_counts: dict[int, tuple[int, int]] | None = None,
 ) -> GsLmsSyllabusNodeOut:
     """Recursively build a GsLmsSyllabusNodeOut from a reviewed node.
 
@@ -129,10 +250,23 @@ def _build_node_out(
         [c for c in node.children if c.review_status == GsReviewStatusEnum.REVIEWED],
         key=lambda n: (n.display_order, n.id),
     )
-    children_out = [_build_node_out(c, completion_map) for c in reviewed_children]
+    children_out = [
+        _build_node_out(
+            c, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+        )
+        for c in reviewed_children
+    ]
 
     completion_percent, completed = _compute_completion(
-        node, children_out, completion_map
+        node, children_out, completed_leaf_ids
+    )
+
+    beta_ready: bool | None = None
+    if beta_ready_ids is not None and node.node_type == GsLmsNodeTypeEnum.LEAF_TOPIC:
+        beta_ready = node.id in beta_ready_ids
+
+    prelims_pyqs, mains_pyqs = (
+        pyq_counts.get(node.id, (0, 0)) if pyq_counts else (0, 0)
     )
 
     return GsLmsSyllabusNodeOut(
@@ -144,6 +278,10 @@ def _build_node_out(
         review_status=_review_status_value(node),
         completion_percent=completion_percent,
         completed=completed,
+        mcq_count=mcq_counts.get(node.id, 0),
+        prelims_pyq_count=prelims_pyqs,
+        mains_pyq_count=mains_pyqs,
+        beta_ready=beta_ready,
         day_lesson_id=node.day_lesson_id,
         ordering_justification=node.ordering_justification,
         children=children_out,
@@ -186,10 +324,22 @@ def get_syllabus_tree(
         .all()
     )
 
-    # Build completion map for this student in one query.
-    completion_map = _build_completion_map(db, current_user.id)
+    # Build subject-scoped, learner-aware completion state in bounded queries.
+    completed_leaf_ids = _build_completed_leaf_ids(
+        db, current_user.id, subject.id
+    )
+    mcq_counts = _build_mcq_counts(db, subject.id)
+    pyq_counts = _build_pyq_counts(db, subject.id)
+    beta_ready_ids = (
+        compute_loop_ready_ids(db, subject.id) if beta_scope_enabled() else None
+    )
 
-    tree = [_build_node_out(node, completion_map) for node in root_nodes]
+    tree = [
+        _build_node_out(
+            node, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+        )
+        for node in root_nodes
+    ]
     total_nodes = _count_nodes(tree)
 
     data = GsLmsSyllabusTreeOut(
@@ -221,6 +371,7 @@ def get_syllabus_node(
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
@@ -231,8 +382,17 @@ def get_syllabus_node(
             detail="Topic not found",
         )
 
-    completion_map = _build_completion_map(db, current_user.id)
-    data = _build_node_out(node, completion_map)
+    completed_leaf_ids = _build_completed_leaf_ids(
+        db, current_user.id, subject.id
+    )
+    mcq_counts = _build_mcq_counts(db, subject.id)
+    pyq_counts = _build_pyq_counts(db, subject.id)
+    beta_ready_ids = (
+        compute_loop_ready_ids(db, subject.id) if beta_scope_enabled() else None
+    )
+    data = _build_node_out(
+        node, completed_leaf_ids, mcq_counts, beta_ready_ids, pyq_counts
+    )
 
     return StandardResponse(
         success=True,

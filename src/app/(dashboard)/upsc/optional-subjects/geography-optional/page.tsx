@@ -33,8 +33,8 @@ export default function GeographyOptionalHome() {
           </h1>
           <p className="mt-3 max-w-2xl text-[16px] font-semibold leading-7 text-[#44506b]">
             Read one concept at a time, written like a topper&apos;s personal notes — so that a single,
-            honest read builds real confidence. Every topic is mapped to the official syllabus, the
-            25-year question trend, and the hidden topics UPSC never prints but always asks.
+            honest read builds real confidence. Every live topic is mapped to the official syllabus,
+            a curated PYQ trend, and the hidden-topic warnings the syllabus leaves implicit.
           </p>
 
           {/* Syllabus button FIRST, then Read button */}
@@ -61,7 +61,7 @@ export default function GeographyOptionalHome() {
         <section className="mt-5 grid gap-3 md:grid-cols-3">
           {[
             { t: "Official says", d: "The exact syllabus line as printed by UPSC — nothing added, nothing dropped.", c: "border-[#2e7d4f] bg-[#eef8f1]" },
-            { t: "Trend says", d: "What 25 years of papers actually demand, ranked by how often it is asked.", c: "border-[#2a5db0] bg-[#eaf1fb]" },
+            { t: "Trend says", d: "Recurring themes from past papers, with frequency bands and best-effort year tags.", c: "border-[#2a5db0] bg-[#eaf1fb]" },
             { t: "Hidden topics", d: "Never named in the syllabus, but required to answer — surfaced for you.", c: "border-[#b9770e] bg-[#fdf4e3]" },
           ].map((x) => (
             <div key={x.t} className={`rounded-md border-l-4 p-4 ${x.c}`}>

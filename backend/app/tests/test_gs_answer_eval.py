@@ -34,6 +34,7 @@ from app.core.gs_lms.models import (
     GsLmsPyq,
     GsLmsPaperEnum,
 )
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.evaluation import service as eval_service
 from app.core.storage.media_store import InMemoryMediaStore, LocalMediaStore, MediaStoreError
 
@@ -63,6 +64,10 @@ def test_engine():
 def db_session(test_engine):
     Session = sessionmaker(bind=test_engine, autoflush=False, autocommit=False)
     s = Session()
+    # resolve_subject() resolves the URL slug through gs_subjects; without the
+    # row every answers request is a 404 before reaching route logic.
+    s.add(GsSubject(id=1, slug="geography", name="Geography", display_order=1))
+    s.flush()
     yield s
     s.close()
 
@@ -77,6 +82,9 @@ def _make_mains_pyq(db, *, marks=15, paper=GsLmsPaperEnum.GS1) -> GsLmsPyq:
         question_text="Discuss the Big Bang.",
         answer_text="Model answer points.",
         marks=marks,
+        # The API deliberately hides unreviewed PYQs (404). These fixtures
+        # exercise the answer flow, so the row must be an approved question.
+        review_status=GsReviewStatusEnum.REVIEWED,
     )
     db.add(pyq)
     db.flush()
@@ -204,6 +212,10 @@ class _FakeUser:
 @pytest.fixture()
 def client(db_session, monkeypatch):
     monkeypatch.setenv("MEDIA_STORE_BACKEND", "memory")
+    # The shared evaluation registry reads the provider key from os.environ,
+    # not from Settings. Without this the API calls the live Gemini provider,
+    # which has no credentials in CI, and every submit is an honest 503.
+    monkeypatch.setenv("OPTIONAL_EVAL_PROVIDER", "mock")
     from app.api.dependencies import get_current_user
     from app.db.session import get_db
     import app.main as main

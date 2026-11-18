@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Star, GitBranch } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import { caService, CAItemDetailOut } from '@/services/api/caService';
+import { apiErrorStatus } from '@/services/api/error';
 import { CAItemFunnel } from '@/components/current-affairs/CAItemFunnel';
 import { CADoubtChat } from '@/components/current-affairs/CADoubtChat';
 
@@ -15,18 +16,40 @@ import { CADoubtChat } from '@/components/current-affairs/CADoubtChat';
 export default function CAItemPage() {
   const params = useParams();
   const itemId = Number(params.itemId);
+  const invalidItemId = !Number.isInteger(itemId) || itemId <= 0;
   const [item, setItem] = useState<CAItemDetailOut | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<'not-found' | 'failed' | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (invalidItemId) return;
+    let cancelled = false;
     caService.getItemDetail(itemId)
-      .then(setItem)
-      .catch(() => setError('Item not found'))
-      .finally(() => setLoading(false));
-  }, [itemId]);
+      .then((nextItem) => {
+        if (cancelled) return;
+        setItem(nextItem);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(apiErrorStatus(err) === 404 ? 'not-found' : 'failed');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemId, invalidItemId, attempt]);
 
-  if (loading) {
+  const retryLoad = () => {
+    setLoadError(null);
+    setLoading(true);
+    setAttempt((count) => count + 1);
+  };
+
+  if (loading && !invalidItemId) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5]">
         <div className="mx-auto max-w-3xl px-4 py-6">
@@ -39,12 +62,31 @@ export default function CAItemPage() {
     );
   }
 
-  if (error || !item) {
+  if (invalidItemId || loadError || !item) {
+    // A missing or malformed item ID and a failed request are different
+    // states: only the missing item is final. A network or server failure
+    // keeps the retry.
+    const notFound = invalidItemId || loadError !== 'failed';
     return (
       <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5]">
         <div className="mx-auto max-w-3xl px-4 py-6 text-center">
-          <p className="text-sm text-red-600">{error || 'Item not found'}</p>
-          <Link href="/upsc/current-affairs" className="mt-3 text-xs text-[#1d9e75] font-black">← Back to feed</Link>
+          <p role="alert" className="text-sm font-semibold text-red-600">
+            {notFound
+              ? 'This item does not exist or is no longer published.'
+              : 'This item could not be loaded. Check the connection and retry.'}
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            {!notFound && (
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="inline-flex h-9 items-center rounded-lg bg-[#1d9e75] px-3 text-xs font-black text-white transition hover:bg-[#178a65]"
+              >
+                Retry load
+              </button>
+            )}
+            <Link href="/upsc/current-affairs" className="text-xs font-black text-[#1d9e75]">← Back to feed</Link>
+          </div>
         </div>
       </main>
     );

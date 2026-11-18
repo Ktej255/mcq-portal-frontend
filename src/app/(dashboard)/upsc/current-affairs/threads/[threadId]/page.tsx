@@ -12,6 +12,7 @@ import { ThreadConsolidation } from '@/components/current-affairs/ThreadConsolid
 export default function ThreadPage() {
   const params = useParams();
   const threadId = Number(params.threadId);
+  const validThreadId = Number.isInteger(threadId) && threadId > 0;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5]">
@@ -19,7 +20,11 @@ export default function ThreadPage() {
         <Link href="/upsc/current-affairs" className="flex items-center gap-1.5 text-xs font-semibold text-[#5d675f] hover:text-[#1d9e75]">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Current Affairs
         </Link>
-        <ThreadConsolidation threadId={threadId} />
+        {validThreadId ? (
+          <ThreadConsolidation threadId={threadId} />
+        ) : (
+          <p role="alert" className="text-sm text-red-600">Thread not found.</p>
+        )}
       </div>
     </main>
   );

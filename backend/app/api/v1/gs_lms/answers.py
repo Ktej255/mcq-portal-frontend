@@ -22,12 +22,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import ai_rate_limit, get_current_user, require_access
 from app.schemas.common import StandardResponse
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsAnswerAttempt,
     GsLmsAnswerAttemptStatusEnum,
@@ -38,6 +40,7 @@ from app.core.gs_lms.models import (
     GsLmsPaperEnum,
     GsLmsPyq,
 )
+from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.gs_lms.evaluation import service as eval_service
 from app.api.v1.gs_lms.answer_schemas import (
     GsAnswerAckOut,
@@ -48,6 +51,7 @@ from app.api.v1.gs_lms.answer_schemas import (
     GsOverrideIn,
     GsPageUploadOut,
 )
+from app.api.v1.gs_lms.dependencies import resolve_subject
 
 router = APIRouter()
 
@@ -89,11 +93,18 @@ def _compose_typed_text(payload: GsAnswerSubmitIn) -> str:
 
 
 def _resolve_pyq_context(
-    db: Session, payload_pyq_id: Optional[int]
+    db: Session, payload_pyq_id: Optional[int], subject_id: int
 ) -> tuple[Optional[GsLmsPyq], Optional[GsLmsPaperEnum], Optional[int]]:
     if payload_pyq_id is None:
         return None, None, None
-    pyq = db.query(GsLmsPyq).filter(GsLmsPyq.id == payload_pyq_id).one_or_none()
+    pyq = (
+        db.query(GsLmsPyq)
+        .filter(
+            GsLmsPyq.id == payload_pyq_id,
+            GsLmsPyq.subject_id == subject_id,
+        )
+        .one_or_none()
+    )
     if pyq is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="PYQ not found")
     # Descriptive answer submission is offered only for MAINS PYQs (R9.3/R9.4).
@@ -102,6 +113,8 @@ def _resolve_pyq_context(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Descriptive answers are only accepted for MAINS questions.",
         )
+    if pyq.review_status != GsReviewStatusEnum.REVIEWED:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="PYQ not found")
     return pyq, pyq.gs_paper, pyq.marks
 
 
@@ -142,17 +155,29 @@ def _report_out(report: GsLmsEvaluationReport) -> GsEvaluationReportOut:
     )
 
 
-def _own_attempt_or_404(db: Session, attempt_id: int, user: User) -> GsLmsAnswerAttempt:
-    attempt = (
+def _attempt_for_subject_or_404(
+    db: Session, attempt_id: int, subject_id: int
+) -> GsLmsAnswerAttempt | None:
+    return (
         db.query(GsLmsAnswerAttempt)
+        .outerjoin(GsLmsPyq, GsLmsAnswerAttempt.pyq_id == GsLmsPyq.id)
         .filter(
             GsLmsAnswerAttempt.id == attempt_id,
-            GsLmsAnswerAttempt.student_id == user.id,
+            or_(
+                GsLmsAnswerAttempt.pyq_id.is_(None),
+                GsLmsPyq.subject_id == subject_id,
+            ),
         )
         .one_or_none()
     )
-    if attempt is None:
-        # No existence leak for another student's attempt (R17.2).
+
+
+def _own_attempt_or_404(
+    db: Session, attempt_id: int, user: User, subject_id: int
+) -> GsLmsAnswerAttempt:
+    attempt = _attempt_for_subject_or_404(db, attempt_id, subject_id)
+    if attempt is None or attempt.student_id != user.id:
+        # No existence leak for another student's or subject's attempt (R17.2).
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Answer attempt not found")
     return attempt
 
@@ -176,6 +201,7 @@ def _enforce_cost_gates(db: Session, student_id: int, text: str) -> None:
 @router.post("/answers/typed", dependencies=[Depends(ai_rate_limit)])
 def submit_typed_answer(
     payload: GsAnswerSubmitIn,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -185,7 +211,7 @@ def submit_typed_answer(
             status.HTTP_400_BAD_REQUEST, detail="No answer text was provided."
         )
 
-    pyq, pyq_paper, pyq_marks = _resolve_pyq_context(db, payload.pyq_id)
+    pyq, pyq_paper, pyq_marks = _resolve_pyq_context(db, payload.pyq_id, subject.id)
     gs_paper = pyq_paper or _paper_enum(payload.gs_paper)
     max_marks = payload.max_marks if payload.max_marks is not None else pyq_marks
 
@@ -205,7 +231,17 @@ def submit_typed_answer(
     db.add(attempt)
     db.flush()
 
-    job = eval_service.evaluate_attempt_job(db, attempt)
+    try:
+        job = eval_service.evaluate_attempt_job(db, attempt)
+    except EvaluationProviderUnavailableError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+                "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+            },
+        ) from exc
     db.commit()
     db.refresh(attempt)
 
@@ -225,10 +261,11 @@ def submit_typed_answer(
 @router.post("/answers/handwritten", dependencies=[Depends(require_access("mains_upload")), Depends(ai_rate_limit)])
 def create_handwritten_attempt(
     payload: GsAnswerSubmitIn,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    pyq, pyq_paper, pyq_marks = _resolve_pyq_context(db, payload.pyq_id)
+    pyq, pyq_paper, pyq_marks = _resolve_pyq_context(db, payload.pyq_id, subject.id)
     attempt = GsLmsAnswerAttempt(
         student_id=current_user.id,
         pyq_id=payload.pyq_id,
@@ -257,10 +294,11 @@ async def upload_answer_page(
     page_order: int = Form(...),
     ocr_confidence: Optional[float] = Form(default=None),
     ocr_text: Optional[str] = Form(default=None),
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    attempt = _own_attempt_or_404(db, attempt_id, current_user)
+    attempt = _own_attempt_or_404(db, attempt_id, current_user, subject.id)
 
     ext = os.path.splitext(image.filename or "")[1].lower()
     if ext not in _ALLOWED_IMAGE_EXTS:
@@ -344,10 +382,11 @@ async def upload_answer_page(
 def submit_attempt(
     attempt_id: int,
     acknowledge_review: bool = Form(default=False),
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    attempt = _own_attempt_or_404(db, attempt_id, current_user)
+    attempt = _own_attempt_or_404(db, attempt_id, current_user, subject.id)
 
     if acknowledge_review:
         attempt.review_acknowledged = True
@@ -367,8 +406,17 @@ def submit_attempt(
             ),
         )
 
-    _enforce_cost_gates(db, current_user.id, attempt.raw_text or "")
-    job = eval_service.evaluate_attempt_job(db, attempt)
+    try:
+        job = eval_service.evaluate_attempt_job(db, attempt)
+    except EvaluationProviderUnavailableError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "EVALUATION_PROVIDER_UNAVAILABLE",
+                "message": "Answer evaluation is temporarily unavailable. Please retry later.",
+            },
+        ) from exc
     db.commit()
     return StandardResponse(
         success=True,
@@ -392,10 +440,11 @@ def _job_status_label(raw: str) -> str:
 @router.get("/answers/{attempt_id}/status")
 def get_attempt_status(
     attempt_id: int,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    attempt = _own_attempt_or_404(db, attempt_id, current_user)
+    attempt = _own_attempt_or_404(db, attempt_id, current_user, subject.id)
     job = eval_service.latest_job_for_attempt(db, attempt_id)
     report = (
         db.query(GsLmsEvaluationReport)
@@ -419,10 +468,11 @@ def get_attempt_status(
 @router.get("/answers/{attempt_id}/report")
 def get_attempt_report(
     attempt_id: int,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    _own_attempt_or_404(db, attempt_id, current_user)
+    _own_attempt_or_404(db, attempt_id, current_user, subject.id)
     report = (
         db.query(GsLmsEvaluationReport)
         .filter(GsLmsEvaluationReport.attempt_id == attempt_id)
@@ -439,11 +489,16 @@ def get_attempt_report(
 def override_report(
     attempt_id: int,
     payload: GsOverrideIn,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     if not _is_evaluator(current_user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Evaluator role required")
+
+    attempt = _attempt_for_subject_or_404(db, attempt_id, subject.id)
+    if attempt is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Answer attempt not found")
 
     report = (
         db.query(GsLmsEvaluationReport)
@@ -484,14 +539,11 @@ def override_report(
 def fetch_answer_page(
     attempt_id: int,
     page_order: int,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    attempt = (
-        db.query(GsLmsAnswerAttempt)
-        .filter(GsLmsAnswerAttempt.id == attempt_id)
-        .one_or_none()
-    )
+    attempt = _attempt_for_subject_or_404(db, attempt_id, subject.id)
     if attempt is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Answer attempt not found")
 

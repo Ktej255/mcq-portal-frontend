@@ -7,20 +7,24 @@ import { gsLmsService } from "@/services/api/gsLmsService";
 import { paymentService, type SubscriptionResponse } from "@/services/api/paymentService";
 import type { DailyPlanOut, PlanItemOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
+import {
+  getSupportedGsLmsSubject,
+  type SupportedGsLmsSubject,
+} from "@/lib/gsLmsRoutePolicy";
 
-/** Read the student's active LMS subject from localStorage (set by daily planner state). */
-function getActiveSubject(): string {
-  if (typeof window === "undefined") return "geography";
+/** Read the student's active, supported LMS subject from localStorage. */
+function getActiveSubject(): SupportedGsLmsSubject | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem("sarit-upsc-daily-command-v1");
     if (raw) {
       const parsed = JSON.parse(raw) as { subjectSlug?: string };
-      if (parsed?.subjectSlug) return parsed.subjectSlug;
+      return getSupportedGsLmsSubject(parsed?.subjectSlug)?.slug ?? null;
     }
+    return "geography";
   } catch {
-    // ignore
+    return null;
   }
-  return "geography";
 }
 
 interface RecallGateState {
@@ -45,33 +49,38 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const [recallGate, setRecallGate] = useState<RecallGateState | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSubject, setActiveSubject] = useState("geography");
+  const [activeSubject, setActiveSubject] = useState<SupportedGsLmsSubject | null>(null);
 
   useEffect(() => {
-    setActiveSubject(getActiveSubject());
+    const subjectTimer = window.setTimeout(() => setActiveSubject(getActiveSubject()), 0);
+    return () => window.clearTimeout(subjectTimer);
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
-      setLoading(false);
-      return;
-    }
+    const requestTimer = window.setTimeout(() => {
+      if (!activeSubject || !isLoaded || !isSignedIn) {
+        setLoading(false);
+        return;
+      }
 
-    Promise.all([
-      gsLmsService.getTodayPlan(activeSubject).catch(() => null),
-      gsLmsService.checkRecallGate(activeSubject).catch(() => null),
-      paymentService.getSubscription().catch(() => null),
-    ])
-      .then(([planData, gateData, subData]) => {
-        setPlan(planData);
-        setRecallGate(gateData);
-        setSubscription(subData);
-      })
-      .finally(() => setLoading(false));
+      setLoading(true);
+      Promise.all([
+        gsLmsService.getTodayPlan(activeSubject).catch(() => null),
+        gsLmsService.checkRecallGate(activeSubject).catch(() => null),
+        paymentService.getSubscription().catch(() => null),
+      ])
+        .then(([planData, gateData, subData]) => {
+          setPlan(planData);
+          setRecallGate(gateData);
+          setSubscription(subData);
+        })
+        .finally(() => setLoading(false));
+    }, 0);
+    return () => window.clearTimeout(requestTimer);
   }, [isLoaded, isSignedIn, activeSubject]);
 
   // Don't show anything while loading or if backend is unreachable
-  if (loading || (!plan && !recallGate)) return null;
+  if (!activeSubject || loading || (!plan && !recallGate)) return null;
 
   const streakDays = plan?.streak_days ?? 0;
   const completedCount = plan?.completed_count ?? 0;
@@ -164,7 +173,11 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
             Today&apos;s plan ({completedCount}/{totalItems} done)
           </p>
           {pendingItems.slice(0, 3).map((item, idx) => (
-            <PlanItemRow key={`${item.node_id}-${item.item_type}-${idx}`} item={item} />
+            <PlanItemRow
+              key={`${item.node_id}-${item.item_type}-${idx}`}
+              item={item}
+              subject={activeSubject}
+            />
           ))}
           {pendingItems.length > 3 && (
             <p className="text-xs font-semibold text-[#536259]">
@@ -201,7 +214,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           href={`/upsc/${activeSubject}/lms/gaps`}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
         >
-          View Gaps
+          View Readiness
         </Link>
       </div>
 
@@ -220,7 +233,13 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   );
 }
 
-function PlanItemRow({ item }: { item: PlanItemOut }) {
+function PlanItemRow({
+  item,
+  subject,
+}: {
+  item: PlanItemOut;
+  subject: SupportedGsLmsSubject;
+}) {
   const isRevisit = item.item_type === "revisit";
   const isRetro = item.item_type === "retro";
 
@@ -232,13 +251,15 @@ function PlanItemRow({ item }: { item: PlanItemOut }) {
     <BookOpen className="h-3.5 w-3.5 text-[#1d9e75]" />
   );
 
+  // The topic page detects a due revisit itself and offers the "mark reviewed"
+  // action, so the summary links straight to the topic.
   const dest = isRetro
-    ? `/upsc/${getActiveSubject()}/lms/retro`
+    ? `/upsc/${subject}/lms/retro`
     : isRevisit
-      ? `/upsc/${getActiveSubject()}/lms/topic/${item.node_id}?mode=revisit`
+      ? `/upsc/${subject}/lms/topic/${item.node_id}`
       : item.item_type === "practice"
-        ? `/upsc/${getActiveSubject()}/lms/practice`
-        : `/upsc/${getActiveSubject()}/lms/topic/${item.node_id}`;
+        ? `/upsc/${subject}/lms/practice`
+        : `/upsc/${subject}/lms/topic/${item.node_id}`;
 
   return (
     <Link

@@ -11,6 +11,9 @@ Requirements traced: 5.1, 5.2, 5.3, 5.6, 5.7, 5.8, 13.7
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
+import math
+from numbers import Real
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -32,6 +35,19 @@ from app.api.v1.gs_lms.dependencies import resolve_subject
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_PROVIDER_IDENTITY_MAX_LENGTH = 128
+
+
+def _sanitize_provider_identity(value: object) -> str | None:
+    """Return a bounded, log-safe provider identity, if one was supplied."""
+    if not isinstance(value, str):
+        return None
+
+    sanitized = "".join(character for character in value if character.isprintable())
+    sanitized = " ".join(sanitized.split())[:_PROVIDER_IDENTITY_MAX_LENGTH].strip()
+    return sanitized or None
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +176,12 @@ async def submit_recall_audio(
 
     Accepts audio file (webm/wav/mp4), transcribes via the STT provider,
     scores against section key concepts, and persists the attempt.
-    If STT confidence < 0.6, flags for student review.
+    * Provider errors and unusable provider output return a sanitized 503
+      before scoring or persistence so the learner can retry or type instead.
+    * Low-confidence semantics remain represented only by `stt_confidence`;
+      review-gate behavior is a separate contract decision.
     """
+
     # Verify node exists
     node = db.query(GsLmsSyllabusNode).filter(
         GsLmsSyllabusNode.id == node_id,
@@ -192,14 +212,53 @@ async def submit_recall_audio(
     if not key_concepts:
         key_concepts = [section.title.lower()] if section.title else []
 
-    stt_result = stt.transcribe(
-        audio_bytes,
-        vocabulary_hint=key_concepts[:10],
-        mime_type=audio.content_type,
-    )
+    try:
+        stt_result = stt.transcribe(
+            audio_bytes,
+            vocabulary_hint=key_concepts[:10],
+            mime_type=audio.content_type,
+        )
+        configured_provider_name = _sanitize_provider_identity(
+            getattr(stt, "name", None)
+        )
+        provider_name = _sanitize_provider_identity(
+            getattr(stt_result, "provider", None)
+        ) or configured_provider_name
+        if not provider_name:
+            raise ValueError("STT provider identity is invalid")
 
-    transcript = stt_result.text
-    stt_confidence = stt_result.confidence
+        raw_transcript = getattr(stt_result, "text", None)
+        transcript = raw_transcript.strip() if isinstance(raw_transcript, str) else ""
+        if not transcript:
+            raise ValueError("STT provider returned an empty transcript")
+
+        raw_confidence = getattr(stt_result, "confidence", None)
+        if isinstance(raw_confidence, bool) or not isinstance(raw_confidence, Real):
+            raise ValueError("STT provider returned an invalid confidence")
+        stt_confidence = float(raw_confidence)
+        if not math.isfinite(stt_confidence) or not 0.0 <= stt_confidence <= 1.0:
+            raise ValueError("STT provider returned an invalid confidence")
+    except Exception as exc:
+        # Provider failures must not escape as an opaque 500 or create a
+        # fabricated recall result. Roll back before returning a retryable,
+        # learner-safe response; log only non-sensitive provider/type metadata.
+        db.rollback()
+        logger.warning(
+            "GS LMS recall STT unavailable provider=%s error_type=%s",
+            getattr(stt, "name", "unknown"),
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Speech transcription is temporarily unavailable. Please retry or type your recall.",
+        ) from exc
+
+    logger.info(
+        "GS LMS recall STT completed provider=%s node_id=%s confidence=%s",
+        provider_name,
+        node_id,
+        stt_confidence,
+    )
 
     # Score the recall
     result = score_recall(transcript, key_concepts)
@@ -257,6 +316,17 @@ def get_recall_attempt(
 
     Returns None (204) if no attempt exists.
     """
+    node = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
+        )
+        .one_or_none()
+    )
+    if node is None:
+        raise HTTPException(status_code=404, detail="Topic node not found")
+
     attempt = (
         db.query(GsLmsRecallAttempt)
         .filter(

@@ -19,6 +19,7 @@ from app.core.evaluation.providers.config import (
     ProviderConfig,
     active_provider_key,
     load_provider_config,
+    mock_provider_enabled,
 )
 from app.core.evaluation.providers.openai_compatible import OpenAICompatibleProvider
 
@@ -37,13 +38,39 @@ class ProviderRegistry:
     def __init__(self) -> None:
         self._factories: Dict[str, ProviderFactory] = {}
         self._cache: Dict[str, IInferenceProvider] = {}
+        # Built-in mock resolution is policy-gated. A public registration is
+        # an explicit test/dev injection and intentionally replaces that
+        # built-in entry without changing the provider/schema contracts.
+        self._builtin_keys: set[str] = set()
         self._register_builtins()
+
+    def _register_builtin(self, key: str, factory: ProviderFactory) -> None:
+        normalized = key.strip().lower()
+        self._factories[normalized] = factory
+        self._builtin_keys.add(normalized)
+        self._cache.pop(normalized, None)
+
+    def _ensure_runtime_policy(self, key: str) -> None:
+        if key == "mock" and key in self._builtin_keys and not mock_provider_enabled():
+            raise ConfigurationError(
+                "Evaluation provider 'mock' is disabled outside an explicitly "
+                "enabled non-production runtime. Set APP_ENVIRONMENT to "
+                "development, test, or local and ENABLE_OPTIONAL_EVAL_MOCK=true."
+            )
 
     # -- registration -------------------------------------------------------
     def register(self, key: str, factory: ProviderFactory) -> None:
-        """Register a provider factory under ``key`` (open-closed — R3.7)."""
-        self._factories[key.strip().lower()] = factory
-        self._cache.pop(key.strip().lower(), None)
+        """Register an explicitly injected provider factory under ``key``.
+
+        Explicit registration remains available to hermetic tests and local
+        development. It replaces a built-in entry, so the built-in mock policy
+        does not turn dependency injection into an accidental production
+        fallback.
+        """
+        normalized = key.strip().lower()
+        self._factories[normalized] = factory
+        self._builtin_keys.discard(normalized)
+        self._cache.pop(normalized, None)
 
     def _register_builtins(self) -> None:
         # Built-ins route through the existing inference gateway providers so
@@ -65,13 +92,14 @@ class ProviderRegistry:
 
             return MockEvaluationInferenceProvider()
 
-        self.register("mock", _mock_factory)
-        self.register("gemini", _gateway_factory("gemini"))
+        self._register_builtin("mock", _mock_factory)
+        self._register_builtin("gemini", _gateway_factory("gemini"))
 
     # -- resolution ---------------------------------------------------------
     def resolve_config(self, key: Optional[str] = None) -> ProviderConfig:
         """Load the :class:`ProviderConfig` for ``key`` (or the active key)."""
         resolved_key = (key or active_provider_key()).strip().lower()
+        self._ensure_runtime_policy(resolved_key)
         return load_provider_config(resolved_key)
 
     def resolve(self, key: Optional[str] = None) -> IInferenceProvider:
@@ -82,6 +110,7 @@ class ProviderRegistry:
         required value (R3.6).
         """
         resolved_key = (key or active_provider_key()).strip().lower()
+        self._ensure_runtime_policy(resolved_key)
         if resolved_key in self._cache:
             return self._cache[resolved_key]
 

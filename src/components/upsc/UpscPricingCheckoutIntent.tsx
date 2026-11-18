@@ -7,14 +7,13 @@ import { ArrowLeft, ArrowRight, BadgeIndianRupee, CheckCircle2, ShieldCheck } fr
 import { Badge } from "@/components/ui/badge";
 import {
   getProductPricingPlan,
-  productMonthlyBasePrice,
   pricingCheckoutPath,
   productPricingPlans,
-  recommendedProductPlanId,
 } from "@/lib/upsc/yearlyPlanner";
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
 import { CashfreeCheckout } from "@/components/upsc/CashfreeCheckout";
+import type { SubscriptionResponse } from "@/services/api/paymentService";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 function money(value: number) {
@@ -25,23 +24,30 @@ function money(value: number) {
 // Payment Success Receipt (Task 6.3)
 // ---------------------------------------------------------------------------
 
+function formatSubscriptionDate(value: string | null) {
+  if (!value) return "Unavailable";
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function PaymentSuccessReceipt({
   orderId,
   amount,
   planTitle,
   billingCycle,
-  months,
+  startDate,
+  endDate,
 }: {
   orderId: string;
   amount: number;
   planTitle: string;
   billingCycle: string;
-  months: number;
+  startDate: string | null;
+  endDate: string | null;
 }) {
-  const startDate = new Date();
-  const endDate = new Date();
-  endDate.setMonth(endDate.getMonth() + months);
-
   return (
     <div
       data-testid="payment-success-receipt"
@@ -78,9 +84,9 @@ function PaymentSuccessReceipt({
             Subscription Period
           </p>
           <p className="mt-1 text-sm font-black text-[#13251d]">
-            {startDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            {formatSubscriptionDate(startDate)}
             {" → "}
-            {endDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            {formatSubscriptionDate(endDate)}
           </p>
         </div>
       </div>
@@ -106,6 +112,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
   const [activationSuccess, setActivationSuccess] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
+  const [confirmedSubscription, setConfirmedSubscription] = useState<SubscriptionResponse | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const selectedPlan = getProductPricingPlan(planId);
@@ -134,11 +141,13 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
     }
   };
 
-  const handlePaymentSuccess = (orderId: string) => {
+  const handlePaymentSuccess = (orderId: string, subscription: SubscriptionResponse) => {
+    // CashfreeCheckout calls this only after the webhook-backed subscription
+    // endpoint confirms the exact order, tier, and billing cycle.
     setPaymentOrderId(orderId);
+    setConfirmedSubscription(subscription);
     setPaymentSuccess(true);
     setPaymentError(null);
-    // Also update local profile state to reflect the new subscription
     if (profile) {
       saveProfile({
         ...profile,
@@ -166,7 +175,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           data-testid="upsc-pricing-checkout-intent"
           data-plan-id={selectedPlan.id}
           data-months={selectedPlan.months}
-          data-monthly-base={productMonthlyBasePrice}
+          data-monthly-base={Math.round(selectedPlan.listPrice / selectedPlan.months)}
           data-list-price={selectedPlan.listPrice}
           data-launch-price={selectedPlan.launchPrice}
           data-savings={savings}
@@ -223,7 +232,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
         <section
           data-testid="upsc-pricing-checkout-proof"
           data-plan-id={selectedPlan.id}
-          data-monthly-base={productMonthlyBasePrice}
+          data-monthly-base={Math.round(selectedPlan.listPrice / selectedPlan.months)}
           data-duration-months={selectedPlan.months}
           data-list-price={selectedPlan.listPrice}
           data-launch-price={selectedPlan.launchPrice}
@@ -233,27 +242,34 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
         >
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#085041]">Checkout proof</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#31443a]">
-            {selectedPlan.title} at {money(selectedPlan.launchPrice)} for {selectedPlan.months} month
-            {selectedPlan.months === 1 ? "" : "s"}. Saves {money(savings)} compared to base monthly pricing.
+            {selectedPlan.months === 1
+              ? `${selectedPlan.title} at ${money(selectedPlan.launchPrice)} for 1 month, the base monthly price. No payment is collected today.`
+              : `${selectedPlan.title} at ${money(selectedPlan.launchPrice)} for ${selectedPlan.months} months. Saves ${money(savings)} compared to paying monthly.`}
           </p>
         </section>
 
         {/* Payment / Activation Controller */}
-        {paymentSuccess && paymentOrderId ? (
+        {paymentSuccess && paymentOrderId && confirmedSubscription ? (
           <PaymentSuccessReceipt
             orderId={paymentOrderId}
             amount={selectedPlan.launchPrice}
             planTitle={selectedPlan.title}
             billingCycle={selectedPlan.cycle}
-            months={selectedPlan.months}
+            startDate={confirmedSubscription.start_date}
+            endDate={confirmedSubscription.end_date}
           />
         ) : publicCommerceLaunchBoundary.readyForPayment ? (
           /* Live commerce mode — render Cashfree checkout */
           <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
             <h2 className="text-xl font-black text-[#13251d]">Complete Payment</h2>
             <p className="mt-1 text-sm font-semibold text-[#5d675f]">
-              Secure payment via Cashfree. Your subscription activates immediately after successful payment.
+              Secure payment via Cashfree. Your plan activates only after the signed webhook confirms the matching subscription.
             </p>
+            {paymentError && (
+              <p className="mt-2 text-xs font-bold text-red-700" role="status">
+                {paymentError}
+              </p>
+            )}
 
             <div className="mt-4">
               <CashfreeCheckout
@@ -267,17 +283,19 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             </div>
           </section>
         ) : (
-          /* Pilot mode — existing pilot activation flow */
+          /* Pilot mode — record a plan intent; never claim a subscription */
           <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
-            <h2 className="text-xl font-black text-[#13251d]">Confirm & Activate</h2>
+            <h2 className="text-xl font-black text-[#13251d]">Record your plan intent</h2>
             <p className="mt-1 text-sm font-semibold text-[#5d675f]">
-              Since you are part of the pilot validation, you can activate this plan directly to your workspace.
+              This saves your preferred plan for the pilot. No payment is collected and no
+              subscription or usage quota changes until live payments open and a payment is
+              confirmed.
             </p>
             
             <div className="mt-4 flex flex-wrap gap-3 items-center">
               {isCurrentlyActive ? (
                 <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] px-4 py-2 text-xs font-black text-[#085041]">
-                  ✓ Plan is currently active on your account
+                  ✓ Plan intent saved on this device
                 </div>
               ) : (
                 <button
@@ -285,15 +303,15 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
                   onClick={handleConfirmActivation}
                   className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-5 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
                 >
-                  Confirm Pilot Activation <ArrowRight className="ml-2 h-4 w-4" />
+                  Save Plan Intent <ArrowRight className="ml-2 h-4 w-4" />
                 </button>
               )}
             </div>
 
             {(activationSuccess || isCurrentlyActive) && (
               <div className="mt-4 rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] p-3 text-sm font-bold text-[#085041]">
-                Active subscription updated to **{selectedPlan.title} ({selectedPlan.cycle})**! 
-                Usage limits have been reallocated according to the tier configuration.
+                Plan intent recorded: {selectedPlan.title} ({selectedPlan.cycle}). No payment has
+                been collected and workspace access is unchanged.
               </div>
             )}
           </section>
@@ -319,7 +337,6 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           <div className="grid gap-3 md:grid-cols-2">
             {[
               "Daily planner, AI discussion, MCQ builder, revision command, and reports.",
-              `Hourly rate limits: ${selectedPlan.limits}`,
               "Optional-subject catalog with Paper I and Paper II year-wise source rows.",
               "Local progress works immediately; live payment opens only after the launch gates close.",
             ].map((item) => (

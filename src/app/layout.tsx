@@ -1,24 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { QueryProvider } from "@/lib/contexts/QueryProvider";
 import { activeAuthProvider, clerkConfigReady, env } from "@/env";
 import "./globals.css";
+import "./fonts.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { SITE_URL, organizationSchema, websiteSchema } from "@/lib/seo";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -64,7 +54,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationSchema} />

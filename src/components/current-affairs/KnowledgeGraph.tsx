@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, Panel, Node, Edge, Position, useNodesState, useEdgesState, MarkerType } from '@xyflow/react';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { ReactFlow, Background, Controls, MiniMap, Panel, Position, useNodesState, useEdgesState, MarkerType, type Node, type Edge, type NodeMouseHandler } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { caService, GraphNodeOut, GraphEdgeOut, CAFilters } from '@/services/api/caService';
@@ -25,7 +25,7 @@ const SUBJECT_COLORS: Record<string, string> = {
   'internal-security': '#6366f1',
 };
 
-const EDGE_STYLES: Record<string, any> = {
+const EDGE_STYLES: Record<string, CSSProperties> = {
   thread: { stroke: '#94a3b8', strokeWidth: 1.5 },
   causality: { stroke: '#1d9e75', strokeWidth: 2 },
   syllabus_link: { stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '5 3' },
@@ -67,23 +67,33 @@ export function KnowledgeGraph({ onNodeClick }: KnowledgeGraphProps) {
   const [rawNodes, setRawNodes] = useState<GraphNodeOut[]>([]);
   const [rawEdges, setRawEdges] = useState<GraphEdgeOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [filters, setFilters] = useState<Partial<CAFilters>>({});
   const [selectedNode, setSelectedNode] = useState<GraphNodeOut | null>(null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  const fetchGraph = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await caService.getGraphData(filters);
-      setRawNodes(data.nodes);
-      setRawEdges(data.edges);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
-  }, [filters]);
-
-  useEffect(() => { fetchGraph(); }, [fetchGraph]);
+  useEffect(() => {
+    let cancelled = false;
+    caService.getGraphData(filters)
+      .then((data) => {
+        if (cancelled) return;
+        setRawNodes(data.nodes);
+        setRawEdges(data.edges);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, attempt]);
 
   // Transform backend data to react-flow format + apply dagre layout
   useEffect(() => {
@@ -141,7 +151,7 @@ export function KnowledgeGraph({ onNodeClick }: KnowledgeGraphProps) {
     setEdges(laid.edges);
   }, [rawNodes, rawEdges, setNodes, setEdges]);
 
-  const handleNodeClick = useCallback((_: any, node: Node) => {
+  const handleNodeClick: NodeMouseHandler = useCallback((_, node) => {
     const raw = rawNodes.find(n => n.id === node.id);
     setSelectedNode(raw || null);
     if (raw && raw.node_type === 'ca_item') {
@@ -152,6 +162,27 @@ export function KnowledgeGraph({ onNodeClick }: KnowledgeGraphProps) {
 
   if (loading) {
     return <div className="h-[600px] rounded-2xl bg-[#fffdf8] border border-[#dcd5c7] animate-pulse flex items-center justify-center text-sm text-[#5d675f]">Loading graph...</div>;
+  }
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-bold leading-5 text-[#7a5410]">
+          The knowledge graph could not be loaded, so this is not an empty graph.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadFailed(false);
+            setLoading(true);
+            setAttempt((count) => count + 1);
+          }}
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410]"
+        >
+          Retry load
+        </button>
+      </div>
+    );
   }
 
   if (rawNodes.length === 0) {

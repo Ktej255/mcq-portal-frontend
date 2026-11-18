@@ -104,7 +104,14 @@ export function useDashboardData() {
   };
   const stats = { watchedCount: 0, mcqCompletedCount: 0 };
   const geographyQuestionBankAttempts = questionBankAttemptsBySubject.geography ?? [];
-  const today = getCurrentGeographyTopic(geographyProgress as any, geographyQuestionBankAttempts);
+  const geographyProgressForGuidedPath: Parameters<typeof getCurrentGeographyTopic>[0] =
+    Object.fromEntries(
+      Object.entries(geographyProgress).filter(([, progress]) => progress !== undefined)
+    ) as Parameters<typeof getCurrentGeographyTopic>[0];
+  const today = getCurrentGeographyTopic(
+    geographyProgressForGuidedPath,
+    geographyQuestionBankAttempts
+  );
 
   // Active mission subject
   const activeMissionSubject =
@@ -121,14 +128,20 @@ export function useDashboardData() {
     activeMissionSubject.sessions.find((session) => session.day === activeMissionDay) ??
     activeMissionSubject.sessions[0];
 
-  const activeMissionProgressMap = (
-    activeMissionSubject.slug === "geography"
-      ? geographyProgress
-      : progressBySubject[activeMissionSubject.slug] ?? {}
-  ) as Record<string, DailyPlannerProgress | undefined>;
+  const activeMissionProgressMap = useMemo(
+    () =>
+      (
+        activeMissionSubject.slug === "geography"
+          ? progressBySubject.geography ?? {}
+          : progressBySubject[activeMissionSubject.slug] ?? {}
+      ) as Record<string, DailyPlannerProgress | undefined>,
+    [activeMissionSubject.slug, progressBySubject]
+  );
   const activeMissionProgress = activeMissionProgressMap[String(activeMissionDay)];
-  const activeMissionQuestionBankAttempts =
-    questionBankAttemptsBySubject[activeMissionSubject.slug] ?? [];
+  const activeMissionQuestionBankAttempts = useMemo(
+    () => questionBankAttemptsBySubject[activeMissionSubject.slug] ?? [],
+    [activeMissionSubject.slug, questionBankAttemptsBySubject]
+  );
 
   // Build planner decision
   const activeMissionDecision = useMemo(
@@ -161,7 +174,6 @@ export function useDashboardData() {
   // Streak calculation: count consecutive days with me-time completed, working backward
   const streakCount = useMemo(() => {
     let streak = 0;
-    const totalSessions = activeMissionSubject.sessions.length;
     for (let d = activeMissionDay; d >= 1; d--) {
       const dayProgress = activeMissionProgressMap[String(d)];
       if (dayProgress?.meTimeCompletedAt || dayProgress?.watched || dayProgress?.mcqCompleted) {
@@ -171,7 +183,7 @@ export function useDashboardData() {
       }
     }
     return streak;
-  }, [activeMissionDay, activeMissionProgressMap, activeMissionSubject.sessions.length]);
+  }, [activeMissionDay, activeMissionProgressMap]);
 
   // Load data from localStorage + Supabase
   useEffect(() => {

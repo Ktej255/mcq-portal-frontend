@@ -1,11 +1,8 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  BookOpen,
   PenTool,
-  Layers,
   FileText,
-  CheckCircle2,
   BarChart3,
   GraduationCap,
   MessageSquare,

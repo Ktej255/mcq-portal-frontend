@@ -27,7 +27,7 @@ import app.core.gs.models  # noqa: F401
 import app.core.gs_lms.models  # noqa: F401
 import app.core.gs_lms.student_models  # noqa: F401
 
-from app.core.gs_lms.importer import import_gs_geography
+from app.core.gs_lms.importer import import_gs_geography, load_artifact
 
 
 def _ensure_gs_paper_column() -> None:
@@ -47,38 +47,70 @@ def _ensure_gs_paper_column() -> None:
 
 
 def main() -> None:
-    print(f"DB: {engine.url}")
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError(
+            "local_seed_upgraded.py requires a SQLite database; refusing to run "
+            "against a non-local database"
+        )
+
+    # Validate the artifact before any schema or content write. The committed
+    # artifact is geography content; its subject_id is remapped to the
+    # slug-resolved local Geography row below rather than assuming ID 1.
+    artifact = load_artifact()
+    if not isinstance(artifact.get("subject_id"), int) or isinstance(
+        artifact["subject_id"], bool
+    ):
+        raise ValueError("Geography artifact must contain an integer subject_id")
+    tree = artifact.get("tree")
+    if not isinstance(tree, list) or not tree or not all(
+        isinstance(node, dict) for node in tree
+    ):
+        raise ValueError(
+            "Geography artifact must contain a non-empty tree of mapping nodes"
+        )
+
+    from scripts.seed_production import (
+        _clear_subject_content,
+        _ensure_csat_syllabus,
+        _ensure_subjects,
+    )
+
+    print("DB: local SQLite")
     # 1. Create any missing tables (new answer-eval tables, etc.). Existing
     #    tables are left untouched.
     Base.metadata.create_all(engine)
     # 2. Ensure the additive column exists on the existing PYQ table.
     _ensure_gs_paper_column()
 
-    # 3. Clear + re-import subject_id=1 content as REVIEWED, and seed all subjects/CSAT.
-    from scripts.seed_production import _ensure_subjects, _ensure_csat_syllabus
-
+    # 3. Resolve subjects by stable slug and use the existing cleanup helper,
+    #    which flushes and propagates cleanup failures.
     session = SessionLocal()
     try:
         print("Ensuring core subjects exist...")
-        _ensure_subjects(session)
+        subject_ids = _ensure_subjects(session)
+        geography_subject_id = subject_ids["geography"]
+
+        # The artifact is the fixed geography seed, but database IDs are not
+        # stable across local databases. Pass the resolved ID to the importer.
+        artifact = dict(artifact)
+        artifact["subject_id"] = geography_subject_id
 
         print("Clearing geography content...")
-        session.execute(text("DELETE FROM gs_lms_mcq_questions WHERE syllabus_node_id IN (SELECT id FROM gs_lms_syllabus_nodes WHERE subject_id = 1)"))
-        session.execute(text("DELETE FROM gs_lms_pyqs WHERE subject_id = 1"))
-        session.execute(text("DELETE FROM gs_lms_content_sections WHERE syllabus_node_id IN (SELECT id FROM gs_lms_syllabus_nodes WHERE subject_id = 1)"))
-        session.flush()
+        _clear_subject_content(session, geography_subject_id)
 
         print("Importing geography content...")
-        result = import_gs_geography(session, review_status="REVIEWED")
+        result = import_gs_geography(
+            session, artifact, review_status="REVIEWED"
+        )
 
         print("Seeding CSAT syllabus...")
-        _ensure_csat_syllabus(session)
+        _ensure_csat_syllabus(session, subject_ids["csat"])
 
         session.commit()
     except Exception as exc:
         session.rollback()
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
+        raise
     finally:
         session.close()
 

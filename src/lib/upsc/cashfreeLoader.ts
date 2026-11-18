@@ -1,11 +1,15 @@
-let cashfreeInstance: any = null;
+type CashfreeInstance = Awaited<
+  ReturnType<typeof import("@cashfreepayments/cashfree-js").load>
+>;
+
+let cashfreeInstance: CashfreeInstance | null = null;
 
 /**
  * Dynamically loads and initializes the Cashfree JS SDK.
  * Caches the instance to avoid re-initialization on subsequent calls.
  * Mode is determined by `NEXT_PUBLIC_CASHFREE_MODE` env var (defaults to "sandbox").
  */
-export async function loadCashfreeSDK(): Promise<any> {
+export async function loadCashfreeSDK(): Promise<CashfreeInstance> {
   if (cashfreeInstance) return cashfreeInstance;
 
   const { load } = await import("@cashfreepayments/cashfree-js");

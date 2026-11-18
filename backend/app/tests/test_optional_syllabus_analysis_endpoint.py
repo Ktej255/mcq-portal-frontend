@@ -27,6 +27,8 @@ Asserts:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -193,7 +195,9 @@ def test_syllabus_analysis_gates_unreviewed_segments(seeded_engine):
             d.close()
 
     app.dependency_overrides[get_db] = _override_get_db
-    app.dependency_overrides[get_current_user] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=1, google_uid="optional-syllabus-test", role="STUDENT"
+    )
     try:
         c = TestClient(app)
         before = c.get("/api/v1/optional/geography/syllabus-analysis").json()["data"]

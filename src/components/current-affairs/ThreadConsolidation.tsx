@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, ArrowRight, CheckCircle2, Circle, GitBranch } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, CheckCircle2, Circle, GitBranch, type LucideIcon } from 'lucide-react';
 import { caService, ThreadConsolidationOut } from '@/services/api/caService';
+import { apiErrorStatus } from '@/services/api/error';
 
 /**
  * ThreadConsolidation — Full thread assembly view showing chronological
@@ -17,7 +18,7 @@ interface ThreadConsolidationProps {
   threadId: number;
 }
 
-const DIRECTION_DISPLAY: Record<string, { icon: any; color: string; label: string }> = {
+const DIRECTION_DISPLAY: Record<string, { icon: LucideIcon; color: string; label: string }> = {
   escalating: { icon: TrendingUp, color: 'text-red-600 bg-red-50 border-red-200', label: 'Escalating' },
   'de-escalating': { icon: TrendingDown, color: 'text-green-600 bg-green-50 border-green-200', label: 'De-escalating' },
   evolving: { icon: ArrowRight, color: 'text-blue-600 bg-blue-50 border-blue-200', label: 'Evolving' },
@@ -27,12 +28,29 @@ const DIRECTION_DISPLAY: Record<string, { icon: any; color: string; label: strin
 export function ThreadConsolidation({ threadId }: ThreadConsolidationProps) {
   const [data, setData] = useState<ThreadConsolidationOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     caService.getThread(threadId)
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [threadId]);
+      .then((nextData) => {
+        if (cancelled) return;
+        setData(nextData);
+        setLoadFailed(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // A missing thread is final; a failed request keeps the retry.
+        if (apiErrorStatus(err) !== 404) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, attempt]);
 
   if (loading) {
     return (
@@ -41,6 +59,27 @@ export function ThreadConsolidation({ threadId }: ThreadConsolidationProps) {
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-24 animate-pulse bg-[#fffdf8] rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-bold leading-5 text-[#7a5410]">
+          This thread could not be loaded. Check the connection and retry.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadFailed(false);
+            setLoading(true);
+            setAttempt((count) => count + 1);
+          }}
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410]"
+        >
+          Retry load
+        </button>
       </div>
     );
   }

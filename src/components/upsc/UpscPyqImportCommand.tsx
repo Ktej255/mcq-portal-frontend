@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { resolveToken } from "@/lib/auth/token-strategy";
-import { supabase } from "@/lib/supabase/client";
 import {
   appendLocalPyqImportRecords,
   buildExactPyqImportReadiness,
@@ -141,15 +140,14 @@ function stateFromPersistencePayload(payload: PyqPersistencePayload): PyqPersist
 }
 
 export function UpscPyqImportCommand() {
-  const [records, setRecords] = useState<PyqImportRecord[]>([]);
+  const [records, setRecords] = useState<PyqImportRecord[]>(() => readLocalPyqImportRecords());
   const [csvInput, setCsvInput] = useState("");
   const [lastResult, setLastResult] = useState<PyqImportParseResult | null>(null);
   const [persistence, setPersistence] = useState<PyqPersistenceState>(defaultPersistenceState);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const hydratePersistence = useCallback(async () => {
-    const initialLocalRecords = readLocalPyqImportRecords();
-    setRecords(initialLocalRecords);
+    await Promise.resolve();
     setPersistence(defaultPersistenceState);
 
     try {
@@ -181,12 +179,14 @@ export function UpscPyqImportCommand() {
         return;
       }
 
+      setRecords(latestLocalRecords);
       setPersistence({
         ...nextPersistence,
         savedCount: latestLocalRecords.length,
       });
     } catch (error) {
       const latestLocalRecords = readLocalPyqImportRecords();
+      setRecords(latestLocalRecords);
       setPersistence({
         mode: "unavailable",
         message:
@@ -200,7 +200,11 @@ export function UpscPyqImportCommand() {
   }, []);
 
   useEffect(() => {
-    void hydratePersistence();
+    const hydrationTask = window.setTimeout(() => {
+      void hydratePersistence();
+    }, 0);
+
+    return () => window.clearTimeout(hydrationTask);
   }, [hydratePersistence]);
 
   const summary = useMemo(() => summarizePyqImportLedger(records), [records]);

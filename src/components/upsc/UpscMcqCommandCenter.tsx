@@ -22,6 +22,7 @@ import { geographySessions } from "@/lib/upsc/plan";
 import { strategyPracticeHandoffStorageKey, type StrategyPracticeHandoff } from "@/lib/upsc/prelims2027Strategy";
 import { getSubjectBatchCode, subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { cn } from "@/lib/utils";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 
 type McqSubject = {
   slug: string;
@@ -612,7 +613,7 @@ export function UpscMcqCommandCenter({
                   <CheckCircle2 className="h-4 w-4" /> Mark ready
                 </button>
                 <Link
-                  href={`/upsc/${activeSubject.slug}/mcq-readiness?day=${activeSession.day}`}
+                  href={lmsHrefForRoom(activeSubject.slug, "mcq-readiness")}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
                   Daily MCQ room

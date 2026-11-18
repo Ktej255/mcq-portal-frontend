@@ -35,9 +35,17 @@ import {
  *
  * Fetches the subject's **student-visible** PYQs from the backend
  * (`/api/v1/optional/{slug}/pyqs`) via `optionalService`. The backend gates out
- * unreviewed/draft questions (design Property 8 / R17.3), so this view only
- * ever renders REVIEWED content — when nothing matches it shows an honest
- * empty state rather than fabricating questions.
+ * unreviewed/draft questions (design Property 8 / R17.3) and only ever
+ * serialises rows whose `review_status === "REVIEWED"`; this view enforces the
+ * same contract on the response it receives and shows an honest empty state
+ * when nothing matches.
+ *
+ * Honest-failure rule (founder decision, 2026-10-31): the previous-year claim
+ * is only ever made from stored, reviewed backend rows. When the request fails
+ * this view reports the failure and offers a retry — it never substitutes the
+ * frontend's offline topic data, because rows assembled in the browser are not
+ * reviewed content and a failed load must not render as if it were.
+ *
  *
  * Controls:
  * - View mode toggle: "By year" (the year/paper/section list) and "By topic"
@@ -90,6 +98,36 @@ const SECTION_LABELS: Record<SectionLabel, string> = {
 /** Explorer view modes: the year/paper/section list vs. the topic-wise tree. */
 type ViewMode = "year" | "topic";
 
+/**
+ * Defence in depth for the REVIEWED contract (design Property 8 / R17.3).
+ *
+ * The backend only serialises reviewed rows, so anything that reaches this
+ * client claiming to be a student-visible PYQ must actually look like one:
+ * `review_status === "REVIEWED"`, a real numeric year, and question text. A
+ * response that fails the check is refused with an explicit failure instead of
+ * being rendered, because "this was asked in <year>" is exactly the claim the
+ * learner relies on.
+ */
+function isReviewedPyqRow(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as {
+    review_status?: unknown;
+    year?: unknown;
+    question_text?: unknown;
+  };
+  return (
+    row.review_status === "REVIEWED" &&
+    typeof row.year === "number" &&
+    Number.isFinite(row.year) &&
+    typeof row.question_text === "string" &&
+    row.question_text.trim().length > 0
+  );
+}
+
+function hasOnlyReviewedPyqs(rows: unknown): boolean {
+  return Array.isArray(rows) && rows.every(isReviewedPyqRow);
+}
+
 export interface PyqExplorerProps {
   /** Subject slug, e.g. "geography". */
   slug: string;
@@ -117,11 +155,14 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
   const [data, setData] = useState<PyqListOut | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Bumped by "Try again" so a failed request re-runs; the effect depends on it.
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   // "By topic" view state (R6.4) — fetched lazily the first time the mode opens.
   const [topicData, setTopicData] = useState<PyqByTopicOut | null>(null);
   const [topicState, setTopicState] = useState<LoadState>("idle");
   const [topicError, setTopicError] = useState<string | null>(null);
+  const [topicReloadNonce, setTopicReloadNonce] = useState(0);
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
 
   // Interim "Solve" target — only used when no `onSolve` host seam is provided.
@@ -130,7 +171,8 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
   // Section only applies to Paper I; clear it whenever Paper I is not selected.
   useEffect(() => {
     if (paper !== "PAPER_I" && section !== null) {
-      setSection(null);
+      const clearSectionTimer = window.setTimeout(() => setSection(null), 0);
+      return () => window.clearTimeout(clearSectionTimer);
     }
   }, [paper, section]);
 
@@ -147,24 +189,35 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setState("loading");
-    setError(null);
-    optionalService
-      .getPyqs(slug, query)
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        setState("loaded");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageFromError(err));
-        setState("error");
-      });
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setState("loading");
+      setError(null);
+      optionalService
+        .getPyqs(slug, query)
+        .then((res) => {
+          if (cancelled) return;
+          if (!hasOnlyReviewedPyqs(res.pyqs)) {
+            throw new Error(
+              "The published PYQ library returned rows that are not marked reviewed. Nothing is shown.",
+            );
+          }
+          setData(res);
+          setState("loaded");
+        })
+        .catch((err: unknown) => {
+          // Honest failure: no offline substitute, no rows, no "loaded".
+          if (cancelled) return;
+          setData(null);
+          setError(messageFromError(err));
+          setState("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
-  }, [slug, query, isLoaded, isSignedIn]);
+  }, [slug, query, isLoaded, isSignedIn, reloadNonce]);
 
   // Reset the "By topic" cache + interim panel whenever the subject changes.
   // Done as a deferred state update guarded by a slug mismatch so we never
@@ -184,31 +237,45 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
     if (!isLoaded || !isSignedIn) return;
     if (viewMode !== "topic") return;
     if (topicState === "loading") return;
+    // A failed grouping stays failed until the learner retries, so the effect
+    // never becomes a background retry loop.
+    if (topicState === "error") return;
     if (topicState === "loaded" && topicData?.slug === slug) return;
     let cancelled = false;
-    setTopicState("loading");
-    setTopicError(null);
-    optionalService
-      .getPyqsByTopic(slug)
-      .then((res) => {
-        if (cancelled) return;
-        setTopicData(res);
-        setTopicState("loaded");
-        // Open the first group by default so a topic's PYQs are immediately
-        // visible; the rest stay collapsed and are picked to expand.
-        setExpandedNodes(
-          new Set(res.groups.length > 0 ? [res.groups[0].node_id] : []),
-        );
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setTopicError(messageFromError(err));
-        setTopicState("error");
-      });
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setTopicState("loading");
+      setTopicError(null);
+      optionalService
+        .getPyqsByTopic(slug)
+        .then((res) => {
+          if (cancelled) return;
+          if (!res.groups.every((group) => hasOnlyReviewedPyqs(group.pyqs))) {
+            throw new Error(
+              "The published PYQ library returned rows that are not marked reviewed. Nothing is shown.",
+            );
+          }
+          setTopicData(res);
+          setTopicState("loaded");
+          // Open the first group by default so a topic's PYQs are immediately
+          // visible; the rest stay collapsed and are picked to expand.
+          setExpandedNodes(
+            new Set(res.groups.length > 0 ? [res.groups[0].node_id] : []),
+          );
+        })
+        .catch((err: unknown) => {
+          // Honest failure: the topic-wise tree is not rebuilt from frontend data.
+          if (cancelled) return;
+          setTopicData(null);
+          setTopicError(messageFromError(err));
+          setTopicState("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
-  }, [slug, viewMode, isLoaded, isSignedIn, topicState, topicData]);
+  }, [slug, viewMode, isLoaded, isSignedIn, topicState, topicData, topicReloadNonce]);
 
   const toggleNode = useCallback((nodeId: number) => {
     setExpandedNodes((prev) => {
@@ -389,7 +456,9 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
         {viewMode === "year" ? (
           <>
             {state === "loading" ? <LoadingPanel /> : null}
-            {state === "error" && error ? <ErrorPanel message={error} /> : null}
+            {state === "error" && error ? (
+              <ErrorPanel message={error} onRetry={() => setReloadNonce((n) => n + 1)} />
+            ) : null}
             {state === "loaded" ? (
               pyqs.length > 0 ? (
                 <section data-testid="pyq-results" className="flex flex-col gap-3">
@@ -415,7 +484,15 @@ export function PyqExplorer({ slug, onClose, onSolve }: PyqExplorerProps) {
         {viewMode === "topic" ? (
           <>
             {topicState === "loading" ? <LoadingPanel /> : null}
-            {topicState === "error" && topicError ? <ErrorPanel message={topicError} /> : null}
+            {topicState === "error" && topicError ? (
+              <ErrorPanel
+                message={topicError}
+                onRetry={() => {
+                  setTopicState("idle");
+                  setTopicReloadNonce((n) => n + 1);
+                }}
+              />
+            ) : null}
             {topicState === "loaded" ? (
               topicData && topicData.groups.length > 0 ? (
                 <section data-testid="pyq-topic-results" className="flex flex-col gap-3">
@@ -799,14 +876,31 @@ function LoadingPanel() {
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
+/**
+ * Load-failure panel. It states the failure and offers a retry only — there is
+ * deliberately no offline content behind it, so "couldn't load" never looks
+ * like a corpus.
+ */
+function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
       data-testid="pyq-error"
-      className="flex items-start gap-2 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
+      className="flex flex-col gap-3 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
     >
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{message}</span>
+      <span className="flex items-start gap-2">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{message}</span>
+      </span>
+      {onRetry ? (
+        <button
+          type="button"
+          data-testid="pyq-error-retry"
+          onClick={onRetry}
+          className="self-start rounded-xl border border-[#8a4b52] bg-[#fbf0ee] px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#8a4b52] hover:bg-[#8a4b52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a4b52]/40"
+        >
+          Try again
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -819,7 +913,7 @@ function messageFromError(err: unknown): string {
     }
     if (anyErr.message) return anyErr.message;
   }
-  return "Couldn't load the PYQs. Please try again.";
+  return "Couldn't load the published PYQs from the library, so nothing is shown here. Please try again.";
 }
 
 export default PyqExplorer;

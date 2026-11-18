@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import User
 from app.api.dependencies import get_current_user
-from app.core.gs.models import GsReviewStatusEnum
+from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsContentSection,
@@ -38,6 +38,7 @@ from app.core.gs_lms.pdf_generator import (
     get_file_extension,
 )
 from app.api.v1.gs_lms.schemas import GsLmsPdfStatusOut
+from app.api.v1.gs_lms.dependencies import resolve_subject
 
 router = APIRouter()
 
@@ -47,12 +48,15 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _get_reviewed_node_or_404(db: Session, node_id: int) -> GsLmsSyllabusNode:
-    """Fetch a REVIEWED syllabus node by ID or raise 404."""
+def _get_reviewed_node_or_404(
+    db: Session, node_id: int, subject_id: int
+) -> GsLmsSyllabusNode:
+    """Fetch a reviewed node owned by the requested subject or raise 404."""
     node = (
         db.query(GsLmsSyllabusNode)
         .filter(
             GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsSyllabusNode.review_status == GsReviewStatusEnum.REVIEWED,
         )
         .one_or_none()
@@ -98,6 +102,7 @@ def _sanitize_filename(title: str) -> str:
 @router.get("/topics/{node_id}/pdf")
 def download_topic_pdf(
     node_id: int,
+    subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -115,8 +120,9 @@ def download_topic_pdf(
 
     Validates: Requirements 8.1, 8.4, 8.5
     """
-    # Fetch REVIEWED node or 404
-    node = _get_reviewed_node_or_404(db, node_id)
+    # Resolve the URL subject before fetching the reviewed node so a valid
+    # node ID cannot be reused through a different subject route.
+    node = _get_reviewed_node_or_404(db, node_id, subject.id)
 
     # Get all REVIEWED sections for this topic
     all_sections = (
@@ -149,7 +155,7 @@ def download_topic_pdf(
     pdf_bytes = generate_topic_pdf(
         sections=pdf_sections,
         topic_title=node.title,
-        subject_name="GS Geography",
+        subject_name=subject.name,
     )
 
     # Determine content type and file extension

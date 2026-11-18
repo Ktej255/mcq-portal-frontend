@@ -177,11 +177,11 @@ class GsLmsSyllabusNode(Base, InstitutionalAuditMixin):
 # ---------------------------------------------------------------------------
 
 class GsLmsContentSection(Base, InstitutionalAuditMixin):
-    """One of 4 progressive-disclosure sections per topic.
+    """One of 5 progressive-disclosure sections per topic.
 
-    Each leaf-level syllabus node has exactly four content sections:
-    BASIC → ADVANCED → NCERT_LEVEL → EXAMINER_TRAPS, enforced by
-    display_order (1-4).
+    Each leaf-level syllabus node has five canonical content sections:
+    BASIC → NCERT_LEVEL → ADVANCED → CURRENT_AFFAIRS → EXAMINER_TRAPS,
+    enforced by display_order (1-5).
     """
     __tablename__ = "gs_lms_content_sections"
 

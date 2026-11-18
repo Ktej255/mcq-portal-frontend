@@ -9,9 +9,9 @@ answer-writing pipeline.
 
 Honesty (design **Property 6**): a report is "complete" only when no required
 section is missing; if the model cannot produce a section it is named in
-``incomplete_sections`` rather than fabricated. Total model/parse failure
-degrades honestly to an *all-incomplete* report — never a fabricated complete
-one.
+``incomplete_sections`` rather than fabricated. An injected provider may return
+an honest all-incomplete report, but gateway call/validation failures raise a
+typed unavailable error so API callers cannot persist them as evaluated.
 
 Subject-neutral: references no GS or Optional modules (Requirement 2 /
 Property 9).
@@ -42,6 +42,15 @@ from app.core.evaluation.schema import (
 # ---------------------------------------------------------------------------
 # Interface
 # ---------------------------------------------------------------------------
+class EvaluationProviderUnavailableError(RuntimeError):
+    """Raised when evaluation cannot produce a trustworthy provider result."""
+
+    def __init__(self, provider: str, operation: str):
+        self.provider = provider
+        self.operation = operation
+        super().__init__(f"Evaluation provider unavailable during {operation}")
+
+
 class EvaluationProvider(ABC):
     """Abstract answer-evaluation provider.
 
@@ -149,8 +158,8 @@ class GatewayEvaluationProvider(EvaluationProvider):
 
     Honesty (design Property 6 / R6): if the gateway call fails (no creds /
     backend down) or the model returns output that fails strict validation, the
-    provider degrades to an *all-incomplete* report rather than trusting bad
-    output or fabricating a "complete" one.
+    provider raises :class:`EvaluationProviderUnavailableError` rather than
+    trusting bad output or allowing an evaluated failure to be persisted.
     """
 
     name = "gemini"
@@ -179,17 +188,19 @@ class GatewayEvaluationProvider(EvaluationProvider):
             from app.core.inference.gateway import InferenceGateway
 
             response = InferenceGateway.get_provider(self.provider_name).generate(request)
-        except Exception:
-            # Backend not operational in this environment — honest degradation
-            # (never a fabricated complete report).
-            return _all_incomplete(required_sections)
+        except Exception as exc:
+            # Provider failure must not become a persisted evaluated report.
+            raise EvaluationProviderUnavailableError(
+                self.provider_name, "provider_call"
+            ) from exc
 
         try:
             return parse_evaluation_report(response)
-        except SchemaValidationError:
-            # Model returned malformed / non-conforming output — flag everything
-            # as incomplete rather than trusting it (Property 6 / R6).
-            return _all_incomplete(required_sections)
+        except SchemaValidationError as exc:
+            # Malformed model output is unavailable for institutional scoring.
+            raise EvaluationProviderUnavailableError(
+                self.provider_name, "response_validation"
+            ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -204,15 +215,29 @@ def get_evaluation_provider(name: Optional[str] = None) -> EvaluationProvider:
     Selection precedence:
         1. explicit ``name`` argument
         2. ``OPTIONAL_EVAL_PROVIDER`` environment variable
-        3. default → ``"mock"``
+        3. configured default → ``"gemini"``
 
-    The mock is the safe default for test/dev (no model, deterministic complete
-    report), exactly like the inference gateway and the STT/OCR selectors.
-    Providers are cached per-name. ``ValueError`` is raised for unknown names.
+    Deterministic evaluation is available only when the runtime is explicitly
+    non-production, ``mock`` is explicitly selected, and
+    ``ENABLE_OPTIONAL_EVAL_MOCK=true``. Providers are cached per name. Policy,
+    configuration, and unknown-provider failures all raise the typed
+    unavailable error so API callers fail closed with a retryable response.
     """
+    from app.core.config import settings
+
     resolved = (
-        name or os.environ.get("OPTIONAL_EVAL_PROVIDER") or "mock"
+        name
+        or os.environ.get("OPTIONAL_EVAL_PROVIDER")
+        or settings.OPTIONAL_EVAL_PROVIDER
     ).strip().lower()
+
+    if resolved == "mock" and (
+        settings.APP_ENVIRONMENT not in {"development", "test", "local"}
+        or not settings.ENABLE_OPTIONAL_EVAL_MOCK
+    ):
+        raise EvaluationProviderUnavailableError(
+            "mock", "runtime_policy"
+        )
 
     if resolved in _PROVIDERS:
         return _PROVIDERS[resolved]
@@ -222,7 +247,7 @@ def get_evaluation_provider(name: Optional[str] = None) -> EvaluationProvider:
     elif resolved in ("gemini", "gateway"):
         provider = GatewayEvaluationProvider()
     else:
-        raise ValueError(f"Unknown evaluation provider '{resolved}'")
+        raise EvaluationProviderUnavailableError(resolved, "provider_selection")
 
     _PROVIDERS[resolved] = provider
     return provider
@@ -230,6 +255,7 @@ def get_evaluation_provider(name: Optional[str] = None) -> EvaluationProvider:
 
 __all__ = [
     "EvaluationProvider",
+    "EvaluationProviderUnavailableError",
     "MockEvaluationProvider",
     "GatewayEvaluationProvider",
     "MockEvaluationInferenceProvider",

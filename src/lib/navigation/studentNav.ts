@@ -9,6 +9,7 @@ import {
   FileInput,
   FileSearch,
   FolderTree,
+  Gauge,
   GitBranch,
   GraduationCap,
   LayoutDashboard,
@@ -66,8 +67,8 @@ export const operatorRoutes = new Set<string>([
   "/upsc/readiness-audit",
   "/upsc/mcq-command",
   "/upsc/content-command",
+  "/upsc/content-coverage",
   "/upsc/revision-command",
-  "/upsc/yearly-planner",
   "/upsc/geography/testing",
   "/upsc/geography/animation-studio",
   "/upsc/geography/continue",
@@ -138,7 +139,21 @@ export const studentNavSections: StudentNavSection[] = [
         name: "GS",
         href: "/upsc/geography/lms",
         icon: Compass,
-        match: (pathname) => pathname.startsWith("/upsc/geography"),
+        // Study-map surfaces only. Practice, Readiness and the revision plan
+        // have their own entries below, so marking GS active on those pages
+        // would highlight two destinations at once.
+        match: (pathname) =>
+          pathname === "/upsc/geography" ||
+          pathname === "/upsc/geography/lms" ||
+          pathname === "/upsc/geography/lms/syllabus" ||
+          pathname.startsWith("/upsc/geography/lms/topic") ||
+          pathname.startsWith("/upsc/geography/lms/onboarding"),
+      },
+      {
+        name: "Yearly Planner",
+        href: "/upsc/yearly-planner",
+        icon: FolderTree,
+        match: (pathname) => pathname.startsWith("/upsc/yearly-planner"),
       },
       {
         name: "Optional",
@@ -150,7 +165,11 @@ export const studentNavSections: StudentNavSection[] = [
         name: "Practice",
         href: "/practice",
         icon: ClipboardCheck,
-        match: (pathname) => pathname.startsWith("/practice"),
+        // /practice redirects into the Geography MCQ Lab, so the nav item must
+        // stay active on the destination the learner actually lands on.
+        match: (pathname) =>
+          pathname.startsWith("/practice") ||
+          pathname.startsWith("/upsc/geography/lms/practice"),
       },
     ],
   },
@@ -158,16 +177,24 @@ export const studentNavSections: StudentNavSection[] = [
     label: "Account",
     items: [
       {
-        name: "Reports",
-        href: "/reports",
+        // The server-backed "what UPSC asks vs what you covered" dashboard is
+        // the real report for a beta learner. The legacy /reports page reads
+        // local storage from the old exam flow and stays reachable by URL only.
+        name: "Readiness",
+        href: "/upsc/geography/lms/gaps",
         icon: BarChart3,
-        match: (pathname) => pathname.startsWith("/reports"),
+        match: (pathname) => pathname.startsWith("/upsc/geography/lms/gaps"),
       },
       {
+        // Due Day 3/7/21 revisits are listed at the top of Today's plan. The
+        // legacy /revision queue is fed only by full-exam attempts, so pointing
+        // learners there produced an empty page while revisits were due.
         name: "Revision",
-        href: "/revision",
+        href: "/upsc/geography/lms/planner",
         icon: RefreshCcw,
-        match: (pathname) => pathname.startsWith("/revision"),
+        match: (pathname) =>
+          pathname.startsWith("/upsc/geography/lms/planner") ||
+          pathname.startsWith("/upsc/geography/lms/retro"),
       },
       {
         name: "Billing",
@@ -188,6 +215,7 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Pricing", href: "/upsc/pricing", icon: BadgeIndianRupee },
   { name: "Syllabus/PYQ", href: "/upsc/source-library", icon: LibraryBig },
   { name: "Review Command", href: "/upsc/prelims-review-command", icon: GitBranch },
+  { name: "Content Coverage", href: "/upsc/content-coverage", icon: Gauge },
   { name: "2027 Strategy", href: "/upsc/prelims-2027-strategy", icon: Route },
   { name: "2026 Showcase", href: "/upsc/prelims-2026-showcase", icon: BarChart3 },
   { name: "PYQ Import", href: "/admin/pyq-import", icon: FileInput },

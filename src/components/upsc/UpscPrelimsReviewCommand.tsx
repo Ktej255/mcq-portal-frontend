@@ -6,7 +6,6 @@ import {
   ArrowRight,
   BarChart3,
   BookOpenCheck,
-  CheckCircle2,
   ClipboardCheck,
   Database,
   FileCheck2,
@@ -101,8 +100,8 @@ export function UpscPrelimsReviewCommand() {
     fetch("/api/upsc/source-archive", { cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json()) as SourceArchiveIntakeResponse;
-        if (!response.ok) {
-          throw new Error(payload.message || "Source archive is not reachable.");
+        if (!response.ok || !payload.ok || !payload.scanComplete) {
+          throw new Error(payload.message || "Source archive scan is incomplete.");
         }
         return buildPrelims2026ArchiveProofReadiness(payload);
       })

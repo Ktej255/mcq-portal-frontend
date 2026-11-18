@@ -60,7 +60,7 @@ export interface CAItemDetailOut {
   source_authority: string;
   relevance_score: number;
   threads: Array<{ id: number; title: string }>;
-  syllabus_links: Array<{ node_id: number; topic_title: string }>;
+  syllabus_links: Array<{ node_id: number; topic_title: string; link_type: string }>;
 }
 
 export interface CAFunnelStateOut {
@@ -86,6 +86,44 @@ export interface CAMcqResultOut {
   correct_count: number;
   score: number;
   attempts: Array<{ question_id: number; chosen_answer: string; correct_answer: string; is_correct: boolean; question_type: string; explanation: string }>;
+}
+
+export interface CAMainsQuestionOut {
+  id: number;
+  question_text: string;
+  gs_paper: string;
+  marks: number;
+  word_limit: number;
+}
+
+export interface QuickTestMcqOut {
+  id: number;
+  question_text: string;
+  question_type: string;
+  options: Array<{ label: string; text: string }>;
+  item_title: string;
+  item_date: string;
+}
+
+export interface QuickTestOut {
+  quiz_label: string;
+  mcqs: QuickTestMcqOut[];
+  total_count: number;
+}
+
+export interface QuickTestResultOut {
+  total_questions: number;
+  correct_count: number;
+  score: number;
+  persistence_status: 'not_persisted';
+  attempt_id: null;
+  attempts: Array<{
+    question_id: number;
+    chosen_answer: string;
+    is_correct: boolean;
+    question_type: string;
+    explanation: string | null;
+  }>;
 }
 
 export interface ThreadSummaryOut {
@@ -218,6 +256,24 @@ export const caService = {
   submitCaMcqs: async (itemId: number, answers: Record<number, string>): Promise<CAMcqResultOut> => {
     const response = await apiClient.post(`current-affairs/items/${itemId}/mcqs/submit`, { answers });
     return unwrap<CAMcqResultOut>(response.data);
+  },
+
+  getCaMainsQuestions: async (itemId: number): Promise<CAMainsQuestionOut[]> => {
+    const response = await apiClient.get(`current-affairs/items/${itemId}/mains`);
+    return unwrap<CAMainsQuestionOut[]>(response.data);
+  },
+
+  getQuickTest: async (scope: 'today' | 'this_week' | 'this_month' | 'subject', count = 10): Promise<QuickTestOut> => {
+    const response = await apiClient.get(`current-affairs/quick-test?scope=${scope}&count=${count}`);
+    return unwrap<QuickTestOut>(response.data);
+  },
+
+  submitQuickTest: async (questionIds: number[], answers: Record<number, string>): Promise<QuickTestResultOut> => {
+    const response = await apiClient.post('current-affairs/quick-test/submit', {
+      question_ids: questionIds,
+      answers,
+    });
+    return unwrap<QuickTestResultOut>(response.data);
   },
 
   // Analytics

@@ -19,7 +19,7 @@ import {
 import { PageShell, StartFreeCta } from "@/components/marketing/PageShell";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { getSubject, subjects, type Subject } from "@/components/marketing/site-data";
-import { getGsSubjectDetail, gsSubjectSlugs } from "@/lib/subjects/gs-subject-data";
+import { getGsSubjectDetail } from "@/lib/subjects/gs-subject-data";
 import { pageMeta, SITE_URL, ORG_NAME } from "@/lib/seo";
 
 /* ------------------------------------------------------------------ */

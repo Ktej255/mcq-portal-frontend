@@ -52,6 +52,10 @@ import {
  * - The status is derived purely from the student's own attempts (ownership —
  *   design Property 10). A student with no attempts sees the honest zero-state
  *   (Not started, no count, no last-practiced date) — nothing is invented.
+ * - Honest-failure rule (founder decision, 2026-10-31): if the status request
+ *   fails, the board reports the failure with a retry. It is never populated
+ *   from the frontend's offline topic modules, because topic ids, `authored`
+ *   flags and attempt counts are backend facts.
  *
  * The practice action itself (typed/spoken/handwritten answer writing +
  * AI-assisted evaluation) is the `AnswerWorkspace` built in **Task 9**. This
@@ -128,6 +132,8 @@ export function PracticeBoard({ slug, onClose, onPractice }: PracticeBoardProps)
   const [data, setData] = useState<PracticeBoardOut | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Bumped by "Try again" so a failed request re-runs against the backend.
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Interim "Practice" target — only used when no `onPractice` host seam.
@@ -138,29 +144,36 @@ export function PracticeBoard({ slug, onClose, onPractice }: PracticeBoardProps)
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setState("loading");
-    setError(null);
-    optionalService
-      .getPracticeStatus(slug)
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        setState("loaded");
-        // Open the first non-empty section by default so topics are visible.
-        const firstSection = res.papers
-          .flatMap((p) => p.sections)
-          .find((s) => s.topics.length > 0);
-        setExpanded(new Set(firstSection ? [firstSection.section_id] : []));
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageFromError(err));
-        setState("error");
-      });
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setState("loading");
+      setError(null);
+      optionalService
+        .getPracticeStatus(slug)
+        .then((res) => {
+          if (cancelled) return;
+          setData(res);
+          setState("loaded");
+          // Open the first non-empty section by default so topics are visible.
+          const firstSection = res.papers
+            .flatMap((p) => p.sections)
+            .find((s) => s.topics.length > 0);
+          setExpanded(new Set(firstSection ? [firstSection.section_id] : []));
+        })
+        .catch((err: unknown) => {
+          // Honest failure: no offline board, no invented topics or counts.
+          if (cancelled) return;
+          setData(null);
+          setExpanded(new Set());
+          setError(messageFromError(err));
+          setState("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
-  }, [slug, isLoaded, isSignedIn]);
+  }, [slug, isLoaded, isSignedIn, reloadNonce]);
 
   const toggleSection = useCallback((sectionId: number) => {
     setExpanded((prev) => {
@@ -229,7 +242,9 @@ export function PracticeBoard({ slug, onClose, onPractice }: PracticeBoardProps)
         </section>
 
         {state === "loading" ? <LoadingPanel /> : null}
-        {state === "error" && error ? <ErrorPanel message={error} /> : null}
+        {state === "error" && error ? (
+          <ErrorPanel message={error} onRetry={() => setReloadNonce((n) => n + 1)} />
+        ) : null}
 
         {state === "loaded" ? (
           data && hasAnyTopics ? (
@@ -587,14 +602,30 @@ function LoadingPanel() {
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
+/**
+ * Load-failure panel. Retry only — the offline topic modules are not used, so
+ * "couldn't load" never appears as a practice board.
+ */
+function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
       data-testid="practice-error"
-      className="flex items-start gap-2 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
+      className="flex flex-col gap-3 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
     >
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{message}</span>
+      <span className="flex items-start gap-2">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{message}</span>
+      </span>
+      {onRetry ? (
+        <button
+          type="button"
+          data-testid="practice-error-retry"
+          onClick={onRetry}
+          className="self-start rounded-xl border border-[#8a4b52] bg-[#fbf0ee] px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#8a4b52] hover:bg-[#8a4b52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a4b52]/40"
+        >
+          Try again
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -617,7 +648,7 @@ function messageFromError(err: unknown): string {
     }
     if (anyErr.message) return anyErr.message;
   }
-  return "Couldn't load the practice board. Please try again.";
+  return "Couldn't load the practice board from the published library, so nothing is shown here. Please try again.";
 }
 
 export default PracticeBoard;

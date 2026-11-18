@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PlannerUI } from "../PlannerUI";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
@@ -79,20 +79,59 @@ export function PlannerPage() {
   const { isLoaded, isSignedIn } = useApiConfig();
   const { subject } = useSubjectLms();
   const [gate, setGate] = useState<RecallGateState | null>(null);
+  const [failedSubject, setFailedSubject] = useState<string | null>(null);
+  const recallRequestRef = useRef(0);
+  // The failure is recorded against the subject that failed, so switching
+  // subject cannot show the previous subject's error and the loader does not
+  // have to clear state before it starts.
+  const recallGateError =
+    failedSubject === subject ? "Recall check unavailable. Please retry." : null;
+
+  // Writes happen inside promise callbacks so they are provably asynchronous,
+  // and the request id stops a slow response for a previous subject from
+  // overwriting the current one.
+  const fetchRecallGate = useCallback(() => {
+    const requestId = ++recallRequestRef.current;
+
+    gsLmsService
+      .checkRecallGate(subject)
+      .then((nextGate) => {
+        if (requestId !== recallRequestRef.current) return;
+        setGate(nextGate);
+        setFailedSubject(null);
+      })
+      .catch(() => {
+        if (requestId !== recallRequestRef.current) return;
+        setGate(null);
+        setFailedSubject(subject);
+      });
+  }, [subject]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    gsLmsService
-      .checkRecallGate(subject)
-      .then(setGate)
-      .catch(() => setGate(null));
-  }, [isLoaded, isSignedIn, subject]);
+    fetchRecallGate();
+    return () => {
+      recallRequestRef.current += 1;
+    };
+  }, [isLoaded, isSignedIn, fetchRecallGate]);
 
   return (
     <div className="p-6">
       <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">
         Daily Planner
       </h1>
+      {recallGateError && (
+        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">{recallGateError}</p>
+          <button
+            type="button"
+            onClick={fetchRecallGate}
+            className="mt-3 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            Retry recall check
+          </button>
+        </div>
+      )}
       {gate?.recall_needed && (
         <RecallGateBanner gate={gate} onClear={() => setGate(null)} />
       )}

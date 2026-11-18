@@ -60,6 +60,20 @@ const unwrap = <T>(data: unknown): T => {
   return (record.data ?? record) as T;
 };
 
+/**
+ * Check the exact server-confirmed subscription required to activate a payment.
+ * The subscription endpoint is webhook-backed, so an SDK callback alone is not
+ * sufficient evidence of activation.
+ */
+export const isMatchingActiveSubscription = (
+  subscription: SubscriptionResponse,
+  expected: Pick<CreateOrderResponse, 'order_id' | 'plan_tier' | 'billing_cycle'>,
+): boolean =>
+  subscription.status === 'active' &&
+  subscription.order_id === expected.order_id &&
+  subscription.plan_tier === expected.plan_tier &&
+  subscription.billing_cycle === expected.billing_cycle;
+
 export const paymentService = {
   /**
    * Create a Cashfree payment order for the given plan tier and billing cycle.

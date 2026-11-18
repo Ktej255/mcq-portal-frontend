@@ -1,0 +1,714 @@
+{
+  "items": [
+    {
+      "title": "GSLV-F18 / NVS-03: ISRO's next NavIC navigation satellite",
+      "publish_date": "2026-10-30",
+      "subject": "science-tech",
+      "gs_paper": "GS3",
+      "exam_relevance": "both",
+      "source_authority": "official",
+      "relevance_score": 4,
+      "video_url": null,
+      "content_blocks": [
+        {
+          "type": "paragraph",
+          "text": "ISRO's own mission list scheduled the GSLV-F18 / NVS-03 launch for 30 October 2026. NVS-03 belongs to the Navigation with Indian Constellation (NavIC) family of satellites, the regional positioning system India maintains for its own civil and strategic user base."
+        },
+        {
+          "type": "paragraph",
+          "text": "What the mission adds. NavIC satellites sit in geosynchronous orbit and broadcast positioning and timing signals over India and roughly 1,500 kilometres beyond its borders. A fresh satellite in the constellation replaces ageing segments, keeps the number of usable satellites above the minimum the service needs, and extends the life of an Indian-owned alternative to GPS for applications such as disaster management, fisheries, transport telematics and precise timing for power and telecom networks."
+        },
+        {
+          "type": "paragraph",
+          "text": "The launcher matters as much as the payload. GSLV Mark II carries these heavier, cryogenic-upper-stage missions, which is why an NVS launch is scheduled on GSLV rather than on the smaller PSLV used for the light earth-observation satellites in the same period."
+        },
+        {
+          "type": "paragraph",
+          "text": "Status of this note. It records the schedule published by ISRO. It does not assert a successful injection into orbit; confirm launch outcome from ISRO's own mission page before treating any part of this item as completed fact."
+        },
+        {
+          "type": "source",
+          "text": "Source: Indian Space Research Organisation, mission list (https://www.isro.gov.in/), GSLV-F18/NVS-03 scheduled 30 October 2026; GSLV-F17/EOS-05 launched 4 September 2026. Retrieved 30 October 2026."
+        }
+      ],
+      "upsc_statement_frames": {
+        "prelims_statements": [
+          "NavIC is a regional navigation system whose service area covers India and roughly 1,500 km around it, not a global constellation.",
+          "NVS-series navigation satellites are launched on GSLV vehicles because of their mass and their geosynchronous destination.",
+          "Navigation satellites provide positioning and timing; the timing signal is as exam-relevant as the position fix."
+        ],
+        "mains_angle": "Strategic autonomy in space: why India keeps a regional positioning system alongside access to GPS, and what a depleted satellite constellation would cost civil users."
+      },
+      "so_what_analysis": {
+        "who_benefits": "Transport, fisheries, disaster-response and telecom users who need an Indian-controlled positioning and timing signal.",
+        "who_loses": "Foreign constellations lose exclusivity in Indian critical applications where NavIC is mandated.",
+        "what_changes_next": "Constellation health depends on replacing satellites before capacity drops, so the launch calendar itself is the strategic variable.",
+        "upsc_angle": "GS III science and technology: indigenisation, space applications, and the difference between launch capability and navigation capability.",
+        "connected_static_topic": "Space technology and its applications; remote sensing and GIS; Indian Science and Technology programme."
+      },
+      "mcqs": [
+        {
+          "question_text": "Consider the following statements about the NavIC system:\n1. It is a regional navigation system rather than a global one.\n2. Its service area is limited to the territory of India.\n3. Its satellites provide a timing signal in addition to positioning.\nHow many of the above statements are correct?",
+          "question_type": "HOW_MANY_CORRECT",
+          "options": [
+            {
+              "label": "A",
+              "text": "Only one"
+            },
+            {
+              "label": "B",
+              "text": "Only two"
+            },
+            {
+              "label": "C",
+              "text": "All three"
+            },
+            {
+              "label": "D",
+              "text": "None"
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "Statements 1 and 3 are correct. Statement 2 is wrong: NavIC covers India and approximately 1,500 km beyond it, which is what makes it regional rather than global."
+        },
+        {
+          "question_text": "Why is an NVS-series navigation satellite launched on a GSLV vehicle rather than on PSLV?",
+          "question_type": "DIRECT_RECALL",
+          "options": [
+            {
+              "label": "A",
+              "text": "Because it needs a cryogenic upper stage to reach its geosynchronous orbit and has a higher launch mass"
+            },
+            {
+              "label": "B",
+              "text": "Because PSLV can only carry satellites for earth observation"
+            },
+            {
+              "label": "C",
+              "text": "Because GSLV is cheaper and flies more frequently"
+            },
+            {
+              "label": "D",
+              "text": "Because navigation satellites must be launched from a equatorial site"
+            }
+          ],
+          "correct_answer": "A",
+          "explanation": "GSLV Mark II is India's heavier-lift vehicle with a cryogenic upper stage, needed to place a navigation satellite into its geosynchronous transfer orbit. PSLV is a lighter polar/LEO workhorse, not restricted to earth-observation payloads."
+        },
+        {
+          "question_text": "Which one of the following is a legitimate civilian use of a regional navigation timing and positioning signal?",
+          "question_type": "NOT_EXCEPTION",
+          "options": [
+            {
+              "label": "A",
+              "text": "Synchronising telecom and power-grid clocks"
+            },
+            {
+              "label": "B",
+              "text": "Vehicle tracking and fleet telematics"
+            },
+            {
+              "label": "C",
+              "text": "Fisheries position reporting and disaster-response mapping"
+            },
+            {
+              "label": "D",
+              "text": "Setting the orbital altitude of a launch vehicle's crew cabin"
+            }
+          ],
+          "correct_answer": "D",
+          "explanation": "Timing, telematics and position reporting are standard applications of satellite navigation. Navigation signals do not set a vehicle's orbital altitude; that is a launch-and-insertion function."
+        }
+      ],
+      "mains_questions": [
+        {
+          "question_text": "Distinguish between global and regional satellite navigation systems. Why has India maintained NavIC alongside open access to foreign constellations, and what vulnerabilities does a regional system still leave?",
+          "gs_paper": "GS3",
+          "marks": 15,
+          "word_limit": 250,
+          "model_answer": null,
+          "display_order": 1
+        },
+        {
+          "question_text": "\"Launch capability and navigation capability are different strategic assets.\" Evaluate this statement with reference to India's GSLV and NVS programmes, and discuss how satellite-constellation health affects civilian services.",
+          "gs_paper": "GS3",
+          "marks": 10,
+          "word_limit": 150,
+          "model_answer": null,
+          "display_order": 2
+        }
+      ]
+    },
+    {
+      "title": "Very Severe Cyclonic Storm \"Arnab\" on the Andhra Pradesh-Odisha coast",
+      "publish_date": "2026-10-27",
+      "subject": "disaster-mgmt",
+      "gs_paper": "GS1",
+      "exam_relevance": "both",
+      "source_authority": "official",
+      "relevance_score": 4,
+      "video_url": null,
+      "content_blocks": [
+        {
+          "type": "paragraph",
+          "text": "The India Meteorological Department's National Bulletin No. 22, issued at 23:30 IST on 27 October 2026, tracked the Very Severe Cyclonic Storm \"Arnab\" along and off the Andhra Pradesh-Odisha coasts, with heavy to very heavy rain likely over the period around 28 and 30 October 2026."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why the Bay of Bengal produces the worst landfalls. Cyclones in the north Bay move with the seasonal winds toward the Odisha-Andhra coast, which is low-lying, densely populated and repeatedly exposed. The post-1999 Indian disaster-management response is built around exactly this hazard: multi-hazard early warning, pre-landfall evacuation of vulnerable blocks, and stockpiling before rather than after the storm."
+        },
+        {
+          "type": "paragraph",
+          "text": "What the bulletin's wording tells a candidate. IMD classifies intensity in named stages, from cyclonic storm to extremely severe cyclonic storm, and it issues numbered national bulletins while a system is live. The warning is area-based and time-bound, which is why coastal district administration, not the meteorological department alone, converts a forecast into evacuation orders."
+        },
+        {
+          "type": "paragraph",
+          "text": "Status of this note. It records the warning as published on 27 October 2026. Landfall timing, intensity at landfall and damage reports must be re-verified from the later IMD bulletins and the state disaster authorities before being treated as outcomes."
+        },
+        {
+          "type": "source",
+          "text": "Source: India Meteorological Department, National Bulletin No. 22 on Very Severe Cyclonic Storm \"Arnab\", 27 October 2026, 23:30 IST (https://mausam.imd.gov.in/backend/assets/cyclone_pdf/22__National_Bulletin_No_22-27Oct2026_2330IST.pdf). Retrieved 30 October 2026."
+        }
+      ],
+      "upsc_statement_frames": {
+        "prelims_statements": [
+          "The north Bay of Bengal coast, especially Odisha and Andhra Pradesh, is India's most cyclone-exposed shoreline.",
+          "IMD issues numbered national bulletins and classifies cyclonic systems into named intensity stages while a system is live.",
+          "Cyclone preparedness in India is organised around pre-landfall evacuation driven by area-based, time-bound warnings."
+        ],
+        "mains_angle": "From warning to action: how institutional learning from the 1999 Odisha cyclone reshaped India's disaster-management cycle, and what climate intensification changes about it."
+      },
+      "so_what_analysis": {
+        "who_benefits": "Coastal communities in Andhra Pradesh and Odisha when time-bound warnings trigger early evacuation and asset shifting.",
+        "who_loses": "Agriculture, fisheries and coastal infrastructure absorb the loss even when mortality is successfully reduced.",
+        "what_changes_next": "Whether the system intensifies or weakens before landfall decides the scale of the response; later IMD bulletins supersede this one.",
+        "upsc_angle": "GS I cyclone and monsoon geography linked to GS III disaster-management institutions and the Sendai-framework priorities.",
+        "connected_static_topic": "Cyclones and their mechanism; disaster-management institutional framework; National Disaster Management Authority."
+      },
+      "mcqs": [
+        {
+          "question_text": "Which one of the following best explains why the Odisha-Andhra coastline suffers more cyclone landfalls than the Arabian Sea coast of Gujarat?",
+          "question_type": "DIRECT_RECALL",
+          "options": [
+            {
+              "label": "A",
+              "text": "The Bay of Bengal supplies warmer moisture and the storm tracks are steered toward that shoreline"
+            },
+            {
+              "label": "B",
+              "text": "The Arabian Sea has no tropical cyclones at any time of the year"
+            },
+            {
+              "label": "C",
+              "text": "Cyclones cannot cross into the Arabian Sea because of the Western Ghats"
+            },
+            {
+              "label": "D",
+              "text": "Gujarat's coastline is entirely rocky and cannot be flooded"
+            }
+          ],
+          "correct_answer": "A",
+          "explanation": "The north Bay of Bengal is the main cyclone basin for India because of sea-surface warmth and the steering flow that drives systems toward Odisha and Andhra Pradesh. The Arabian Sea does produce cyclones, and the Western Ghats are not the reason for the difference in landfall frequency."
+        },
+        {
+          "question_text": "Consider the following statements about cyclone warnings in India:\n1. A national bulletin is issued by the India Meteorological Department while a cyclonic system is live.\n2. The classification of a system as a Very Severe Cyclonic Storm is based on intensity.\n3. Once a warning is issued, evacuation orders are framed and enforced by the coastal district administration.\nWhich of the statements given above are correct?",
+          "question_type": "MULTI_STATEMENT",
+          "options": [
+            {
+              "label": "A",
+              "text": "1 and 2 only"
+            },
+            {
+              "label": "B",
+              "text": "2 and 3 only"
+            },
+            {
+              "label": "C",
+              "text": "1 and 3 only"
+            },
+            {
+              "label": "D",
+              "text": "1, 2 and 3"
+            }
+          ],
+          "correct_answer": "D",
+          "explanation": "All three are correct. IMD issues the numbered bulletins and names the intensity stage; converting the forecast into evacuation and relief orders is the job of the state and district machinery under the disaster-management framework."
+        },
+        {
+          "question_text": "In disaster-management terms, what is the main reason a time-bound, area-based cyclone warning matters more than a general statement that a cyclone is \"likely\"?",
+          "question_type": "SCENARIO_APPLIED",
+          "options": [
+            {
+              "label": "A",
+              "text": "It allows evacuation, labour deployment and stockpiling to be scheduled before landfall"
+            },
+            {
+              "label": "B",
+              "text": "It prevents the cyclone from intensifying"
+            },
+            {
+              "label": "C",
+              "text": "It replaces the need for a early-warning satellite network"
+            },
+            {
+              "label": "D",
+              "text": "It fixes the compensation amount payable after the event"
+            }
+          ],
+          "correct_answer": "A",
+          "explanation": "Warnings cannot change the hazard, but a defined area and a defined window let administration sequence evacuation and pre-position resources, which is the core of India's post-1999 cyclone preparedness."
+        }
+      ],
+      "mains_questions": [
+        {
+          "question_text": "\"India has converted cyclone mortality into cyclone damage.\" Critically examine this statement with reference to the institutional response built after the 1999 Odisha super cyclone, and indicate what remains weak in the preparedness chain.",
+          "gs_paper": "GS3",
+          "marks": 15,
+          "word_limit": 250,
+          "model_answer": null,
+          "display_order": 1
+        }
+      ]
+    },
+    {
+      "title": "RBI moves to calibrated tightening: repo rate raised 25 bps to 5.50%",
+      "publish_date": "2026-10-07",
+      "subject": "economy",
+      "gs_paper": "GS3",
+      "exam_relevance": "both",
+      "source_authority": "official",
+      "relevance_score": 5,
+      "video_url": null,
+      "content_blocks": [
+        {
+          "type": "paragraph",
+          "text": "What happened. The Monetary Policy Committee (MPC) of the Reserve Bank of India met from 5 to 7 October 2026 and announced a 25 basis point increase in the policy repo rate, taking it from 5.25 per cent to 5.50 per cent. Alongside the rate decision the committee replaced its accommodation-oriented stance with what the statement calls calibrated tightening. The minutes of the meeting were published on 21 October 2026."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why the stance matters more than the 25 basis points. The policy rate tells you what has been decided; the stance tells you what the committee is preparing the market for. Calibrated tightening keeps the inflation-fighting direction without pre-committing to a specific number or pace of further increases, and reporting of the post-meeting press conference has Governor Sanjay Malhotra saying that rate cuts are off the table in the near term. For an exam answer the useful distinction is between a data-dependent decision and a directional signal, because the signal moves bond yields, the rupee and inflation expectations before any further rate change actually happens."
+        },
+        {
+          "type": "paragraph",
+          "text": "The numbers in the statement. The MPC projected real GDP growth of 7.1 per cent and headline CPI inflation of 5.2 per cent for FY 2026-27, with inflation rising through the middle of the year and peaking in the third quarter before easing. Read against the statutory framework this is the uncomfortable combination: growth is running strongly while inflation sits above the 4 per cent target but inside the plus-or-minus 2 per cent tolerance band, so the central bank is tightening into a fast-growing economy rather than rescuing a weak one."
+        },
+        {
+          "type": "paragraph",
+          "text": "How the hike reaches a citizen. The repo rate is the rate at which the RBI lends to scheduled commercial banks against collateral under the Liquidity Adjustment Facility. A higher repo raises the marginal cost of bank funds, and because most fresh floating-rate loans are priced off an external benchmark linked to the repo, the pass-through shows up in home, vehicle and working-capital loans within a few reset cycles. Depositors see savings rates recover some ground against prices. This transmission chain - policy rate, bank cost of funds, benchmark lending rate, EMI - is the part UPSC asks you to describe, not the specific figure."
+        },
+        {
+          "type": "paragraph",
+          "text": "Status of this note. The rate decision, the new stance, the meeting dates and the 5.2 per cent and 7.1 per cent projections are taken from the RBI's own Monetary Policy Statement of 7 October 2026 and corroborated by news reporting of the announcement. The quarter-by-quarter inflation path, the FY 2027-28 projection and the vote split should be re-read against the statement PDF and the minutes before publication. Nothing here predicts the next move."
+        },
+        {
+          "type": "source",
+          "text": "Source: Reserve Bank of India, Monetary Policy Statement dated October 07, 2026 - Resolution of the Monetary Policy Committee, 5 to 7 October 2026 (https://www.rbi.org.in/scripts/annualpolicy.aspx, press release prid 63742). Retrieved 30 October 2026."
+        },
+        {
+          "type": "source",
+          "text": "Secondary corroboration: The Hindu, RBI MPC meeting highlights: Repo rate hiked to 5.5%, 7 October 2026 (https://www.thehindu.com/business/rbi-monetary-policy-meeting-decision-on-repo-rate-live-updates-october-7-2026/article71554262.ece). Retrieved 30 October 2026."
+        }
+      ],
+      "upsc_statement_frames": {
+        "prelims_statements": [
+          "The repo rate is the rate at which the Reserve Bank lends to scheduled commercial banks against collateral; it is not the rate at which banks lend to one another.",
+          "The monetary policy stance is a separate communication from the rate decision and indicates the expected direction of future policy.",
+          "Headline CPI inflation is measured against a 4 per cent target with a tolerance band of plus or minus 2 per cent."
+        ],
+        "mains_angle": "Why a central bank tightens when growth is strong: the trade-off between controlling inflation expectations and not choking investment, and what an independent MPC costs the government when borrowing becomes dearer."
+      },
+      "so_what_analysis": {
+        "who_benefits": "Deposit holders and lenders, whose returns stop lagging prices, and savers in small-income instruments whose rates are reset upward.",
+        "who_loses": "Borrowers on floating-rate home, vehicle and working-capital loans, and firms whose project economics were built on cheap credit.",
+        "what_changes_next": "Watch the next MPC: whether this is treated as a one-off calibrated move or the first step of a sequence, and how quickly banks pass it through under the external-benchmark regime.",
+        "upsc_angle": "GS III economy - inflation, money and credit, the role of the central bank, and the standing debate about RBI autonomy versus the government's borrowing cost.",
+        "connected_static_topic": "Money and credit; inflation and its control; RBI monetary policy instruments (LAF, CRR, SLR, OMO); the MPC and the statutory inflation-targeting framework."
+      },
+      "mcqs": [
+        {
+          "question_text": "Consider the following statements about the policy repo rate:\n1. It is the rate at which the Reserve Bank of India lends to scheduled commercial banks against collateral.\n2. A change in it reaches borrowers only after the statutory liquidity ratio has been revised.\n3. It is decided by a majority vote of the Monetary Policy Committee, with the Governor holding a casting vote in the case of a tie.\nHow many of the above statements are correct?",
+          "question_type": "HOW_MANY_CORRECT",
+          "options": [
+            {
+              "label": "A",
+              "text": "Only one"
+            },
+            {
+              "label": "B",
+              "text": "Only two"
+            },
+            {
+              "label": "C",
+              "text": "All three"
+            },
+            {
+              "label": "D",
+              "text": "None"
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "Statements 1 and 3 are correct - the repo rate is the LAF lending rate against collateral, and the six-member MPC decides by majority with a casting vote for the Governor. Statement 2 is wrong: transmission runs through liquidity conditions and benchmark-linked loan pricing, not through a revision of the statutory liquidity ratio."
+        },
+        {
+          "question_text": "In the RBI's October 2026 statement, the stance of calibrated tightening is best understood as:",
+          "question_type": "SCENARIO_APPLIED",
+          "options": [
+            {
+              "label": "A",
+              "text": "A commitment to a fixed number of further rate increases at coming MPC meetings."
+            },
+            {
+              "label": "B",
+              "text": "A replacement of the CPI inflation target with a growth target for the current cycle."
+            },
+            {
+              "label": "C",
+              "text": "A tightening bias that leaves the size and pace of any further move dependent on incoming data."
+            },
+            {
+              "label": "D",
+              "text": "A change that applies only to the deposit rate and not to the policy rate."
+            }
+          ],
+          "correct_answer": "C",
+          "explanation": "A stance communicates direction, not a schedule. Calibrated tightening signals a bias towards further restriction while keeping each decision data-dependent; it neither commits to a number of hikes nor alters the statutory inflation target."
+        },
+        {
+          "question_text": "Consider the following statements about India's statutory inflation-targeting framework:\n1. The price variable used for the target is the Consumer Price Index for industrial workers.\n2. The target and the tolerance band are specified by the Central Government in consultation with the Reserve Bank after the recommendations of a committee.\n3. If inflation breaches the upper or lower limit of the band for three consecutive quarters, the Government and the Reserve Bank must explain the causes and agree remedial action.\nWhich of the above statements are correct?",
+          "question_type": "MULTI_STATEMENT",
+          "options": [
+            {
+              "label": "A",
+              "text": "1 and 2 only"
+            },
+            {
+              "label": "B",
+              "text": "1 and 3 only"
+            },
+            {
+              "label": "C",
+              "text": "2 and 3 only"
+            },
+            {
+              "label": "D",
+              "text": "1, 2 and 3"
+            }
+          ],
+          "correct_answer": "C",
+          "explanation": "Statements 2 and 3 are correct. Statement 1 is wrong: the target is set on the Consumer Price Index (Combined), not the CPI for industrial workers, which is the wage-bargaining index used for some central-government employees."
+        }
+      ],
+      "mains_questions": [
+        {
+          "question_text": "Why does a central bank raise policy rates while growth is strong rather than wait for growth to slow? Explain the transmission mechanism from the repo rate to household EMIs and evaluate where that mechanism works imperfectly in India.",
+          "gs_paper": "GS3",
+          "marks": 15,
+          "word_limit": 250,
+          "model_answer": null,
+          "display_order": 1
+        },
+        {
+          "question_text": "Distinguish between the policy rate decision and the monetary policy stance. What does a shift from an accommodation-oriented stance to calibrated tightening signal to bond markets, currency markets and inflation expectations?",
+          "gs_paper": "GS3",
+          "marks": 10,
+          "word_limit": 150,
+          "model_answer": null,
+          "display_order": 2
+        }
+      ]
+    },
+    {
+      "title": "Delimitation package, April 2026: the 131st Amendment is negatived and the Delimitation Bill goes infructuous",
+      "publish_date": "2026-04-17",
+      "subject": "polity",
+      "gs_paper": "GS2",
+      "exam_relevance": "both",
+      "source_authority": "standard",
+      "relevance_score": 5,
+      "video_url": null,
+      "content_blocks": [
+        {
+          "type": "paragraph",
+          "text": "What was introduced. On 16 April 2026 the Law Minister, Arjun Ram Meghwal, moved two bills in Lok Sabha that together made up the delimitation package. The Constitution (131st Amendment) Bill, 2026 amended Articles 81 and 82 so that the maximum number of Lok Sabha seats would rise from 550 to 850, and it made the readjustment of seat allocation among the States run on the 2011 census rather than the 2001 census that the existing freeze had locked in. PRS records that the same bill provided for women's reservation to apply immediately instead of waiting for the exercise. The Delimitation Bill, 2026 was the statutory half: it provided for a Delimitation Commission - a retired Supreme Court judge, a nominee of the Election Commission of India and the concerned State Election Commissioner - to carry out the readjustment and delimitation using the latest census for which figures have been published."
+        },
+        {
+          "type": "paragraph",
+          "text": "One number worth reading carefully. PRS describes the maximum strength rising from 550 to 850, while the government's own NewsOnAir report of the introduction says the seats go from 543 to 850. Both are being used honestly: 550 is the ceiling written in Article 81, 543 is the present sanctioned strength of the House. A Prelims question can test either figure, so name which one you are quoting."
+        },
+        {
+          "type": "paragraph",
+          "text": "What happened. Lok Sabha negatived the amendment bill on 17 April 2026. PRS's bill page carries that outcome; the vote tally of 298 members in favour and 230 against comes from Wikipedia's article on the bill. A Constitution amendment bill has to clear the special majority in Article 368 - a majority of the total membership of the House and two-thirds of the members present and voting. Computed from the reported tally, 528 members voted, so two-thirds of those present and voting was 352: the government had the absolute-majority half of the test and fell roughly 54 votes short of the two-thirds half. That arithmetic is derived here from the reported figures, not quoted from a source."
+        },
+        {
+          "type": "paragraph",
+          "text": "What follows from it. PRS lists the companion Delimitation Bill, 2026 as 'Infructuous: Lok Sabha, Apr 17, 2026' - the same day the amendment fell. Once the constitutional basis failed, the statute that would have set the Commission in motion had nothing to implement. Some secondary commentary described this as a withdrawal; the tracker's own word is infructuous, and the distinction is the kind a Prelims option plays on. The practical position for an aspirant: allocation of Lok Sabha seats among the States stays on the 2001-census basis under the existing freeze, and no fresh delimitation exercise was under way on the pages read for this note."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why it is a GS2 story rather than a headline. Readjustment moves seats toward the states whose population share grew fastest, which is why the package was contested as a federal question and not only as arithmetic. This note deliberately does not state the government's or the opposition's reasons for the defeat: the debates and the Gazette text were not read, so the mechanism (latest-census basis shifts the balance between states) is described while the politics is left as a Mains question."
+        },
+        {
+          "type": "paragraph",
+          "text": "Status of this note. Authored on 31 October 2026 from the two PRS bill pages read in full, PRS's summary of the Delimitation Bill, NewsOnAir's report of the introduction, and Wikipedia for the vote tally. The Gazette of India notification, the Constitution (131st Amendment) Bill text and the Lok Sabha debates remain unread, and both PRS pages still end at 17 April 2026, so no revived or replacement bill is claimed here. Before publishing, a reviewer should open the PRS pages and the bill text; nothing in this item asserts a cause for the defeat or a future delimitation date."
+        },
+        {
+          "type": "source",
+          "text": "Source: PRS India, The Constitution (131st Amendment) Bill, 2026 (https://prsindia.org/billtrack/the-constitution-131st-amendment-bill-2026) and The Delimitation Bill, 2026 (https://prsindia.org/billtrack/the-delimitation-bill-2026), both read 31 October 2026; PRS bill summary of the Delimitation Bill, 2026 (https://prsindia.org/billtrack/prs-products/prs-bill-summary-1776322273); NewsOnAir/PIB report of the introduction, 16 April 2026 (https://newsonair.gov.in/parliament-budget-session-begins-opposition-protests-against-key-bills/); Wikipedia, Constitution (131st Amendment) Bill, 2026 (https://en.wikipedia.org/wiki/Constitution_(131st_Amendment)_Bill,_2026) for the 298-230 tally."
+        }
+      ],
+      "upsc_statement_frames": {
+        "prelims_statements": [
+          "The Constitution (131st Amendment) Bill, 2026 sought to amend Articles 81 and 82 and to raise the maximum number of Lok Sabha seats from 550 to 850.",
+          "A bill that alters the composition provisions of Articles 81-82 is a Constitution amendment bill and is tested by the special majority under Article 368, not by a simple majority.",
+          "PRS records the companion Delimitation Bill, 2026 as infructuous in Lok Sabha on 17 April 2026, the day the amendment bill was negatived."
+        ],
+        "mains_angle": "Federal arithmetic against one-vote-one-value: why readjustment on the latest census redistributes seats between states, why states that controlled population growth resist it, and what a negatived amendment bill shows about the majorities Article 368 actually demands."
+      },
+      "so_what_analysis": {
+        "who_benefits": "The states whose 2011 population share is larger than the seat share they hold on the 2001-census basis would have gained seats; parties whose seat planning assumed an enlarged House also stood to gain.",
+        "who_loses": "States whose population growth fell fastest would have given up relative seats, and the women's reservation timetable lost the constitutional vehicle that was meant to activate it immediately.",
+        "what_changes_next": "Watch for a re-introduction in a later session, any change in the census basis, and any attempt to separate women's reservation from delimitation. On the pages read on 31 October 2026 both bills still end at 17 April 2026.",
+        "upsc_angle": "GS II - Parliament and constitutional amendment procedure, Articles 81-82 and 368, federalism and the delimitation freeze, and the representation question behind the north-south seat argument.",
+        "connected_static_topic": "Composition of Lok Sabha (Articles 81-82); the delimitation freeze under the 84th Amendment, 2003; the special majority under Article 368; women's reservation and its linkage to delimitation; State-wise seat allocation and census basis."
+      },
+      "mcqs": [
+        {
+          "question_text": "Consider the following statements about the Constitution (131st Amendment) Bill, 2026:\n1. It sought to amend Articles 81 and 82 of the Constitution.\n2. It would have based the readjustment of Lok Sabha seat allocation among the States on the 2011 census.\n3. It needed only a simple majority in each House because it dealt with the size of the House.\nHow many of the above statements are correct?",
+          "question_type": "HOW_MANY_CORRECT",
+          "options": [
+            {
+              "label": "A",
+              "text": "Only one"
+            },
+            {
+              "label": "B",
+              "text": "Only two"
+            },
+            {
+              "label": "C",
+              "text": "All three"
+            },
+            {
+              "label": "D",
+              "text": "None"
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "Statements 1 and 2 are correct: PRS records the bill as amending Articles 81 and 82, raising the maximum strength from 550 to 850 and basing readjustment on the 2011 census, ending the existing freeze. Statement 3 is wrong - a Constitution amendment bill is passed under Article 368 by a majority of the total membership of each House and by two-thirds of the members present and voting, which is exactly the test it failed in Lok Sabha on 17 April 2026.",
+          "display_order": 1
+        },
+        {
+          "question_text": "With reference to the Delimitation Bill, 2026, which one of the following best states its position as recorded by the parliamentary bill tracker read for this item?",
+          "question_type": "DIRECT_RECALL",
+          "options": [
+            {
+              "label": "A",
+              "text": "Passed by both Houses and awaiting a notification."
+            },
+            {
+              "label": "B",
+              "text": "Referred to a department-related standing committee."
+            },
+            {
+              "label": "C",
+              "text": "Infructuous in Lok Sabha on 17 April 2026."
+            },
+            {
+              "label": "D",
+              "text": "Introduced in Rajya Sabha on 16 April 2026."
+            }
+          ],
+          "correct_answer": "C",
+          "explanation": "PRS's page for the Delimitation Bill, 2026 shows two milestones only: introduced in Lok Sabha on 16 April 2026 and infructuous in Lok Sabha on 17 April 2026, the day the linked Constitution (131st Amendment) Bill was negatived. Secondary commentary called it a withdrawal; the tracker's own status word is infructuous, and the tracker shows no committee referral and no Rajya Sabha introduction.",
+          "display_order": 2
+        },
+        {
+          "question_text": "Suppose a Constitution Amendment Bill to raise the maximum strength of the Lok Sabha is negatived in Lok Sabha, and on the same day a separate Bill to constitute a Delimitation Commission is declared infructuous. Which one of the following inferences is correct?",
+          "question_type": "SCENARIO_APPLIED",
+          "options": [
+            {
+              "label": "A",
+              "text": "The Commission Bill can still be implemented by executive order because it is not a constitutional amendment."
+            },
+            {
+              "label": "B",
+              "text": "The allocation of seats among the States cannot be changed by the ordinary law alone, because that allocation is fixed by Articles 81 and 82."
+            },
+            {
+              "label": "C",
+              "text": "Rajya Sabha can validate the negatived amendment by passing it with a two-thirds majority on its own."
+            },
+            {
+              "label": "D",
+              "text": "Delimitation is unaffected, because readjustment of seats is not connected to the census."
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "Allocation of seats among the States under Article 81 read with Article 82 is constitutional, so an ordinary statute setting up a commission cannot alter it without the amendment that was negatived. Option A is wrong because no executive order can override Articles 81-82; option C is wrong because Article 368 requires both Houses; option D is wrong because readjustment is precisely the census-linked exercise.",
+          "display_order": 3
+        }
+      ],
+      "mains_questions": [
+        {
+          "question_text": "Why did the delimitation package of April 2026 require a constitutional amendment rather than an ordinary law? Analyse what the negation of the Constitution (131st Amendment) Bill, 2026 leaves unchanged about the allocation of Lok Sabha seats among the States.",
+          "gs_paper": "GS2",
+          "marks": 15,
+          "word_limit": 250,
+          "model_answer": null,
+          "display_order": 1
+        },
+        {
+          "question_text": "Delimitation on the latest census sets the principle of one-vote-one-value against the federal bargain that rewards states for population control. Discuss, bringing out both sides of the argument.",
+          "gs_paper": "GS2",
+          "marks": 10,
+          "word_limit": 150,
+          "model_answer": null,
+          "display_order": 2
+        }
+      ]
+    },
+    {
+      "title": "Tiger estimation for the exam: the published all-India figure is still 3,682 from the 2022 round",
+      "publish_date": "2026-10-31",
+      "subject": "environment",
+      "gs_paper": "GS3",
+      "exam_relevance": "both",
+      "source_authority": "official",
+      "relevance_score": 4,
+      "video_url": null,
+      "content_blocks": [
+        {
+          "type": "paragraph",
+          "text": "The part a paper can mark. NTCA's own pages, read on 31 October 2026, list published All-India Tiger Estimation rounds ending with the 2022 estimation, issued as the report 'Status of Tigers-2022' and appearing on the site with a 2023 publication date; the agency's home page still headlines that report. The figure attached to that round is 3,682 tigers. That is the number an aspirant should write, with its round named."
+        },
+        {
+          "type": "paragraph",
+          "text": "The part that is not yet official. Percentage increases reported in the press around tiger conservation are not, on the pages read for this note, present in a published NTCA report. An estimate that has not been brought out as a report cannot be cited as the official position, however widely it is repeated - and in Prelims the difference between 'the 2022 round reported 3,682' and 'the latest estimate shows a big jump' is the difference between a mark and a wrong option."
+        },
+        {
+          "type": "paragraph",
+          "text": "Why the method matters for the answer. The All-India Tiger Estimation is a field-based statistical survey of tiger populations across tiger habitats and reserves using camera-trap capture data, and it is described officially as the world's largest biodiversity survey. It yields an estimate with uncertainty, not a headcount of individual animals, so naming the round and the estimating agency is worth more in a Mains answer than quoting a bare number."
+        },
+        {
+          "type": "paragraph",
+          "text": "The concentration point that stays true regardless of the round. India is described on NTCA's report as harbouring approximately 75 per cent of the global wild tiger population. That is the GS3 hook: a species concentrated that heavily in one country's reserves makes prey-base health, habitat fragmentation and co-predator competition national responsibilities, not just Indian statistics."
+        },
+        {
+          "type": "paragraph",
+          "text": "Status of this note and what the reviewer must confirm. Two numbers here were not read from a primary page directly: NTCA's 2022 report PDF is 42 MB and exceeded the retrieval limit of this review, and the PIB note of 28 July 2026 (PRID 2290233), which restates the 3,682 figure, returns 403 to automated fetch. So before publishing, open https://ntca.gov.in/reports/ , the report PDF cover and the PIB release in a browser and confirm 3,682 and the approximately-75 per cent share. This item asserts no newer round, no increase percentage and no release date for a 2026 cycle, because none appears on the NTCA pages read."
+        },
+        {
+          "type": "source",
+          "text": "Source: NTCA, Reports page (https://ntca.gov.in/reports/) and home page (https://ntca.gov.in/), read 31 October 2026, listing published rounds through 'Status of Tigers-2022'; NTCA, Status of tigers, co-predators and prey in India, 2022 (https://ntca.gov.in/assets/uploads/Reports/AITM/status_of_tiger-copredators-2022.pdf); PIB note PRID 2290233 dated 28 July 2026 (https://www.pib.gov.in/PressReleasePage.aspx?PRID=2290233), which returned 403 to automated retrieval and whose figures were seen only in search-index text."
+        }
+      ],
+      "upsc_statement_frames": {
+        "prelims_statements": [
+          "As of 31 October 2026 the latest All-India Tiger Estimation round listed on NTCA's reports page is the 2022 estimation, published as 'Status of Tigers-2022'.",
+          "The all-India figure associated with that round is 3,682 tigers; an increase quoted in secondary reporting was not backed by a published NTCA report at the time of this check.",
+          "The estimation is a statistical survey of tiger populations across tiger habitats, not a physical count of every animal in the country."
+        ],
+        "mains_angle": "Evidence and conservation policy: what an estimation cycle can and cannot tell a manager, why the gap between a published round and a reported headline matters for wildlife policy, and what India's roughly 75 per cent share of wild tigers implies for habitat and prey-base risk."
+      },
+      "so_what_analysis": {
+        "who_benefits": "Learners, who get the figure a paper can be marked against together with the round it comes from, and reserve managers whose baselines should be the published report rather than a press number.",
+        "who_loses": "Anyone repeating an unpublished increase. In Prelims it is a mark lost on a wrong option; in an interview it is credibility lost on a number that the official report does not contain.",
+        "what_changes_next": "The appearance of a new round on ntca.gov.in/reports. Re-check that page before reusing this item; if NTCA publishes a later estimation, this note becomes the historical position and the figure should be replaced from the report itself.",
+        "upsc_angle": "GS III - Conservation: wildlife protection institutions (NTCA, Project Tiger), biodiversity survey methods and indicators, and the standing caution about official data versus secondary reporting.",
+        "connected_static_topic": "Project Tiger (1973) and tiger reserves; NTCA's mandate; IUCN status of the tiger; camera-trap and occupancy estimation; India's share of the global wild tiger population; prey depletion and co-predators."
+      },
+      "mcqs": [
+        {
+          "question_text": "As of 31 October 2026, which one of the following is the latest All-India Tiger Estimation round available on NTCA's report pages?",
+          "question_type": "DIRECT_RECALL",
+          "options": [
+            {
+              "label": "A",
+              "text": "The 2018 estimation round."
+            },
+            {
+              "label": "B",
+              "text": "The 2022 estimation round, published as Status of Tigers-2022."
+            },
+            {
+              "label": "C",
+              "text": "A 2026 estimation round published in October 2026."
+            },
+            {
+              "label": "D",
+              "text": "No all-India tiger estimation report has been published."
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "NTCA's reports page read on 31 October 2026 lists published rounds ending with the 2022 estimation, issued as 'Status of Tigers-2022'. No later round appears on that page, so a question built on a 2026 official figure is not supported by the agency's own listing at the time of this check.",
+          "display_order": 1
+        },
+        {
+          "question_text": "Consider the following statements about the All-India Tiger Estimation:\n1. It produces a statistical estimate of the tiger population from field survey data rather than a headcount of every animal.\n2. A percentage increase reported in the press becomes part of the official record as soon as it is quoted in news reporting.\n3. Until a later round is published, the figure available for answering an examination question is the one from the latest published report.\nHow many of the above statements are correct?",
+          "question_type": "HOW_MANY_CORRECT",
+          "options": [
+            {
+              "label": "A",
+              "text": "Only one"
+            },
+            {
+              "label": "B",
+              "text": "Only two"
+            },
+            {
+              "label": "C",
+              "text": "All three"
+            },
+            {
+              "label": "D",
+              "text": "None"
+            }
+          ],
+          "correct_answer": "B",
+          "explanation": "Statements 1 and 3 are correct. The estimation is a survey-based statistical estimate, and the citable figure is the one carried by the latest published NTCA report. Statement 2 is wrong: reporting an increase does not make it official, which is precisely why the 2022 round's 3,682 remains the answer while a widely repeated increase is not in a published report.",
+          "display_order": 2
+        }
+      ],
+      "mains_questions": [
+        {
+          "question_text": "Distinguish between a published tiger estimation round and a reported increase in tiger numbers. Why does that distinction matter both for conservation policy and for answering an examination question? Bring out what a survey-based estimate can and cannot establish.",
+          "gs_paper": "GS3",
+          "marks": 15,
+          "word_limit": 250,
+          "model_answer": null,
+          "display_order": 1
+        },
+        {
+          "question_text": "India is described as harbouring approximately 75 per cent of the world's wild tiger population. What does such a concentration imply for the risks from habitat fragmentation, prey depletion and co-predator competition?",
+          "gs_paper": "GS3",
+          "marks": 10,
+          "word_limit": 150,
+          "model_answer": null,
+          "display_order": 2
+        }
+      ]
+    }
+  ],
+  "pending_verification": [
+    {
+      "candidate": "The 2022 tiger figure and the approximately 75 per cent global share, read from the primary pages",
+      "why_excluded": "Authored as a draft on 31 October 2026 but not yet confirmed on the source's own page: the NTCA 2022 report PDF is 42 MB and exceeded the retrieval limit of the review, and PIB PRID 2290233 returns 403 to automated fetch. Both numbers are in the draft's status block with the exact links to open.",
+      "primary_source_to_read": "https://ntca.gov.in/reports/ , https://ntca.gov.in/assets/uploads/Reports/AITM/status_of_tiger-copredators-2022.pdf (cover page) and https://www.pib.gov.in/PressReleasePage.aspx?PRID=2290233"
+    },
+    {
+      "candidate": "The reported 10-15 per cent increase in the tiger population",
+      "why_excluded": "Re-checked 31 October 2026. NTCA's reports page still ends at the 2022 round, so the increase remains secondary reporting and is not authored anywhere in this file.",
+      "primary_source_to_read": "https://ntca.gov.in/reports/ (a newly published round would appear here first)"
+    },
+    {
+      "candidate": "COP 31 presidency, host and schedule",
+      "why_excluded": "Re-checked 30 October 2026. https://unfccc.int/cop31 and the UNFCCC COP body page returned no quotable content to automated retrieval, so the host city and dates rest on a think-tank article and a search snippet.",
+      "primary_source_to_read": "https://unfccc.int/cop31 (read manually) and the COP 30 decision on hosting arrangements"
+    },
+    {
+      "candidate": "The Gazette text and the stated reasons for the 131st Amendment's defeat",
+      "why_excluded": "The draft authored on 31 October 2026 rests on the two PRS bill pages, PRS's bill summary, NewsOnAir's report of the introduction and Wikipedia's vote tally. The Gazette of India notification, the bill's own text and the Lok Sabha debates were not read, so the item describes the mechanism and the recorded outcome but no cause of the defeat.",
+      "primary_source_to_read": "The Gazette of India notification for the bill text, the Lok Sabha debates of 16-17 April 2026, and the PRS pages https://prsindia.org/billtrack/the-constitution-131st-amendment-bill-2026 and https://prsindia.org/billtrack/the-delimitation-bill-2026"
+    }
+  ]
+}

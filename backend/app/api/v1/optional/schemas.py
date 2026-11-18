@@ -390,8 +390,9 @@ class TranscriptionOut(BaseModel):
     * ``low_confidence`` — True iff ``confidence < threshold``; when True the UI
       must show a review/correct step before the transcript fills the segment
       (R8.4 / R20.3 / design Property 7) rather than committing it silently.
-    * ``provider`` — which STT backend produced this (mock by default in
-      dev/test; a configured Whisper backend in production).
+    * ``provider`` — the actual STT backend provenance. Gemini is the
+      fail-closed real default; deterministic mock is permitted only by the
+      explicit non-production selection + enable policy.
     * ``segments`` — per-segment breakdown for finer-grained review.
     """
     text: str
@@ -442,8 +443,9 @@ class HandwritingOcrOut(BaseModel):
       must inform the student and offer a review/correct / type / re-upload
       fallback before the text fills the answer (R9.3 / R20.1 / design
       Property 7) rather than committing it silently.
-    * ``provider`` — which OCR backend produced this (mock by default in
-      dev/test; Gemini-Vision via the shared gateway in production).
+    * ``provider`` — the actual OCR backend provenance. Gemini Vision is the
+      fail-closed real default; deterministic mock is permitted only by the
+      explicit non-production selection + enable policy.
     * ``blocks`` — per-region breakdown for finer-grained review.
     """
     text: str
@@ -650,20 +652,22 @@ class RecallMatchedConceptOut(BaseModel):
 
 
 class RecallTurnResultOut(BaseModel):
-    """The result of one recall turn (R14.1/R14.3/R14.5/R20.4).
+    """The result of one recall turn with immediate provider provenance.
 
-    ``recall_score`` is the cumulative session score in ``[0, 1]`` after this
-    turn; ``recall_percent`` is the same as 0–100. ``matched`` / ``missed`` are
-    the explainability payload (R14.5). When the score is below 100% a Socratic
-    ``hint`` toward a ``hint_target`` missed concept is included (R14.2/R14.4).
-    ``stt_low_confidence`` flags an uncertain transcript (R20.3) — the student
-    can simply speak again.
+    Provider fields are populated for newly scored turns. They remain nullable
+    because the current persistence model predates provenance; reload must
+    report unknown rather than infer historical providers. Durable per-turn
+    provenance requires a separately approved migration.
     """
     session_id: int
     turn_order: int
     transcript: str
     stt_confidence: float
     stt_low_confidence: bool
+    stt_provider: Optional[str] = None
+    stt_is_mock: Optional[bool] = None
+    recall_provider: Optional[str] = None
+    recall_is_mock: Optional[bool] = None
     recall_score: float
     recall_percent: float
     matched: list[RecallMatchedConceptOut] = []

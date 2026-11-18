@@ -86,10 +86,12 @@ export default function AdminNewItemPage() {
     };
 
     try {
-      const result = await adminCmsService.createItem(payload);
+      await adminCmsService.createItem(payload);
       router.push('/admin/cms');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to save');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: unknown } }; message?: unknown };
+      const detail = error.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : typeof error.message === "string" ? error.message : 'Failed to save');
     } finally {
       setSaving(false);
     }

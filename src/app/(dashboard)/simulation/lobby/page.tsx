@@ -1,27 +1,69 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  ShieldCheck, 
-  Timer, 
-  ZapOff, 
+import {
+  ShieldCheck,
+  Timer,
+  ZapOff,
   AlertTriangle,
-  LockKeyhole,
-  Target
+  Target,
+  ArrowRight,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
+import { examService, TestMetadata } from '@/services/api/examService';
 
 export default function SimulationLobby() {
   return (
-    <ProtectedRoute requiredRole="ADMIN">
+    <ProtectedRoute>
       <SimulationLobbyContent />
     </ProtectedRoute>
   );
 }
 
 function SimulationLobbyContent() {
+  const router = useRouter();
+  const [tests, setTests] = useState<TestMetadata[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [startingTestId, setStartingTestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    examService.getAvailableTests()
+      .then((availableTests) => {
+        if (active) setTests(availableTests);
+      })
+      .catch(() => {
+        if (active) setError('Simulation sessions are temporarily unavailable. Please try again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const startSimulation = async (test: TestMetadata) => {
+    setStartingTestId(test.id);
+    setError(null);
+    try {
+      const attempt = await examService.startSimulation(test.id);
+      if (!attempt.attemptId) {
+        throw new Error('The simulation did not return an attempt ID.');
+      }
+      router.push(`/exam/${test.id}?attemptId=${encodeURIComponent(attempt.attemptId)}`);
+    } catch {
+      setError('This simulation could not be started. Please try again.');
+    } finally {
+      setStartingTestId(null);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto py-20 px-6 space-y-12">
       <div className="text-center space-y-4">
@@ -32,17 +74,13 @@ function SimulationLobbyContent() {
         <p className="text-zinc-500 font-medium max-w-lg mx-auto">
           This is a high-fidelity exam environment designed to build temperament. All educational safety nets are removed.
         </p>
-        <div className="mx-auto flex max-w-lg items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
-          <LockKeyhole className="h-4 w-4 shrink-0" />
-          Internal prototype. Launch stays disabled until the legacy exam API is connected and verified.
-        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
         {[
-          { icon: <Timer className="text-indigo-600" />, title: "Strict Timing", desc: "No pausing. Session auto-terminates at 120m." },
-          { icon: <ZapOff className="text-indigo-600" />, title: "No Feedback", desc: "Explanations hidden until final submission." },
-          { icon: <AlertTriangle className="text-indigo-600" />, title: "Serious Scoring", desc: "Negative marking (0.66) strictly enforced." }
+          { icon: <Timer className="text-indigo-600" />, title: 'Strict Timing', desc: 'No pausing. Sessions follow the selected test duration.' },
+          { icon: <ZapOff className="text-indigo-600" />, title: 'No Feedback', desc: 'Explanations remain hidden until final submission.' },
+          { icon: <AlertTriangle className="text-indigo-600" />, title: 'Serious Scoring', desc: 'The selected test configuration controls negative marking.' },
         ].map((rule, i) => (
           <div key={i} className="p-6 rounded-3xl bg-white border border-zinc-100 space-y-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -54,41 +92,69 @@ function SimulationLobbyContent() {
         ))}
       </div>
 
-      <Card className="rounded-[3rem] border-none bg-zinc-900 text-white overflow-hidden shadow-2xl">
-        <CardContent className="p-12 space-y-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Available Session</p>
-              <h2 className="text-3xl font-black tracking-tight">All-India Prelims Mock #7</h2>
-              <p className="text-zinc-400 font-medium">100 Questions • 200 Marks • General Studies I</p>
-            </div>
-            <div className="text-right">
-              <span className="text-5xl font-black tracking-tighter">120</span>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Minutes</p>
-            </div>
-          </div>
+      {error && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          {error}
+        </div>
+      )}
 
-          <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-              <Target className="w-5 h-5 text-indigo-400" />
-            </div>
-            <p className="text-sm text-zinc-300 font-medium italic">
-              &quot;Temperament is the silent differentiator in the final 10 minutes of the exam.&quot;
-            </p>
-          </div>
+      {loading ? (
+        <Card className="rounded-[3rem] border-none bg-zinc-900 text-white overflow-hidden shadow-2xl">
+          <CardContent className="p-12 text-center text-zinc-300">Loading available sessions…</CardContent>
+        </Card>
+      ) : tests.length === 0 ? (
+        <Card className="rounded-[3rem] border-none bg-zinc-900 text-white overflow-hidden shadow-2xl">
+          <CardContent className="p-12 text-center text-zinc-300">No active simulation sessions with published questions are available.</CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {tests.map((test) => {
+            const canStart = test.canStart !== false && Boolean(test.totalQuestions);
+            const isStarting = startingTestId === test.id;
+            return (
+              <Card key={test.id} className="rounded-[3rem] border-none bg-zinc-900 text-white overflow-hidden shadow-2xl">
+                <CardContent className="p-12 space-y-8">
+                  <div className="flex items-center justify-between gap-6">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Available Session</p>
+                      <h2 className="text-3xl font-black tracking-tight">{test.title}</h2>
+                      <p className="text-zinc-400 font-medium">{test.totalQuestions ?? 0} Questions • {test.subject}</p>
+                      {test.description && <p className="mt-2 text-sm text-zinc-400">{test.description}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-5xl font-black tracking-tighter">{test.durationMinutes}</span>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Minutes</p>
+                    </div>
+                  </div>
 
-          <Button 
-            disabled
-            className="w-full h-18 rounded-lg bg-indigo-500 text-white font-black text-xl shadow-xl shadow-indigo-500/20"
-          >
-            SIMULATION API REQUIRED
-          </Button>
-          
-          <p className="text-[10px] text-center text-zinc-500 font-bold uppercase tracking-widest">
-            By starting, you acknowledge that this attempt cannot be paused or reset.
-          </p>
-        </CardContent>
-      </Card>
+                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                      <Target className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <p className="text-sm text-zinc-300 font-medium italic">
+                      &quot;Temperament is the silent differentiator in the final 10 minutes of the exam.&quot;
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    disabled={!canStart || isStarting}
+                    onClick={() => startSimulation(test)}
+                    className="w-full h-18 rounded-lg bg-indigo-500 text-white font-black text-xl shadow-xl shadow-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isStarting ? 'STARTING…' : canStart ? 'START SIMULATION' : 'NO PUBLISHED QUESTIONS'}
+                    {canStart && !isStarting ? <ArrowRight className="ml-2" /> : null}
+                  </Button>
+
+                  <p className="text-[10px] text-center text-zinc-500 font-bold uppercase tracking-widest">
+                    By starting, you acknowledge that this attempt cannot be paused or reset.
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

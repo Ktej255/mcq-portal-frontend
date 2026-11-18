@@ -11,6 +11,7 @@ import {
   type OptionalSubjectCatalogEntry,
 } from "@/lib/upsc/optionalSubjectsCatalog";
 import {
+  clearSelectedOptional,
   optionalSubjectRoute,
   readSelectedOptional,
   writeSelectedOptional,
@@ -23,8 +24,10 @@ import { optionalService } from "@/services/api/optionalService";
  * Requirements:
  * - R1.2: lists all 25 optional subjects.
  * - R1.3: selecting a subject records it as the student's selected subject.
- * - R1.5: a student who already has a selection can change it (any card is
- *   selectable; the current selection is highlighted).
+ * - R1.5: a student who already has a selection can change it (any available
+ *   card is selectable; the current selection is highlighted). A `coming-soon`
+ *   card navigates to that subject's page instead of persisting a selection,
+ *   because nothing is reviewed behind it (founder decision, 2026-10-31).
  * - R3.5: each subject shows its honest completeness status.
  *
  * Selection persistence: localStorage is the synchronous cache and the
@@ -36,38 +39,71 @@ export function OptionalCatalog() {
   const router = useRouter();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [selectingSlug, setSelectingSlug] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState("");
+  const [failedSlug, setFailedSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedSlug(readSelectedOptional()?.slug ?? null);
-    setIsLoaded(true);
-    // Hydrate from the backend-persisted selection when available (R15.3):
-    // reloads the student's choice across devices, not just this browser.
-    // Best-effort - falls back silently to the localStorage value when the
-    // student is unauthenticated/offline or the call fails.
-    optionalService
-      .getSelection()
-      .then((sel) => {
-        if (sel.selected && sel.slug) {
-          setSelectedSlug(sel.slug);
-          if (sel.name) writeSelectedOptional({ slug: sel.slug, name: sel.name });
-        }
-      })
-      .catch(() => {
-        /* offline / unauthenticated - keep the localStorage value */
-      });
+    const hydrationTimer = window.setTimeout(() => {
+      const localSelection = readSelectedOptional();
+      setSelectedSlug(localSelection?.slug ?? null);
+
+      // The backend is authoritative when it responds. An explicit empty
+      // selection must clear stale browser cache; only transport failure falls
+      // back to the local cache.
+      void optionalService
+        .getSelection()
+        .then((sel) => {
+          if (sel.selected && sel.slug) {
+            writeSelectedOptional({ slug: sel.slug, name: sel.name ?? "" });
+            setSelectedSlug(sel.slug);
+          } else {
+            clearSelectedOptional();
+            setSelectedSlug(null);
+          }
+        })
+        .catch(() => {
+          setSelectedSlug(localSelection?.slug ?? null);
+        })
+        .finally(() => {
+          setIsLoaded(true);
+        });
+    }, 0);
+    return () => window.clearTimeout(hydrationTimer);
   }, []);
 
-  function handleSelect(subject: OptionalSubjectCatalogEntry) {
-    // R1.3 / R1.5: record (or change) the student's selected subject, then
-    // navigate into its route. Persist to localStorage (synchronous cache) AND
-    // to the backend (durable, cross-device - R15.2). The backend write is
-    // best-effort so navigation never blocks on it.
-    writeSelectedOptional({ slug: subject.slug, name: subject.name });
-    setSelectedSlug(subject.slug);
-    void optionalService.setSelection(subject.slug).catch(() => {
-      /* best-effort: localStorage already holds the choice */
-    });
-    router.push(optionalSubjectRoute(subject.slug));
+  async function handleSelect(subject: OptionalSubjectCatalogEntry) {
+    if (!isLoaded || selectingSlug !== null) return;
+
+    setSelectionError("");
+    setFailedSlug(null);
+
+    // A `coming-soon` subject is browsed, never selected. Nothing is reviewed
+    // behind it (and 23 of them have no `optional_subjects` row at all, so a
+    // PUT /optional/selection would fail), and persisting a selection for a
+    // subject we describe as not open yet would be a false record. Founder
+    // decision, 2026-10-31.
+    if (subject.status !== "available") {
+      router.push(optionalSubjectRoute(subject.slug));
+      return;
+    }
+
+    setSelectingSlug(subject.slug);
+    try {
+      const selection = await optionalService.setSelection(subject.slug);
+      if (!selection.selected || selection.slug !== subject.slug) {
+        throw new Error("Selection response did not confirm the requested subject");
+      }
+
+      writeSelectedOptional({ slug: selection.slug, name: selection.name ?? subject.name });
+      setSelectedSlug(selection.slug);
+      router.push(optionalSubjectRoute(selection.slug));
+    } catch {
+      setFailedSlug(subject.slug);
+      setSelectionError("This optional-subject selection could not be saved. Your current selection is unchanged; retry when the connection is available.");
+    } finally {
+      setSelectingSlug(null);
+    }
   }
 
   return (
@@ -81,11 +117,30 @@ export function OptionalCatalog() {
             Choose your UPSC optional
           </h1>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-            All {OPTIONAL_SUBJECTS_COUNT} standard optional subjects in one place. Pick one to set it
-            as your optional - you can change it anytime. Geography is fully authored now; Anthropology is available next. The rest
-            are on the way to the same depth standard.
+            All {OPTIONAL_SUBJECTS_COUNT} standard optional subjects in one place. Geography is the
+            only one with reviewed notes and PYQs today. The other {OPTIONAL_SUBJECTS_COUNT - 1} —
+            Anthropology and Sociology included — are honestly marked coming soon until their
+            material is authored and reviewed; you can still browse the exam structure of any
+            subject.
           </p>
         </section>
+
+        {selectionError && failedSlug ? (
+          <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#ef9f27]/50 bg-[#fff4df] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-bold leading-5 text-[#7a5410]">{selectionError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                const failedSubject = OPTIONAL_SUBJECTS.find((subject) => subject.slug === failedSlug);
+                if (failedSubject) void handleSelect(failedSubject);
+              }}
+              disabled={selectingSlug !== null}
+              className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {selectingSlug === failedSlug ? "Retrying..." : "Retry selection"}
+            </button>
+          </div>
+        ) : null}
 
         <section
           data-testid="optional-catalog-grid"
@@ -101,7 +156,8 @@ export function OptionalCatalog() {
               <button
                 key={subject.slug}
                 type="button"
-                onClick={() => handleSelect(subject)}
+                onClick={() => void handleSelect(subject)}
+                disabled={!isLoaded || selectingSlug !== null}
                 data-testid="optional-catalog-card"
                 data-slug={subject.slug}
                 data-status={subject.status}
@@ -144,7 +200,11 @@ export function OptionalCatalog() {
                     isSelected ? "text-[#13251d]" : "text-[#31443a] group-hover:text-[#1a3a2a]"
                   }`}
                 >
-                  {isSelected ? "Continue" : "Select subject"}
+                  {isSelected
+                    ? "Continue"
+                    : isAvailable
+                      ? "Select subject"
+                      : "View structure"}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </span>
               </button>

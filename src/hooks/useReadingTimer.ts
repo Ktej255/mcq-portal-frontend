@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { funnelService } from '@/services/api/funnelService';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { funnelService } from "@/services/api/funnelService";
 
 /**
- * Hook for tracking cumulative reading time per content section.
- * Starts a 1-second interval timer when active, stops and persists on
- * navigation/unmount. Queues to localStorage on persist failure.
- *
- * Requirements: 3.2, 3.3, 3.4, 3.7
+ * Tracks cumulative reading time for one content section. Persistence is
+ * best-effort: failed writes are queued locally and retried on a later mount.
  */
 
 interface UseReadingTimerOptions {
@@ -24,6 +21,15 @@ interface UseReadingTimerReturn {
   isActive: boolean;
 }
 
+type TimerHandle = ReturnType<typeof setInterval>;
+
+const MAX_SUBMISSION_SECONDS = 7200;
+
+const queueKeyFor = (subject: string, nodeId: number, sectionId: number) =>
+  `reading_time_queue_${encodeURIComponent(subject)}_${nodeId}_${sectionId}`;
+
+const canUseStorage = () => typeof window !== "undefined" && typeof localStorage !== "undefined";
+
 export function useReadingTimer({
   nodeId,
   sectionId,
@@ -31,98 +37,146 @@ export function useReadingTimer({
 }: UseReadingTimerOptions): UseReadingTimerReturn {
   const [currentSeconds, setCurrentSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<TimerHandle | null>(null);
   const accumulatedRef = useRef(0);
+  const activeRef = useRef(false);
+  const mountedRef = useRef(false);
+  const resumeOnVisibleRef = useRef(false);
+  const persistInFlightRef = useRef<Promise<void> | null>(null);
 
   const persist = useCallback(async () => {
+    if (persistInFlightRef.current) {
+      await persistInFlightRef.current;
+    }
+
     const seconds = accumulatedRef.current;
     if (seconds <= 0) return;
+    accumulatedRef.current = 0;
 
-    try {
-      await funnelService.submitReadingTime(subject, nodeId, sectionId, seconds);
-      accumulatedRef.current = 0;
-    } catch {
-      // Queue to localStorage on failure (learnerPersistence pattern)
+    const request = (async () => {
       try {
-        const key = `reading_time_queue_${nodeId}_${sectionId}`;
-        const existing = localStorage.getItem(key);
-        const queued = existing ? parseInt(existing, 10) : 0;
-        localStorage.setItem(key, String(queued + seconds));
-        accumulatedRef.current = 0;
+        await funnelService.submitReadingTime(subject, nodeId, sectionId, seconds);
       } catch {
-        // localStorage unavailable — keep in memory for next attempt
+        try {
+          if (!canUseStorage()) throw new Error("localStorage unavailable");
+          const key = queueKeyFor(subject, nodeId, sectionId);
+          const existing = Number.parseInt(localStorage.getItem(key) ?? "0", 10);
+          localStorage.setItem(key, String((Number.isFinite(existing) ? existing : 0) + seconds));
+        } catch {
+          // Keep the snapshot in memory when localStorage is unavailable.
+          accumulatedRef.current += seconds;
+        }
+      }
+    })();
+
+    persistInFlightRef.current = request;
+    try {
+      await request;
+    } finally {
+      if (persistInFlightRef.current === request) {
+        persistInFlightRef.current = null;
       }
     }
   }, [nodeId, sectionId, subject]);
 
-  const startTimer = useCallback(() => {
-    if (isActive) return;
-    setIsActive(true);
-
-    intervalRef.current = setInterval(() => {
-      setCurrentSeconds((prev) => prev + 1);
-      accumulatedRef.current += 1;
-    }, 1000);
-  }, [isActive]);
-
-  const stopTimer = useCallback(() => {
-    if (!isActive) return;
-    setIsActive(false);
-
-    if (intervalRef.current) {
+  const clearIntervalRef = useCallback(() => {
+    if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+  }, []);
 
-    // Persist accumulated time
-    persist();
-  }, [isActive, persist]);
+  const startTimer = useCallback(() => {
+    if (activeRef.current || (typeof document !== "undefined" && document.hidden)) return;
 
-  // Handle visibility change (tab hidden = stop, visible = resume)
+    activeRef.current = true;
+    resumeOnVisibleRef.current = true;
+    setIsActive(true);
+    intervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      setCurrentSeconds((previous) => previous + 1);
+      accumulatedRef.current += 1;
+    }, 1000);
+  }, []);
+
+  const stopTimer = useCallback(() => {
+    if (!activeRef.current) return;
+
+    activeRef.current = false;
+    resumeOnVisibleRef.current = false;
+    setIsActive(false);
+    clearIntervalRef();
+    void persist();
+  }, [clearIntervalRef, persist]);
+
+  // Pause while hidden and resume the same mounted section when visible again.
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && isActive) {
-        stopTimer();
+      if (document.hidden) {
+        if (!activeRef.current) return;
+        activeRef.current = false;
+        resumeOnVisibleRef.current = true;
+        setIsActive(false);
+        clearIntervalRef();
+        void persist();
+      } else if (resumeOnVisibleRef.current && mountedRef.current) {
+        startTimer();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [isActive, stopTimer]);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [clearIntervalRef, persist, startTimer]);
 
-  // Cleanup on unmount
+  // Stop and flush on section unmount or identity change.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      // Persist any remaining accumulated time
-      if (accumulatedRef.current > 0) {
-        persist();
-      }
+      mountedRef.current = false;
+      activeRef.current = false;
+      resumeOnVisibleRef.current = false;
+      clearIntervalRef();
+      void persist();
     };
-  }, [persist]);
+  }, [clearIntervalRef, persist]);
 
-  // Try to sync any queued localStorage data on mount
+  // Sync queued writes in backend-sized chunks when this section is mounted.
   useEffect(() => {
-    const key = `reading_time_queue_${nodeId}_${sectionId}`;
-    const queued = localStorage.getItem(key);
-    if (queued) {
-      const seconds = parseInt(queued, 10);
-      if (seconds > 0) {
-        funnelService.submitReadingTime(subject, nodeId, sectionId, seconds)
-          .then(() => localStorage.removeItem(key))
-          .catch(() => { /* keep queued for next attempt */ });
-      }
+    if (!canUseStorage()) return;
+    const key = queueKeyFor(subject, nodeId, sectionId);
+    let remaining = 0;
+    try {
+      remaining = Number.parseInt(localStorage.getItem(key) ?? "0", 10);
+    } catch {
+      return;
     }
+    if (!Number.isFinite(remaining) || remaining <= 0) return;
+
+    const syncQueued = async () => {
+      while (remaining > 0) {
+        const chunk = Math.min(remaining, MAX_SUBMISSION_SECONDS);
+        try {
+          await funnelService.submitReadingTime(subject, nodeId, sectionId, chunk);
+          remaining -= chunk;
+
+          // Read the queue after the request: a failed flush may have appended
+          // seconds while this replay request was in flight. Subtract only the
+          // chunk we just submitted so those newly queued seconds survive.
+          const queuedAfterSubmit = Number.parseInt(localStorage.getItem(key) ?? "0", 10);
+          const nextRemaining = Math.max(
+            0,
+            (Number.isFinite(queuedAfterSubmit) ? queuedAfterSubmit : 0) - chunk,
+          );
+          if (nextRemaining > 0) localStorage.setItem(key, String(nextRemaining));
+          else localStorage.removeItem(key);
+        } catch {
+          return;
+        }
+      }
+    };
+
+    void syncQueued();
   }, [nodeId, sectionId, subject]);
 
-  return {
-    startTimer,
-    stopTimer,
-    currentSeconds,
-    isActive,
-  };
+  return { startTimer, stopTimer, currentSeconds, isActive };
 }

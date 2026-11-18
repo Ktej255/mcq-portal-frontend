@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Caveat, Kalam } from "next/font/google";
 
 /**
  * Handwritten "personal notes" fonts, scoped to the Geography Optional section.
- * Caveat = display headings; Kalam = running note body.
+ * Caveat = display headings; Kalam = running note body. The woff2 files are
+ * self-hosted in `/public/fonts` and the family variables are declared in
+ * `src/app/fonts.css`, so no font is fetched at build time.
  */
-const caveat = Caveat({
-  variable: "--font-hand",
-  subsets: ["latin"],
-  weight: ["500", "700"],
-});
-
-const kalam = Kalam({
-  variable: "--font-hand-body",
-  subsets: ["latin"],
-  weight: ["300", "400", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Geography (Optional) — Read | Sarit Learn",
@@ -28,5 +18,5 @@ export default function GeographyOptionalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className={`${caveat.variable} ${kalam.variable}`}>{children}</div>;
+  return <div>{children}</div>;
 }

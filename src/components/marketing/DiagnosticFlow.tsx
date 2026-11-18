@@ -42,11 +42,18 @@ const dailyMcqByHours: Record<string, number> = {
 const totalSteps = 5;
 
 type Phase = "questions" | "capture" | "result";
+type LeadDeliveryState = "delivered" | "unavailable";
+
+type LeadResponse = {
+  delivered?: boolean;
+};
 
 export function DiagnosticFlow() {
   const [phase, setPhase] = useState<Phase>("questions");
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [leadDelivery, setLeadDelivery] = useState<LeadDeliveryState>("unavailable");
+  const [planSavedLocally, setPlanSavedLocally] = useState(false);
   const [answers, setAnswers] = useState<Answers>({ year: "", stage: "", subjects: [], hours: "", optional: "" });
   const [contact, setContact] = useState<Contact>({ name: "", email: "", phone: "" });
 
@@ -72,20 +79,30 @@ export function DiagnosticFlow() {
     if (!contactValid || submitting) return;
     setSubmitting(true);
     const payload = { ...answers, ...contact, source: "diagnostic" };
+    let savedLocally = false;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...payload, createdAt: new Date().toISOString() }));
+      savedLocally = true;
     } catch {
-      // ignore storage errors
+      // The on-page plan remains available even when browser storage is unavailable.
     }
+    setPlanSavedLocally(savedLocally);
+
+    let delivery: LeadDeliveryState = "unavailable";
     try {
-      await fetch("/api/lead", {
+      const response = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const result = (await response.json().catch(() => null)) as LeadResponse | null;
+      if (response.ok && result?.delivered === true) {
+        delivery = "delivered";
+      }
     } catch {
-      // never block the user on a delivery error
+      // The plan remains available locally/on-page when delivery cannot be reached.
     }
+    setLeadDelivery(delivery);
     setSubmitting(false);
     setPhase("result");
   }
@@ -93,6 +110,8 @@ export function DiagnosticFlow() {
   function restart() {
     setAnswers({ year: "", stage: "", subjects: [], hours: "", optional: "" });
     setContact({ name: "", email: "", phone: "" });
+    setLeadDelivery("unavailable");
+    setPlanSavedLocally(false);
     setStep(0);
     setPhase("questions");
   }
@@ -167,7 +186,13 @@ export function DiagnosticFlow() {
             Preview your daily dashboard
             <ArrowRight className="ml-1.5 h-4 w-4" />
           </Link>
-          <p className="mt-3 text-xs font-semibold text-[#6b7a70]">We&apos;ve saved your plan. We&apos;ll email it and helpful next steps to {contact.email}.</p>
+          <p className="mt-3 text-xs font-semibold text-[#6b7a70]">
+            {leadDelivery === "delivered"
+              ? `Your plan is ready, and a copy with helpful next steps was sent to ${contact.email}.`
+              : planSavedLocally
+                ? "Your plan is ready on this page. Email delivery is temporarily unavailable, but your answers are saved on this device."
+                : "Your plan is ready on this page. Email delivery is temporarily unavailable; keep this page open to retain it."}
+          </p>
         </div>
       </section>
     );

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -146,7 +147,7 @@ function LearnTab() {
       </div>
 
       <Callout icon={<Lightbulb className="h-4 w-4 text-[#f59e0b]" />} title="Key Insight" tone="amber">
-        The Chandrasekhar Limit (1.4 solar masses) is named after Indian astrophysicist Subrahmanyan Chandrasekhar — Nobel Prize 1983. This is the maximum mass of a white dwarf. UPSC tests Indian scientists' contributions to global science frequently.
+        The Chandrasekhar Limit (1.4 solar masses) is named after Indian astrophysicist Subrahmanyan Chandrasekhar — Nobel Prize 1983. This is the maximum mass of a white dwarf. UPSC tests Indian scientists&apos; contributions to global science frequently.
       </Callout>
 
       {/* Stellar Remnants */}
@@ -179,7 +180,7 @@ function LearnTab() {
       </div>
 
       <Callout icon={<ArrowRight className="h-4 w-4 text-[#3b82f6]" />} title="What Comes Next" tone="blue">
-        Stars don't exist in isolation — they cluster into galaxies. In the next sub-topic, we explore the Milky Way's structure, galaxy types, dark matter, and the large-scale architecture of the Universe that determines where solar systems like ours can form.
+        Stars don&apos;t exist in isolation — they cluster into galaxies. In the next sub-topic, we explore the Milky Way&apos;s structure, galaxy types, dark matter, and the large-scale architecture of the Universe that determines where solar systems like ours can form.
       </Callout>
     </motion.div>
   );
@@ -373,7 +374,6 @@ function MainsTab() {
     0: { intro: "", body: "", conclusion: "" },
     1: { intro: "", body: "", conclusion: "" },
   });
-  const [evaluating, setEvaluating] = useState(false);
 
   const questions = [
     { id: 0, paper: "GS-1 • 2018", marks: "10 Marks • 150 Words", text: "Explain the life cycle of a star. How does stellar mass determine its ultimate fate?", framework: ["Intro: Define star, mention mass as destiny determinant", "Body: Formation — molecular cloud → protostar → main sequence", "Body: Low-mass path (<8 M☉) — red giant → planetary nebula → white dwarf", "Body: High-mass path (>8 M☉) — supergiant → supernova → neutron star/black hole", "Body: Mention thresholds — Chandrasekhar (1.4 M☉), TOV (~3 M☉)", "Conclusion: Link to nucleosynthesis, Earth's composition, Indian contributions (Chandrasekhar)"] },
@@ -440,13 +440,12 @@ function MainsTab() {
           <textarea value={draft.conclusion} onChange={e => setDrafts(prev => ({ ...prev, [activeQ]: { ...prev[activeQ], conclusion: e.target.value } }))} placeholder="Tie the argument together and end on a way-forward note…" className="w-full h-20 rounded-lg border border-[#e8e2d5] bg-[#f7f4ee] p-3 text-sm font-medium text-[#13251d] placeholder:text-[#9ca3af] resize-none focus:outline-none focus:ring-2 focus:ring-[#0f766e]/30 focus:border-[#0f766e]" />
         </div>
         <div className="flex items-center gap-3 pt-2 border-t border-[#e8e2d5]">
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => { setEvaluating(true); setTimeout(() => setEvaluating(false), 2000); }} disabled={wordCount < 10 || evaluating} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0f766e] to-[#1d9e75] px-5 py-3 text-sm font-black text-white shadow-md disabled:opacity-40 transition-all">
-            {evaluating ? "Evaluating…" : "🎯 Evaluate Your Mains Answer"}
-          </motion.button>
-          <label className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#99f6e4] px-4 py-2.5 text-xs font-black text-[#0f766e] cursor-pointer hover:bg-[#f0fdfa] transition">
-            📷 Upload Handwritten
-            <input type="file" accept="image/*" className="hidden" />
-          </label>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8e2d5]/60 px-5 py-3 text-sm font-black text-[#5d675f]" aria-disabled="true">
+            Evaluation available in the authenticated Mains workspace
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#dcd5c7] px-4 py-2.5 text-xs font-black text-[#5d675f]" aria-disabled="true">
+            Handwritten upload available in the authenticated workspace
+          </span>
         </div>
       </div>
     </motion.div>
@@ -504,9 +503,10 @@ export default function StarsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("learn");
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set(["learn"]));
 
-  useEffect(() => {
-    setVisitedTabs(prev => new Set([...prev, activeTab]));
-  }, [activeTab]);
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => new Set([...prev, tab]));
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5] text-[#13251d]">
@@ -524,14 +524,14 @@ export default function StarsPage() {
           <p className="mt-1.5 text-sm font-semibold text-[#5d675f]">Earth and Its Origin (The Universe) › Geomorphology</p>
           <div className="mt-3 flex items-center gap-3">
             <div className="flex-1"><ProgressIndicator current={visitedTabs.size} total={TABS.length} /></div>
-            <button
-              onClick={() => alert("PDF download coming soon! This chapter will be available as a formatted PDF for offline study.")}
-              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/40 hover:text-[#1d9e75] transition-all shadow-sm shrink-0"
+            <div
+              role="status"
+              aria-label="PDF coming soon"
+              className="flex items-center gap-1.5 rounded-xl border border-[#dcd5c7] bg-white/80 px-3 py-2 text-xs font-black text-[#5d675f] shadow-sm shrink-0 opacity-70 cursor-default"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </button>
+              <span>PDF coming soon</span>
+            </div>
           </div>
         </motion.div>
 
@@ -541,7 +541,7 @@ export default function StarsPage() {
             const isActive = activeTab === tab.id;
             const isVisited = visitedTabs.has(tab.id);
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 whitespace-nowrap ${isActive ? "bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md scale-[1.02]" : isVisited ? "text-[#1d9e75] hover:bg-[#e7f5ee]" : "text-[#5d675f] hover:bg-[#f7f4ee]"}`}>
                 <Icon className="h-3.5 w-3.5" />
                 {tab.label}
@@ -572,15 +572,15 @@ export default function StarsPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="mt-8 rounded-2xl border border-[#dcd5c7] bg-white/70 backdrop-blur-sm p-3 shadow-sm flex items-center justify-between gap-2">
               {/* Previous Topic */}
-              <a href="/upsc/content-preview/solar-system"
+              <Link href="/upsc/content-preview/solar-system"
                 className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">1.2 Solar System</span>
                 <span className="sm:hidden">Prev</span>
-              </a>
+              </Link>
               {/* Next Section */}
               {nextTab ? (
-                <button onClick={() => setActiveTab(nextTab.id)}
+                <button onClick={() => handleTabChange(nextTab.id)}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-4 py-2.5 text-xs font-black text-white shadow-md hover:scale-[1.02] transition-all">
                   <span>Next: {nextTab.label}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -591,12 +591,12 @@ export default function StarsPage() {
                 </span>
               )}
               {/* Next Topic */}
-              <a href="/upsc/content-preview/galaxies"
+              <Link href="/upsc/content-preview/galaxies"
                 className="flex items-center gap-2 rounded-xl border border-[#dcd5c7] px-3 py-2.5 text-xs font-black text-[#5d675f] hover:bg-[#e7f5ee] hover:border-[#1d9e75]/30 transition-all">
                 <span className="hidden sm:inline">1.4 Galaxies</span>
                 <span className="sm:hidden">Next</span>
                 <ArrowRight className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </motion.div>
           );
         })()}

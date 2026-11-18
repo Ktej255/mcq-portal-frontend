@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from app.core.evaluation.providers.evaluation import (  # noqa: F401  (re-export)
     EvaluationProvider,
+    EvaluationProviderUnavailableError,
     GatewayEvaluationProvider,
     MockEvaluationProvider,
     _all_incomplete,
@@ -22,6 +23,7 @@ from app.core.evaluation.providers.evaluation import (  # noqa: F401  (re-export
 
 __all__ = [
     "EvaluationProvider",
+    "EvaluationProviderUnavailableError",
     "MockEvaluationProvider",
     "GatewayEvaluationProvider",
     "get_evaluation_provider",

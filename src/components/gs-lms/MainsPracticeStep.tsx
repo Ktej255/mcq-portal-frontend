@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { PenLine, Upload, Mic, RefreshCw, SkipForward } from 'lucide-react';
+import { PenLine, RefreshCw, SkipForward } from 'lucide-react';
 import { funnelService, MainsQuestionOut, MainsEvalStatusOut } from '@/services/api/funnelService';
 
 /**
@@ -18,7 +18,7 @@ interface MainsPracticeStepProps {
   onComplete: () => void;
 }
 
-type MainsMode = 'loading' | 'writing' | 'submitting' | 'polling' | 'result' | 'error';
+type MainsMode = 'loading' | 'writing' | 'submitting' | 'polling' | 'timed_out' | 'result' | 'error';
 
 export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }: MainsPracticeStepProps) {
   const [mode, setMode] = useState<MainsMode>('loading');
@@ -30,19 +30,42 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
   const [evalStatus, setEvalStatus] = useState<MainsEvalStatusOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const jobStorageKey = `gs-lms:mains-job:${subject}:${nodeId}`;
 
-  // Load questions
+  // Load questions and restore a server-issued job ID for same-browser reloads.
   useEffect(() => {
+    let active = true;
+    let savedJobId: string | null = null;
+    try {
+      savedJobId = window.sessionStorage.getItem(jobStorageKey);
+    } catch {
+      // Storage may be unavailable in privacy-restricted browser contexts.
+    }
+
+    if (savedJobId) {
+      queueMicrotask(() => {
+        if (!active) return;
+        setJobId(savedJobId);
+        setMode('polling');
+      });
+    }
+
     funnelService.getMainsQuestions(subject, nodeId)
       .then((qs) => {
+        if (!active) return;
         setQuestions(qs);
-        setMode('writing');
+        setMode((currentMode) => currentMode === 'polling' ? currentMode : 'writing');
       })
       .catch(() => {
+        if (!active) return;
         setError('Failed to load Mains questions');
         setMode('error');
       });
-  }, [nodeId, subject]);
+
+    return () => {
+      active = false;
+    };
+  }, [jobStorageKey, nodeId, subject]);
 
   const activeQuestion = questions[activeQIdx] || null;
 
@@ -56,7 +79,7 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
 
   // Submit typed answer
   const handleSubmit = useCallback(async () => {
-    if (!canSubmit || !activeQuestion) return;
+    if (!canSubmit || !activeQuestion || mode === 'submitting' || jobId) return;
     setMode('submitting');
     setError(null);
 
@@ -68,12 +91,17 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
         mode: 'TYPED',
       });
       setJobId(res.job_id);
+      try {
+        window.sessionStorage.setItem(jobStorageKey, res.job_id);
+      } catch {
+        // Best-effort reload recovery; the server remains the status authority.
+      }
       setMode('polling');
     } catch {
       setError('Failed to submit answer. Please try again.');
       setMode('writing');
     }
-  }, [canSubmit, activeQuestion, introduction, body, conclusion, subject, nodeId]);
+  }, [canSubmit, activeQuestion, introduction, body, conclusion, subject, nodeId, mode, jobId, jobStorageKey]);
 
   // Poll for evaluation result
   useEffect(() => {
@@ -88,22 +116,37 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
           clearInterval(pollInterval);
           setMode('result');
         }
-      } catch {
-        // Continue polling on transient error
+      } catch (err: unknown) {
+        const status =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined;
+        if (status === 404) {
+          try {
+            window.sessionStorage.removeItem(jobStorageKey);
+          } catch {
+            // Ignore unavailable browser storage.
+          }
+          setJobId(null);
+          setError('This evaluation is no longer available. You can submit a new answer.');
+          setMode('writing');
+        }
+        // Continue polling on transient errors.
       }
     }, 3000);
 
-    // Max polling: 5 minutes
+    // Max polling: 5 minutes. Keep the job ID and latest server status so the
+    // learner can resume polling instead of seeing an incomplete result.
     const timeout = setTimeout(() => {
       clearInterval(pollInterval);
-      setMode('result');
+      setMode('timed_out');
     }, 300000);
 
     return () => {
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [mode, jobId, subject, nodeId]);
+  }, [mode, jobId, subject, nodeId, jobStorageKey]);
 
   if (mode === 'loading') {
     return <div className="animate-pulse h-64 bg-[#fffdf8] rounded-2xl" />;
@@ -157,11 +200,74 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
             </p>
           )}
         </div>
+        {(evalStatus.model_answer || evalStatus.explanation) && (
+          <details className="rounded-2xl border border-[#dcd5c7] bg-white p-5">
+            <summary className="cursor-pointer text-sm font-black text-[#1a3a2a]">
+              Compare with the examiner&apos;s reference
+            </summary>
+            <p className="mt-2 text-[11px] leading-relaxed text-[#49675e]">
+              This is the reference used to score your answer, not a perfect answer to memorise.
+              Note what it covers that yours did not.
+            </p>
+            {evalStatus.model_answer && (
+              <div className="mt-3">
+                <p className="text-[10px] font-black uppercase tracking-wide text-[#085041]">Reference answer</p>
+                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-[#1f2e26]">
+                  {evalStatus.model_answer}
+                </p>
+              </div>
+            )}
+            {evalStatus.explanation && (
+              <div className="mt-3 border-t border-[#dcd5c7] pt-3">
+                <p className="text-[10px] font-black uppercase tracking-wide text-[#085041]">Reference outline</p>
+                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-[#1f2e26]">
+                  {evalStatus.explanation}
+                </p>
+              </div>
+            )}
+          </details>
+        )}
         <button
-          onClick={onComplete}
+          onClick={() => {
+            try {
+              window.sessionStorage.removeItem(jobStorageKey);
+            } catch {
+              // Ignore unavailable browser storage.
+            }
+            onComplete();
+          }}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
         >
           Continue to Growth Report →
+        </button>
+      </div>
+    );
+  }
+
+  // Bounded-timeout view: the server job remains authoritative and can be
+  // resumed through the same status endpoint without submitting again.
+  if (mode === 'timed_out') {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center space-y-3">
+        <RefreshCw className="h-8 w-8 text-amber-700 mx-auto" />
+        <p className="text-sm font-black text-amber-900">Evaluation is still pending</p>
+        <p className="text-xs text-amber-800">
+          We stopped automatic checking after five minutes. Your answer is still submitted, and the server may still be completing the evaluation.
+        </p>
+        {evalStatus && (
+          <p className="text-[11px] text-amber-800">
+            Latest server status: {evalStatus.status.replace('_', ' ').toLowerCase()}.
+          </p>
+        )}
+        <button
+          onClick={() => {
+            setError(null);
+            setMode('polling');
+          }}
+          disabled={!jobId}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50"
+        >
+          <RefreshCw className="h-3 w-3" /> Resume checking
         </button>
       </div>
     );

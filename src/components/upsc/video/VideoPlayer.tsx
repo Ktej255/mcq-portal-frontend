@@ -69,7 +69,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(funct
 ) {
   if (source.kind === "youtube") {
     return (
-      <YouTubePlayer ref={ref} videoId={source.videoId} title={title} onEnded={onEnded} className={className} />
+      <YouTubePlayer
+        key={source.videoId}
+        ref={ref}
+        videoId={source.videoId}
+        title={title}
+        onEnded={onEnded}
+        className={className}
+      />
     );
   }
   if (source.kind === "direct") {
@@ -110,7 +117,6 @@ const YouTubePlayer = forwardRef<VideoPlayerHandle, {
   useEffect(() => {
     let cancelled = false;
     endedFiredRef.current = false;
-    setStatus("loading");
 
     loadYouTubeApi()
       .then((YT) => {

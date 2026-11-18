@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Any
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,8 @@ from app.services.educational_state_manager import build_unified_educational_sta
 from app.services.session_intelligence_engine import build_session_intelligence
 
 EDUCATIONAL_ORCHESTRATOR_VERSION = "educational-orchestrator.v1"
+
+logger = logging.getLogger(__name__)
 
 
 ENGINE_WEIGHTS = {
@@ -161,24 +164,40 @@ def orchestrate_education(db: Session, user_id: int) -> dict[str, Any]:
 
 def orchestration_observability(db: Session) -> dict[str, Any]:
     users = db.query(User).filter(User.behavioral_profile != None).limit(100).all()
+    eligible_user_count = len(users)
     decisions = []
+    failure_types: Counter[str] = Counter()
     for user in users:
         try:
             decisions.append(orchestrate_education(db, user.id))
-        except Exception:
-            continue
+        except Exception as exc:
+            failure_type = type(exc).__name__
+            failure_types[failure_type] += 1
+            logger.warning(
+                "Educational orchestration failed for user_id=%s exception_type=%s",
+                user.id,
+                failure_type,
+            )
+
+    orchestration_failure_count = sum(failure_types.values())
     action_counts = Counter(decision.get("decision", {}).get("action_type") for decision in decisions)
     conflicts = sum(len(decision.get("unified_state", {}).get("contradictions", [])) for decision in decisions)
     blocked = sum(len(decision.get("decision", {}).get("safety_overrides", [])) for decision in decisions)
     human_review = len([decision for decision in decisions if decision.get("decision", {}).get("policy", {}).get("requires_human_review")])
     low_confidence = len([decision for decision in decisions if decision.get("decision", {}).get("decision_confidence", 0) < 0.55])
+    denominator = max(1, eligible_user_count)
     return {
+        "eligible_user_count": eligible_user_count,
         "orchestrated_user_count": len(decisions),
+        "orchestration_failure_count": orchestration_failure_count,
+        "orchestration_failure_rate": round(orchestration_failure_count / denominator * 100, 4),
+        "orchestration_status": "DEGRADED" if orchestration_failure_count else "HEALTHY",
+        "orchestration_failure_types": dict(failure_types),
         "action_counts": dict(action_counts),
         "arbitration_conflict_count": conflicts,
         "blocked_unsafe_adaptation_count": blocked,
-        "human_review_escalation_rate": round(human_review / max(1, len(decisions)) * 100, 4),
-        "low_confidence_orchestration_rate": round(low_confidence / max(1, len(decisions)) * 100, 4),
+        "human_review_escalation_rate": round(human_review / denominator * 100, 4),
+        "low_confidence_orchestration_rate": round(low_confidence / denominator * 100, 4),
         "metric_version": EDUCATIONAL_ORCHESTRATOR_VERSION,
     }
 

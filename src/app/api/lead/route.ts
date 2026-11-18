@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type LeadPayload = {
   name?: string;
@@ -15,6 +17,27 @@ type LeadPayload = {
 };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const INVALID_LEAD = { ok: false, delivered: false, error: "Invalid lead payload" } as const;
+const UNAVAILABLE = { ok: false, delivered: false, error: "Lead delivery is temporarily unavailable" } as const;
+
+function noStoreJson(body: object, init?: ResponseInit) {
+  const response = NextResponse.json(body, init);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function isLeadPayload(value: unknown): value is LeadPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const payload = value as Record<string, unknown>;
+  const stringFields = ["name", "email", "phone", "year", "stage", "hours", "optional", "source"];
+  if (stringFields.some((field) => payload[field] !== undefined && typeof payload[field] !== "string")) {
+    return false;
+  }
+
+  return payload.subjects === undefined ||
+    (Array.isArray(payload.subjects) && payload.subjects.every((subject) => typeof subject === "string"));
+}
 
 // Server-side address of the FastAPI backend (same env var as the /api/v1 rewrite).
 function backendLeadsUrl() {
@@ -33,14 +56,19 @@ function backendLeadsUrl() {
 export async function POST(request: Request) {
   let data: LeadPayload;
   try {
-    data = (await request.json()) as LeadPayload;
+    const parsed: unknown = await request.json();
+    if (!isLeadPayload(parsed)) return noStoreJson(INVALID_LEAD, { status: 400 });
+    data = parsed;
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+    return noStoreJson({ ok: false, delivered: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  const email = (data.email ?? "").trim();
+  const email = data.email?.trim().toLowerCase() ?? "";
   if (!EMAIL_RE.test(email)) {
-    return NextResponse.json({ ok: false, error: "A valid email is required" }, { status: 422 });
+    return noStoreJson(
+      { ok: false, delivered: false, error: "A valid email is required" },
+      { status: 422 },
+    );
   }
 
   let stored = false;
@@ -75,32 +103,32 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const notify = process.env.LEADS_NOTIFY_EMAIL?.trim();
+  if (!apiKey || !notify) return noStoreJson(UNAVAILABLE, { status: 503 });
 
-  if (apiKey && notify) {
-    try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(apiKey);
-      const summary = [
-        `Name: ${data.name || "-"}`,
-        `Email: ${email}`,
-        `WhatsApp: ${data.phone || "-"}`,
-        `Attempt: ${data.year || "-"}`,
-        `Stage: ${data.stage || "-"}`,
-        `Hours/day: ${data.hours || "-"}`,
-        `Optional: ${data.optional || "-"}`,
-        `Focus areas: ${(data.subjects ?? []).join(", ") || "-"}`,
-        `Source: ${data.source || "diagnostic"}`,
-      ].join("\n");
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(apiKey);
+    const summary = [
+      `Name: ${data.name?.trim() || "-"}`,
+      `Email: ${email}`,
+      `WhatsApp: ${data.phone?.trim() || "-"}`,
+      `Attempt: ${data.year?.trim() || "-"}`,
+      `Stage: ${data.stage?.trim() || "-"}`,
+      `Hours/day: ${data.hours?.trim() || "-"}`,
+      `Optional: ${data.optional?.trim() || "-"}`,
+      `Focus areas: ${(data.subjects ?? []).join(", ") || "-"}`,
+      `Source: ${data.source?.trim() || "diagnostic"}`,
+    ].join("\n");
 
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || "Sarit Classes <leads@upsccommand.com>",
-        to: [notify],
-        subject: `New UPSC lead: ${data.name || email}`,
-        text: summary,
-      });
-    } catch {
-      // Never fail the user flow on a delivery error.
-    }
+    const { error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || "Sarit Classes <leads@upsccommand.com>",
+      to: [notify],
+      subject: `New UPSC lead: ${data.name?.trim() || email}`,
+      text: summary,
+    });
+    if (error) throw new Error("Lead delivery failed");
+  } catch {
+    return noStoreJson(UNAVAILABLE, { status: 503 });
   }
 
   return NextResponse.json({ ok: true, stored });

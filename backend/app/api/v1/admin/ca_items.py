@@ -6,10 +6,10 @@ Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 10.1, 10.3, 10.4, 14.7
 from __future__ import annotations
 
 from datetime import date
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -20,10 +20,116 @@ from app.core.current_affairs.ca_engine import (
     update_ca_item,
     update_review_status,
     soft_delete_ca_item,
+    CASubject,
+    ExamRelevance,
+    GSPaper,
+    SourceAuthority,
 )
 from app.core.current_affairs.ca_models import CAItem, CAMcq, CAMainsQuestion
 
 router = APIRouter()
+
+
+def _get_active_item(db: Session, item_id: int) -> CAItem:
+    item = db.query(CAItem).filter(
+        CAItem.id == item_id,
+        CAItem.is_deleted.is_(False),
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"CA item {item_id} not found")
+    return item
+
+
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+#
+# ``subject``, ``gs_paper``, ``exam_relevance`` and ``source_authority`` are
+# plain strings on the table, so before these validators existed the admin API
+# accepted any value and wrote it. That is how a ``polity-governance`` /
+# ``GS-II`` row reached the database: the subject does not exist in
+# ``CASubject`` (the polity value is ``polity``) and the paper does not exist in
+# ``GSPaper``. Learner filtering, the feed taxonomy and the syllabus graph all
+# key off those columns, so an invalid value is silently invisible rather than
+# rejected. ``backend/scripts/seed_current_affairs.py`` enforces the same rules
+# for authored content; the API is the other door and now has the same lock.
+
+
+_TAXONOMY_ENUMS = {
+    "subject": CASubject,
+    "gs_paper": GSPaper,
+    "exam_relevance": ExamRelevance,
+    "source_authority": SourceAuthority,
+}
+
+
+def _allowed_values(enum_cls) -> list[str]:
+    return sorted(member.value for member in enum_cls)
+
+
+def _validate_taxonomy(field_name: str, value):
+    if value is None:
+        return None
+    enum_cls = _TAXONOMY_ENUMS[field_name]
+    allowed = {member.value for member in enum_cls}
+    if value not in allowed:
+        raise ValueError(f"{field_name} must be one of {allowed}")
+    return value
+
+
+def _validate_secondary_subjects(values):
+    allowed = {member.value for member in CASubject}
+    for value in values or []:
+        if value not in allowed:
+            raise ValueError(f"secondary_subjects must be drawn from {sorted(allowed)}")
+    return values
+
+
+def _validate_publish_date(value):
+    if value is None:
+        return None
+    try:
+        date.fromisoformat(str(value))
+    except ValueError:
+        raise ValueError("publish_date must be an ISO date such as 2026-10-30")
+    return value
+
+
+def _option_labels(options: Any) -> list[str] | None:
+    """Mirror the learner-side MCQ shape rule (quick_test._option_labels).
+
+    Returns the label list when the options are usable, otherwise None, so an
+    MCQ whose stored shape the learner page cannot render cannot be created.
+    """
+    if not isinstance(options, list) or not options:
+        return None
+    labels: list[str] = []
+    for option in options:
+        if not isinstance(option, dict):
+            return None
+        label = option.get("label")
+        text = option.get("text")
+        if not isinstance(label, str) or not label.strip():
+            return None
+        if not isinstance(text, str) or not text.strip():
+            return None
+        if label.strip().casefold() in [existing.casefold() for existing in labels]:
+            return None
+        labels.append(label.strip())
+    return labels
+
+
+def _validate_mcq(mcq: "MCQCreateIn") -> "MCQCreateIn":
+    labels = _option_labels(mcq.options)
+    if labels is None:
+        raise ValueError(
+            "options must be a non-empty list of {label, text} objects with unique, "
+            "non-empty labels and non-empty text"
+        )
+    correct = (mcq.correct_answer or "").strip().casefold()
+    if not any(label.casefold() == correct for label in labels):
+        raise ValueError("correct_answer must match one of the option labels")
+    return mcq
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +144,11 @@ class MCQCreateIn(BaseModel):
     explanation: str | None = None
     display_order: int = 1
 
+    @model_validator(mode="after")
+    def _options_are_renderable_and_answered(self):
+        _validate_mcq(self)
+        return self
+
 
 class MainsCreateIn(BaseModel):
     question_text: str
@@ -46,6 +157,11 @@ class MainsCreateIn(BaseModel):
     word_limit: int = Field(..., ge=150, le=250)
     model_answer: str | None = None
     display_order: int = 1
+
+    @field_validator("gs_paper")
+    @classmethod
+    def _paper_is_known(cls, value):
+        return _validate_taxonomy("gs_paper", value)
 
 
 class CAItemCreateIn(BaseModel):
@@ -64,6 +180,24 @@ class CAItemCreateIn(BaseModel):
     mcqs: List[MCQCreateIn] = Field(default=[], max_length=10)
     mains_questions: List[MainsCreateIn] = Field(default=[], max_length=3)
 
+    @field_validator("subject", "gs_paper", "exam_relevance", "source_authority")
+    @classmethod
+    def _taxonomy_is_known(cls, value, info):
+        return _validate_taxonomy(info.field_name, value)
+
+    @field_validator("secondary_subjects")
+    @classmethod
+    def _secondary_is_known(cls, value):
+        return _validate_secondary_subjects(value)
+
+    @field_validator("publish_date")
+    @classmethod
+    def _publish_date_is_iso(cls, value):
+        return _validate_publish_date(value)
+
+    # Each MCQ validates itself (see MCQCreateIn), so an item cannot be created
+    # with an option set the learner page cannot render.
+
 
 class CAItemUpdateIn(BaseModel):
     title: str | None = None
@@ -78,6 +212,21 @@ class CAItemUpdateIn(BaseModel):
     so_what_analysis: dict | None = None
     source_authority: str | None = None
     relevance_score: int | None = Field(None, ge=1, le=5)
+
+    @field_validator("subject", "gs_paper", "exam_relevance", "source_authority")
+    @classmethod
+    def _taxonomy_is_known(cls, value, info):
+        return _validate_taxonomy(info.field_name, value)
+
+    @field_validator("secondary_subjects")
+    @classmethod
+    def _secondary_is_known(cls, value):
+        return _validate_secondary_subjects(value)
+
+    @field_validator("publish_date")
+    @classmethod
+    def _publish_date_is_iso(cls, value):
+        return _validate_publish_date(value)
 
 
 class StatusChangeIn(BaseModel):
@@ -163,6 +312,7 @@ def update_item(
     db: Session = Depends(get_db),
 ):
     """Admin: update CA item fields."""
+    _get_active_item(db, item_id)
     payload = {k: v for k, v in body.model_dump().items() if v is not None}
     if "publish_date" in payload:
         payload["publish_date"] = date.fromisoformat(payload["publish_date"])
@@ -184,6 +334,7 @@ def change_status(
     db: Session = Depends(get_db),
 ):
     """Admin: transition review status (DRAFT→IN_REVIEW→PUBLISHED→ARCHIVED)."""
+    _get_active_item(db, item_id)
     try:
         update_review_status(db, admin.id, item_id, body.status)
         db.commit()
@@ -200,6 +351,7 @@ def delete_item(
     db: Session = Depends(get_db),
 ):
     """Admin: soft-delete a CA item."""
+    _get_active_item(db, item_id)
     try:
         soft_delete_ca_item(db, admin.id, item_id)
         db.commit()

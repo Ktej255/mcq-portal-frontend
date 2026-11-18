@@ -8,15 +8,17 @@ Feature: unified-answer-evaluation-engine
 """
 from __future__ import annotations
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.core.inference.contracts import IInferenceProvider, InferenceRequest, InferenceResponse
 from app.core.evaluation.engine import EvaluationEngine, EvaluationInput
+from app.core.evaluation.providers.evaluation import EvaluationProviderUnavailableError
 from app.core.evaluation.json_io import JsonRepair
 from app.core.evaluation.providers.config import ConfigurationError, ProviderConfig
 from app.core.evaluation.providers.registry import ProviderRegistry
-from app.core.evaluation.resilience import reset_breakers
+from app.core.evaluation.resilience import ResilientCallError, reset_breakers
 from app.core.evaluation.rubric import PrebuiltRubricStrategy
 from app.core.evaluation.schema import (
     REQUIRED_EVALUATION_SECTIONS,
@@ -59,7 +61,7 @@ class _CountingFailProvider(IInferenceProvider):
 
     def generate(self, request):
         self.calls += 1
-        raise TimeoutError("simulated transient failure")
+        raise ResilientCallError("simulated transient failure")
 
     async def generate_async(self, request):
         return self.generate(request)
@@ -140,7 +142,7 @@ def test_property2_shape_invariance_across_strategies():
 
 
 # ---------------------------------------------------------------------------
-# Property 3 + 4: honest degradation + retry up to the configured limit
+# Property 3 + 4: fail-closed terminal behavior + retry up to the configured limit
 # ---------------------------------------------------------------------------
 # Feature: unified-answer-evaluation-engine, Property 4: retry up to the configured limit
 @settings(max_examples=100, deadline=None)
@@ -149,15 +151,15 @@ def test_property4_retries_transient_up_to_limit(seed):
     reset_breakers()
     prov = _CountingFailProvider()
     eng = EvaluationEngine(_registry_with(prov))
-    report = eng.evaluate(
-        EvaluationInput(
-            answer_text="ans", rubric_strategy=PrebuiltRubricStrategy("r"), provider_key="mock"
+    # mock built-in retry_limit=2 → exactly 3 attempts; then fail closed.
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        eng.evaluate(
+            EvaluationInput(
+                answer_text="ans", rubric_strategy=PrebuiltRubricStrategy("r"), provider_key="mock"
+            )
         )
-    )
-    # mock built-in retry_limit=2 → exactly 3 attempts; then honest degradation.
+    assert exc.value.operation == "provider_call"
     assert prov.calls == 3
-    assert not report.is_complete
-    assert set(report.incomplete_sections) == set(REQUIRED_EVALUATION_SECTIONS)
 
 
 # Feature: unified-answer-evaluation-engine, Property 4: retry up to the configured limit
@@ -167,13 +169,16 @@ def test_property4_retries_badjson_up_to_limit(seed):
     reset_breakers()
     prov = _CountingBadJsonProvider()
     eng = EvaluationEngine(_registry_with(prov))
-    report = eng.evaluate(
-        EvaluationInput(
-            answer_text="ans", rubric_strategy=PrebuiltRubricStrategy("r"), provider_key="mock"
+    # Malformed output is never degraded into an evaluated report: the engine
+    # retries, then fails closed with a typed response-validation error.
+    with pytest.raises(EvaluationProviderUnavailableError) as exc:
+        eng.evaluate(
+            EvaluationInput(
+                answer_text="ans", rubric_strategy=PrebuiltRubricStrategy("r"), provider_key="mock"
+            )
         )
-    )
+    assert exc.value.operation == "response_validation"
     assert prov.calls == 3
-    assert not report.is_complete  # Property 3: degraded, never fabricated
 
 
 # ---------------------------------------------------------------------------

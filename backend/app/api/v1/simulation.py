@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.domain import Test, Attempt, AttemptStatusEnum, ExamEvent
 from app.api.dependencies import get_current_user
-from datetime import datetime, timezone, timedelta
-import uuid
+from app.services.test_engine_service import count_published_questions
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -14,18 +14,28 @@ async def start_simulation(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # 1. Fetch Test
-    test = db.query(Test).filter(Test.id == test_id).first()
+    # A simulation can only target an active test with published questions.
+    test = db.query(Test).filter(Test.id == test_id, Test.is_active == True).first()
     if not test:
-        raise HTTPException(status_code=404, detail="Simulation target not found")
-    
-    # 2. Check for existing active simulation
+        raise HTTPException(status_code=404, detail="Test not found or inactive")
+
+    if count_published_questions(db, test_id) == 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "TEST_HAS_NO_PUBLISHED_QUESTIONS",
+                "message": "This test has no published questions yet.",
+            },
+        )
+
+    # Resume only this student's in-progress simulation for this selected test.
     existing = db.query(Attempt).filter(
         Attempt.user_id == current_user.id,
+        Attempt.test_id == test_id,
         Attempt.status == AttemptStatusEnum.IN_PROGRESS,
-        Attempt.is_simulation == True
+        Attempt.is_simulation == True,
     ).first()
-    
+
     if existing:
         return {
             "status": "RESUMED",
@@ -51,7 +61,7 @@ async def start_simulation(
         event_type="SIMULATION_START",
         payload={
             "enforced_duration_minutes": test.duration_minutes or 120,
-            "negative_marking": 0.66,
+            "negative_marking": test.negative_marking_value,
             "interruption_tolerance": "ZERO"
         }
     )
@@ -74,19 +84,57 @@ async def simulation_heartbeat(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # Verify the simulation is still valid
-    attempt = db.query(Attempt).filter(Attempt.id == attempt_id, Attempt.user_id == current_user.id).first()
-    if not attempt or not attempt.is_simulation:
+    # Fetch by ID first so a real attempt owned by another user remains a
+    # denied session rather than being confused with a missing attempt.
+    attempt = db.query(Attempt).filter(Attempt.id == attempt_id).first()
+    if not attempt or attempt.user_id != current_user.id or not attempt.is_simulation:
         raise HTTPException(status_code=403, detail="Invalid simulation session")
-    
-    # Check if time exceeded
+
+    # Heartbeats are only valid for an active simulation.  Do not expose
+    # terminal-state details or attempt data to the client.
+    if attempt.status != AttemptStatusEnum.IN_PROGRESS:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SIMULATION_NOT_ACTIVE",
+                "message": "This simulation is no longer active.",
+            },
+        )
+
     test = db.query(Test).filter(Test.id == attempt.test_id).first()
+    if not test:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SIMULATION_UNAVAILABLE",
+                "message": "This simulation is unavailable.",
+            },
+        )
+
+    start_time = attempt.start_time
+    if not isinstance(start_time, datetime):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "SIMULATION_INVALID_STATE",
+                "message": "This simulation cannot continue in its current state.",
+            },
+        )
+
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    else:
+        start_time = start_time.astimezone(timezone.utc)
+
     duration = test.duration_minutes or 120
-    elapsed = (datetime.now(timezone.utc) - attempt.start_time.replace(tzinfo=timezone.utc)).total_seconds() / 60
-    
-    if elapsed > duration + 5: # 5 min grace for network
-        attempt.status = AttemptStatusEnum.COMPLETED
+    elapsed = (datetime.now(timezone.utc) - start_time).total_seconds() / 60
+
+    if elapsed > duration + 5:  # 5 min grace for network
+        # SUBMITTED is the existing persisted terminal state.  Updating only
+        # from IN_PROGRESS makes repeated heartbeats safely terminal/idempotent.
+        attempt.status = AttemptStatusEnum.SUBMITTED
+        attempt.end_time = datetime.now(timezone.utc)
         db.commit()
         return {"status": "AUTO_TERMINATED", "reason": "TIME_EXCEEDED"}
-        
+
     return {"status": "ACTIVE", "elapsed_minutes": round(elapsed, 2)}

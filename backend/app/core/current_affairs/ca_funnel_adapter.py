@@ -84,12 +84,20 @@ def get_ca_funnel_state(db: Session, student_id: int, item_id: int) -> CAFunnelS
     ).first()
 
     if progress:
-        completed = frozenset(progress.completed_steps or [])
+        completed = set(progress.completed_steps or [])
+        current_step = progress.current_step
+        # If the item's video was removed after this learner started, the
+        # saved step 1 would render a hidden Watch screen with no control to
+        # advance. Treat the video as skipped so Read becomes current. The
+        # reconciliation is persisted by the next completed step.
+        if not video_available and current_step < 2:
+            current_step = 2
+            completed.add(1)
         return CAFunnelState(
             student_id=student_id,
             ca_item_id=item_id,
-            current_step=progress.current_step,
-            completed_steps=completed,
+            current_step=current_step,
+            completed_steps=frozenset(completed),
             video_available=video_available,
             started_at=progress.started_at,
             last_activity_at=progress.last_activity_at,

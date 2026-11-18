@@ -227,22 +227,33 @@ export function useSubjectProgress(subjectSlug: string, sessions: SubjectSession
   }, [subjectSlug]);
 
   const saveDayProgress = useCallback(
-    (day: number, patch: Omit<Partial<SubjectDayProgress>, "day">) => {
-      setProgress((current) => {
-        const key = String(day);
-        const nextDay = {
-          ...current[key],
-          day,
-          ...patch,
-          updatedAt: new Date().toISOString(),
-        };
-        const next = {
-          ...current,
-          [key]: nextDay,
-        };
-        writeProgress(subjectSlug, next);
-        void saveRemoteSubjectProgress(subjectSlug, next);
-        return next;
+    (
+      day: number,
+      patch: Omit<Partial<SubjectDayProgress>, "day">,
+    ): Promise<boolean> => {
+      return new Promise((resolve) => {
+        setProgress((current) => {
+          const key = String(day);
+          const nextDay = {
+            ...current[key],
+            day,
+            ...patch,
+            updatedAt: new Date().toISOString(),
+          };
+          const next = {
+            ...current,
+            [key]: nextDay,
+          };
+          // Keep the local-first draft behavior for offline learners. The
+          // returned promise represents whether the queued remote write was
+          // accepted, so callers can gate durable completion on that result.
+          writeProgress(subjectSlug, next);
+          void saveRemoteSubjectProgress(subjectSlug, next).then(
+            (accepted) => resolve(accepted),
+            () => resolve(false),
+          );
+          return next;
+        });
       });
     },
     [subjectSlug]

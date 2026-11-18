@@ -99,9 +99,13 @@ def seeded_engine():
         )
         session.add(user)
 
-        # Create GS Geography subject
-        subject = GsSubject(id=1, slug="geography", name="GS Geography", display_order=1)
-        session.add(subject)
+        # Create test GS subjects
+        session.add_all(
+            [
+                GsSubject(id=1, slug="geography", name="GS Geography", display_order=1),
+                GsSubject(id=2, slug="polity", name="GS Polity", display_order=2),
+            ]
+        )
         session.flush()
 
         # Syllabus nodes
@@ -140,6 +144,18 @@ def seeded_engine():
             review_status=GsReviewStatusEnum.REVIEWED,
         )
         session.add(atmosphere)
+
+        polity_topic = GsLmsSyllabusNode(
+            id=50,
+            subject_id=2,
+            parent_id=None,
+            title="Constitutional Framework",
+            node_type=GsLmsNodeTypeEnum.LEAF_TOPIC,
+            weight=1.0,
+            display_order=1,
+            review_status=GsReviewStatusEnum.REVIEWED,
+        )
+        session.add(polity_topic)
         session.flush()
 
         # PYQs for Continental Drift (id=30)
@@ -219,6 +235,22 @@ def seeded_engine():
             review_status=GsReviewStatusEnum.UNREVIEWED,
         )
         session.add(pyq5)
+
+        # Reviewed PYQ owned by Polity. Geography URLs must not expose or reveal it.
+        pyq6 = GsLmsPyq(
+            id=6,
+            subject_id=2,
+            syllabus_node_id=50,
+            exam_type=GsLmsExamTypeEnum.PRELIMS,
+            year=2024,
+            question_text="Which feature is part of the constitutional framework?",
+            answer_text="Option D",
+            explanation="The Constitution establishes the framework of government.",
+            marks=None,
+            question_type=GsLmsQuestionTypeEnum.FACTUAL,
+            review_status=GsReviewStatusEnum.REVIEWED,
+        )
+        session.add(pyq6)
 
         session.commit()
     finally:
@@ -340,6 +372,18 @@ def test_get_pyqs_node_not_found(client):
     assert resp.status_code == 404
 
 
+def test_get_pyqs_rejects_node_owned_by_another_subject(client):
+    """A valid node ID cannot be read through a different subject URL."""
+    resp = client.get("/api/v1/gs-lms/geography/topics/50/pyqs")
+    assert resp.status_code == 404
+
+
+def test_get_pyqs_rejects_unknown_subject(client):
+    """Unknown subject slugs fail before any node lookup."""
+    resp = client.get("/api/v1/gs-lms/unknown/topics/30/pyqs")
+    assert resp.status_code == 404
+
+
 def test_get_pyqs_empty_state_no_pyqs(client):
     """Empty state message when no PYQs exist at all for a topic (R3.6)."""
     resp = client.get("/api/v1/gs-lms/geography/topics/40/pyqs")
@@ -432,6 +476,22 @@ def test_reveal_pyq_not_found(client):
     """404 when PYQ doesn't exist."""
     resp = client.post("/api/v1/gs-lms/geography/pyqs/9999/reveal")
     assert resp.status_code == 404
+
+
+def test_reveal_pyq_rejects_pyq_owned_by_another_subject(client):
+    """A PYQ cannot be revealed through a different subject URL."""
+    blocked = client.post("/api/v1/gs-lms/geography/pyqs/6/reveal")
+    assert blocked.status_code == 404
+
+    # The valid subject route still sees the PYQ as unrevealed, proving the
+    # rejected cross-subject request did not create a reveal event.
+    visible = client.get("/api/v1/gs-lms/polity/topics/50/pyqs")
+    assert visible.status_code == 200
+    assert visible.json()["data"]["pyqs"][0]["answer_text"] is None
+
+    allowed = client.post("/api/v1/gs-lms/polity/pyqs/6/reveal")
+    assert allowed.status_code == 200
+    assert allowed.json()["data"]["answer_text"] == "Option D"
 
 
 def test_reveal_unreviewed_pyq_not_found(client):

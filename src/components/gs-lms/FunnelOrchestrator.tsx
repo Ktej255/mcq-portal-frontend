@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, GraduationCap, Newspaper, AlertTriangle, Target, PenLine, Lock, CheckCircle2 } from 'lucide-react';
-import { useFunnelState, TabId, STEP_TAB_MAP } from '@/hooks/useFunnelState';
+import { useFunnelState, TabId } from '@/hooks/useFunnelState';
 
 /**
  * FunnelOrchestrator — Client-side state machine that reads funnel state from
@@ -61,7 +61,9 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
   // Auto-switch to the correct tab when currentStep advances to a new tab
   useEffect(() => {
     // When the funnel advances and the active tab changes, follow it
-    setSelectedTab(null); // Reset override so it follows activeTab
+    queueMicrotask(() => {
+      setSelectedTab(null); // Reset override so it follows activeTab
+    });
   }, [activeTab]);
 
   // Determine tab states
@@ -161,6 +163,19 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
           );
         })}
       </div>
+
+      {!canAccessStep(12) && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] px-4 py-3 text-xs text-[#1a3a2a]"
+        >
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
+            MCQ Lab unlocks after you complete Advanced, Current Affairs, and
+            Examiner Traps, including each recall check.
+          </p>
+        </div>
+      )}
 
       {/* Step Indicator */}
       <div className="flex items-center gap-1 text-[10px] font-semibold text-[#49675e]">

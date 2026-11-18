@@ -66,22 +66,26 @@ export function MappingModule({ slug, onClose }: MappingModuleProps) {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setState("loading");
-    setError(null);
-    optionalService
-      .getMapping(slug)
-      .then((res) => {
-        if (cancelled) return;
-        setData(res);
-        setState("loaded");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(messageFromError(err));
-        setState("error");
-      });
+    const requestTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setState("loading");
+      setError(null);
+      optionalService
+        .getMapping(slug)
+        .then((res) => {
+          if (cancelled) return;
+          setData(res);
+          setState("loaded");
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setError(messageFromError(err));
+          setState("error");
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimer);
     };
   }, [slug, isLoaded, isSignedIn]);
 

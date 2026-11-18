@@ -1,131 +1,88 @@
-"use client";
+import Link from "next/link";
+import { LmsLayoutShell } from "@/components/gs-lms/pages/LmsLayoutShell";
+import { SubjectLmsProvider } from "@/components/gs-lms/SubjectLmsContext";
+import { SUPPORTED_GS_LMS_SUBJECTS, getSupportedGsLmsSubject } from "@/lib/gsLmsRoutePolicy";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter, useParams } from "next/navigation";
-import { gsLmsService } from "@/services/api/gsLmsService";
-import { useApiConfig } from "@/lib/hooks/useApi";
-import { SubjectLmsProvider, useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
+/**
+ * Subject layout for the GS LMS workspace.
+ *
+ * Only subjects with reviewed, beta-open content render the workspace shell.
+ * Every other GS subject slug stays addressable — a learner following a saved,
+ * shared, or stale link gets an honest "not open yet" explanation instead of a
+ * 404, because `notFound()` here used to swallow the whole locked-subject
+ * surface (the `/upsc/{slug}` pages and their retired day rooms all redirect
+ * into this layout).
+ */
+export default async function LmsLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ subject: string }>;
+}) {
+  const { subject: routeSubject } = await params;
+  const subject = getSupportedGsLmsSubject(routeSubject);
 
-const ONBOARDING_CACHE_KEY_PREFIX = "lms-onboarding-completed-";
-
-const BREADCRUMB_MAP: Record<string, string> = {
-  syllabus: "Syllabus",
-  topic: "Topic",
-  practice: "Practice",
-  gaps: "Gaps",
-  planner: "Planner",
-  onboarding: "Onboarding",
-};
-
-function getBreadcrumbLabel(pathname: string): string {
-  const segments = pathname.split("/").filter(Boolean);
-  // Find the segment after "lms"
-  const lmsIdx = segments.indexOf("lms");
-  const pageSegment = lmsIdx >= 0 ? segments[lmsIdx + 1] : undefined;
-  return BREADCRUMB_MAP[pageSegment ?? ""] ?? "Home";
-}
-
-function LmsLayoutInner({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { isLoaded, isSignedIn } = useApiConfig();
-  const [gateChecked, setGateChecked] = useState(false);
-  const { subject, label, lmsBase } = useSubjectLms();
-
-  const onboardingCacheKey = `${ONBOARDING_CACHE_KEY_PREFIX}${subject}`;
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    // Skip onboarding check if already on the onboarding page
-    if (pathname.includes("/onboarding")) {
-      setGateChecked(true);
-      return;
-    }
-
-    // Check sessionStorage cache first
-    try {
-      const cached = sessionStorage.getItem(onboardingCacheKey);
-      if (cached === "true") {
-        setGateChecked(true);
-        return;
-      }
-    } catch {
-      // sessionStorage unavailable (private browsing) — continue to API
-    }
-
-    gsLmsService
-      .getOnboardingStatus(subject)
-      .then((status) => {
-        if (!status.completed) {
-          router.replace(`${lmsBase}/onboarding`);
-        } else {
-          try {
-            sessionStorage.setItem(onboardingCacheKey, "true");
-          } catch {
-            // Ignore storage errors
-          }
-          setGateChecked(true);
-        }
-      })
-      .catch(() => {
-        // On error, allow through (don't block the student)
-        setGateChecked(true);
-      });
-  }, [pathname, router, isLoaded, isSignedIn, subject, lmsBase, onboardingCacheKey]);
-
-  // While checking onboarding status, show minimal loading
-  if (!gateChecked && !pathname.includes("/onboarding")) {
+  if (!subject) {
     return (
-      <div className="min-h-screen bg-[#fffdf8] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[#1d9e75] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <SubjectNotOpen
+        slug={typeof routeSubject === "string" ? routeSubject : ""}
+        openSubjects={Object.values(SUPPORTED_GS_LMS_SUBJECTS)}
+      />
     );
   }
 
-  const breadcrumbLabel = getBreadcrumbLabel(pathname);
-
   return (
-    <div className="min-h-screen bg-[#fffdf8]">
-      {/* Breadcrumb header */}
-      <div className="border-b border-[#dcd5c7] bg-white/60 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 py-3">
-          <nav className="flex items-center gap-1.5 text-sm text-[#13251d]/60">
-            <span>{label}</span>
-            <span className="text-[#13251d]/30">›</span>
-            <span>LMS</span>
-            <span className="text-[#13251d]/30">›</span>
-            <span className="text-[#1a3a2a] font-medium">{breadcrumbLabel}</span>
-          </nav>
-        </div>
-      </div>
-
-      {/* Page content */}
-      <div className="max-w-5xl mx-auto">{children}</div>
-    </div>
+    <SubjectLmsProvider subject={subject.slug} label={subject.label}>
+      <LmsLayoutShell>{children}</LmsLayoutShell>
+    </SubjectLmsProvider>
   );
 }
 
-export default function LmsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams<{ subject: string }>();
-  const subject = params.subject || "geography";
-
-  const labelMap: Record<string, string> = {
-    geography: "Geography",
-    "polity-governance": "Polity & Governance",
-    economy: "Economy",
-    history: "History",
-    "science-tech": "Science & Tech",
-    environment: "Environment",
-    "disaster-management": "Disaster Management",
-    "internal-security-society": "Internal Security & Society",
-    csat: "CSAT",
-  };
-  const label = labelMap[subject] || subject.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+function SubjectNotOpen({
+  slug,
+  openSubjects,
+}: {
+  slug: string;
+  openSubjects: Array<{ slug: string; label: string }>;
+}) {
+  const readable = slug
+    .split("-")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+  const [firstOpen] = openSubjects;
 
   return (
-    <SubjectLmsProvider subject={subject} label={label}>
-      <LmsLayoutInner>{children}</LmsLayoutInner>
-    </SubjectLmsProvider>
+    <div className="mx-auto max-w-2xl px-6 py-16">
+      <div className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-8 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8c5d14]">
+          Not open in the beta yet
+        </p>
+        <h1 className="mt-3 text-2xl font-black tracking-tight text-[#13251d]">
+          {readable || "This subject"} is not available
+        </h1>
+        <p className="mt-4 text-sm leading-6 text-[#495c52]">
+          No reviewed study content, MCQ sets, or past questions have been published for this
+          subject, so there is nothing here to study yet. It will appear in the sidebar when its
+          content is reviewed and opened.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {firstOpen ? (
+            <Link
+              href={`/upsc/${firstOpen.slug}/lms`}
+              className="inline-flex min-h-11 items-center rounded-lg bg-[#1a3a2a] px-4 text-sm font-bold text-white transition hover:bg-[#10291d]"
+            >
+              Continue with {firstOpen.label}
+            </Link>
+          ) : null}
+          <Link
+            href="/upsc"
+            className="inline-flex min-h-11 items-center rounded-lg border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+          >
+            Back to Today
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

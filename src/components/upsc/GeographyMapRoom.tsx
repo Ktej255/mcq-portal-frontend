@@ -26,7 +26,7 @@ export function GeographyMapRoom() {
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Geography edge</p>
         <h2 className="mt-1 text-2xl font-black tracking-tight">Interactive India map</h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-          Pick a layer, then click a marker to study it. Map-based questions are among the highest-scoring areas in Geography optional.
+          Pick a layer, then click a marker to study it. Map-based questions recur in the Geography optional, so practise locating each feature and linking it to a PYQ angle.
         </p>
         {/* Layer sub-tabs */}
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -86,7 +86,7 @@ export function GeographyMapRoom() {
             })}
           </div>
           <p className="mt-1 text-center text-[10px] font-semibold text-[#8a8174]">
-            Schematic outline (incl. J&amp;K, Ladakh/Aksai Chin, Arunachal). To be replaced with the official government-approved India map.
+            Schematic study outline, not a boundary-accurate survey map. It includes J&amp;K, Ladakh/Aksai Chin and Arunachal Pradesh; use an official Survey of India map for boundary study.
           </p>
         </div>
 
@@ -128,11 +128,11 @@ export function GeographyMapRoom() {
       {/* Diagram bank stays below the map */}
       <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Diagram bank</p>
-        <p className="mt-1 text-xs font-semibold leading-5 text-[#8a8174]">Topic-wise labelled diagrams. AI-generated handwritten / 3D versions will render inside each card.</p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[#8a8174]">Named diagrams with revision notes. Illustrations are not authored yet — each card states what the diagram should show.</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {geographyDiagrams.map((d) => (
             <div key={d.id} className="rounded-md border border-[#e7e0d2] bg-white p-3">
-              <div className="flex h-20 items-center justify-center rounded bg-[#eef6f1] text-[10px] font-black uppercase tracking-[0.12em] text-[#1d9e75]">Diagram preview</div>
+              <div className="flex h-20 items-center justify-center rounded border border-dashed border-[#cfc6b6] bg-[#f7f4ee] px-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#8a8174]">Illustration not authored yet</div>
               <p className="mt-2 text-sm font-black leading-5 text-[#13251d]">{d.title}</p>
               <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#1d9e75]">{d.topic}</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[#66736b]">{d.note}</p>

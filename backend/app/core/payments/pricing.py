@@ -2,7 +2,9 @@
 Server-side pricing engine for Sarit Learn subscription plans.
 
 Mirrors frontend buildPlan logic in frontend/src/lib/upsc/yearlyPlanner.ts exactly.
-Formula: Math.round((baseMonthlyPrice * months * (1 - discountPercent / 100)) / 10) * 10
+Discounted cycles: round(base * months * (1 - discount / 100) / 10) * 10.
+Monthly cycles keep their list price: rounding 399 to the nearest 10 would
+charge 400 for a plan advertised at 399.
 """
 
 from typing import Dict
@@ -40,8 +42,11 @@ def compute_plan_amount(plan_tier: str, billing_cycle: str) -> int:
 
     Mirrors the frontend buildPlan function exactly:
         listPrice = baseMonthlyPrice * months
-        discountMultiplier = 1 - discountPercent / 100
-        launchPrice = Math.round((listPrice * discountMultiplier) / 10) * 10
+        launchPrice = listPrice when discountPercent == 0
+        launchPrice = round(listPrice * (1 - discountPercent / 100) / 10) * 10 otherwise
+
+    Rounding a 0% monthly plan to the nearest 10 charged 400 for a 399 plan,
+    so monthly orders must use the list price unchanged.
 
     Args:
         plan_tier: One of "foundation", "plus", "pro", "ultimate"
@@ -71,6 +76,10 @@ def compute_plan_amount(plan_tier: str, billing_cycle: str) -> int:
 
     list_price = base * months
     discount_multiplier = 1 - discount_percent / 100
-    launch_price = round((list_price * discount_multiplier) / 10) * 10
+    launch_price = (
+        list_price
+        if discount_percent == 0
+        else round((list_price * discount_multiplier) / 10) * 10
+    )
 
     return launch_price

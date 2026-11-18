@@ -186,7 +186,7 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
                 </span>
               </div>
               <h1 className="mt-3 text-2xl font-black tracking-tight text-[var(--subject-heading)] md:text-4xl">
-                Today's {plan.title} study
+                Today&apos;s {plan.title} study
               </h1>
               <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
                 Follow the next button. The generated path and deeper planner stay folded into this simple daily flow.
@@ -210,7 +210,7 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.2em] opacity-75">Today's task</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] opacity-75">Today&apos;s task</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">{activeSession.title}</h2>
                 <p
                   data-testid="subject-command-primary-status"
@@ -252,7 +252,7 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
                   Generated path
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-[var(--subject-heading)]">
-                  {generatedDailyPath.length} topic{generatedDailyPath.length === 1 ? "" : "s"} in today's sitting
+                  {generatedDailyPath.length} topic{generatedDailyPath.length === 1 ? "" : "s"} in today&apos;s sitting
                 </h2>
               </div>
               <span
@@ -317,7 +317,7 @@ export function SubjectCommandRoom({ plan, initialDay }: { plan: SubjectSprintPl
             >
               <ClipboardCheck className="h-5 w-5 text-[var(--subject-accent)]" />
               <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--subject-accent)]">
-                Today's task
+                Today&apos;s task
               </p>
               <p className="mt-2 text-sm font-black leading-6 text-[var(--subject-heading)]">
                 {activeReadiness.actionLabel}

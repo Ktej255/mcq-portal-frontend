@@ -119,20 +119,22 @@ export function ThinkersModule({ slug, onClose }: ThinkersModuleProps) {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
-    setTreeState("loading");
-    setTreeError(null);
-    optionalService
-      .getSyllabusTree(slug)
-      .then((tree) => {
+    const loadTree = async () => {
+      if (cancelled) return;
+      setTreeState("loading");
+      setTreeError(null);
+      try {
+        const tree = await optionalService.getSyllabusTree(slug);
         if (cancelled) return;
         setNodeIds(resolveThinkerNodeIds(tree));
         setTreeState("loaded");
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (cancelled) return;
         setTreeError(messageFromError(err));
         setTreeState("error");
-      });
+      }
+    };
+    void loadTree();
     return () => {
       cancelled = true;
     };
@@ -144,28 +146,29 @@ export function ThinkersModule({ slug, onClose }: ThinkersModuleProps) {
   //    Read-layer content endpoint (no separate content store — R4.4).
   useEffect(() => {
     if (selected == null || !isLoaded || !isSignedIn) return;
-    // No resolved node id => the subtopic isn't in the tree yet; show the
-    // honest "not yet authored" state rather than calling a bogus id (R4.7).
-    if (selectedNodeId == null) {
-      setNode(null);
-      setContentState("loaded");
-      return;
-    }
     let cancelled = false;
-    setContentState("loading");
-    setContentError(null);
-    optionalService
-      .getTopicContent(slug, selectedNodeId)
-      .then((data) => {
+    const loadContent = async () => {
+      // No resolved node id => the subtopic isn't in the tree yet; show the
+      // honest "not yet authored" state rather than calling a bogus id (R4.7).
+      if (selectedNodeId == null) {
+        setNode(null);
+        setContentState("loaded");
+        return;
+      }
+      setContentState("loading");
+      setContentError(null);
+      try {
+        const data = await optionalService.getTopicContent(slug, selectedNodeId);
         if (cancelled) return;
         setNode(data);
         setContentState("loaded");
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (cancelled) return;
         setContentError(messageFromError(err));
         setContentState("error");
-      });
+      }
+    };
+    void loadContent();
     return () => {
       cancelled = true;
     };

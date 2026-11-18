@@ -40,6 +40,8 @@ from app.core.gs_lms.models import (  # noqa: F401
     GsLmsNodeTypeEnum,
     GsLmsContentSection,
     GsLmsSectionLabelEnum,
+    GsLmsPyq,
+    GsLmsExamTypeEnum,
 )
 from app.core.gs_lms.student_models import (  # noqa: F401
     GsLmsStudentSectionProgress,
@@ -85,6 +87,7 @@ def seeded_engine():
             "gs_day_lessons",
             "gs_lms_syllabus_nodes",
             "gs_lms_content_sections",
+            "gs_lms_pyqs",
             "gs_lms_student_section_progress",
             "gs_lms_daily_plans",
             "gs_lms_replan_events",
@@ -161,6 +164,30 @@ def seeded_engine():
 
         session.flush()
 
+        # Reviewed PYQ evidence behind the next scheduled topic (node 2).
+        session.add_all(
+            [
+                GsLmsPyq(
+                    subject_id=1,
+                    syllabus_node_id=2,
+                    exam_type=GsLmsExamTypeEnum.PRELIMS,
+                    year=2022,
+                    question_text="Sea-floor spreading evidence?",
+                    review_status=GsReviewStatusEnum.REVIEWED,
+                ),
+                GsLmsPyq(
+                    subject_id=1,
+                    syllabus_node_id=2,
+                    exam_type=GsLmsExamTypeEnum.MAINS,
+                    year=2023,
+                    marks=10,
+                    question_text="Discuss sea-floor spreading.",
+                    review_status=GsReviewStatusEnum.REVIEWED,
+                ),
+            ]
+        )
+        session.flush()
+
         # Mark Topic 1 as completed (all 4 sections).
         for sec_id in [100, 101, 102, 103]:
             progress = GsLmsStudentSectionProgress(
@@ -233,6 +260,11 @@ def test_get_today_plan_creates_plan_if_none(client):
     # Items should start from position 1 (Sea Floor Spreading).
     assert data["planned_items"][0]["node_id"] == 2
     assert data["planned_items"][1]["node_id"] == 3
+    first = data["planned_items"][0]
+    assert first["sequence_position"] == 2
+    assert first["sequence_total"] == 5
+    assert first["prelims_pyq_count"] == 1
+    assert first["mains_pyq_count"] == 1
 
 
 def test_get_today_plan_returns_existing_plan(client):
@@ -249,6 +281,51 @@ def test_get_today_plan_returns_existing_plan(client):
     assert data1["plan_date"] == data2["plan_date"]
     assert data1["bandwidth"] == data2["bandwidth"]
     assert len(data1["planned_items"]) == len(data2["planned_items"])
+
+
+def test_beta_scope_limits_plan_to_loop_ready_topics(client, monkeypatch):
+    """The planner must not schedule a topic the paid-beta gate rejects."""
+    import app.core.gs_lms.planner as planner_core
+
+    monkeypatch.setattr(planner_core, "beta_scope_enabled", lambda: True)
+    monkeypatch.setattr(
+        planner_core, "compute_loop_ready_ids", lambda db, subject_id: {3, 4}
+    )
+
+    resp = client.get("/api/v1/gs-lms/geography/plan/today")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+
+    planned_ids = [item["node_id"] for item in data["planned_items"]]
+    assert planned_ids == [3, 4]
+    # Positions follow the scoped sequence, not the full syllabus order.
+    assert [item["sequence_position"] for item in data["planned_items"]] == [1, 2]
+    assert [item["sequence_total"] for item in data["planned_items"]] == [2, 2]
+    # Two scoped topics at bandwidth 2 finish in one day, not the four-topic
+    # projection the unrestricted sequence would report.
+    assert data["projected_completion_date"] == (
+        date.today() + timedelta(days=1)
+    ).isoformat()
+
+
+def test_beta_scope_regenerates_plan_that_names_locked_topics(client, monkeypatch):
+    """A plan persisted before scoping is regenerated instead of shown."""
+    import app.core.gs_lms.planner as planner_core
+
+    first = client.get("/api/v1/gs-lms/geography/plan/today").json()["data"]
+    assert [item["node_id"] for item in first["planned_items"]] == [2, 3]
+
+    monkeypatch.setattr(planner_core, "beta_scope_enabled", lambda: True)
+    monkeypatch.setattr(
+        planner_core, "compute_loop_ready_ids", lambda db, subject_id: {4, 5}
+    )
+
+    second = client.get("/api/v1/gs-lms/geography/plan/today").json()["data"]
+    planned_ids = [item["node_id"] for item in second["planned_items"]]
+    assert planned_ids == [4, 5]
+    assert second["projected_completion_date"] == (
+        date.today() + timedelta(days=1)
+    ).isoformat()
 
 
 def test_get_today_plan_includes_projected_completion(client):

@@ -189,10 +189,63 @@ const ANTHROPOLOGY_STRUCTURE: SubjectStructure = {
   },
 };
 
+/**
+ * Bespoke navigational structure for Sociology Optional.
+ *
+ * The top-level titles intentionally match ``sociology_seed.py`` exactly so
+ * SubjectShell can merge the backend tree's live ``authored`` flags onto these
+ * rows. Deep notes and PYQs remain backend-served and review-gated; this only
+ * makes the verified syllabus skeleton navigable.
+ */
+const SOCIOLOGY_STRUCTURE: SubjectStructure = {
+  slug: "sociology",
+  paperOne: {
+    id: "paper-1",
+    label: "Paper I",
+    sections: [
+      {
+        id: "section-a",
+        label: "Section A",
+        title: "Fundamentals of Sociology · Foundations and Thinkers",
+        topics: [
+          "Sociology - The Discipline",
+          "Sociology as Science",
+          "Research Methods and Analysis",
+          "Sociological Thinkers",
+          "Stratification and Mobility",
+        ],
+      },
+      {
+        id: "section-b",
+        label: "Section B",
+        title: "Fundamentals of Sociology · Institutions and Change",
+        topics: [
+          "Works and Economic Life",
+          "Politics and Society",
+          "Religion and Society",
+          "Systems of Kinship",
+          "Social Change in Modern Society",
+        ],
+      },
+    ],
+  },
+  paperTwo: {
+    id: "paper-2",
+    label: "Paper II",
+    title: "Indian Society: Structure and Change",
+    topics: [
+      "Introducing Indian Society",
+      "Social Structure",
+      "Social Changes in India",
+    ],
+  },
+};
+
 /** Bespoke structures keyed by subject slug. */
 const BESPOKE_STRUCTURES: Readonly<Record<string, SubjectStructure>> = {
   anthropology: ANTHROPOLOGY_STRUCTURE,
   geography: GEOGRAPHY_STRUCTURE,
+  sociology: SOCIOLOGY_STRUCTURE,
 };
 
 /**

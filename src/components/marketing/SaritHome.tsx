@@ -21,7 +21,6 @@ import {
   Route,
   Sparkles,
   Target,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -106,7 +105,7 @@ const features: { title: string; detail: string; icon: LucideIcon; tag: string }
 const retentionItems: { title: string; detail: string; icon: LucideIcon }[] = [
   { title: "Daily streaks", detail: "Don't break the chain — small daily targets build the habit.", icon: Flame },
   { title: "Your second brain", detail: "Notes, bookmarks, weakness map & revision queue live in one place.", icon: BrainCircuit },
-  { title: "Peer percentile", detail: "See where you stand against other aspirants — momentum, not isolation.", icon: Users },
+  { title: "Personal trend", detail: "Track your own accuracy across attempts — progress, not a peer rank.", icon: LineChart },
 ];
 
 const comparison: { label: string; typical: string; sarit: string }[] = [
@@ -128,7 +127,7 @@ const roadmap: { window: string; subject: string; status: string }[] = [
 const faqs: { q: string; a: string }[] = [
   {
     q: "Is it free to try?",
-    a: "Previous year questions, study resources, daily current affairs, guides and the 2-minute diagnostic are free for everyone. Full subject plans start at ₹399/mo.",
+    a: "Previous year questions, study resources, guides and the 2-minute diagnostic are free for everyone, along with current affairs as reviewed items publish. Full subject plans start at ₹399/mo.",
   },
   {
     q: "How is this different from other UPSC platforms?",
@@ -136,7 +135,7 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "What do the paid plans include?",
-    a: "Plans run from Foundation (₹399/mo) to Ultimate (₹1,299/mo) — unlocking more subjects, higher AI limits, unlimited MCQs and testing, mains uploads and priority support. See the pricing page for details.",
+    a: "Plans run from Foundation (₹399/mo) to Ultimate (₹1,299/mo) — adding optional libraries, deeper diagnostics, unlimited MCQs, mains uploads and priority access. Choices are saved as plan intent; payment collection has not opened. See the pricing page for details.",
   },
   {
     q: "Do you cover Hindi medium?",
@@ -588,7 +587,7 @@ function PricingSection() {
         <SectionHeading
           eyebrow="Plans for every stage"
           title="From ₹399/mo — match your tier to your prep."
-          sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Launch pricing continued till 11/4. Free resources stay open to everyone."
+          sub="Foundation to Ultimate, with deeper discounts on yearly and multi-year plans. Choices are recorded as plan intent; payment collection has not opened. Free resources stay open to everyone."
         />
 
         <div className="mx-auto mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">

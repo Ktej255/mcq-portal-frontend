@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   FolderTree,
   LibraryBig,
   Route,
@@ -30,18 +29,34 @@ import {
 } from "@/lib/upsc/yearlyPlanner";
 import { pricingPlanIntentLabel, publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 import { syllabusPyqRegistrySummary } from "@/lib/upsc/syllabusPyqRegistry";
+import { OPTIONAL_SUBJECTS } from "@/lib/upsc/optionalSubjectsCatalog";
 import { useDashboardData } from "@/hooks/useDashboardData";
+
+// Geography is the only GS subject open in the paid beta; the other seven
+// stay locked until their content ships. Optional subjects come from the
+// catalog, where `status === "available"` now means reviewed content is
+// published (founder decision 2026-10-31: Anthropology and Sociology went back
+// to coming-soon until their notes are reviewed), so the stat reads
+// "Optional reviewed" and matches the marketing figure of 1 of 25.
+const liveGsSubjectCount = 1;
+const liveOptionalSubjectCount = OPTIONAL_SUBJECTS.filter(
+  (subject) => subject.status === "available"
+).length;
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
 export function UpscPricingCommand() {
-  const { profile, saveProfile, isLoaded } = useDashboardData();
-  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>(
-    profile?.billingCycle ?? "three-year"
-  );
-  
+  const { profile, isLoaded } = useDashboardData();
+  // The profile is read from localStorage after mount, so it is null on the
+  // first render. Keep the learner's manual toggle as an override and fall
+  // back to the saved billing cycle, so someone who recorded a monthly plan
+  // intent is not shown three-year pricing under a monthly header.
+  const [cycleOverride, setCycleOverride] = useState<BillingCycle | null>(null);
+  const selectedCycle: BillingCycle =
+    cycleOverride ?? profile?.billingCycle ?? "three-year";
+
   // Accordion toggle states to keep the page minimalist
   const [isDiscountProofOpen, setIsDiscountProofOpen] = useState(false);
   const [isInclusionsOpen, setIsInclusionsOpen] = useState(false);
@@ -72,7 +87,9 @@ export function UpscPricingCommand() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">
-                  Active Student Subscription
+                  {publicCommerceLaunchBoundary.readyForPayment
+                    ? "Active Student Subscription"
+                    : "Selected plan (pilot)"}
                 </p>
                 <h2 className="mt-1 text-2xl font-black text-[#13251d] capitalize">
                   {currentPlanId} Plan
@@ -81,12 +98,16 @@ export function UpscPricingCommand() {
                   </span>
                 </h2>
                 <p className="mt-1.5 text-xs font-semibold text-[#49675e]">
-                  Active Status • Pilot rate of {money(productPricingPlans.find(p => p.tier === currentPlanId && p.cycle === currentPlanCycle)?.launchPrice ?? 399)} reserved.
+                  {publicCommerceLaunchBoundary.readyForPayment
+                    ? `Active status • Pilot rate of ${money(productPricingPlans.find(p => p.tier === currentPlanId && p.cycle === currentPlanCycle)?.launchPrice ?? 399)} reserved.`
+                    : `Plan intent recorded • Pilot rate of ${money(productPricingPlans.find(p => p.tier === currentPlanId && p.cycle === currentPlanCycle)?.launchPrice ?? 399)} reserved. No payment has been collected.`}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-[#1d9e75]/10 border border-[#1d9e75]/30 px-3 py-1 text-xs font-black text-[#085041]">
-                  Status: Paid & Active
+                  {publicCommerceLaunchBoundary.readyForPayment
+                    ? "Status: Paid & Active"
+                    : "Status: Plan intent only"}
                 </span>
                 <Link
                   href="/upsc/daily-command?tab=today"
@@ -113,17 +134,25 @@ export function UpscPricingCommand() {
                 Flexible plans. Transparent value.
               </h1>
               <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-[#5d675f]">
-                Select a tier to match your preparation level. Get deeper discounts with yearly, 
-                2-year, or 3-year commitments. Start for ₹399/mo, upgrade anytime.
+                Select a tier to match your preparation level. Get deeper discounts with yearly,
+                2-year, or 3-year commitments.{" "}
+                {publicCommerceLaunchBoundary.readyForPayment
+                  ? "Start for ₹399/mo, upgrade anytime."
+                  : "Start for ₹399/mo. Payments are closed in the pilot, so choosing a plan records intent without charging you."}
               </p>
               
               {/* Billing Duration Toggle — ChatGPT-style pill strip */}
-              <div className="mt-5 inline-flex rounded-full bg-[#1a3a2a]/5 p-1">
+              <div
+                role="group"
+                aria-label="Billing cycle"
+                className="mt-5 inline-flex rounded-full bg-[#1a3a2a]/5 p-1"
+              >
                 {billingCycles.map((cycleItem) => (
                   <button
                     key={cycleItem.cycle}
                     type="button"
-                    onClick={() => setSelectedCycle(cycleItem.cycle)}
+                    aria-pressed={selectedCycle === cycleItem.cycle}
+                    onClick={() => setCycleOverride(cycleItem.cycle)}
                     className={`relative rounded-full px-5 py-2.5 text-sm font-black transition-all duration-200 ${
                       selectedCycle === cycleItem.cycle
                         ? "bg-[#1a3a2a] text-white shadow-md"
@@ -149,15 +178,30 @@ export function UpscPricingCommand() {
                   🎉 You save {billingCycles.find(c => c.cycle === selectedCycle)?.discountPercent}% with {billingCycles.find(c => c.cycle === selectedCycle)?.label} billing
                 </p>
               )}
+              <p
+                data-testid="upsc-pricing-launch-boundary"
+                data-commerce-mode={publicCommerceLaunchBoundary.mode}
+                data-ready-for-payment={String(publicCommerceLaunchBoundary.readyForPayment)}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] px-2.5 py-1 text-[11px] font-black text-[#49675e]"
+              >
+                <ShieldCheck className="h-3 w-3 text-[#1d9e75]" />
+                {publicCommerceLaunchBoundary.paymentStatusValue}
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
-                ["Base Monthly", "₹399"],
-                ["GS subjects", coreSubjectBlueprints.length],
-                ["Optional pages", optionalSubjects.length],
+                ["Base monthly", money(productMonthlyBasePrice)],
+                ["GS live", `${liveGsSubjectCount} of ${coreSubjectBlueprints.length}`],
+                ["Optional reviewed", `${liveOptionalSubjectCount} of ${optionalSubjects.length}`],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
+                <div
+                  key={label}
+                  data-testid="upsc-pricing-stat"
+                  data-stat-label={label}
+                  data-stat-value={value}
+                  className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4"
+                >
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{label}</p>
                   <p className="mt-1 text-2xl font-black">{value}</p>
                 </div>
@@ -240,12 +284,6 @@ export function UpscPricingCommand() {
                     {plan.promise}
                   </p>
 
-                  {/* Usage limits */}
-                  <div className="mt-4 flex items-center gap-1.5 rounded-lg bg-[#f7f4ee] px-3 py-2">
-                    <Clock className="h-3.5 w-3.5 text-[#1d9e75]" />
-                    <p className="text-xs font-bold text-[#31443a]">{plan.limits}</p>
-                  </div>
-
                   {/* Features */}
                   <ul className="mt-5 space-y-2.5">
                     {plan.features.map((feature) => (
@@ -277,9 +315,17 @@ export function UpscPricingCommand() {
         </section>
 
         {/* Collapsible Section 1: Discount Proof (Minimalist) */}
-        <section data-testid="upsc-pricing-discount-proof" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
+        <section
+          data-testid="upsc-pricing-discount-proof"
+          data-monthly-base={productMonthlyBasePrice}
+          data-plan-count={activePlans.length}
+          data-proof-rule="monthly-base-times-duration-minus-launch-price"
+          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm"
+        >
           <button
             type="button"
+            aria-expanded={isDiscountProofOpen}
+            aria-controls="pricing-discount-math"
             onClick={() => setIsDiscountProofOpen(!isDiscountProofOpen)}
             className="flex w-full items-center justify-between font-black text-[#13251d]"
           >
@@ -291,7 +337,7 @@ export function UpscPricingCommand() {
           </button>
           
           {isDiscountProofOpen && (
-            <div className="mt-4 space-y-2 border-t border-[#e8e2d5] pt-4">
+            <div id="pricing-discount-math" className="mt-4 space-y-2 border-t border-[#e8e2d5] pt-4">
               <p className="text-xs font-semibold text-[#5d675f] mb-3">
                 Transparent math explaining effective pricing calculations from base values:
               </p>
@@ -309,6 +355,8 @@ export function UpscPricingCommand() {
                       data-list-price={plan.listPrice}
                       data-launch-price={plan.launchPrice}
                       data-savings={savings}
+                      data-discount-percent={plan.discountPercent}
+                      data-effective-monthly={plan.effectiveMonthly}
                       className="grid gap-2 rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-semibold text-[#31443a] md:grid-cols-[1fr_1fr_1fr] md:items-center"
                     >
                       <span className="font-black text-[#13251d]">{plan.title} ({plan.cycle})</span>
@@ -316,7 +364,9 @@ export function UpscPricingCommand() {
                         Base: {money(plan.listPrice / plan.months)} x {plan.months}m = {money(plan.listPrice)} list
                       </span>
                       <span>
-                        Pay {money(plan.launchPrice)} (Saves {money(savings)} / {plan.discountPercent}% off)
+                        {savings > 0
+                          ? `Pay ${money(plan.launchPrice)} (Saves ${money(savings)} / ${plan.discountPercent}% off)`
+                          : `Pay ${money(plan.launchPrice)} (${plan.discountPercent}% off)`}
                       </span>
                     </div>
                   );
@@ -329,6 +379,8 @@ export function UpscPricingCommand() {
         <section data-testid="upsc-pricing-inclusions" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
           <button
             type="button"
+            aria-expanded={isInclusionsOpen}
+            aria-controls="pricing-inclusions"
             onClick={() => setIsInclusionsOpen(!isInclusionsOpen)}
             className="flex w-full items-center justify-between font-black text-[#13251d]"
           >
@@ -340,16 +392,16 @@ export function UpscPricingCommand() {
           </button>
           
           {isInclusionsOpen && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 border-t border-[#e8e2d5] pt-4">
+            <div id="pricing-inclusions" className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4 border-t border-[#e8e2d5] pt-4">
               {[
                 {
                   title: "Systematic subject path",
-                  detail: "GS subjects follow syllabus demand, PYQ anchors, 10-year trend maps, and NCERT basics.",
+                  detail: "Geography follows reviewed syllabus demand and PYQ anchors. In the beta it is the open GS subject; the remaining GS subjects unlock as their content ships.",
                   icon: Route,
                 },
                 {
                   title: "Daily planner loop",
-                  detail: "Structured classes based around recall checks, talk exercises, and practice questions.",
+                  detail: "A day-start recall check, syllabus-scoped practice, and due Day 3/7/21 revisions.",
                   icon: CalendarDays,
                 },
                 {
@@ -358,8 +410,8 @@ export function UpscPricingCommand() {
                   icon: LibraryBig,
                 },
                 {
-                  title: "AI discussion path",
-                  detail: "Talk rooms, verbal correction prompts, and diagnostic feedback are built directly in.",
+                  title: "Teacher discussion",
+                  detail: "Explain a topic and receive a structured gap diagnosis with one repair action, wired into the daily planner.",
                   icon: BrainCircuit,
                 },
               ].map((block) => (
@@ -379,6 +431,8 @@ export function UpscPricingCommand() {
         <section data-testid="upsc-pricing-operating-rules" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
           <button
             type="button"
+            aria-expanded={isLaunchRulesOpen}
+            aria-controls="pricing-launch-rules"
             onClick={() => setIsLaunchRulesOpen(!isLaunchRulesOpen)}
             className="flex w-full items-center justify-between font-black text-[#13251d]"
           >
@@ -390,12 +444,14 @@ export function UpscPricingCommand() {
           </button>
           
           {isLaunchRulesOpen && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-2 border-t border-[#e8e2d5] pt-4">
+            <div id="pricing-launch-rules" className="mt-4 grid gap-4 lg:grid-cols-2 border-t border-[#e8e2d5] pt-4">
               <div className="grid gap-2">
                 {[
                   "Monthly remains starting from ₹399 for pilot low-friction validation.",
                   "Yearly option billing contains a built-in 15% discount for a complete UPSC prep cycle.",
-                  "Upgrades/downgrades take effect instantly, calculating credit values dynamically.",
+                  publicCommerceLaunchBoundary.readyForPayment
+                    ? "Upgrades and downgrades are confirmed only after a successful payment."
+                    : "Changing your selected plan is free while payments are closed: record a new intent at any time; nothing is charged.",
                   publicCommerceLaunchBoundary.gateSummary,
                 ].map((rule) => (
                   <p key={rule} className="rounded-md border border-[#dcd5c7] bg-[#f7f4ee] p-3 text-xs font-semibold text-[#31443a]">
@@ -406,7 +462,7 @@ export function UpscPricingCommand() {
               
               <div className="rounded-lg border border-[#b9d9cd] bg-[#e7f5ee] p-4 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-sm font-black text-[#085041]">Ready Database Anchors</h4>
+                  <h4 className="text-sm font-black text-[#085041]">Coverage snapshot</h4>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {[
                       ["Yearly windows", yearlyPlannerBlocks.length],
@@ -425,8 +481,8 @@ export function UpscPricingCommand() {
                   <Link href="/upsc/yearly-planner" className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 py-1.5 text-xs font-black text-white hover:bg-[#10291d] transition">
                     Yearly planner
                   </Link>
-                  <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center rounded-md border border-[#1a3a2a] px-3 py-1.5 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition">
-                    Source library
+                  <Link href="/upsc/optional-subjects" className="inline-flex min-h-9 items-center rounded-md border border-[#1a3a2a] px-3 py-1.5 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition">
+                    Optional subjects
                   </Link>
                 </div>
               </div>

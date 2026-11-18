@@ -36,6 +36,7 @@ import {
   type PyqImportRecord,
 } from "@/lib/upsc/pyqImportLedger";
 import type { SourceArchiveIntakeResponse } from "@/lib/upsc/sourceArchiveIntake";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 
 function statusLabel(status: ImportStatus) {
   if (status === "source-indexed") return "Source indexed";
@@ -92,30 +93,26 @@ function formatArchiveDate(value: string) {
 }
 
 export function UpscSyllabusPyqLibrary() {
-  const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
+  const [pyqRecords] = useState<PyqImportRecord[]>(() => readLocalPyqImportRecords());
   const [archiveIntake, setArchiveIntake] = useState<SourceArchiveIntakeResponse | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<"loading" | "ready" | "error">("loading");
 
   const [isArchiveIntakeOpen, setIsArchiveIntakeOpen] = useState(false);
   const [isPreloadProofOpen, setIsPreloadProofOpen] = useState(false);
+  const [isOptionalSourcePacksOpen, setIsOptionalSourcePacksOpen] = useState(false);
   const [isReadinessMatrixOpen, setIsReadinessMatrixOpen] = useState(false);
   const [isPaperIndexOpen, setIsPaperIndexOpen] = useState(false);
   const [isPriorityQueueOpen, setIsPriorityQueueOpen] = useState(false);
   const [isReadinessGateOpen, setIsReadinessGateOpen] = useState(false);
-  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
-  const [isOptionalSourcePacksOpen, setIsOptionalSourcePacksOpen] = useState(false);
-
-  useEffect(() => {
-    setPyqRecords(readLocalPyqImportRecords());
-  }, []);
-
   const loadArchiveIntake = async () => {
     setArchiveStatus("loading");
     try {
       const response = await fetch("/api/upsc/source-archive", { cache: "no-store" });
       const payload = (await response.json()) as SourceArchiveIntakeResponse;
       setArchiveIntake(payload);
-      setArchiveStatus(response.ok && payload.rootExists ? "ready" : "error");
+      setArchiveStatus(
+        response.ok && payload.ok && payload.rootExists && payload.scanComplete ? "ready" : "error",
+      );
     } catch {
       setArchiveIntake(null);
       setArchiveStatus("error");
@@ -123,7 +120,11 @@ export function UpscSyllabusPyqLibrary() {
   };
 
   useEffect(() => {
-    void loadArchiveIntake();
+    const timeoutId = window.setTimeout(() => {
+      void loadArchiveIntake();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const [firstSubject] = subjectSourcePacks;
@@ -937,7 +938,7 @@ export function UpscSyllabusPyqLibrary() {
                     {subject.dailyLoop.stages.map((stage, index) => (
                       <Link
                         key={stage.id}
-                        href={`${subject.route}/${stage.routeSuffix}`}
+                        href={lmsHrefForRoom(subject.slug, stage.routeSuffix)}
                         data-testid="upsc-subject-loop-stage"
                         data-stage-id={stage.id}
                         data-stage-index={index + 1}

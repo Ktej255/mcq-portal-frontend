@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { UpscLoader } from "@/components/upsc/UpscLoader";
 import { OptionalHomeEntry } from "@/components/upsc/OptionalHomeEntry";
@@ -19,21 +19,15 @@ import {
   FileText,
   Gauge,
   HeartPulse,
-  Layers3,
   LineChart,
   PlayCircle,
   RefreshCcw,
   Save,
   Target,
   LockKeyhole,
-  Sparkles,
   UploadCloud,
-  ChevronDown,
-  ChevronUp,
   FolderTree,
-  LibraryBig,
   CalendarCheck,
-  Settings,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +55,6 @@ import {
 import { readLocalPyqImportRecords, type PyqImportRecord } from "@/lib/upsc/pyqImportLedger";
 import {
   readStudentProfile,
-  defaultStudentProfile,
   saveStudentProfile,
   readSyncedStudentProfile,
   type StudentProfile,
@@ -73,6 +66,8 @@ import { BADGE_DEFINITIONS } from "@/lib/upsc/gamification";
 import { getSubjectBatchCode, subjectPlans, type SubjectLab, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import { buildUpscActionQueue } from "@/lib/upsc/upscActionQueue";
 import type { SubjectDayProgress, SubjectMeTimeMood } from "@/lib/upsc/useSubjectProgress";
+import { lockedSubjectNavItems } from "@/lib/navigation/studentNav";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 import { cn } from "@/lib/utils";
 
 type DailySubject = {
@@ -127,10 +122,18 @@ const dailySubjects: DailySubject[] = [
   })),
 ];
 
+/**
+ * Only Geography is open in the paid beta. The other day-based subject plans
+ * still exist for history and future authoring, but a beta learner must never
+ * be handed a quick link into a locked subject's LMS or have a stale stored
+ * selection override the live subject.
+ */
+const lockedDailySubjectRoutes = new Set(lockedSubjectNavItems.map((item) => item.href));
+const isLiveDailySubject = (slug: string) => !lockedDailySubjectRoutes.has(`/upsc/${slug}`);
+
 const dailyStorageKey = "sarit-upsc-daily-command-v1";
 const contentStorageKey = "sarit-upsc-content-command-v1";
 const mcqStorageKey = "sarit-upsc-mcq-command-v1";
-const defaultMcqState: McqState = { planned: 25, drafted: 0, status: "DRAFT" };
 const meTimeOptions: Array<{
   mood: SubjectMeTimeMood;
   label: string;
@@ -224,16 +227,16 @@ function isContentReady(state: ContentState) {
   return state.videoStatus === "Ready" && state.notesStatus === "Ready" && state.transcriptStatus === "Ready";
 }
 
-function getLabSlug(subject: DailySubject, session: SubjectSession) {
-  return subject.labs.find((lab) => lab.title === session.lab)?.slug ?? subject.labs[0]?.slug ?? "";
-}
-
 function getInitialDailyState(): DailyState {
-  return readJson<DailyState>(dailyStorageKey, {
+  const stored = readJson<DailyState>(dailyStorageKey, {
     subjectSlug: "geography",
     day: 1,
     note: "",
   });
+  if (!isLiveDailySubject(stored.subjectSlug)) {
+    return { subjectSlug: "geography", day: 1, note: stored.note ?? "" };
+  }
+  return stored;
 }
 
 function gapTone(tone: "good" | "repair" | "neutral") {
@@ -288,10 +291,8 @@ export function UpscDailyMissionControl() {
   const [saved, setSaved] = useState(false);
   const [meTimeSaved, setMeTimeSaved] = useState(false);
   const [evidenceRefresh, setEvidenceRefresh] = useState(0);
-  const [autoHandoffSavedAt, setAutoHandoffSavedAt] = useState("");
   const [pyqRecords, setPyqRecords] = useState<PyqImportRecord[]>([]);
-  const [showPlanningDetails, setShowPlanningDetails] = useState(false);
-  
+
   // Collapsible states for Gaps & Revision tabs decluttering
   const [isSessionReadinessOpen, setIsSessionReadinessOpen] = useState(false);
   const [isNextSessionProofOpen, setIsNextSessionProofOpen] = useState(false);
@@ -299,21 +300,37 @@ export function UpscDailyMissionControl() {
   const [isSimplePathOpen, setIsSimplePathOpen] = useState(false);
   const [isOperatingContractOpen, setIsOperatingContractOpen] = useState(false);
   const searchParams = useSearchParams();
-  const validTabs = ["today", "yearly", "gaps", "revision", "history", "syllabus", "settings", "doubts", "performance"] as const;
-  type TabId = (typeof validTabs)[number];
-  const tabFromUrl = searchParams.get("tab") as TabId | null;
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (tabFromUrl && validTabs.includes(tabFromUrl)) return tabFromUrl;
-    return "today";
-  });
+  const router = useRouter();
+  const pathname = usePathname();
+  type TabId =
+    | "today"
+    | "yearly"
+    | "gaps"
+    | "revision"
+    | "history"
+    | "syllabus"
+    | "settings"
+    | "doubts"
+    | "performance";
+  // Only Today's Study and the Yearly Planner are linked. The seven legacy
+  // day-plan tabs still exist in the type so their JSX compiles, but the URL
+  // router below refuses to activate them: a stale bookmark lands on Today's
+  // Study instead of a retired day-based surface with its own progress model.
+  const linkedTabs: readonly TabId[] = ["today", "yearly"];
+  const requestedTab = searchParams.get("tab");
+  const activeTab: TabId =
+    requestedTab && linkedTabs.includes(requestedTab as TabId) ? (requestedTab as TabId) : "today";
 
-  // Sync tab when URL query changes (e.g. sidebar click from another page)
-  useEffect(() => {
-    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl);
+  const selectTab = (tab: TabId) => {
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    if (tab === "today") {
+      nextSearchParams.delete("tab");
+    } else {
+      nextSearchParams.set("tab", tab);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFromUrl]);
+    const query = nextSearchParams.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -386,27 +403,31 @@ export function UpscDailyMissionControl() {
     setEvidenceRefresh((current) => current + 1);
   };
 
-  const activeSubject = dailySubjects.find((subject) => subject.slug === dailyState.subjectSlug) ?? dailySubjects[0];
+  const activeSubject =
+    dailySubjects.find(
+      (subject) => subject.slug === dailyState.subjectSlug && isLiveDailySubject(subject.slug),
+    ) ??
+    dailySubjects.find((subject) => isLiveDailySubject(subject.slug)) ??
+    dailySubjects[0];
   const activeSession =
     activeSubject.sessions.find((session) => session.day === dailyState.day) ?? activeSubject.sessions[0];
-  const activeLabSlug = getLabSlug(activeSubject, activeSession);
   const activeProgress = isLoaded ? getProgress(activeSubject, activeSession) : undefined;
-  const activeContent = isLoaded ? getContentState(activeSubject, activeSession) : {};
-  const activeMcq = isLoaded ? getMcqState(activeSubject, activeSession) : defaultMcqState;
-  const contentReady = isContentReady(activeContent);
-  const activeMcqBatch = getUpscMcqBatchStatus(activeMcq);
-  const basePath = `/upsc/${activeSubject.slug}`;
   const activeBatchCode = batchCode(activeSubject, activeSession);
-  const activeMcqCommand = isUpscMcqCommandCleared(activeProgress, activeBatchCode);
+  // Progress, content, MCQ and queue state all live in browser storage, which is
+  // not reactive. These memos therefore take `dailyState`, `saved` and
+  // `evidenceRefresh` as invalidation keys: they change whenever a write lands,
+  // even though the values themselves are not inputs to the calculation. The
+  // `void` reads below make that contract explicit to the hook linter.
   const activeQuestionBankAttempts = useMemo(() => {
+    void evidenceRefresh;
     if (!isLoaded) return [];
     return readLocalQuestionBankAttempts(activeSubject.slug);
   }, [isLoaded, activeSubject.slug, evidenceRefresh]);
-  const activeDayQuestionBankAttempts = activeQuestionBankAttempts.filter(
-    (attempt) => attempt.linkedDay === activeSession.day
-  );
 
   const totals = useMemo(() => {
+    void dailyState;
+    void evidenceRefresh;
+
     if (!isLoaded) {
       return {
         watched: 0,
@@ -439,20 +460,29 @@ export function UpscDailyMissionControl() {
       { watched: 0, reflected: 0, revisit: 0, contentReady: 0, mcqBatchReady: 0, mcqCommand: 0, total: 0 }
     );
   }, [isLoaded, dailyState, evidenceRefresh]);
-  const actionQueue = useMemo(() => (isLoaded ? buildUpscActionQueue(8) : []), [isLoaded, dailyState, saved, evidenceRefresh]);
-  const strategyOpsQueue = useMemo(
-    () => (isLoaded ? buildPrelims2027OperationalQueue(3) : []),
-    [isLoaded, saved, evidenceRefresh]
-  );
-  const strategyOpsTotals = useMemo(
-    () =>
-      isLoaded
-        ? buildPrelims2027OperationalTotals()
-        : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 },
-    [isLoaded, saved, evidenceRefresh]
-  );
+  const actionQueue = useMemo(() => {
+    void dailyState;
+    void saved;
+    void evidenceRefresh;
+    return isLoaded ? buildUpscActionQueue(8) : [];
+  }, [isLoaded, dailyState, saved, evidenceRefresh]);
+  const strategyOpsQueue = useMemo(() => {
+    void saved;
+    void evidenceRefresh;
+    return isLoaded ? buildPrelims2027OperationalQueue(3) : [];
+  }, [isLoaded, saved, evidenceRefresh]);
+  const strategyOpsTotals = useMemo(() => {
+    void saved;
+    void evidenceRefresh;
+    return isLoaded
+      ? buildPrelims2027OperationalTotals()
+      : { sourceOrders: 0, queued: 0, drafted: 0, resolved: 0, unresolved: 0 };
+  }, [isLoaded, saved, evidenceRefresh]);
   const studentProfile = profile;
   const activeProgressMap = useMemo<Record<string, DailyPlannerProgress | undefined>>(() => {
+    void dailyState;
+    void saved;
+    void evidenceRefresh;
     if (!isLoaded) return {};
     return activeSubject.sessions.reduce<Record<string, DailyPlannerProgress | undefined>>((map, session) => {
       map[String(session.day)] = getProgress(activeSubject, session) as DailyPlannerProgress | undefined;
@@ -505,9 +535,17 @@ export function UpscDailyMissionControl() {
     .join("|");
   const selectedExactPyqCount = questionBankSelection.questions.filter((question) => question.isExactPyqImport).length;
   const automaticHandoff = dailyPlanner.automaticSessionHandoff;
-
-  useEffect(() => {
-    if (!isLoaded) return;
+  const automaticHandoffRecord = useMemo<AutoSessionHandoffRecord>(
+    () => ({
+      ...automaticHandoff,
+      generatedAt: new Date().toISOString(),
+      selectedDay: activeSession.day,
+      selectedSubjectSlug: activeSubject.slug,
+    }),
+    [activeSession.day, activeSubject.slug, automaticHandoff]
+  );
+  const autoHandoffSavedAt = useMemo(() => {
+    if (!isLoaded) return "";
 
     const currentSaved = readLocalAutoSessionHandoff();
     if (
@@ -516,20 +554,27 @@ export function UpscDailyMissionControl() {
       currentSaved.selectedDay === activeSession.day &&
       currentSaved.selectedSubjectSlug === activeSubject.slug
     ) {
+      return currentSaved.generatedAt;
+    }
+
+    return automaticHandoffRecord.generatedAt;
+  }, [activeSession.day, activeSubject.slug, automaticHandoff.id, automaticHandoffRecord.generatedAt, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const currentSaved = readLocalAutoSessionHandoff();
+    if (
+      currentSaved &&
+      currentSaved.id === automaticHandoffRecord.id &&
+      currentSaved.selectedDay === automaticHandoffRecord.selectedDay &&
+      currentSaved.selectedSubjectSlug === automaticHandoffRecord.selectedSubjectSlug
+    ) {
       return;
     }
 
-    const generatedAt = new Date().toISOString();
-    const record: AutoSessionHandoffRecord = {
-      ...automaticHandoff,
-      generatedAt,
-      selectedDay: activeSession.day,
-      selectedSubjectSlug: activeSubject.slug,
-    };
-
-    writeJson(AUTO_SESSION_HANDOFF_STORAGE_KEY, record);
-    setAutoHandoffSavedAt(generatedAt);
-  }, [activeSession.day, activeSubject.slug, automaticHandoff, isLoaded]);
+    writeJson(AUTO_SESSION_HANDOFF_STORAGE_KEY, automaticHandoffRecord);
+  }, [automaticHandoffRecord, isLoaded]);
 
   const activeMeTimeOption = activeProgress?.meTimeMood
     ? meTimeOptions.find((option) => option.mood === activeProgress.meTimeMood)
@@ -625,6 +670,7 @@ export function UpscDailyMissionControl() {
   };
 
   const selectSubject = (slug: string) => {
+    if (!isLiveDailySubject(slug)) return;
     const subject = dailySubjects.find((item) => item.slug === slug) ?? dailySubjects[0];
     saveDailyState({ subjectSlug: subject.slug, day: subject.sessions[0]?.day ?? 1 });
     setSaved(false);
@@ -698,7 +744,7 @@ export function UpscDailyMissionControl() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {[
-              { id: "today", name: "Today's Study", icon: CalendarCheck },
+              { id: "today", name: "Today\u0027s Study", icon: CalendarCheck },
               { id: "yearly", name: "Yearly Planner", icon: FolderTree },
             ].map((item) => {
               const isActive = activeTab === item.id;
@@ -706,7 +752,7 @@ export function UpscDailyMissionControl() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id as TabId)}
+                  onClick={() => selectTab(item.id as TabId)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all active:scale-95",
                     isActive
@@ -729,7 +775,7 @@ export function UpscDailyMissionControl() {
               {[
                 {
                   title: "Study Syllabus",
-                  description: "Access progressive content sections (Basic, NCERT, Advanced, Traps) and video lectures.",
+                  description: "Open the syllabus map, pick a topic, and work through its reviewed sections and Mains step.",
                   href: `/upsc/${activeSubject.slug}/lms`,
                   icon: BookOpen,
                   badge: "Core LMS",
@@ -737,26 +783,26 @@ export function UpscDailyMissionControl() {
                 },
                 {
                   title: "Practice MCQs",
-                  description: "Solve adaptive topic-wise questions to evaluate understanding and clear gaps.",
+                  description: "Solve a reviewed 15-question set per open topic to check understanding and expose gaps.",
                   href: `/upsc/${activeSubject.slug}/lms/practice`,
                   icon: ClipboardCheck,
                   badge: "15-MCQ Lab",
                   color: "from-[#085041] to-[#1d9e75]",
                 },
                 {
-                  title: "Learning Gaps",
-                  description: "Review subject weakness metrics, incorrect attempt history, and gap suggestions.",
+                  title: "Readiness & Gaps",
+                  description: "Review demand-weighted readiness, tested topic gaps, and what to revise next.",
                   href: `/upsc/${activeSubject.slug}/lms/gaps`,
                   icon: LineChart,
-                  badge: "Gap Analytics",
+                  badge: "Readiness",
                   color: "from-[#13251d] to-[#085041]",
                 },
                 {
                   title: "Mains Uploader",
-                  description: "Practice UPSC Mains answer writing with typed reviews and handwritten OCR checking.",
+                  description: "Assemble photographed answer pages into one downloadable PDF to review or share. Scored typed practice lives in each topic's Mains step.",
                   href: `/upsc/answer-upload`,
                   icon: UploadCloud,
-                  badge: "Mains Writing",
+                  badge: "PDF assembly",
                   color: "from-[#1a3a2a] to-[#085041]",
                 },
               ].map((item) => (
@@ -800,7 +846,7 @@ export function UpscDailyMissionControl() {
                     </div>
                     <div>
                       <h3 className="text-base font-black text-[#13251d]">Session Targets & Notes</h3>
-                      <p className="text-xs font-semibold text-[#746f66]">Draft targets or notes for today's session</p>
+                      <p className="text-xs font-semibold text-[#746f66]">Draft targets or notes for today&apos;s session</p>
                     </div>
                   </div>
 
@@ -1662,22 +1708,29 @@ export function UpscDailyMissionControl() {
                 <div className="mb-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   {dailySubjects.map((subject) => {
                     const isActive = activeSubject.slug === subject.slug;
+                    const isLive = isLiveDailySubject(subject.slug);
                     return (
                       <button
                         key={subject.slug}
                         type="button"
                         aria-pressed={isActive}
+                        aria-disabled={!isLive}
+                        disabled={!isLive}
+                        title={isLive ? undefined : "This subject is in preparation for the beta"}
                         onClick={() => selectSubject(subject.slug)}
                         className={cn(
                           "min-h-20 rounded-md border p-3 text-left transition",
                           isActive
                             ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
-                            : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
+                            : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]",
+                          !isLive && "cursor-not-allowed opacity-60 hover:border-[#dcd5c7]"
                         )}
                       >
                         <span className="block text-xs font-black uppercase tracking-[0.14em]">{subject.window}</span>
                         <span className="mt-2 block text-sm font-black leading-5">{subject.title}</span>
-                        <span className="mt-2 block text-xs font-semibold opacity-75">{subject.sessions.length} days</span>
+                        <span className="mt-2 block text-xs font-semibold opacity-75">
+                          {isLive ? `${subject.sessions.length} days` : "In preparation"}
+                        </span>
                       </button>
                     );
                   })}
@@ -1991,7 +2044,7 @@ export function UpscDailyMissionControl() {
                   { label: "Content Command", href: "/upsc/content-command", gated: false },
                   { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
                   { label: "Revision Command", href: "/upsc/revision-command", gated: false },
-                  { label: "Sunday AI Retro", href: `/upsc/${activeSubject.slug}/retro`, gated: true },
+                  { label: "Sunday AI Retro", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
                   { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
                 ].map((item) => {
                   const isLocked = item.gated && profile && !profile.inductionCompleted;

@@ -145,7 +145,11 @@ export function clearLocalUpscLearnerState() {
   if (typeof window === "undefined") return;
 
   Object.keys(window.localStorage).forEach((key) => {
-    if (key === "sarit-upsc-student-profile-v1" || learnerProgressStoragePattern.test(key)) {
+    if (
+      key === "sarit-upsc-student-profile-v1" ||
+      key === "sarit-upsc-student-profile-pending-v1" ||
+      learnerProgressStoragePattern.test(key)
+    ) {
       window.localStorage.removeItem(key);
     }
   });
@@ -208,7 +212,6 @@ export async function saveRemoteStudentProfile<T extends object>(profile: T) {
     // Keeps the small profile in Clerk metadata too, and refreshes on-page stats.
     window.dispatchEvent(new CustomEvent("sarit-upsc-profile-updated", { detail: profile }));
   }
-
   return queueLatestRemoteWrite("profile", () =>
     backendPut("student/profile", { profile }),
   );

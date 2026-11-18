@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -8,6 +9,8 @@ interface ErrorBoundaryProps {
 }
 
 export default function LmsErrorBoundary({ error, reset }: ErrorBoundaryProps) {
+  const { lmsBase } = useSubjectLms();
+
   useEffect(() => {
     console.error("[LMS Error Boundary]", error);
   }, [error]);
@@ -46,7 +49,7 @@ export default function LmsErrorBoundary({ error, reset }: ErrorBoundaryProps) {
             Try Again
           </button>
           <a
-            href="/upsc/geography/lms/syllabus"
+            href={`${lmsBase}/syllabus`}
             className="px-4 py-2 text-sm font-medium text-[#1d9e75] border border-[#1d9e75] rounded-lg hover:bg-[#1d9e75]/5 transition-colors"
           >
             Back to Syllabus

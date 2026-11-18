@@ -80,7 +80,7 @@ export function awardGamificationRewards(
     points: 0,
     coins: 0,
     unlockedBadges: [],
-  } as any;
+  };
 
   let addedPoints = 0;
   let addedCoins = 0;
@@ -148,7 +148,7 @@ export function awardGamificationRewards(
     coins: nextCoins,
     unlockedBadges: updatedBadges,
     updatedAt: new Date().toISOString(),
-  } as any;
+  };
 
   // Persist updated profile
   saveStudentProfile(updatedProfile);

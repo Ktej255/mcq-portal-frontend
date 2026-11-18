@@ -40,6 +40,7 @@ from app.core.gs_lms import student_models as gs_lms_student_models  # noqa: F40
 from app.core.gs import models as gs_models  # noqa: F401
 from app.models import domain as domain_models  # noqa: F401
 from app.core.gs.models import GsSubject
+from app.core.gs_lms.models import GsLmsNodeTypeEnum, GsLmsSyllabusNode
 
 from app.core.gs_lms.student_models import (
     GsLmsDiscussionSession,
@@ -80,6 +81,17 @@ def test_engine():
     try:
         subject = GsSubject(id=1, slug="geography", name="GS Geography", display_order=1)
         db.add(subject)
+        db.add_all(
+            [
+                GsLmsSyllabusNode(
+                    id=node_id,
+                    subject_id=subject.id,
+                    title=f"Discussion topic {node_id}",
+                    node_type=GsLmsNodeTypeEnum.LEAF_TOPIC,
+                )
+                for node_id in (NODE_ID, NODE_ID + 1, NODE_ID + 5, NODE_ID + 10, NODE_ID + 20, NODE_ID + 21)
+            ]
+        )
         db.commit()
     finally:
         db.close()
@@ -116,6 +128,29 @@ def client(session_factory):
 
     app.dependency_overrides.pop(get_db, None)
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def deterministic_discussion_provider(monkeypatch):
+    """Keep the endpoint tests hermetic.
+
+    These tests verify turn persistence and gate behaviour, not the AI
+    provider. Without a stub they depend on whichever provider happens to be
+    configured in the environment, so they either pass only with credentials
+    or fail with the deliberate typed 503.
+    """
+    from app.api.v1.gs_lms import discussion as discussion_api
+    from app.core.gs_lms.discussion import GeneratedAIResponse
+
+    monkeypatch.setattr(
+        discussion_api,
+        "generate_ai_response_with_provenance",
+        lambda *args, **kwargs: GeneratedAIResponse(
+            text="What evidence supports that claim?",
+            provider="test-stub",
+            is_mock=True,
+        ),
+    )
 
 
 @pytest.fixture()

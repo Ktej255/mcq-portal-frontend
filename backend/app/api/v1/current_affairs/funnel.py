@@ -53,7 +53,7 @@ class CAMcqOut(BaseModel):
 
 
 class CAMcqAnswerIn(BaseModel):
-    answers: dict  # {question_id: chosen_answer}
+    answers: dict[int, str] = Field(default_factory=dict)  # {question_id: chosen_answer}
 
 
 class CAMcqResultOut(BaseModel):
@@ -72,6 +72,22 @@ class CAMainsQuestionOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _published_item_or_404(db: Session, item_id: int) -> CAItem:
+    """Only published, non-deleted items may expose funnel content or be scored."""
+    item = db.query(CAItem).filter(
+        CAItem.id == item_id,
+        CAItem.review_status == "PUBLISHED",
+        CAItem.is_deleted == False,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -82,13 +98,7 @@ def get_funnel_state(
     db: Session = Depends(get_db),
 ):
     """Get or initialize funnel state for a CA item."""
-    item = db.query(CAItem).filter(
-        CAItem.id == item_id,
-        CAItem.review_status == "PUBLISHED",
-        CAItem.is_deleted == False,
-    ).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+    _published_item_or_404(db, item_id)
 
     state = get_ca_funnel_state(db, current_user.id, item_id)
 
@@ -111,13 +121,7 @@ def complete_step(
     db: Session = Depends(get_db),
 ):
     """Mark a CA funnel step as complete. Idempotent for already-completed steps."""
-    item = db.query(CAItem).filter(
-        CAItem.id == item_id,
-        CAItem.review_status == "PUBLISHED",
-        CAItem.is_deleted == False,
-    ).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+    _published_item_or_404(db, item_id)
 
     try:
         state = complete_ca_funnel_step(db, current_user.id, item_id, body.step)
@@ -143,6 +147,7 @@ def get_mcqs(
     db: Session = Depends(get_db),
 ):
     """Get MCQs attached to a CA item (up to 10)."""
+    _published_item_or_404(db, item_id)
     mcqs = get_ca_mcqs(db, item_id)
     return [
         CAMcqOut(
@@ -164,20 +169,28 @@ def submit_mcqs(
     db: Session = Depends(get_db),
 ):
     """Submit MCQ answers for a CA item. All-or-nothing scoring."""
+    _published_item_or_404(db, item_id)
     consume_mcq_quota(db, current_user, len(body.answers))
     mcqs = get_ca_mcqs(db, item_id)
     if not mcqs:
         raise HTTPException(status_code=404, detail="No MCQs for this item")
 
     mcq_map = {m.id: m for m in mcqs}
+    expected_ids = set(mcq_map)
+    submitted_ids = set(body.answers)
+    if submitted_ids != expected_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Submit exactly one answer for every current MCQ in this item.",
+        )
+    if any(not chosen.strip() for chosen in body.answers.values()):
+        raise HTTPException(status_code=422, detail="MCQ answers cannot be blank.")
+
     attempts = []
     correct_count = 0
 
-    for qid_str, chosen in body.answers.items():
-        qid = int(qid_str)
-        mcq = mcq_map.get(qid)
-        if not mcq:
-            continue
+    for qid, chosen in body.answers.items():
+        mcq = mcq_map[qid]
         is_correct = chosen.strip().upper() == mcq.correct_answer.strip().upper()
         if is_correct:
             correct_count += 1
@@ -219,6 +232,7 @@ def get_mains_questions(
     db: Session = Depends(get_db),
 ):
     """Get Mains questions attached to a CA item (up to 3)."""
+    _published_item_or_404(db, item_id)
     questions = get_ca_mains_questions(db, item_id)
     return [
         CAMainsQuestionOut(

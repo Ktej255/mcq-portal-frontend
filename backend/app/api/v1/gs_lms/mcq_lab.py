@@ -36,7 +36,7 @@ from app.core.gs_lms.mcq_lab_scoring import (
     WEAKNESS_THRESHOLD,
     WEAKNESS_MIN_ATTEMPTS,
 )
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
 
 
 router = APIRouter()
@@ -105,10 +105,12 @@ def get_mcq_lab_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get 15 MCQ Lab questions for a topic with required type distribution.
+    """Get 15 MCQ Lab questions for a topic.
 
-    Selects questions per REQUIRED_TYPE_DISTRIBUTION (7 UPSC types, total 15).
-    Only REVIEWED questions are included. Shuffles for random presentation order.
+    Selection prefers the canonical pattern mix in
+    ``REQUIRED_TYPE_DISTRIBUTION`` (same taxonomy the topic's reviewed bank
+    uses), then fills any deficit from the remaining reviewed questions. Only
+    REVIEWED questions are included. Shuffles for random presentation order.
     """
     node = db.query(GsLmsSyllabusNode).filter(
         GsLmsSyllabusNode.id == node_id,
@@ -116,6 +118,7 @@ def get_mcq_lab_questions(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_beta_topic(db, subject.id, node_id)
 
     # Get all reviewed questions for this topic
     all_questions = (
@@ -127,28 +130,13 @@ def get_mcq_lab_questions(
         .all()
     )
 
-    # Backfill from other topics in the same subject if we have fewer than 15 questions
-    if len(all_questions) < 15:
-        subject_node_ids = [
-            r[0] for r in db.query(GsLmsSyllabusNode.id).filter(
-                GsLmsSyllabusNode.subject_id == node.subject_id
-            ).all()
-        ]
-        existing_ids = {q.id for q in all_questions}
-        needed = 15 - len(all_questions)
-        
-        fallback_questions = (
-            db.query(GsLmsMcqQuestion)
-            .filter(
-                GsLmsMcqQuestion.syllabus_node_id.in_(subject_node_ids),
-                GsLmsMcqQuestion.id.notin_(existing_ids) if existing_ids else True,
-                GsLmsMcqQuestion.review_status == GsReviewStatusEnum.REVIEWED,
-            )
-            .limit(needed)
-            .all()
+    # Never backfill from another topic: a short reviewed bank is an honest
+    # unavailable state rather than a silently substituted question set.
+    if len(all_questions) < TOTAL_MCQ_LAB_QUESTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This topic does not yet have a complete reviewed MCQ Lab set",
         )
-        all_questions.extend(fallback_questions)
-
 
     # Group by question type
     by_type: Dict[str, list] = {}
@@ -213,6 +201,7 @@ def submit_mcq_lab(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_beta_topic(db, subject.id, node_id)
 
     if len(body.answers) != TOTAL_MCQ_LAB_QUESTIONS:
         raise HTTPException(
@@ -220,15 +209,24 @@ def submit_mcq_lab(
             detail=f"Expected {TOTAL_MCQ_LAB_QUESTIONS} answers, got {len(body.answers)}"
         )
 
-    # Fetch questions to validate and get correct answers
+    # Fetch questions only from this reviewed topic. Duplicate IDs are
+    # rejected before any scoring or persistence takes place.
     question_ids = [a.question_id for a in body.answers]
+    if len(set(question_ids)) != len(question_ids):
+        raise HTTPException(status_code=422, detail="Duplicate question IDs are not allowed")
+
     questions = db.query(GsLmsMcqQuestion).filter(
-        GsLmsMcqQuestion.id.in_(question_ids)
+        GsLmsMcqQuestion.id.in_(question_ids),
+        GsLmsMcqQuestion.syllabus_node_id == node_id,
+        GsLmsMcqQuestion.review_status == GsReviewStatusEnum.REVIEWED,
     ).all()
     question_map = {q.id: q for q in questions}
 
     if len(question_map) != len(question_ids):
-        raise HTTPException(status_code=422, detail="Some question IDs are invalid")
+        raise HTTPException(
+            status_code=422,
+            detail="Questions must be reviewed and belong to the requested topic",
+        )
 
     # Create attempts with all-or-nothing scoring
     attempts = []
@@ -342,9 +340,14 @@ def get_mcq_lab_result(
     """Get the latest MCQ Lab result for a topic."""
     session = (
         db.query(GsLmsMcqLabSession)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsMcqLabSession.syllabus_node_id,
+        )
         .filter(
             GsLmsMcqLabSession.student_id == current_user.id,
             GsLmsMcqLabSession.syllabus_node_id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
             GsLmsMcqLabSession.submitted_at.isnot(None),
         )
         .order_by(GsLmsMcqLabSession.submitted_at.desc())
@@ -352,7 +355,10 @@ def get_mcq_lab_result(
     )
 
     if not session:
-        raise HTTPException(status_code=404, detail="No MCQ Lab result found")
+        # "No attempt yet" is the normal state on a first visit, not an error.
+        # Returning 200 with a null body keeps browsers and error monitors from
+        # logging a failed request every time a learner opens the lab.
+        return None
 
     # Load attempts
     attempts = (

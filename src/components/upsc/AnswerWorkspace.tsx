@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 
 import { optionalService } from "@/services/api/optionalService";
+import { activeAuthProvider } from "@/env";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { answerDraftStorageKey } from "@/lib/auth/identity-storage";
 import type {
   AnswerEvaluationOut,
   EvaluationReportOut,
@@ -54,8 +57,8 @@ import type {
  *   review/correct step before they fill the active segment.
  * - 9.3 (done) adds a handwritten-image upload per segment that extracts text
  *   via the backend `OcrProvider` (Gemini-Vision through the shared inference
- *   gateway; deterministic mock in dev/test). Low-confidence (or failed)
- *   extractions never fill silently: the student is informed and offered a
+ *   gateway; deterministic mock only with explicit non-production selection
+ *   and enablement). Low-confidence (or failed) extractions never fill silently: the student is informed and offered a
  *   fallback to review/correct, type instead, or re-upload (R9.1/R9.3/R20.1).
  * - 9.4 (done) wires `onSubmit`/inline submit to the real evaluation endpoint
  *   + report rendering + persistence.
@@ -136,6 +139,12 @@ function appendText(existing: string, addition: string): string {
 
 const EMPTY_DRAFT: AnswerDraft = { intro: "", body: "", conclusion: "" };
 
+function answerPromptStorageKey(prompt: AnswerPrompt) {
+  return [prompt.questionText, prompt.topicNodeId, prompt.topicTitle, prompt.pyqId]
+    .map((value) => String(value ?? ""))
+    .join("|");
+}
+
 /**
  * Per-segment speak-to-fill status (Task 9.2):
  * - `idle`        — nothing happening for this segment.
@@ -154,6 +163,11 @@ interface PendingReview {
   threshold: number;
   /** Where the low-confidence text came from — drives the fallback wording. */
   source: "speech" | "ocr";
+}
+
+interface ProviderProvenance {
+  source: "speech" | "ocr";
+  provider: string;
 }
 
 interface SegmentMeta {
@@ -193,7 +207,61 @@ const SEGMENTS: SegmentMeta[] = [
 ];
 
 export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorkspaceProps) {
+  const { user } = useAuth();
+  const draftStorageKey = user?.uid
+    ? answerDraftStorageKey(activeAuthProvider, user.uid, slug, answerPromptStorageKey(prompt))
+    : null;
   const [draft, setDraft] = useState<AnswerDraft>(EMPTY_DRAFT);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftHydratedKey, setDraftHydratedKey] = useState<string | null>(null);
+  useEffect(() => {
+    // The saved draft lives in sessionStorage, which only exists in the browser.
+    // Reading it is deferred to a microtask so this effect never writes state
+    // synchronously and cascades a render. The autosave effect below is guarded
+    // by draftHydratedKey, so a key change cannot persist a previous draft into
+    // the new slot while this read is pending.
+    queueMicrotask(() => {
+      if (!draftStorageKey) {
+        setDraft(EMPTY_DRAFT);
+        setDraftHydrated(true);
+        setDraftHydratedKey(null);
+        return;
+      }
+
+      try {
+        const raw = window.sessionStorage.getItem(draftStorageKey);
+        if (!raw) {
+          setDraft(EMPTY_DRAFT);
+        } else {
+          const saved = JSON.parse(raw) as Partial<AnswerDraft>;
+          setDraft({
+            intro: typeof saved.intro === "string" ? saved.intro : "",
+            body: typeof saved.body === "string" ? saved.body : "",
+            conclusion: typeof saved.conclusion === "string" ? saved.conclusion : "",
+          });
+        }
+      } catch {
+        setDraft(EMPTY_DRAFT);
+      } finally {
+        setDraftHydrated(true);
+        setDraftHydratedKey(draftStorageKey);
+      }
+    });
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftHydrated || draftHydratedKey !== draftStorageKey || !draftStorageKey) return;
+    try {
+      if (!draft.intro.trim() && !draft.body.trim() && !draft.conclusion.trim()) {
+        window.sessionStorage.removeItem(draftStorageKey);
+      } else {
+        window.sessionStorage.setItem(draftStorageKey, JSON.stringify(draft));
+      }
+    } catch {
+      // Draft persistence is best effort; the live editor remains authoritative.
+    }
+  }, [draft, draftHydrated, draftHydratedKey, draftStorageKey]);
+
   // --- Evaluation state (Task 9.4 — R9.2/R9.4/R9.5) ------------------------
   // The persisted evaluation result (report, or a review-required signal).
   const [evaluation, setEvaluation] = useState<AnswerEvaluationOut | null>(null);
@@ -216,10 +284,20 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
   const [ocrStatus, setOcrStatus] = useState<"idle" | "extracting">("idle");
   // Human-readable OCR error (unreadable image / backend unavailable / failed).
   const [ocrError, setOcrError] = useState<string | null>(null);
+  // Last successful assisted-input provider per segment. This remains visible
+  // after insertion so mock/real provenance is never hidden from the student.
+  const [providerProvenance, setProviderProvenance] = useState<
+    Partial<Record<keyof AnswerDraft, ProviderProvenance>>
+  >({});
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  // Retry targets live in state, not refs: the "Try again" affordance is part of
+  // the render output, so reading it from a ref during render would be both a
+  // React violation and a stale-UI risk.
+  const [speechRetry, setSpeechRetry] = useState<{ key: keyof AnswerDraft; blob: Blob } | null>(null);
+  const [ocrRetry, setOcrRetry] = useState<{ key: keyof AnswerDraft; file: File } | null>(null);
 
   const setSegment = useCallback((key: keyof AnswerDraft, value: string) => {
     // Editing invalidates any prior evaluation — clear the stale report.
@@ -239,10 +317,16 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
   const transcribe = useCallback(
     async (key: keyof AnswerDraft, blob: Blob) => {
       setSpeakStatus("transcribing");
+      setSpeechRetry({ key, blob });
       try {
         const result = await optionalService.transcribeAudio(slug, blob, {
           vocabularyHint: prompt.topicTitle ?? undefined,
         });
+        setSpeechRetry(null);
+        setProviderProvenance((prev) => ({
+          ...prev,
+          [key]: { source: "speech", provider: result.provider },
+        }));
         if (result.low_confidence) {
           // R8.4 / R20.3: do NOT silently commit. Hold the transcript for an
           // explicit review/correct step before it fills the segment.
@@ -257,9 +341,14 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
           // High confidence: fill directly (still editable — it's a textarea).
           fillSegment(key, result.text);
         }
-      } catch {
+      } catch (error: unknown) {
+        const unavailable =
+          error && typeof error === "object" && "response" in error &&
+          (error as { response?: { status?: number } }).response?.status === 503;
         setSpeakError(
-          "We couldn't transcribe that recording. Please try again, or type your answer instead.",
+          unavailable
+            ? "Voice transcription is temporarily unavailable. Try again, or type your answer instead."
+            : "We couldn't transcribe that recording. Please try again, or type your answer instead.",
         );
       } finally {
         setSpeakStatus("idle");
@@ -365,12 +454,18 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
 
       setOcrError(null);
       setPendingReview(null);
+      setOcrRetry({ key, file });
       setActiveOcrKey(key);
       setOcrStatus("extracting");
       try {
         const result = await optionalService.extractHandwriting(slug, file, {
           filename: file.name,
         });
+        setOcrRetry(null);
+        setProviderProvenance((prev) => ({
+          ...prev,
+          [key]: { source: "ocr", provider: result.provider },
+        }));
         if (!result.text.trim()) {
           // Nothing legible came back — never fabricate; offer the fallback.
           setOcrError(
@@ -390,9 +485,14 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
           // High confidence: fill directly (still editable — it's a textarea).
           fillSegment(key, result.text);
         }
-      } catch {
+      } catch (error: unknown) {
+        const unavailable =
+          error && typeof error === "object" && "response" in error &&
+          (error as { response?: { status?: number } }).response?.status === 503;
         setOcrError(
-          "We couldn't read that image. Please try a clearer photo, re-upload, or type your answer instead.",
+          unavailable
+            ? "Handwriting OCR is temporarily unavailable. Try again, re-upload, or type your answer instead."
+            : "We couldn't read that image. Please try a clearer photo, re-upload, or type your answer instead.",
         );
       } finally {
         setOcrStatus("idle");
@@ -450,9 +550,14 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
         pyq_id: prompt.pyqId ?? null,
       });
       setEvaluation(result);
-    } catch {
+    } catch (error: unknown) {
+      const unavailable =
+        error && typeof error === "object" && "response" in error &&
+        (error as { response?: { status?: number } }).response?.status === 503;
       setEvalError(
-        "We couldn't evaluate your answer right now. Please try again in a moment.",
+        unavailable
+          ? "Answer evaluation is temporarily unavailable. Your draft is saved; try again when ready."
+          : "We couldn't evaluate your answer right now. Your draft is saved; please try again.",
       );
     } finally {
       setEvaluating(false);
@@ -547,6 +652,7 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
                 speakStatus !== "idle"
               }
               onUploadImage={(file) => extractHandwriting(seg.key, file)}
+              provenance={providerProvenance[seg.key] ?? null}
               review={pendingReview && pendingReview.key === seg.key ? pendingReview : null}
               onReviewChange={(text) =>
                 setPendingReview((r) => (r ? { ...r, text } : r))
@@ -573,6 +679,15 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#b9831f]" />
             <span>{speakError}</span>
+            {speechRetry ? (
+              <button
+                type="button"
+                onClick={() => void transcribe(speechRetry.key, speechRetry.blob)}
+                className="font-black underline underline-offset-2 hover:text-[#5d4315]"
+              >
+                Try again
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setSpeakError(null)}
@@ -601,6 +716,15 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#b9831f]" />
             <span>{ocrError}</span>
+            {ocrRetry ? (
+              <button
+                type="button"
+                onClick={() => void extractHandwriting(ocrRetry.key, ocrRetry.file)}
+                className="font-black underline underline-offset-2 hover:text-[#5d4315]"
+              >
+                Try again
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setOcrError(null)}
@@ -659,6 +783,14 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
             <span>{evalError}</span>
             <button
               type="button"
+              onClick={() => void handleSubmit()}
+              disabled={evaluating}
+              className="font-black underline underline-offset-2 hover:text-[#6b2418] disabled:opacity-50"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
               onClick={() => setEvalError(null)}
               aria-label="Dismiss evaluation error"
               className="ml-auto text-[#8a2f1e]/70 hover:text-[#8a2f1e]"
@@ -691,6 +823,7 @@ function SegmentEditor({
   ocrStatus,
   ocrDisabled,
   onUploadImage,
+  provenance,
   review,
   onReviewChange,
   onAcceptReview,
@@ -706,6 +839,7 @@ function SegmentEditor({
   ocrStatus: "idle" | "extracting";
   ocrDisabled: boolean;
   onUploadImage: (file: File | null | undefined) => void;
+  provenance: ProviderProvenance | null;
   review: PendingReview | null;
   onReviewChange: (text: string) => void;
   onAcceptReview: () => void;
@@ -734,6 +868,7 @@ function SegmentEditor({
     : `Upload a handwritten answer image for ${meta.label}`;
 
   const isOcrReview = review?.source === "ocr";
+  const isMockProvenance = provenance?.provider.toLowerCase().includes("mock") ?? false;
 
   return (
     <article
@@ -833,6 +968,23 @@ function SegmentEditor({
       <p id={helperId} className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">
         {meta.helper}
       </p>
+
+      {provenance ? (
+        <p
+          data-testid={`${meta.testid}-provider-provenance`}
+          data-provider={provenance.provider}
+          data-provider-kind={isMockProvenance ? "mock" : "real"}
+          className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.08em] ${
+            isMockProvenance
+              ? "border-[#d39b49] bg-[#fff3dc] text-[#7a4f0d]"
+              : "border-[#9fcdb9] bg-[#edf8f2] text-[#085041]"
+          }`}
+        >
+          Last {provenance.source === "speech" ? "speech-to-text" : "handwriting OCR"} input
+          {" · "}
+          {isMockProvenance ? "Mock provider" : "Provider"}: {provenance.provider}
+        </p>
+      ) : null}
 
       {/* Live status for assistive tech while recording/transcribing/reading. */}
       <span data-testid={`${meta.testid}-speak-status`} aria-live="polite" className="sr-only">

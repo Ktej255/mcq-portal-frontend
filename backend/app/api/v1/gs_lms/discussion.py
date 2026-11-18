@@ -20,6 +20,7 @@ Requirements traced: 5.1, 5.2, 5.3, 5.4, 5.6, 9.1, 9.2
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -30,6 +31,7 @@ from app.models.domain import User
 from app.api.dependencies import ai_rate_limit, get_current_user
 from app.schemas.common import StandardResponse
 from app.core.gs.models import GsSubject
+from app.core.gs_lms.models import GsLmsSyllabusNode
 from app.core.gs_lms.student_models import (
     GsLmsDiscussionSession,
     GsLmsDiscussionStatusEnum,
@@ -38,7 +40,8 @@ from app.core.gs_lms.discussion import (
     create_session,
     add_student_turn,
     add_ai_turn,
-    generate_ai_response,
+    DiscussionProviderUnavailableError,
+    generate_ai_response_with_provenance,
     check_threshold,
     complete_session,
     has_completed_discussion,
@@ -57,6 +60,18 @@ from app.api.v1.gs_lms.schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_PROVIDER_IDENTITY_MAX_LENGTH = 128
+
+
+def _sanitize_provider_identity(value: object) -> str:
+    """Return a bounded, log- and response-safe provider identity."""
+    if not isinstance(value, str):
+        return "unknown"
+    sanitized = "".join(character for character in value if character.isprintable())
+    sanitized = " ".join(sanitized.split())[:_PROVIDER_IDENTITY_MAX_LENGTH].strip()
+    return sanitized or "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -64,11 +79,20 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _get_session_or_404(db: Session, session_id: int) -> GsLmsDiscussionSession:
-    """Fetch a discussion session by ID or raise 404."""
+def _get_session_or_404(
+    db: Session, session_id: int, subject_id: int
+) -> GsLmsDiscussionSession:
+    """Fetch a discussion session scoped to the requested subject."""
     session = (
         db.query(GsLmsDiscussionSession)
-        .filter(GsLmsDiscussionSession.id == session_id)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsDiscussionSession.syllabus_node_id,
+        )
+        .filter(
+            GsLmsDiscussionSession.id == session_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
+        )
         .one_or_none()
     )
     if session is None:
@@ -153,6 +177,21 @@ def start_discussion(
     """
     node_id = body.syllabus_node_id
 
+    # Every discussion must be rooted in a topic owned by the URL subject.
+    node = (
+        db.query(GsLmsSyllabusNode)
+        .filter(
+            GsLmsSyllabusNode.id == node_id,
+            GsLmsSyllabusNode.subject_id == subject.id,
+        )
+        .one_or_none()
+    )
+    if node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Topic not found",
+        )
+
     # Check if already completed — skip directly to content on subsequent visits
     if has_completed_discussion(db, current_user.id, node_id):
         return StandardResponse(
@@ -213,7 +252,7 @@ def submit_turn(
 
     Validates: Requirements 5.2, 5.3, 5.4
     """
-    session = _get_session_or_404(db, session_id)
+    session = _get_session_or_404(db, session_id, subject.id)
     _check_ownership(session, current_user)
 
     # Cannot submit turns on a completed or abandoned session
@@ -238,17 +277,38 @@ def submit_turn(
         db, session, transcript
     )
 
-    # 4. Generate AI response — pass concept gaps for Socratic targeting (R2.6)
-    ai_response_text = generate_ai_response(
-        session,
-        body.content,
-        transcript=transcript,
-        concepts_missed=missed_concepts,
-        match_percentage=match_pct,
-    )
+    # 4. Generate AI response — provider failure rolls back the student turn,
+    # concept updates, and any status transition before returning a typed 503.
+    try:
+        generated_response = generate_ai_response_with_provenance(
+            session,
+            body.content,
+            transcript=transcript,
+            concepts_missed=missed_concepts,
+            match_percentage=match_pct,
+        )
+    except DiscussionProviderUnavailableError as exc:
+        # The student turn and concept updates were flushed before generation;
+        # keep the session retryable and prevent partial persistence.
+        db.rollback()
+        provider_identity = _sanitize_provider_identity(exc.provider)
+        logger.warning(
+            "GS LMS discussion provider unavailable provider=%s error_type=%s",
+            provider_identity,
+            type(exc.__cause__).__name__ if exc.__cause__ else type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "DISCUSSION_PROVIDER_UNAVAILABLE",
+                "message": "AI discussion is temporarily unavailable. Please retry.",
+                "retryable": True,
+                "provider": provider_identity,
+            },
+        ) from exc
 
-    # 5. Add AI turn
-    ai_turn = add_ai_turn(db, session, ai_response_text)
+    # 5. Add the real provider turn only after successful generation.
+    ai_turn = add_ai_turn(db, session, generated_response.text)
 
     # 6. Check threshold and auto-complete if met
     total_turns = len(transcript) + 1  # transcript was fetched before AI turn was added
@@ -277,6 +337,8 @@ def submit_turn(
             student_turn=_turn_to_out(student_turn),
             ai_turn=_turn_to_out(ai_turn),
             gate_passed=gate_passed,
+            provider=generated_response.provider,
+            is_mock=generated_response.is_mock,
             concepts_matched=session.concepts_matched,
             concepts_missed=session.concepts_missed,
             match_percentage=session.match_percentage,
@@ -302,7 +364,7 @@ def get_discussion_status(
 
     Validates: Requirements 5.5
     """
-    session = _get_session_or_404(db, session_id)
+    session = _get_session_or_404(db, session_id, subject.id)
     _check_ownership(session, current_user)
 
     session_out = _build_session_out(db, session)

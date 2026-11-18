@@ -65,10 +65,16 @@ def get_analytics(
         CAItem.is_deleted == False,
     ).scalar() or 0
 
-    # Total completed by this student
-    total_completed = db.query(func.count(CAStudentProgress.id)).filter(
+    # Total completed by this student, counting only items a learner can still
+    # open. A progress row for a draft or soft-deleted item must not inflate
+    # coverage above the published total.
+    total_completed = db.query(func.count(CAStudentProgress.id)).join(
+        CAItem, CAStudentProgress.ca_item_id == CAItem.id
+    ).filter(
         CAStudentProgress.student_id == current_user.id,
         CAStudentProgress.is_completed == True,
+        CAItem.review_status == "PUBLISHED",
+        CAItem.is_deleted == False,
     ).scalar() or 0
 
     # Coverage by subject
@@ -86,6 +92,8 @@ def get_analytics(
             CAStudentProgress.is_completed == True,
         ).join(CAItem, CAStudentProgress.ca_item_id == CAItem.id).filter(
             CAItem.subject == subj,
+            CAItem.review_status == "PUBLISHED",
+            CAItem.is_deleted == False,
         ).scalar() or 0
 
         coverage_by_subject.append(CACoverageOut(

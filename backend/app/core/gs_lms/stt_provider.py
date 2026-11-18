@@ -44,6 +44,10 @@ class SttResult:
 # Abstract Provider
 # ---------------------------------------------------------------------------
 
+class SttProviderUnavailableError(RuntimeError):
+    """Raised when no real GS LMS speech provider is configured."""
+
+
 class GsLmsSttProvider(ABC):
     """Abstract speech-to-text provider for GS LMS recall checks."""
 
@@ -59,6 +63,28 @@ class GsLmsSttProvider(ABC):
     ) -> SttResult:
         """Transcribe audio bytes to text."""
         raise NotImplementedError
+
+
+class UnavailableGsLmsSttProvider(GsLmsSttProvider):
+    """Explicit fail-closed boundary until a real provider is wired.
+
+    The GS LMS audio route must not turn a deterministic placeholder transcript
+    into a persisted recall result. Tests and approved runtime wiring can still
+    replace this provider through :func:`set_stt_provider`.
+    """
+
+    name = "unavailable"
+
+    def transcribe(
+        self,
+        audio: bytes,
+        *,
+        vocabulary_hint: Optional[List[str]] = None,
+        mime_type: Optional[str] = None,
+    ) -> SttResult:
+        raise SttProviderUnavailableError(
+            "GS LMS speech transcription is not configured"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -105,18 +131,21 @@ class MockGsLmsSttProvider(GsLmsSttProvider):
 
 
 # ---------------------------------------------------------------------------
-# Provider Instance (module-level, overridable for testing)
+# Provider Instance (module-level, overridable for testing or approved wiring)
 # ---------------------------------------------------------------------------
 
-_default_provider: GsLmsSttProvider = MockGsLmsSttProvider()
+# Do not default to the deterministic mock: doing so would fabricate a
+# successful transcript and allow a persisted recall result without audio STT.
+_default_provider: GsLmsSttProvider = UnavailableGsLmsSttProvider()
 
 
 def get_stt_provider() -> GsLmsSttProvider:
     """Return the active STT provider.
 
-    In production, this would resolve from environment configuration
-    (WHISPER_API_URL, GEMINI_STT_KEY, etc.) to a real provider.
-    Default is the mock provider for development.
+    GS LMS audio recall is fail-closed until a real provider is wired. The
+    deterministic mock remains available only through explicit
+    ``set_stt_provider(MockGsLmsSttProvider())`` injection for tests or an
+    approved non-production integration.
     """
     return _default_provider
 
@@ -141,7 +170,9 @@ STT_CONFIDENCE_THRESHOLD = 0.6  # Below this, student should review/re-record
 __all__ = [
     "SttSegment",
     "SttResult",
+    "SttProviderUnavailableError",
     "GsLmsSttProvider",
+    "UnavailableGsLmsSttProvider",
     "MockGsLmsSttProvider",
     "get_stt_provider",
     "set_stt_provider",

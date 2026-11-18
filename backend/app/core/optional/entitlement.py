@@ -10,10 +10,10 @@ Decision rules:
     * A subject is "premium" only when its ``config.premium`` flag is true.
       Non-premium subjects are always allowed (R16.3 — no gating where none is
       designated).
-    * For a premium subject with no engine present, the default is configurable
-      via ``OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW`` (default ``true`` = open during
-      early access). When set to ``false`` the seam restricts access and returns
-      an ``upgrade_path`` (R16.2).
+    * For a premium subject with no engine present, the environment-selected
+      default is configurable via ``OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW`` and
+      fails closed when unset. Explicit ``true``/``false`` values remain
+      supported.
 
 When the real engine is wired, add an ``EntitlementProvider`` that consults it
 and select it via ``OPTIONAL_ENTITLEMENT_PROVIDER`` — the call sites
@@ -29,6 +29,10 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
+
+from sqlalchemy.orm import Session
+
+from app.core.payments.subscriptions import get_current_active_subscription
 
 # Where to send a student who needs to upgrade for premium content (R16.2).
 DEFAULT_UPGRADE_PATH = "/pricing"
@@ -57,26 +61,48 @@ class EntitlementProvider(ABC):
     name: str = "abstract"
 
     @abstractmethod
-    def check_access(self, *, student_id: int, subject: Any) -> EntitlementDecision:
-        """Return the access decision for ``student_id`` + ``subject`` (R16)."""
+    def check_access(
+        self,
+        *,
+        student_id: int,
+        subject: Any,
+        external_user_id: Optional[str] = None,
+        db: Optional[Session] = None,
+    ) -> EntitlementDecision:
+        """Return the access decision for ``student_id`` + ``subject``."""
         raise NotImplementedError
 
 
 class DefaultEntitlementProvider(EntitlementProvider):
-    """Safe-default entitlement seam used until the real engine is wired.
+    """Subscription-backed entitlement provider with a safe local fallback.
 
-    Non-premium subjects are always allowed (R16.3). Premium subjects follow a
-    configurable default (``default_allow``): open during early access, or
-    restricted with an upgrade path when the founder flips the flag (R16.2).
+    Real authenticated routes pass the stable external user ID and database
+    session, so premium access requires a current, non-expired subscription.
+    The configurable fallback remains available for isolated callers and the
+    existing dependency-override tests that do not have payment context.
     """
 
     name = "default"
 
-    def __init__(self, default_allow: bool = True, upgrade_path: str = DEFAULT_UPGRADE_PATH):
+    def __init__(
+        self,
+        default_allow: bool = True,
+        upgrade_path: str = DEFAULT_UPGRADE_PATH,
+        *,
+        subscription_required: bool = False,
+    ):
         self.default_allow = default_allow
         self.upgrade_path = upgrade_path
+        self.subscription_required = subscription_required
 
-    def check_access(self, *, student_id: int, subject: Any) -> EntitlementDecision:
+    def check_access(
+        self,
+        *,
+        student_id: int,
+        subject: Any,
+        external_user_id: Optional[str] = None,
+        db: Optional[Session] = None,
+    ) -> EntitlementDecision:
         if not _subject_is_premium(subject):
             return EntitlementDecision(
                 allowed=True,
@@ -84,6 +110,29 @@ class DefaultEntitlementProvider(EntitlementProvider):
                 reason="Open content — no entitlement required.",
                 upgrade_path=None,
             )
+
+        if self.subscription_required and db is not None and external_user_id:
+            try:
+                has_subscription = get_current_active_subscription(
+                    db, external_user_id
+                ) is not None
+            except Exception:
+                db.rollback()
+                has_subscription = False
+            if has_subscription:
+                return EntitlementDecision(
+                    allowed=True,
+                    premium=True,
+                    reason="Active subscription verified.",
+                    upgrade_path=None,
+                )
+            return EntitlementDecision(
+                allowed=False,
+                premium=True,
+                reason="This is premium content and requires an active subscription.",
+                upgrade_path=self.upgrade_path,
+            )
+
         if self.default_allow:
             return EntitlementDecision(
                 allowed=True,
@@ -103,8 +152,10 @@ _PROVIDERS: dict = {}
 
 
 def _env_default_allow() -> bool:
-    raw = (os.environ.get("OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW") or "true").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    raw = os.environ.get("OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW")
+    if raw is None:
+        return False
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 
 def get_entitlement_provider(name: Optional[str] = None) -> EntitlementProvider:
@@ -112,7 +163,8 @@ def get_entitlement_provider(name: Optional[str] = None) -> EntitlementProvider:
 
     Precedence: explicit ``name`` → ``OPTIONAL_ENTITLEMENT_PROVIDER`` env →
     ``"default"``. The default provider's premium behaviour is governed by
-    ``OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW`` (default open). Cached per-name.
+    ``OPTIONAL_ENTITLEMENT_DEFAULT_ALLOW`` and fails closed when unset. Cached
+    per-name.
     """
     resolved = (
         name or os.environ.get("OPTIONAL_ENTITLEMENT_PROVIDER") or "default"
@@ -123,7 +175,8 @@ def get_entitlement_provider(name: Optional[str] = None) -> EntitlementProvider:
 
     if resolved == "default":
         provider: EntitlementProvider = DefaultEntitlementProvider(
-            default_allow=_env_default_allow()
+            default_allow=_env_default_allow(),
+            subscription_required=True,
         )
     else:
         raise ValueError(f"Unknown entitlement provider '{resolved}'")

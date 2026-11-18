@@ -32,6 +32,7 @@ from app.core.gs_lms.planner import (
     create_daily_plan,
     find_current_position,
     get_syllabus_plan_items,
+    plan_eligible_ids,
     get_plan_history,
     record_replan_event,
     check_replan_needed,
@@ -47,7 +48,7 @@ from app.core.gs_lms.student_models import (
     GsLmsStudentSectionProgress,
     GsLmsWeeklyRetro,
 )
-from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsContentSection
+from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsContentSection, GsLmsPyq
 from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.schemas import (
     GsLmsDailyPlanOut,
@@ -156,14 +157,19 @@ def _compute_streak(db: Session, student_id: int) -> int:
 
 
 def _get_due_revisit_items(
-    db: Session, student_id: int
+    db: Session, student_id: int, subject_id: int
 ) -> list[GsLmsPlanItemOut]:
-    """Fetch today's due revisits and convert to plan items."""
+    """Fetch today's due revisits for the requested subject."""
     today = date.today()
     revisits = (
         db.query(GsLmsRevisitSchedule)
+        .join(
+            GsLmsSyllabusNode,
+            GsLmsSyllabusNode.id == GsLmsRevisitSchedule.syllabus_node_id,
+        )
         .filter(
             GsLmsRevisitSchedule.student_id == student_id,
+            GsLmsSyllabusNode.subject_id == subject_id,
             GsLmsRevisitSchedule.due_date <= today,
             GsLmsRevisitSchedule.completed == False,  # noqa: E712
         )
@@ -190,12 +196,58 @@ def _get_due_revisit_items(
 
 
 def _plan_to_response(
-    plan: GsLmsDailyPlan, streak_days: int, revisit_items: list[GsLmsPlanItemOut] | None = None, db: Session | None = None
+    plan: GsLmsDailyPlan,
+    streak_days: int,
+    revisit_items: list[GsLmsPlanItemOut] | None = None,
+    db: Session | None = None,
+    subject_id: int | None = None,
 ) -> GsLmsDailyPlanOut:
     """Convert a GsLmsDailyPlan DB record to the response schema."""
     planned_items = plan.planned_items or []
     completed_items = plan.completed_items or []
     completed_count = len(completed_items)
+
+    # Where each topic sits in the plan-eligible sequence, plus the reviewed
+    # PYQ evidence behind it. This is what tells a learner why today's items
+    # were chosen instead of just naming them.
+    sequence_by_node: dict[int, int] = {}
+    sequence_total: int | None = None
+    pyq_counts: dict[int, tuple[int, int]] = {}
+    if db is not None and subject_id is not None:
+        eligible_items = get_syllabus_plan_items(db, subject_id)
+        sequence_total = len(eligible_items)
+        sequence_by_node = {
+            item.node_id: index
+            for index, item in enumerate(eligible_items, start=1)
+        }
+        section_ids = [
+            item["node_id"]
+            for item in planned_items
+            if item.get("type", "section") == "section"
+        ]
+        if section_ids:
+            for node_id, exam_type, total in (
+                db.query(
+                    GsLmsPyq.syllabus_node_id,
+                    GsLmsPyq.exam_type,
+                    func.count(GsLmsPyq.id),
+                )
+                .filter(
+                    GsLmsPyq.syllabus_node_id.in_(section_ids),
+                    GsLmsPyq.review_status == GsReviewStatusEnum.REVIEWED,
+                )
+                .group_by(GsLmsPyq.syllabus_node_id, GsLmsPyq.exam_type)
+                .all()
+            ):
+                raw_type = (
+                    exam_type.value if hasattr(exam_type, "value") else str(exam_type)
+                )
+                prelims, mains = pyq_counts.get(node_id, (0, 0))
+                if raw_type.upper() == "PRELIMS":
+                    prelims += int(total)
+                else:
+                    mains += int(total)
+                pyq_counts[node_id] = (prelims, mains)
 
     items_out = []
     # Build a set of completed node_ids for fast lookup.
@@ -212,6 +264,7 @@ def _plan_to_response(
                     completed_at = ci.get("completed_at")
                     break
 
+        prelims_pyqs, mains_pyqs = pyq_counts.get(node_id, (0, 0))
         items_out.append(
             GsLmsPlanItemOut(
                 node_id=node_id,
@@ -219,6 +272,10 @@ def _plan_to_response(
                 item_type=item.get("type", "section"),
                 completed=is_completed,
                 completed_at=completed_at,
+                sequence_position=sequence_by_node.get(node_id),
+                sequence_total=sequence_total,
+                prelims_pyq_count=prelims_pyqs,
+                mains_pyq_count=mains_pyqs,
             )
         )
 
@@ -479,11 +536,29 @@ def get_today_plan(
         db.flush()
         db.commit()
     else:
+        # A plan saved before the beta scope tightened can still name topics
+        # the gate rejects. Regenerate today's items from the scoped sequence
+        # so the learner is never sent into a locked topic.
+        eligible_ids = plan_eligible_ids(db, subject.id)
+        planned_ids = {
+            item.get("node_id")
+            for item in (plan.planned_items or [])
+            if item.get("type", "section") == "section"
+        }
+        if eligible_ids is not None and not planned_ids <= eligible_ids:
+            syllabus_items = get_syllabus_plan_items(db, subject.id)
+            current_position = find_current_position(db, student_id, subject.id)
+            day_plan = generate_day_plan(syllabus_items, current_position, plan.bandwidth)
+            plan.planned_items = [
+                {"node_id": item.node_id, "type": item.item_type, "title": item.title}
+                for item in day_plan.items
+            ]
+            plan.projected_completion_date = day_plan.projected_completion
         db.commit()
 
     streak = _compute_streak(db, student_id)
-    revisit_items = _get_due_revisit_items(db, student_id)
-    data = _plan_to_response(plan, streak, revisit_items, db)
+    revisit_items = _get_due_revisit_items(db, student_id, subject.id)
+    data = _plan_to_response(plan, streak, revisit_items, db, subject.id)
 
     return StandardResponse(
         success=True,
@@ -580,8 +655,8 @@ def update_bandwidth(
     # Re-fetch today's plan for the response.
     today_plan = _get_today_plan(db, student_id)
     streak = _compute_streak(db, student_id)
-    revisit_items = _get_due_revisit_items(db, student_id)
-    data = _plan_to_response(today_plan, streak, revisit_items, db)
+    revisit_items = _get_due_revisit_items(db, student_id, subject.id)
+    data = _plan_to_response(today_plan, streak, revisit_items, db, subject.id)
 
     return StandardResponse(
         success=True,

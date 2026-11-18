@@ -7,8 +7,8 @@ validated server-side to prevent client manipulation (skipping steps).
 Key responsibilities:
 - Funnel state initialization and retrieval
 - Step completion validation and persistence
-- Side-effect orchestration (Discussion Gate verification, MCQ weakness
-  update, Growth Report generation, Daily Planner notification)
+- Side-effect orchestration (MCQ weakness update, Growth Report generation,
+  Daily Planner notification)
 
 Requirements: 1.1, 1.2, 1.3, 1.4, 1.6, 14.1
 """
@@ -46,6 +46,16 @@ class StepNotReachableError(Exception):
 class StepAlreadyCompletedError(Exception):
     """Raised when attempting to complete a step that is already done."""
     pass
+
+
+class FunnelCompletionSideEffectError(RuntimeError):
+    """Raised when final-step completion side effects cannot be persisted."""
+
+    retryable = True
+
+    def __init__(self, operation: str) -> None:
+        super().__init__("Funnel completion is temporarily unavailable")
+        self.operation = operation
 
 
 # ---------------------------------------------------------------------------
@@ -259,9 +269,11 @@ def _on_funnel_complete(db: Session, student_id: int, node_id: int) -> None:
         # Import here to avoid circular imports
         from app.core.gs_lms.growth_report import generate_growth_report
         generate_growth_report(db, student_id, node_id)
-    except Exception:
-        # Growth report generation failure should not block funnel completion
-        pass
+    except Exception as exc:
+        # The final funnel step and its report must commit as one unit. The API
+        # translates this typed failure to a retryable response and rolls back
+        # the flushed step/report rows.
+        raise FunnelCompletionSideEffectError("growth_report") from exc
 
     try:
         # Update existing topic completion status (GsLmsStudentSectionProgress pattern)
@@ -298,9 +310,10 @@ def _on_funnel_complete(db: Session, student_id: int, node_id: int) -> None:
                     completed_at=now,
                 )
                 db.add(progress)
-    except Exception:
-        # Progress update failure should not block funnel completion
-        pass
+    except Exception as exc:
+        # Section completion is part of the same finalization contract. Do not
+        # report step 14 complete when this write cannot be persisted.
+        raise FunnelCompletionSideEffectError("section_progress") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -327,6 +340,7 @@ __all__ = [
     "TOTAL_STEPS",
     "StepNotReachableError",
     "StepAlreadyCompletedError",
+    "FunnelCompletionSideEffectError",
     "FunnelState",
     "get_funnel_state",
     "complete_step",

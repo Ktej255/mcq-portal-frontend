@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeIndianRupee,
-  CheckCircle2,
   Clock,
   FileText,
   Loader2,
@@ -16,6 +15,7 @@ import {
   type SubscriptionResponse,
   type OrderHistoryResponse,
 } from "@/services/api/paymentService";
+import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
 
 function money(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -45,8 +45,8 @@ export default function BillingPage() {
         ]);
         setSubscription(subRes);
         setOrders(ordersRes);
-      } catch (err: any) {
-        setError(err?.message || "Failed to load billing data.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load billing data.");
       } finally {
         setLoading(false);
       }
@@ -135,14 +135,26 @@ export default function BillingPage() {
           ) : (
             <div className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5">
               <p className="text-sm font-semibold text-[#5d675f]">
-                No active subscription. Choose a plan to start your UPSC preparation journey.
+                No active subscription.{" "}
+                {publicCommerceLaunchBoundary.readyForPayment
+                  ? "Choose a plan to start your UPSC preparation journey."
+                  : "Payments are not open yet: choosing a plan only records your intent, nothing is charged, and your access stays unchanged until live payments open."}
               </p>
               <Link
                 href="/upsc/pricing"
                 className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-[#1a3a2a] px-4 text-sm font-black text-white hover:bg-[#10291d] transition"
               >
-                View Plans <ArrowRight className="ml-2 h-4 w-4" />
+                {publicCommerceLaunchBoundary.readyForPayment ? "View Plans" : "Review plans & record intent"}
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
+              <p
+                data-testid="upsc-billing-payment-boundary"
+                data-commerce-mode={publicCommerceLaunchBoundary.mode}
+                data-ready-for-payment={String(publicCommerceLaunchBoundary.readyForPayment)}
+                className="mt-3 text-xs font-bold text-[#746f66]"
+              >
+                {publicCommerceLaunchBoundary.paymentStatusValue}
+              </p>
             </div>
           )}
 
@@ -208,7 +220,9 @@ export default function BillingPage() {
             <div className="flex items-center gap-2 rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4">
               <Clock className="h-4 w-4 text-[#5d675f]" />
               <p className="text-sm font-semibold text-[#5d675f]">
-                No orders yet. Your transaction history will appear here after your first purchase.
+                {publicCommerceLaunchBoundary.readyForPayment
+                  ? "No orders yet. Your transaction history will appear here after your first purchase."
+                  : "No order history. Payments are not open yet, so nothing has been charged — purchases will be listed here only after live payments launch."}
               </p>
             </div>
           )}

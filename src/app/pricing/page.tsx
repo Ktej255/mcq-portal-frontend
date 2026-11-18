@@ -13,8 +13,8 @@ export const metadata = pageMeta({
 });
 
 const faqs = [
-  { q: "How do the multi-year discounts work?", a: "Longer commitments cost less per month: Yearly saves 15%, 2-Year saves 25%, and 3-Year saves 35% versus monthly billing." },
-  { q: "Can I upgrade later?", a: "Yes — start on any tier and upgrade anytime as your preparation deepens." },
+  { q: "How do the multi-year discounts work?", a: "Longer commitments cost less per month: Yearly saves 15%, 2-Year saves 25%, and 3-Year saves 35% versus monthly billing. You can record the cycle you want now; payment collection has not opened yet." },
+  { q: "Can I change my plan later?", a: "Yes — your plan choice is saved as an intent and can be changed anytime from the in-app planner. No payment is collected until the payment gateway opens." },
   { q: "What's free without a plan?", a: "Previous year questions, study resources, daily current affairs and our guides are open to everyone, along with the 2-minute diagnostic plan." },
 ];
 
@@ -24,7 +24,7 @@ export default function PricingPage() {
       <PageHero
         eyebrow="UPSC pricing command"
         title="Flexible plans. Transparent value."
-        sub="Select a tier to match your preparation level. Get deeper discounts with yearly, 2-year or 3-year commitments. Launch pricing continued till 11/4. Start for ₹399/mo, upgrade anytime."
+        sub="Select a tier to match your preparation level. Get deeper discounts with yearly, 2-year or 3-year commitments. Start for ₹399/mo. Plans are recorded as intent in the app — payment collection has not opened yet."
       />
 
       <section className="mx-auto max-w-7xl px-4 py-16 md:px-8">
@@ -78,10 +78,6 @@ export default function PricingPage() {
               </div>
               <p className={`mt-2 text-sm font-semibold leading-6 ${tier.featured ? "text-white/80" : "text-[#536259]"}`}>{tier.tagline}</p>
 
-              <div className={`mt-4 rounded-xl p-3 text-xs font-bold leading-5 ${tier.featured ? "bg-white/10 text-white/85" : "bg-[#e7f5ee] text-[#085041]"}`}>
-                {tier.usage}
-              </div>
-
               <ul className="mt-5 flex-1 space-y-2.5">
                 {tier.features.map((f) => (
                   <li key={f} className={`flex items-start gap-2 text-sm font-semibold leading-6 ${tier.featured ? "text-white/90" : "text-[#33443b]"}`}>
@@ -109,7 +105,7 @@ export default function PricingPage() {
         {/* free note */}
         <div className="mt-10 flex flex-col items-start gap-2 rounded-2xl border border-[#1d9e75]/30 bg-[#e7f5ee] p-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-bold text-[#085041]">
-            Free for everyone: previous year questions, study resources, daily current affairs, guides and the 2-minute diagnostic.
+            Free for everyone: previous year questions, study resources, guides and the 2-minute diagnostic. Daily current affairs opens as reviewed items publish.
           </p>
           <Link href="/start" className="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
             Take the free diagnostic

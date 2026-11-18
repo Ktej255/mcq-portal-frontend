@@ -25,12 +25,11 @@ type instead, or re-upload) before the text fills the answer — the backend nev
 decides a shaky OCR result is "good enough" silently.
 
 Provider abstraction (R20.1): this endpoint depends only on the
-:class:`OcrProvider` interface via :func:`get_ocr_provider`. The deterministic
-mock is the default in dev/test (no model, offline, reproducible); a configured
-Gemini-Vision backend (env ``OPTIONAL_OCR_PROVIDER=gemini-vision``) powers real
-handwriting OCR in production by routing the image through the shared inference
-gateway. There is exactly one OCR path — this route reuses the same abstraction
-the recall/import pipelines use; it adds no second one.
+:class:`OcrProvider` interface via :func:`get_ocr_provider`. Gemini Vision is
+the fail-closed real default. The deterministic mock requires an explicit
+development/test/local ``APP_ENVIRONMENT``, explicit ``mock`` provider
+selection, and explicit enable flag; production/staging never fall back to it.
+This slice does not change the competing Next OCR route or its ownership.
 
 Isolation (Requirement 2 / design Property 9): nothing here imports from or
 references GS Geography (``/upsc/geography``) modules.
@@ -64,14 +63,19 @@ _MAX_IMAGE_BYTES = 15 * 1024 * 1024
 
 
 def get_ocr_provider_dep() -> OcrProvider:
-    """FastAPI dependency wrapper around the env-driven OCR factory.
+    """Resolve the policy-approved OCR provider for the FastAPI route.
 
-    Wrapping the factory in a dependency keeps the route depending only on the
-    :class:`OcrProvider` interface and lets tests inject a deterministic
-    provider (e.g. a forced low-confidence stub) via ``dependency_overrides``
-    without touching global env.
+    Tests can still inject a provider through ``dependency_overrides``. A
+    denied deterministic selection is translated into the same honest 503 path
+    used when a selected real backend is unavailable.
     """
-    return get_ocr_provider()
+    try:
+        return get_ocr_provider()
+    except OcrNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/ocr", dependencies=[Depends(ai_rate_limit)])

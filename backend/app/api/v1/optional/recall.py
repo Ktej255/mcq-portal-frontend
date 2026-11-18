@@ -61,6 +61,10 @@ from app.core.optional.providers import (
     RecallProvider,
     get_recall_provider,
 )
+from app.core.optional.providers.recall import (
+    RecallProviderUnavailableError,
+    recall_provider_provenance,
+)
 from app.core.optional.recall import score_classifications, missed_concepts
 from app.api.v1.optional.schemas import (
     STT_CONFIDENCE_THRESHOLD,
@@ -78,12 +82,40 @@ _MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
 def get_recall_stt_provider_dep() -> SttProvider:
     """STT provider dependency for recall (test-overridable)."""
-    return get_stt_provider()
+    try:
+        return get_stt_provider()
+    except SttNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "RECALL_STT_UNAVAILABLE",
+                "message": "Speech transcription is temporarily unavailable. Please retry.",
+                "retryable": True,
+                "provider": "stt",
+            },
+        ) from exc
 
 
 def get_recall_provider_dep() -> RecallProvider:
-    """Recall matcher/hinter dependency (test-overridable)."""
-    return get_recall_provider()
+    """Resolve the policy-approved matcher/hinter (test-overridable)."""
+    try:
+        return get_recall_provider()
+    except RecallProviderUnavailableError as exc:
+        raise _recall_unavailable_http(exc) from exc
+
+
+def _recall_unavailable_http(exc: RecallProviderUnavailableError) -> HTTPException:
+    """Build the sanitized retryable API error for matcher/hinter failure."""
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "RECALL_PROVIDER_UNAVAILABLE",
+            "message": "Recall scoring is temporarily unavailable. Please retry.",
+            "retryable": True,
+            "provider": exc.provider,
+            "operation": exc.operation,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -155,15 +187,26 @@ def _transcribe(
     audio: bytes,
     subject_name: Optional[str],
     mime_type: Optional[str] = None,
-) -> tuple[str, float]:
+) -> tuple[str, float, str, bool]:
     hint = [t for t in (subject_name or "").split() if t] or None
     try:
         result = stt.transcribe(audio, vocabulary_hint=hint, mime_type=mime_type)
     except SttNotConfiguredError as exc:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "RECALL_STT_UNAVAILABLE",
+                "message": "Speech transcription is temporarily unavailable. Please retry.",
+                "retryable": True,
+                "provider": getattr(stt, "name", "stt"),
+            },
         ) from exc
-    return result.text, result.confidence
+    provider = str(result.provider or getattr(stt, "name", "unknown"))
+    is_mock = bool(
+        getattr(stt, "is_mock", False)
+        or provider.strip().lower().startswith("mock")
+    )
+    return result.text, result.confidence, provider, is_mock
 
 
 def _segment_subject_name(db: Session, segment: VideoSegment) -> Optional[str]:
@@ -183,10 +226,13 @@ def _persist_turn_and_score(
     recall: RecallProvider,
     transcript: str,
     stt_confidence: float,
+    stt_provider: str,
+    stt_is_mock: bool,
     audio_ref: Optional[str] = None,
 ) -> RecallTurnResultOut:
     """Match this turn, persist it, recompute cumulative score, build the result."""
     checklist = _checklist(segment)
+    recall_provider, recall_is_mock = recall_provider_provenance(recall)
 
     # Classify THIS turn's transcript against the checklist (anti-gaming via the
     # segment script — Property 5).
@@ -238,6 +284,10 @@ def _persist_turn_and_score(
         transcript=transcript,
         stt_confidence=stt_confidence,
         stt_low_confidence=stt_confidence < STT_CONFIDENCE_THRESHOLD,
+        stt_provider=stt_provider,
+        stt_is_mock=stt_is_mock,
+        recall_provider=recall_provider,
+        recall_is_mock=recall_is_mock,
         recall_score=cumulative.score,
         recall_percent=cumulative.percent,
         matched=[
@@ -310,7 +360,7 @@ def start_recall(
         )
 
     raw = _read_audio_sync(audio)
-    transcript, confidence = _transcribe(
+    transcript, confidence, stt_provider, stt_is_mock = _transcribe(
         stt, raw, _segment_subject_name(db, segment), audio.content_type
     )
 
@@ -323,14 +373,20 @@ def start_recall(
     db.add(session)
     db.flush()
 
-    result = _persist_turn_and_score(
-        db,
-        session=session,
-        segment=segment,
-        recall=recall,
-        transcript=transcript,
-        stt_confidence=confidence,
-    )
+    try:
+        result = _persist_turn_and_score(
+            db,
+            session=session,
+            segment=segment,
+            recall=recall,
+            transcript=transcript,
+            stt_confidence=confidence,
+            stt_provider=stt_provider,
+            stt_is_mock=stt_is_mock,
+        )
+    except RecallProviderUnavailableError as exc:
+        db.rollback()
+        raise _recall_unavailable_http(exc) from exc
     db.commit()
     return StandardResponse(success=True, message="Recall scored", data=result)
 
@@ -361,18 +417,24 @@ def respond_recall(
     segment = _get_segment_or_404(db, session.video_segment_id)
 
     raw = _read_audio_sync(audio)
-    transcript, confidence = _transcribe(
+    transcript, confidence, stt_provider, stt_is_mock = _transcribe(
         stt, raw, _segment_subject_name(db, segment), audio.content_type
     )
 
-    result = _persist_turn_and_score(
-        db,
-        session=session,
-        segment=segment,
-        recall=recall,
-        transcript=transcript,
-        stt_confidence=confidence,
-    )
+    try:
+        result = _persist_turn_and_score(
+            db,
+            session=session,
+            segment=segment,
+            recall=recall,
+            transcript=transcript,
+            stt_confidence=confidence,
+            stt_provider=stt_provider,
+            stt_is_mock=stt_is_mock,
+        )
+    except RecallProviderUnavailableError as exc:
+        db.rollback()
+        raise _recall_unavailable_http(exc) from exc
     db.commit()
     return StandardResponse(success=True, message="Recall updated", data=result)
 
@@ -408,6 +470,10 @@ def get_recall_session(
                 transcript=turn.transcript or "",
                 stt_confidence=0.0,
                 stt_low_confidence=False,
+                stt_provider=None,
+                stt_is_mock=None,
+                recall_provider=None,
+                recall_is_mock=None,
                 recall_score=score,
                 recall_percent=round(score * 100.0, 4),
                 matched=[

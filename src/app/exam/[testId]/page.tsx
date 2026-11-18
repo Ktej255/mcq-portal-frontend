@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu, RefreshCw } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
-import { examService, QuestionData, TestMetadata } from '@/services/api/examService';
+import { examService, ExamQuestionResponseError, QuestionData, TestMetadata } from '@/services/api/examService';
 import { dashboardService, PerformanceReport } from '@/services/api/dashboardService';
 import { revisionService } from '@/services/api/revisionService';
 import { eventsService } from '@/services/api/eventsService';
@@ -58,6 +58,7 @@ function ExamInterface() {
     const fetchExamData = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         let qData: QuestionData[];
         let tData: TestMetadata;
@@ -89,7 +90,14 @@ function ExamInterface() {
           qData = resQ;
           tData = resT;
         }
-        
+
+        if (!Array.isArray(qData)) {
+          throw new ExamQuestionResponseError('INVALID_RESPONSE');
+        }
+        if (qData.length === 0) {
+          throw new ExamQuestionResponseError('EMPTY_QUESTION_BANK');
+        }
+
         setQuestions(qData);
         setTestMetadata(tData);
         
@@ -103,7 +111,7 @@ function ExamInterface() {
         }
       } catch (err) {
         console.error("Failed to fetch exam data:", err);
-        setError("Failed to load exam questions.");
+        setError(err instanceof ExamQuestionResponseError ? err.message : "Failed to load exam questions.");
       } finally {
         setLoading(false);
       }
@@ -174,7 +182,12 @@ function ExamInterface() {
     </div>
   );
 
-  if (!question) return null;
+  if (!question) return (
+    <div className="flex flex-col h-screen items-center justify-center text-center p-4">
+      <p className="text-red-500 mb-4">The selected exam question is unavailable.</p>
+      <Button onClick={() => window.location.reload()}>Retry</Button>
+    </div>
+  );
 
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
@@ -600,7 +613,7 @@ function ExamInterface() {
 
 export default function LegacyExamPage() {
   return (
-    <ProtectedRoute requiredRole="ADMIN">
+    <ProtectedRoute>
       <ExamInterface />
     </ProtectedRoute>
   );

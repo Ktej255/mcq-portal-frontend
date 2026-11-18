@@ -2,10 +2,26 @@ import random
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from app.models.domain import Question, Test, Topic
+from app.models.domain import Question, Test, Topic, WorkflowStatusEnum
 from .contracts import MCQStructure, MCQOption, UPSCQuestionType
 from .forensics import MCQForensics
 from app.core.observability.tracer import trace_execution
+
+
+class _TransactionNeutralTraceSession:
+    """Expose the caller session to tracing without allowing trace commits."""
+
+    def __init__(self, db: Session):
+        self._db = db
+
+    def commit(self):
+        # ExecutionTracer commits its own trace lifecycle updates. Flush those
+        # updates into the caller-owned transaction instead of finalizing it.
+        self._db.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._db, name)
+
 
 class MCQIngestionEngine:
     @staticmethod
@@ -25,7 +41,8 @@ class MCQIngestionEngine:
 
     @staticmethod
     def ingest_batch(db: Session, test_id: int, questions: List[Dict[str, Any]]) -> List[Question]:
-        with trace_execution(db=db, module="pedagogy.ingestion", function="ingest_batch") as trace:
+        trace_db = _TransactionNeutralTraceSession(db)
+        with trace_execution(db=trace_db, module="pedagogy.ingestion", function="ingest_batch") as trace:
             trace.input_payload = {"test_id": test_id, "count": len(questions)}
             
             created_questions = []
@@ -73,6 +90,8 @@ class MCQIngestionEngine:
                     explanation_hi=mcq.explanation_hi,
                     difficulty=mcq.difficulty,
                     question_number=mcq.question_number,
+                    status=WorkflowStatusEnum(raw_q.get("status") or WorkflowStatusEnum.DRAFT),
+                    quality_notes=raw_q.get("quality_notes"),
                     content_hash=fingerprint.content_hash,
                     structure_hash=fingerprint.structure_hash,
                     options_hash=fingerprint.options_hash,
@@ -86,9 +105,9 @@ class MCQIngestionEngine:
                 db.add(db_obj)
                 created_questions.append(db_obj)
             
-            db.commit()
-            for q in created_questions:
-                db.refresh(q)
+            # Flush for generated identifiers and constraint validation, but leave
+            # transaction ownership to the caller (bulk CRUD/API boundary).
+            db.flush()
             
             trace.output_payload = {"status": "success", "ingested_count": len(created_questions)}
             return created_questions

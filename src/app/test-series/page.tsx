@@ -6,10 +6,7 @@ import {
   Brain,
   Target,
   BarChart3,
-  Zap,
   FileText,
-  RefreshCw,
-  Clock,
   Sparkles,
 } from "lucide-react";
 
@@ -25,7 +22,7 @@ export const metadata = pageMeta({
 
 const prelimsFeatures = [
   { icon: Target, title: "Topic-wise MCQs", desc: "Practice any GS topic in isolation — build accuracy before attempting full mocks." },
-  { icon: FileText, title: "Full-length Mocks", desc: "100-question, 2-hour simulations that mirror the real Prelims exam pattern and difficulty." },
+  { icon: FileText, title: "Sectional Practice Sets", desc: "Timed topic and section sets built on the Prelims pattern and difficulty — full-length mocks are on the roadmap." },
   { icon: BarChart3, title: "Per-Question-Type Analysis", desc: "See your accuracy broken down by factual, application, elimination, and mapping questions." },
   { icon: Sparkles, title: "AI-Generated Fresh Questions Daily", desc: "Never run out of practice material — our AI creates new questions calibrated to your weak areas." },
 ];
@@ -44,10 +41,10 @@ const comparison = [
   { feature: "Gap analysis & weak area tracking", ours: true, typical: false },
   { feature: "Spaced repetition of missed questions", ours: true, typical: false },
   { feature: "Fresh AI-generated questions daily", ours: true, typical: false },
-  { feature: "Full-length mock tests", ours: true, typical: true },
+  { feature: "Full-length mock tests", ours: false, typical: true },
   { feature: "Previous year question practice", ours: true, typical: true },
   { feature: "Answer writing evaluation", ours: true, typical: true },
-  { feature: "Rank/percentile among test takers", ours: true, typical: true },
+  { feature: "Rank/percentile among test takers", ours: false, typical: true },
 ];
 
 export default function TestSeriesPage() {
@@ -63,7 +60,7 @@ export default function TestSeriesPage() {
       <section className="mx-auto max-w-7xl px-4 py-16 md:px-8">
         <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Prelims Test Series</h2>
         <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-[#536259]">
-          Build MCQ accuracy with topic-wise practice, full-length mocks, and the kind of per-question analysis that tells you exactly why you&apos;re losing marks.
+          Build MCQ accuracy with topic-wise practice, sectional sets, and the kind of per-question analysis that tells you exactly why you&apos;re losing marks.
         </p>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2">

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, X, CheckCircle2, XCircle } from 'lucide-react';
-import { apiClient } from '@/services/api/client';
+import { caService, type QuickTestMcqOut, type QuickTestResultOut } from '@/services/api/caService';
 
 /**
  * CAQuickTest — "Test Anytime" floating action button + quiz modal.
@@ -12,21 +12,9 @@ import { apiClient } from '@/services/api/client';
  * Enhancement 3: Test Anytime
  */
 
-const unwrap = <T,>(data: unknown): T => {
-  const record = (data && typeof data === 'object' ? (data as Record<string, unknown>) : {});
-  return (record.data ?? record) as T;
-};
-
-interface QuickTestMcq {
-  id: number;
-  question_text: string;
-  question_type: string;
-  options: Array<{ label: string; text: string }>;
-  item_title: string;
-  item_date: string;
-}
-
 type Scope = 'today' | 'this_week' | 'this_month' | 'subject';
+
+type QuickTestMcq = QuickTestMcqOut;
 
 export function CAQuickTest() {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,6 +23,9 @@ export function CAQuickTest() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<QuickTestResultOut | null>(null);
   const [label, setLabel] = useState('');
 
   const startTest = async (selectedScope: Scope) => {
@@ -42,22 +33,40 @@ export function CAQuickTest() {
     setLoading(true);
     setAnswers({});
     setSubmitted(false);
+    setResult(null);
+    setError(null);
+    setLoadFailed(false);
     try {
-      const res = await apiClient.get(`current-affairs/quick-test?scope=${selectedScope}&count=10`);
-      const data = unwrap<{ quiz_label: string; mcqs: QuickTestMcq[]; total_count: number }>(res.data);
+      const data = await caService.getQuickTest(selectedScope, 10);
       setMcqs(data.mcqs);
       setLabel(data.quiz_label);
     } catch {
       setMcqs([]);
+      setLabel('');
+      setLoadFailed(true);
+      setError('Quick Test is temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = () => setSubmitted(true);
-
-  // Simple scoring (no backend call needed for quick test — correct answers not sent to client)
-  const score = submitted ? Object.keys(answers).length : 0;
+  const handleSubmit = async () => {
+    if (Object.keys(answers).length !== mcqs.length || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const submittedResult = await caService.submitQuickTest(
+        mcqs.map((mcq) => mcq.id),
+        answers,
+      );
+      setResult(submittedResult);
+      setSubmitted(true);
+    } catch {
+      setError('Your answers could not be scored. Please retry without leaving this test.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -80,6 +89,9 @@ export function CAQuickTest() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Quick Test"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
@@ -91,7 +103,12 @@ export function CAQuickTest() {
                   <Zap className="h-5 w-5 text-amber-500" />
                   <h2 className="text-sm font-black text-[#13251d]">{label || 'Quick Test'}</h2>
                 </div>
-                <button onClick={() => { setIsOpen(false); setScope(null); setMcqs([]); }} className="text-[#5d675f] hover:text-[#13251d]">
+                <button
+                  type="button"
+                  onClick={() => { setIsOpen(false); setScope(null); setMcqs([]); setLoadFailed(false); setError(null); }}
+                  aria-label="Close Quick Test"
+                  className="text-[#5d675f] hover:text-[#13251d]"
+                >
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -122,8 +139,29 @@ export function CAQuickTest() {
                 {/* Loading */}
                 {loading && <div className="py-8 text-center text-xs text-[#5d675f]">Loading questions...</div>}
 
+                {/* Load failed — keep it distinct from an empty scope */}
+                {scope && !loading && loadFailed && (
+                  <div className="py-8 text-center">
+                    <p role="alert" className="text-xs font-semibold text-red-700">{error}</p>
+                    <div className="mt-3 flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => { if (scope) void startTest(scope); }}
+                        className="rounded-lg bg-[#1d9e75] px-3 py-2 text-xs font-black text-white"
+                      >
+                        Retry
+                      </button>
+                      <button
+                        onClick={() => { setScope(null); setLoadFailed(false); setError(null); }}
+                        className="text-xs font-black text-[#1d9e75]"
+                      >
+                        Choose another scope
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* No questions */}
-                {scope && !loading && mcqs.length === 0 && (
+                {scope && !loading && !loadFailed && mcqs.length === 0 && (
                   <div className="py-8 text-center">
                     <p className="text-xs text-[#5d675f]">No MCQs available for this scope.</p>
                     <button onClick={() => setScope(null)} className="mt-2 text-xs font-black text-[#1d9e75]">Try another scope</button>
@@ -159,26 +197,38 @@ export function CAQuickTest() {
                     ))}
                     <button
                       onClick={handleSubmit}
-                      disabled={Object.keys(answers).length !== mcqs.length}
+                      disabled={Object.keys(answers).length !== mcqs.length || loading}
                       className={`w-full py-3 rounded-xl text-sm font-black ${
-                        Object.keys(answers).length === mcqs.length
+                        Object.keys(answers).length === mcqs.length && !loading
                           ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white'
                           : 'bg-[#dcd5c7] text-[#5d675f]'
                       }`}
                     >
-                      Submit ({Object.keys(answers).length}/{mcqs.length})
+                      {loading ? 'Scoring…' : `Submit (${Object.keys(answers).length}/${mcqs.length})`}
                     </button>
                   </div>
                 )}
 
+                {error && !loadFailed && (
+                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-800">
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
                 {/* Results */}
-                {submitted && (
+                {submitted && result && (
                   <div className="py-6 text-center space-y-3">
                     <CheckCircle2 className="h-10 w-10 text-[#1d9e75] mx-auto" />
                     <p className="text-lg font-black text-[#13251d]">Quiz Submitted!</p>
-                    <p className="text-xs text-[#5d675f]">{Object.keys(answers).length} questions answered</p>
+                    <p className="text-xs text-[#5d675f]">
+                      Score: {result.correct_count}/{result.total_questions} ({result.score}%)
+                    </p>
+                    <p className="text-xs text-[#5d675f]">
+                      This score is authoritative for this submission. It is not saved to history or progress.
+                    </p>
                     <button
-                      onClick={() => { setScope(null); setMcqs([]); setSubmitted(false); setAnswers({}); }}
+                      onClick={() => { setScope(null); setMcqs([]); setSubmitted(false); setResult(null); setAnswers({}); setError(null); setLoadFailed(false); }}
                       className="mt-3 px-4 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f]"
                     >
                       Take Another Test

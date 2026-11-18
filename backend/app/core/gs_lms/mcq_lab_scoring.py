@@ -18,15 +18,21 @@ from typing import Dict, List
 # Constants — Required Type Distribution
 # ---------------------------------------------------------------------------
 
-# Maps UPSC question type → required count in each MCQ Lab (total = 15)
+# Preferred pattern mix for each MCQ Lab (total = 15), expressed in the same
+# question taxonomy that GsLmsMcqQuestion stores and the result screen shows.
+# Earlier revisions used a separate taxonomy (MULTI_STATEMENT, DIRECT_RECALL,
+# ...) that no stored question ever carried, so the "required distribution"
+# was silently never enforced. Selection now prefers these counts and fills
+# any deficit from the remaining reviewed bank; the learner is still served
+# exactly the topic's reviewed set, never a substituted one.
 REQUIRED_TYPE_DISTRIBUTION: Dict[str, int] = {
-    "MULTI_STATEMENT": 3,
-    "HOW_MANY_CORRECT": 2,
+    "STATEMENT_BASED": 4,
     "ASSERTION_REASON": 2,
-    "NOT_EXCEPTION": 2,
-    "SCENARIO_APPLIED": 3,
-    "MATCH_THE_PAIRS": 2,
-    "DIRECT_RECALL": 1,
+    "MATCH_THE_FOLLOWING": 2,
+    "CAUSE_EFFECT": 2,
+    "CHRONOLOGICAL": 2,
+    "FACTUAL": 2,
+    "MAP_BASED": 1,
 }
 
 TOTAL_MCQ_LAB_QUESTIONS = 15

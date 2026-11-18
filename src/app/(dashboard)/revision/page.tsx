@@ -1,450 +1,286 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  AlertCircle,
   ArrowRight,
-  BarChart3,
-  BrainCircuit,
-  CalendarClock,
-  ClipboardCheck,
-  LibraryBig,
-  RefreshCcw,
-  Repeat2,
-  Target,
+  BookOpen,
+  CheckCircle2,
+  Clock3,
+  History,
+  LoaderCircle,
+  RefreshCw,
 } from "lucide-react";
 
-import {
-  buildDailyPlannerDecision,
-  type DailyPlannerDecision,
-  type DailyPlannerProgress,
-} from "@/lib/upsc/dailyPlannerEngine";
-import { readLocalQuestionBankAttempts } from "@/lib/upsc/questionBankEngine";
-import {
-  buildUpscStudentReportSnapshot,
-  readLocalStudentReportProgress,
-  studentReportSubjects,
-  type StudentReportProgress,
-  type StudentReportProgressMap,
-  type StudentReportQuestionBankAttempt,
-  type StudentReportQuestionBankAttemptMap,
-  type StudentReportSubject,
-  type StudentSubjectReport,
-} from "@/lib/upsc/studentReportEngine";
-import { readStudentProfile, type StudentProfile } from "@/lib/upsc/studentProfile";
+import { revisionService, type HistoryItem, type RevisionItem } from "@/services/api/revisionService";
 
-type RevisionSubjectRow = {
-  subject: StudentReportSubject;
-  report: StudentSubjectReport;
-  selectedDay: number;
-  decision: DailyPlannerDecision;
-  questionBankAttempts: StudentReportQuestionBankAttempt[];
-  priority: number;
-};
+type LoadState = "loading" | "ready" | "error";
 
-const emptyProgressBySubject = Object.fromEntries(
-  studentReportSubjects.map((subject) => [subject.slug, {}])
-) as Record<string, StudentReportProgressMap>;
+function getErrorMessage(error: unknown) {
+  const candidate = error as {
+    message?: unknown;
+    response?: { data?: { detail?: unknown } };
+  };
 
-function dayState(progress: StudentReportProgressMap, day: number) {
-  return progress[String(day)];
+  if (typeof candidate.response?.data?.detail === "string") return candidate.response.data.detail;
+  if (typeof candidate.message === "string") return candidate.message;
+  return "We could not load your persisted revision data.";
 }
 
-function attemptsForDay(attempts: StudentReportQuestionBankAttempt[] = [], day: number) {
-  return attempts.filter((attempt) => attempt.linkedDay === day);
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
-function hasTeacherDoubt(progress?: StudentReportProgress) {
-  return Boolean(
-    progress?.teacherDoubtCategory &&
-      progress.teacherDoubtReason &&
-      progress.teacherDoubtRepairAction &&
-      progress.teacherDoubtMasteryCheck
-  );
-}
-
-function needsRecovery(progress?: StudentReportProgress, attempts: StudentReportQuestionBankAttempt[] = []) {
-  return Boolean(
-    progress?.revisitQueued ||
-      progress?.talkBand === "Revisit" ||
-      progress?.mcqOutcome === "Revisit" ||
-      progress?.confidence === "Shaky" ||
-      attempts.some((attempt) => !attempt.isCorrect)
-  );
-}
-
-function hasEvidence(progress?: StudentReportProgress, attempts: StudentReportQuestionBankAttempt[] = []) {
-  return Boolean(
-    progress?.watched ||
-      progress?.reflection?.trim() ||
-      progress?.baselineSavedAt ||
-      typeof progress?.talkScore === "number" ||
-      progress?.labCompleted ||
-      progress?.mcqAttempted ||
-      progress?.mcqCompleted ||
-      progress?.meTimeCompletedAt ||
-      attempts.length
-  );
-}
-
-function selectRevisionDay(
-  subject: StudentReportSubject,
-  progress: StudentReportProgressMap,
-  attempts: StudentReportQuestionBankAttempt[]
-) {
-  const teacherDoubt = subject.sessions.find((session) => hasTeacherDoubt(dayState(progress, session.day)));
-  if (teacherDoubt) return teacherDoubt.day;
-
-  const recovery = subject.sessions.find((session) =>
-    needsRecovery(dayState(progress, session.day), attemptsForDay(attempts, session.day))
-  );
-  if (recovery) return recovery.day;
-
-  const weakRecall = subject.sessions.find((session) => {
-    const state = dayState(progress, session.day);
-    return typeof state?.talkScore === "number" && state.talkScore < 95;
-  });
-  if (weakRecall) return weakRecall.day;
-
-  const startedSessions = subject.sessions.filter((session) =>
-    hasEvidence(dayState(progress, session.day), attemptsForDay(attempts, session.day))
-  );
-  const latestStartedDay = startedSessions.at(-1)?.day;
-  if (latestStartedDay) return Math.min(latestStartedDay + 1, subject.sessions.length);
-
-  return subject.sessions[0]?.day ?? 1;
-}
-
-function priorityFor(row: Omit<RevisionSubjectRow, "priority">) {
-  if (row.decision.teacherDoubt) return 100;
-  if (row.decision.revision.urgent) return 90;
-  if (row.report.teacherDoubtCount > 0) return 80;
-  if (row.report.recoveryItems > 0) return 70;
-  if (row.questionBankAttempts.some((attempt) => !attempt.isCorrect)) return 65;
-  if (row.report.averageRecall !== null && row.report.averageRecall < 95) return 60;
-  if (row.report.meTimeChecks === 0 && row.report.startedDays > 0) return 45;
-  if (row.report.startedDays === 0) return 35;
-  return 20 + row.report.commandDays;
-}
-
-function primaryHref(row: RevisionSubjectRow) {
-  if (row.decision.teacherDoubt) return row.decision.teacherDoubt.href;
-  if (row.decision.revision.urgent) return row.decision.revision.href;
-  const href = row.decision.sessionReadiness.href;
-  return href.startsWith("#") ? `/upsc/daily-command${href}` : href;
-}
-
-function primaryLabel(row: RevisionSubjectRow) {
-  if (row.decision.teacherDoubt) return "Repair AI gap";
-  if (row.decision.revision.urgent) return "Open revision";
-  if (row.report.startedDays === 0) return "Start subject";
-  return row.decision.sessionReadiness.actionLabel;
-}
-
-function subjectTone(row: RevisionSubjectRow) {
-  if (row.decision.revision.urgent || row.report.teacherDoubtCount > 0 || row.report.recoveryItems > 0) {
-    return "border-[#e8b061] bg-[#fff8ed]";
+function StateMessage({
+  state,
+  error,
+  emptyMessage,
+  onRetry,
+}: {
+  state: LoadState;
+  error: string | null;
+  emptyMessage: string;
+  onRetry: () => void;
+}) {
+  if (state === "loading") {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm font-bold text-[#5d675f]" role="status">
+        <LoaderCircle className="h-4 w-4 animate-spin" /> Loading from the server...
+      </div>
+    );
   }
-  if (row.report.commandDays > 0) return "border-[#93d3b8] bg-[#f0fbf5]";
-  return "border-[#dcd5c7] bg-[#fffdf8]";
+
+  if (state === "error") {
+    return (
+      <div className="rounded-md border border-[#e8b061] bg-[#fff8ed] p-4" role="alert">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#9b6517]" />
+          <div>
+            <p className="text-sm font-black text-[#6f4a12]">Unable to load revision data</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-[#795f35]">{error}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-3 inline-flex h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d]"
+            >
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <p className="py-8 text-sm font-semibold text-[#5d675f]">{emptyMessage}</p>;
+}
+
+function masteryPercent(mastery?: number) {
+  if (typeof mastery !== "number" || !Number.isFinite(mastery)) return null;
+  return Math.round(Math.max(0, Math.min(1, mastery)) * 100);
 }
 
 export default function RevisionPage() {
-  const [progressBySubject, setProgressBySubject] =
-    useState<Record<string, StudentReportProgressMap>>(emptyProgressBySubject);
-  const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] =
-    useState<StudentReportQuestionBankAttemptMap>({});
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [queue, setQueue] = useState<RevisionItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [queueState, setQueueState] = useState<LoadState>("loading");
+  const [historyState, setHistoryState] = useState<LoadState>("loading");
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+
+  const loadQueue = useCallback(async () => {
+    setQueueState("loading");
+    setQueueError(null);
+    try {
+      setQueue(await revisionService.getQueue());
+      setQueueState("ready");
+    } catch (error) {
+      setQueueState("error");
+      setQueueError(getErrorMessage(error));
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryState("loading");
+    setHistoryError(null);
+    try {
+      setHistory(await revisionService.getHistory());
+      setHistoryState("ready");
+    } catch (error) {
+      setHistoryState("error");
+      setHistoryError(getErrorMessage(error));
+    }
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    setIsRefreshing(true);
+    await Promise.all([loadQueue(), loadHistory()]);
+    setIsRefreshing(false);
+  }, [loadHistory, loadQueue]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setProgressBySubject(
-        Object.fromEntries(
-          studentReportSubjects.map((subject) => [subject.slug, readLocalStudentReportProgress(subject.slug)])
-        )
-      );
-      setQuestionBankAttemptsBySubject(
-        Object.fromEntries(
-          studentReportSubjects.map((subject) => [subject.slug, readLocalQuestionBankAttempts(subject.slug)])
-        )
-      );
-      setProfile(readStudentProfile());
-      setIsLoaded(true);
+      void refreshAll();
     }, 0);
-
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [refreshAll]);
 
-  const report = useMemo(
-    () => buildUpscStudentReportSnapshot(progressBySubject, questionBankAttemptsBySubject),
-    [progressBySubject, questionBankAttemptsBySubject]
-  );
+  const completeItem = async (item: RevisionItem) => {
+    setCompletingId(item.id);
+    setCompletionError(null);
+    try {
+      await revisionService.completeRevision(item.id, 0.2);
+      // Do not remove locally: the server queue remains authoritative after completion.
+      await refreshAll();
+    } catch (error) {
+      setCompletionError(getErrorMessage(error));
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
-  const subjectRows = useMemo<RevisionSubjectRow[]>(() => {
-    return studentReportSubjects
-      .map((subject) => {
-        const subjectProgress = progressBySubject[subject.slug] ?? {};
-        const attempts = questionBankAttemptsBySubject[subject.slug] ?? [];
-        const selectedDay = selectRevisionDay(subject, subjectProgress, attempts);
-        const decision = buildDailyPlannerDecision({
-          subjectSlug: subject.slug,
-          sessions: subject.sessions,
-          selectedDay,
-          progress: subjectProgress as Record<string, DailyPlannerProgress | undefined>,
-          profile,
-          questionBankAttempts: attempts,
-        });
-        const subjectReport = report.subjects.find((item) => item.slug === subject.slug) ?? report.subjects[0];
-        const row = {
-          subject,
-          report: subjectReport,
-          selectedDay,
-          decision,
-          questionBankAttempts: attempts,
-        };
-
-        return { ...row, priority: priorityFor(row) };
-      })
-      .sort((left, right) => right.priority - left.priority || left.subject.title.localeCompare(right.subject.title));
-  }, [profile, progressBySubject, questionBankAttemptsBySubject, report.subjects]);
-
-  const activeRow = subjectRows[0];
-  const activeChecklist = activeRow?.decision.sessionReadiness.checklist.slice(0, 3) ?? [];
-  const urgentCount = subjectRows.filter((row) => row.decision.revision.urgent).length;
-  const questionBankAttemptCount = report.totals.questionBankAttempts;
-  const aiGapCount = report.totals.teacherDoubtCount;
-  const recoveryCount = report.totals.recoveryItems;
-  const activePrimaryHref = activeRow ? primaryHref(activeRow) : "/upsc";
-  const activePrimaryLabel = activeRow ? primaryLabel(activeRow) : "Start UPSC plan";
-  const activeSignalCards = [
-    {
-      id: "learning-gap",
-      label: "Learning gap",
-      title:
-        aiGapCount > 0
-          ? `${aiGapCount} AI gap${aiGapCount === 1 ? "" : "s"} active`
-          : recoveryCount > 0
-            ? `${recoveryCount} repair item${recoveryCount === 1 ? "" : "s"} active`
-            : "No urgent gap",
-      detail: activeRow?.decision.learningGap.detail ?? "Start a subject day to generate the first gap proof.",
-      icon: Target,
-    },
-    {
-      id: "revise-next",
-      label: "Revise next",
-      title: activeRow?.decision.revision.title ?? "Revision baseline pending",
-      detail: activeRow?.decision.revision.detail ?? "The first saved class will create your revision clock.",
-      icon: RefreshCcw,
-    },
-    {
-      id: "current-path",
-      label: "Current path",
-      title: `${report.totals.growthPercent}% evidence movement`,
-      detail: `${report.totals.startedDays}/${report.totals.totalDays} planned subject days have saved evidence.`,
-      icon: BarChart3,
-    },
-    {
-      id: "today-task",
-      label: "Today's task",
-      title: activeRow?.decision.sessionReadiness.title ?? "Start your first day",
-      detail: activeRow?.decision.sessionReadiness.detail ?? "Open the first subject step and let the planner adapt.",
-      icon: ClipboardCheck,
-    },
-  ];
+  const isLoaded = queueState === "ready" && historyState === "ready";
 
   return (
     <main className="text-[#13251d]">
-      <div>
-        <section
-          data-testid="student-revision-command"
-          data-proof-rule="all-subject-revision-from-recall-mcq-ai-gaps-me-time-question-bank"
-          data-loaded={String(isLoaded)}
-          data-subject-count={studentReportSubjects.length}
-          data-urgent-count={urgentCount}
-          data-recovery-items={recoveryCount}
-          data-ai-gap-count={aiGapCount}
-          data-me-time-checks={report.totals.meTimeChecks}
-          data-question-bank-attempts={questionBankAttemptCount}
-          data-current-affairs-unlocked={report.totals.currentAffairsUnlocked}
-          data-primary-href={activePrimaryHref}
-          data-primary-subject={activeRow?.subject.slug ?? "pending"}
-          className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">All-subject revision</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">
-                Revise the next weak point only
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
-                The page chooses one action from recall, MCQ, AI teacher gaps, me-time, and question-bank evidence so the
-                student does not decide what to open next.
-              </p>
-            </div>
-            <Link
-              href={activePrimaryHref}
-              data-testid="student-revision-primary-action"
-              data-primary-href={activePrimaryHref}
-              data-primary-subject={activeRow?.subject.slug ?? "pending"}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
-            >
-              {activePrimaryLabel} <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-        </section>
-
-        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {activeSignalCards.map((card) => (
-            <article key={card.id} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm">
-              <card.icon className="h-5 w-5 text-[#085041]" />
-              <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{card.label}</p>
-              <h2 className="mt-2 text-lg font-black tracking-tight">{card.title}</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{card.detail}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="mt-5 grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <CalendarClock className="h-5 w-5 text-[#085041]" />
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">One action queue</p>
-            </div>
-            <h2 className="mt-3 text-2xl font-black tracking-tight">
-              {activeRow ? `${activeRow.subject.title} Day ${activeRow.selectedDay}` : "No active subject yet"}
-            </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">
-              {activeRow?.decision.todayOriginProof.evidenceSummary ??
-                "Start Day 1 to create a recall and revision evidence line."}
+      <section
+        data-testid="student-revision-command"
+        data-loaded={String(isLoaded)}
+        data-queue-state={queueState}
+        data-history-state={historyState}
+        data-queue-count={queue.length}
+        data-history-count={history.length}
+        className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Revision authority</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Your persisted revision queue</h1>
+            <p className="mt-3 text-sm font-semibold leading-6 text-[#5d675f]">
+              This view is backed by your authenticated server queue. Completing an item updates the backend and reloads
+              both queue and history, so this page never invents or hides revision state locally.
             </p>
-            <div className="mt-4 space-y-2">
-              {activeChecklist.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex gap-3 rounded-md border border-[#e4dccf] bg-[#f7f4ee] p-3 text-sm font-semibold text-[#4f5e55]"
-                >
-                  <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#1d9e75]" />
-                  <span>
-                    <strong className="text-[#13251d]">{item.label}:</strong> {item.detail}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p className="mt-3 rounded-md border border-[#e4dccf] bg-[#f7f4ee] px-3 py-2 text-xs font-semibold leading-5 text-[#5d675f]">
+              This queue is filled by full-length exam attempts only. GS topic revisits
+              (Day 3/7/21) are listed in{" "}
+              <Link href="/upsc/geography/lms/planner" className="text-[#1d9e75] hover:underline">
+                Today&apos;s plan
+              </Link>
+              .
+            </p>
           </div>
-
-          <div
-            data-testid="student-revision-weekly-monthly-proof"
-            data-weekly-report-id={report.autoReport.weeklyReportId}
-            data-monthly-report-id={report.autoReport.monthlyReportId}
-            data-growth-percent={report.totals.growthPercent}
-            data-weekly-windows={report.totals.weeklyWindowsGenerated}
-            className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm"
+          <button
+            type="button"
+            onClick={() => void refreshAll()}
+            disabled={isRefreshing}
+            className="inline-flex h-11 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] hover:bg-[#f2eadc] disabled:cursor-wait disabled:opacity-60"
           >
-            <div className="flex items-center gap-3">
-              <BrainCircuit className="h-5 w-5 text-[#085041]" />
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Reports</p>
-            </div>
-            <h2 className="mt-3 text-2xl font-black tracking-tight">Weekly and monthly reports stay automatic</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#5d675f]">{report.autoReport.evidenceRule}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Weekly</p>
-                <p className="mt-1 text-sm font-black">{report.autoReport.weeklyReportId}</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{report.autoReport.nextWeeklyAction}</p>
-              </div>
-              <div className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">Monthly</p>
-                <p className="mt-1 text-sm font-black">{report.autoReport.monthlyReportId}</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#5d675f]">{report.autoReport.nextMonthlyAction}</p>
-              </div>
-            </div>
-          </div>
-        </section>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Refreshing..." : "Refresh queue"}
+          </button>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3 text-xs font-black text-[#4f5e55]">
+          <span className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] px-3 py-2">{queue.length} pending</span>
+          <span className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] px-3 py-2">{history.length} reviewed records</span>
+          <Link href="/exam/revision" className="inline-flex items-center px-1 py-2 text-[#1d9e75] hover:underline">
+            Open rapid drill <ArrowRight className="ml-1 h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </section>
 
-        <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Repeat2 className="h-5 w-5 text-[#085041]" />
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Subject queue</p>
-                <h2 className="text-xl font-black tracking-tight">Every subject keeps the same revision rule</h2>
-              </div>
-            </div>
-            <Link
-              href="/reports"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
-            >
-              Open Reports
-            </Link>
-          </div>
+      {completionError && (
+        <div className="mt-5 rounded-md border border-[#e8b061] bg-[#fff8ed] p-4 text-sm font-bold text-[#6f4a12]" role="alert">
+          Could not complete that revision item: {completionError}
+        </div>
+      )}
 
+      <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm" data-testid="revision-queue" data-state={queueState}>
+        <div className="flex items-center gap-3">
+          <BookOpen className="h-5 w-5 text-[#085041]" />
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Queue</p>
+            <h2 className="text-2xl font-black tracking-tight">Pending revision items</h2>
+          </div>
+        </div>
+        <StateMessage
+          state={queueState}
+          error={queueError}
+          emptyMessage="Your server revision queue is clear. New mistakes or flagged questions will appear here."
+          onRetry={() => void loadQueue()}
+        />
+        {queueState === "ready" && queue.length > 0 && (
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {subjectRows.map((row) => {
-              const href = primaryHref(row);
+            {queue.map((item) => {
+              const mastery = masteryPercent(item.mastery);
               return (
-                <article
-                  key={row.subject.slug}
-                  data-testid="student-revision-subject-card"
-                  data-subject-slug={row.subject.slug}
-                  data-selected-day={row.selectedDay}
-                  data-revision-urgent={String(row.decision.revision.urgent)}
-                  data-revision-href={row.decision.revision.href}
-                  data-readiness-status={row.decision.sessionReadiness.statusLabel}
-                  data-learning-gap={row.decision.learningGap.title}
-                  data-teacher-gap-count={row.report.teacherDoubtCount}
-                  data-recovery-items={row.report.recoveryItems}
-                  data-question-bank-attempts={row.report.questionBankAttempts}
-                  data-me-time-checks={row.report.meTimeChecks}
-                  className={`rounded-lg border p-4 shadow-sm ${subjectTone(row)}`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <article key={item.id} className="rounded-lg border border-[#e4dccf] bg-[#f7f4ee] p-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">
-                        {row.subject.window}
-                      </p>
-                      <h3 className="mt-1 text-lg font-black tracking-tight">{row.subject.title}</h3>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">{item.category ?? item.reason}</p>
+                      <h3 className="mt-1 text-lg font-black">{item.topic}</h3>
                     </div>
-                    <Link
-                      href={href}
-                      className="inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
-                    >
-                      Open <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Link>
+                    <span className="rounded-md bg-[#fffdf8] px-2.5 py-1 text-xs font-black text-[#6f4a12]">Priority {item.priority}</span>
                   </div>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-[#4f5e55]">{row.decision.revision.detail}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-md border border-[#e4dccf] bg-white px-2.5 py-1 text-[11px] font-black text-[#1a3a2a]">
-                      {row.decision.sessionReadiness.statusLabel}
-                    </span>
-                    <span className="rounded-md border border-[#e4dccf] bg-white px-2.5 py-1 text-[11px] font-black text-[#6f4a12]">
-                      {row.decision.learningGap.title}
-                    </span>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-[#4f5e55]">{item.reason}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-[#5d675f]">
+                    {item.question_id != null && <span>Question {item.question_id}</span>}
+                    {item.review_count != null && <span>• {item.review_count} prior review{item.review_count === 1 ? "" : "s"}</span>}
+                    {mastery != null && <span>• {mastery}% mastery</span>}
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-black text-[#13251d] sm:grid-cols-4">
-                    <div className="rounded-md border border-[#e4dccf] bg-white p-2">
-                      <LibraryBig className="mb-1 h-4 w-4 text-[#085041]" />
-                      {row.report.startedDays}/{row.report.totalDays}
-                    </div>
-                    <div className="rounded-md border border-[#e4dccf] bg-white p-2">
-                      <BrainCircuit className="mb-1 h-4 w-4 text-[#085041]" />
-                      {row.report.averageRecall ?? 0}%
-                    </div>
-                    <div className="rounded-md border border-[#e4dccf] bg-white p-2">
-                      <RefreshCcw className="mb-1 h-4 w-4 text-[#085041]" />
-                      {row.report.recoveryItems}
-                    </div>
-                    <div className="rounded-md border border-[#e4dccf] bg-white p-2">
-                      <ClipboardCheck className="mb-1 h-4 w-4 text-[#085041]" />
-                      {row.report.questionBankAttempts}
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void completeItem(item)}
+                    disabled={completingId !== null}
+                    className="mt-4 inline-flex h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {completingId === item.id ? <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                    {completingId === item.id ? "Saving..." : "Complete revision"}
+                  </button>
                 </article>
               );
             })}
           </div>
-        </section>
-      </div>
+        )}
+      </section>
+
+      <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm" data-testid="revision-history" data-state={historyState}>
+        <div className="flex items-center gap-3">
+          <History className="h-5 w-5 text-[#085041]" />
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">History</p>
+            <h2 className="text-2xl font-black tracking-tight">Completed revision records</h2>
+          </div>
+        </div>
+        <StateMessage
+          state={historyState}
+          error={historyError}
+          emptyMessage="No completed revision records yet. Complete an item and it will be recorded here by the server."
+          onRetry={() => void loadHistory()}
+        />
+        {historyState === "ready" && history.length > 0 && (
+          <div className="mt-5 divide-y divide-[#e4dccf] rounded-md border border-[#e4dccf] bg-[#f7f4ee]">
+            {history.map((item) => (
+              <div key={`${item.id}-${item.last_reviewed_at}`} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="font-black">{item.topic}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#5d675f]">{item.category} · {formatDate(item.last_reviewed_at)}</p>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#1a3a2a]">
+                  <Clock3 className="h-4 w-4" /> {Math.round(Math.max(0, Math.min(1, item.mastery_at_time)) * 100)}% mastery
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }

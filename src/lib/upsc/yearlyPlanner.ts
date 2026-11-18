@@ -1,5 +1,6 @@
 import { geographySessions } from "@/lib/upsc/plan";
 import { subjectPlans } from "@/lib/upsc/subjectPlans";
+import { OPTIONAL_SUBJECTS } from "./optionalSubjectsCatalog";
 import type { StudentProfile } from "./studentProfile";
 
 export type PlanTier = "foundation" | "plus" | "pro" | "ultimate";
@@ -18,7 +19,6 @@ export type ProductPlan = {
   audience: string;
   promise: string;
   features: string[];
-  limits: string;
 };
 
 export type YearlyPlannerBlock = {
@@ -86,13 +86,12 @@ export const planBases = [
     audience: "Trial and self-paced beginners",
     promise: "Build baseline habits before you commit to higher tiers.",
     features: [
-      "Core UPSC GS Subject Path",
+      "Live Geography GS path, more subjects as they ship",
       "Daily Planner & Workspace notes",
       "Standard MCQ Generator (50/day limit)",
       "1 Spaced Weak-Topic repair run",
       "Basic Syllabus check sheet",
     ],
-    limits: "1 hour daily AI interaction. Generous rate limits apply.",
   },
   {
     tier: "plus" as const,
@@ -102,19 +101,18 @@ export const planBases = [
     promise: "Structural prep including optional subject libraries.",
     features: [
       "Everything in Foundation",
-      "Full Optional Subject Catalog (Academic/Lit)",
+      "Geography optional with reviewed content; 24 more opening as they are authored",
       "Advanced MCQ Generator (200/day limit)",
       "5 Spaced Weak-Topics repair runs",
       "Priority Syllabus & PYQ library",
     ],
-    limits: "3 hours daily AI interaction. Generous rate limits apply.",
   },
   {
     tier: "pro" as const,
     title: "Pro Plan",
     baseMonthlyPrice: 999,
     audience: "Serious candidates demanding deep diagnostics",
-    promise: "Priority AI queues, unlimited testing, and mains uploading.",
+    promise: "Deep diagnostics, unlimited practice, and mobile mains uploading.",
     features: [
       "Everything in Plus",
       "Unlimited MCQ Generator & practice tests",
@@ -122,22 +120,18 @@ export const planBases = [
       "Spaced Revision priority queueing",
       "Auto-Stitched Mobile Mains Uploads",
     ],
-    limits: "6 hours daily AI interaction. Generous rate limits apply.",
   },
   {
     tier: "ultimate" as const,
     title: "Ultimate Plan",
     baseMonthlyPrice: 1299,
     audience: "Full-time candidates looking for zero friction",
-    promise: "No limits whatsoever. Complete command and direct support.",
+    promise: "Complete command of the live portal, with direct guidance.",
     features: [
       "Everything in Pro",
-      "Unlimited AI interaction hours",
-      "No hourly or daily rate limits at all",
-      "Priority AI text and talk model response",
+      "Priority access to new live features as they ship",
       "Direct guidance channel with Sarit Classes",
     ],
-    limits: "Unlimited everything. Zero limits apply.",
   },
 ];
 
@@ -155,7 +149,14 @@ function buildPlan(
   const months = cycleInfo.months;
   const listPrice = tierInfo.baseMonthlyPrice * months;
   const discountMultiplier = 1 - cycleInfo.discountPercent / 100;
-  const launchPrice = Math.round((listPrice * discountMultiplier) / 10) * 10;
+  // Monthly plans are their own base price. Rounding the 0% case to the
+  // nearest ₹10 pushed ₹399 up to ₹400, so the launch price exceeded its own
+  // list price and the proof row read "Saves ₹-1". Only discounted cycles
+  // get the ₹10 presentation rounding.
+  const launchPrice =
+    cycleInfo.discountPercent === 0
+      ? listPrice
+      : Math.round((listPrice * discountMultiplier) / 10) * 10;
   const effectiveMonthly = Math.round(launchPrice / months);
 
   return {
@@ -171,7 +172,6 @@ function buildPlan(
     audience: tierInfo.audience,
     promise: tierInfo.promise,
     features: tierInfo.features,
-    limits: tierInfo.limits,
   };
 }
 
@@ -268,9 +268,9 @@ export const yearlyPlannerBlocks: YearlyPlannerBlock[] = [
     window: "February onward",
     title: "Revision and Command Phase",
     days: "Open revision cycle",
-    route: "/upsc/revision-command",
-    focus: "All-subject spaced revision, weak-topic repair, mocks, CSAT, essay, and mains answer consolidation.",
-    output: "Weekly and monthly reports show where the student started, where they improved, and what remains.",
+    route: "/upsc/geography/lms/planner",
+    focus: "Spaced Day 3/7/21 revisits for completed Geography topics, readiness gaps, and next-action consolidation.",
+    output: "Due revisits appear at the top of Today's plan; the readiness dashboard shows what to repair. Full-subject mocks arrive with the other GS subjects.",
   },
 ];
 
@@ -383,91 +383,35 @@ export const coreSubjectBlueprints: CoreSubjectBlueprint[] = [
   })),
 ];
 
-const academicOptionals = [
-  "Agriculture",
-  "Animal Husbandry and Veterinary Science",
-  "Anthropology",
-  "Botany",
-  "Chemistry",
-  "Commerce and Accountancy",
-  "Economics",
-  "Geography",
-  "Geology",
-  "History",
-  "Law",
-  "Management",
-  "Mathematics",
-  "Philosophy",
-  "Physics",
-  "Political Science and International Relations",
-  "Psychology",
-  "Public Administration",
-  "Sociology",
-  "Statistics",
-  "Zoology",
-] as const;
+const OPTIONAL_GROUP_BY_SLUG: Readonly<Record<string, OptionalSubject["group"]>> = {
+  "civil-engineering": "Engineering",
+  "electrical-engineering": "Engineering",
+  "mechanical-engineering": "Engineering",
+  "medical-science": "Medical",
+};
 
-const engineeringOptionals = [
-  "Civil Engineering",
-  "Electrical Engineering",
-  "Mechanical Engineering",
-] as const;
-
-const medicalOptionals = ["Medical Science"] as const;
-
-const literatureOptionals = [
-  "Assamese Literature",
-  "Bengali Literature",
-  "Bodo Literature",
-  "Dogri Literature",
-  "English Literature",
-  "Gujarati Literature",
-  "Hindi Literature",
-  "Kannada Literature",
-  "Kashmiri Literature",
-  "Konkani Literature",
-  "Maithili Literature",
-  "Malayalam Literature",
-  "Manipuri Literature",
-  "Marathi Literature",
-  "Nepali Literature",
-  "Odia Literature",
-  "Punjabi Literature",
-  "Sanskrit Literature",
-  "Santhali Literature",
-  "Sindhi Literature",
-  "Tamil Literature",
-  "Telugu Literature",
-  "Urdu Literature",
-] as const;
-
-function slugifyOptional(title: string) {
-  return title
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-function optionalSubject(title: string, group: OptionalSubject["group"]): OptionalSubject {
-  const slug = slugifyOptional(title);
+function optionalSubjectFromCatalog(
+  subject: (typeof OPTIONAL_SUBJECTS)[number],
+): OptionalSubject {
   return {
-    slug,
-    title,
-    group,
+    slug: subject.slug,
+    title: subject.name,
+    group: OPTIONAL_GROUP_BY_SLUG[subject.slug] ?? "Academic",
     papers: ["Paper I", "Paper II"],
-    route: `/upsc/optional-subjects/${slug}`,
+    route: `/upsc/optional-subjects/${subject.slug}`,
     preloadTarget: "Syllabus, Paper I PYQs, Paper II PYQs, year-wise question papers, trend map, and answer-writing themes.",
     firstBuildAction: "Create paper-wise topic tree, attach 10-year PYQs, then build recall-first optional discussion loop.",
   };
 }
 
-export const optionalSubjects: OptionalSubject[] = [
-  ...academicOptionals.map((title) => optionalSubject(title, "Academic")),
-  ...engineeringOptionals.map((title) => optionalSubject(title, "Engineering")),
-  ...medicalOptionals.map((title) => optionalSubject(title, "Medical")),
-  ...literatureOptionals.map((title) => optionalSubject(title, "Literature")),
-];
+/**
+ * Planner/source-pack metadata is projected from the canonical route catalog.
+ * Keep planner-only and literature-only subjects out of the canonical flow.
+ */
+export const optionalSubjects: OptionalSubject[] = OPTIONAL_SUBJECTS.map(
+  optionalSubjectFromCatalog,
+);
+
 
 export function getOptionalSubject(slug: string) {
   return optionalSubjects.find((subject) => subject.slug === slug);
@@ -554,7 +498,7 @@ export function getDynamicYearlyPlannerBlocks(profile: StudentProfile | null): Y
 
   let currentMonthIndex = startIdx;
 
-  return subjects.map((sub, idx) => {
+  const blocks: YearlyPlannerBlock[] = subjects.map((sub, idx) => {
     const calculatedDays = Math.round(sub.baseDays * multiplier);
     const totalDays = calculatedDays + (targetYear === "2026" ? 1 : targetYear === "2028" || targetYear === "2029" ? 4 : 2);
     
@@ -571,7 +515,18 @@ export function getDynamicYearlyPlannerBlocks(profile: StudentProfile | null): Y
       days: `${calculatedDays} study days${bufferText}`,
       route: sub.route,
       focus: sub.focus,
-      output: `Student target year: ${targetYear}. Dynamic pacing allocated ${calculatedDays} days with appropriate buffers.`,
+      output: `Student target year: ${targetYear}. Dynamic pacing allocates ${calculatedDays} days at this profile's pace; it is a planning target, not authored content.`,
     };
   });
+
+  blocks.push({
+    window: "After the subject sequence",
+    title: "Revision and Command Phase",
+    days: "Open revision cycle",
+    route: "/upsc/geography/lms/planner",
+    focus: "Spaced Day 3/7/21 revisits for completed Geography topics, readiness gaps, and next-action consolidation.",
+    output: "Due revisits appear at the top of Today's plan; the readiness dashboard shows what to repair. Full-subject mocks arrive with the other GS subjects.",
+  });
+
+  return blocks;
 }

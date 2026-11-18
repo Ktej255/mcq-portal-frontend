@@ -13,10 +13,8 @@ import {
   Lightbulb,
   ArrowRight,
   ArrowLeft,
-  Brain,
   Sparkles,
   ChevronDown,
-  Image as ImageIcon,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -27,6 +25,24 @@ interface TopicData {
   topic_id: string; title: string; parent_topic: string; mega_topic: string;
   part: string; display_order: number; prelims_relevance: string; mains_relevance: string;
   sections: Section[];
+}
+
+function isTopicData(value: unknown): value is TopicData {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const topic = value as Record<string, unknown>;
+  return (
+    typeof topic.topic_id === "string" &&
+    typeof topic.title === "string" &&
+    Array.isArray(topic.sections) &&
+    topic.sections.every((section) => {
+      if (typeof section !== "object" || section === null || Array.isArray(section)) return false;
+      const candidate = section as Record<string, unknown>;
+      return (
+        typeof candidate.section_label === "string" &&
+        Array.isArray(candidate.blocks)
+      );
+    })
+  );
 }
 
 // ─── Topic List ──────────────────────────────────────────────────────────────
@@ -314,25 +330,62 @@ function ProgressIndicator({ current, total }: { current: number; total: number 
 
 export default function UniversePreviewPage() {
   const [currentTopicId, setCurrentTopicId] = useState("1.1");
-  const [topicData, setTopicData] = useState<TopicData | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("learn");
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(new Set(["learn"]));
-  const [loading, setLoading] = useState(true);
   const [selectorOpen, setSelectorOpen] = useState(false);
+  // The topic result is keyed by the request that produced it, so loading,
+  // error and data are derived instead of being cleared at the start of the
+  // effect. A topic switch therefore never renders the previous topic's data.
+  const requestKey = `${currentTopicId}:${loadAttempt}`;
+  const [topicOutcome, setTopicOutcome] = useState<{
+    key: string;
+    data: TopicData | null;
+    error: string | null;
+  }>({ key: "", data: null, error: null });
+  const topicResolved = topicOutcome.key === requestKey;
+  const loading = !topicResolved;
+  const topicData = topicResolved ? topicOutcome.data : null;
+  const loadError = topicResolved ? topicOutcome.error : null;
 
-  useEffect(() => {
-    setVisitedTabs(prev => new Set([...prev, activeTab]));
-  }, [activeTab]);
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => new Set([...prev, tab]));
+  };
 
-  // Load topic from backend
+  // Load topic from the same-origin preview API.
   useEffect(() => {
-    setLoading(true);
-    fetch(`http://localhost:8000/api/v1/gs-lms/preview/universe-topics/${currentTopicId}`)
-      .then(r => r.json())
-      .then(json => { setTopicData(json.data); setActiveTab("learn"); setVisitedTabs(new Set(["learn"])); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [currentTopicId]);
+    let cancelled = false;
+    fetch(`/api/v1/gs-lms/preview/universe-topics/${encodeURIComponent(currentTopicId)}`)
+      .then(async (response) => {
+        const payload: unknown = await response.json().catch(() => null);
+        if (
+          !response.ok ||
+          typeof payload !== "object" ||
+          payload === null ||
+          Array.isArray(payload) ||
+          (payload as Record<string, unknown>).success !== true ||
+          !isTopicData((payload as Record<string, unknown>).data)
+        ) {
+          throw new Error("Universe topic response unavailable");
+        }
+        return (payload as Record<string, unknown>).data as TopicData;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setTopicOutcome({ key: requestKey, data, error: null });
+        setActiveTab("learn");
+        setVisitedTabs(new Set(["learn"]));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTopicOutcome({ key: requestKey, data: null, error: "This Universe topic is temporarily unavailable. Please retry." });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTopicId, requestKey, loadAttempt]);
 
   const currentSection = topicData?.sections?.find(
     s => s.section_label === TABS.find(t => t.id === activeTab)?.section
@@ -409,7 +462,7 @@ export default function UniversePreviewPage() {
             const isActive = activeTab === tab.id;
             const isVisited = visitedTabs.has(tab.id);
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-200 whitespace-nowrap ${
                   isActive
                     ? "bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md scale-[1.02]"
@@ -428,15 +481,35 @@ export default function UniversePreviewPage() {
         {/* Fact Card */}
         <FactCard topicData={topicData} />
 
-        {/* Loading */}
+        {/* Loading and honest unavailable states */}
         {loading && (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-20" aria-live="polite">
             <div className="animate-spin h-8 w-8 border-4 border-[#1d9e75] border-t-transparent rounded-full" />
+            <span className="sr-only">Loading Universe topic</span>
+          </div>
+        )}
+
+        {!loading && loadError && (
+          <div role="alert" className="rounded-xl border border-[#f59e0b]/40 bg-[#fff7e6] p-8 text-center">
+            <p className="text-sm font-semibold text-[#92400e]">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+              className="mt-4 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-black text-white hover:bg-[#1d9e75] transition"
+            >
+              Retry loading topic
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadError && !topicData && (
+          <div role="status" className="rounded-xl border border-[#dcd5c7] bg-[#f7f4ee] p-8 text-center">
+            <p className="text-sm font-semibold text-[#5d675f]">Topic content is unavailable.</p>
           </div>
         )}
 
         {/* Tab Content */}
-        {!loading && topicData && (
+        {!loading && !loadError && topicData && (
           <AnimatePresence mode="wait">
             <motion.div key={`${currentTopicId}-${activeTab}`}
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}

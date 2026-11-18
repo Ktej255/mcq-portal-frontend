@@ -126,6 +126,18 @@ def save_answer(db: Session, attempt_id: int, user_id: int, request: SaveAnswerR
     attempt = db.query(Attempt).filter(Attempt.id == attempt_id, Attempt.user_id == user_id).first()
     if not attempt or attempt.status != AttemptStatusEnum.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="Attempt not valid or already submitted")
+
+    # The question must belong to this attempt's test and remain published.
+    # Without this check a caller could attach an unrelated question ID to an
+    # otherwise valid owned attempt, corrupting scoring and report provenance.
+    question = db.query(Question).filter(
+        Question.id == request.question_id,
+        Question.test_id == attempt.test_id,
+        Question.is_deleted == False,
+        Question.status == WorkflowStatusEnum.PUBLISHED,
+    ).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found for this attempt")
         
     # Check timer (optional strict check, could also be done on submit)
     # if attempt.start_time + attempt.test.duration_minutes < now...
@@ -139,7 +151,7 @@ def save_answer(db: Session, attempt_id: int, user_id: int, request: SaveAnswerR
         apply_variation = False
 
     if selected_option is not None and apply_variation:
-        q = db.query(Question).filter(Question.id == request.question_id).first()
+        q = question
         if q:
             from app.services.mcq_variation_engine import MCQVariationEngine
             mutated = MCQVariationEngine.mutate_question(

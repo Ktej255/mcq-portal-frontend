@@ -3,16 +3,18 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gsLmsService } from "@/services/api/gsLmsService";
+import type { SyllabusNodeOut } from "@/services/api/gsLmsService";
 import { triggerWelcomeEngagement } from "@/lib/engagement/triggerWelcome";
+import { useSubjectLms } from "./SubjectLmsContext";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { activeAuthProvider } from "@/env";
+import { diagnosticStorageKey, DIAGNOSTIC_STORAGE_KEY } from "@/lib/auth/identity-storage";
 import {
   defaultStudentProfile,
   readStudentProfile,
   saveStudentProfile,
-  type StudyWindow,
+  type StudentProfile,
 } from "@/lib/upsc/studentProfile";
-import { useSubjectLms } from "./SubjectLmsContext";
-
-const DIAGNOSTIC_STORAGE_KEY = "sarit-diagnostic-plan-v1";
 
 const STEPS = [
   { label: "Welcome" },
@@ -28,11 +30,14 @@ interface StudyWindowOption {
   label: string;
 }
 
+// A full topic runs through several sittings (content, recall, practice and
+// review), so these are pacing slots rather than a promise that a topic is
+// finished inside one study window.
 const STUDY_WINDOW_OPTIONS: StudyWindowOption[] = [
-  { minutes: 60, topicsPerDay: 1, label: "1 topic/day" },
-  { minutes: 90, topicsPerDay: 2, label: "2 topics/day" },
-  { minutes: 120, topicsPerDay: 3, label: "3 topics/day" },
-  { minutes: 180, topicsPerDay: 4, label: "4 topics/day" },
+  { minutes: 60, topicsPerDay: 1, label: "1 slot/day" },
+  { minutes: 90, topicsPerDay: 2, label: "2 slots/day" },
+  { minutes: 120, topicsPerDay: 3, label: "3 slots/day" },
+  { minutes: 180, topicsPerDay: 4, label: "4 slots/day" },
 ];
 
 const LEARNER_LEVELS: {
@@ -60,82 +65,227 @@ const LEARNER_LEVELS: {
   },
 ];
 
+interface StartingLeafSummary {
+  topic: SyllabusNodeOut | null;
+  openLeaves: number;
+  lockedLeaves: number;
+  totalLeaves: number;
+}
+
+/**
+ * Pick the same starting topic the server would default to.
+ *
+ * When the paid-beta scope is active, the syllabus annotates every leaf with
+ * `beta_ready` and the backend refuses a locked first topic. The wizard must
+ * mirror that rule instead of always taking the first reviewed leaf, which can
+ * be a topic whose content or practice is still in preparation.
+ */
+function findStartingLeaf(nodes: SyllabusNodeOut[]): StartingLeafSummary {
+  const leaves: SyllabusNodeOut[] = [];
+  const collectLeaves = (currentNodes: SyllabusNodeOut[]) => {
+    for (const node of currentNodes) {
+      if (node.node_type === "LEAF_TOPIC" && node.review_status === "REVIEWED") {
+        leaves.push(node);
+      }
+      collectLeaves(node.children);
+    }
+  };
+
+  collectLeaves(nodes);
+  leaves.sort((a, b) => a.display_order - b.display_order || a.node_id - b.node_id);
+
+  const openLeaves = leaves.filter((node) => node.beta_ready === true).length;
+  const lockedLeaves = leaves.filter((node) => node.beta_ready === false).length;
+  const scopeActive = openLeaves + lockedLeaves > 0;
+  const candidates = scopeActive
+    ? leaves.filter((node) => node.beta_ready === true)
+    : leaves;
+
+  return {
+    topic: candidates[0] ?? null,
+    openLeaves,
+    lockedLeaves,
+    totalLeaves: leaves.length,
+  };
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
 export function OnboardingWizard() {
   const router = useRouter();
   const { subject, label, lmsBase } = useSubjectLms();
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [learnerLevel, setLearnerLevel] = useState<LearnerLevel>("beginner");
   const [studyWindowMinutes, setStudyWindowMinutes] = useState(90);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The first-topic lookup is keyed by the request that produced it, so a
+  // subject change or retry cannot show the previous request's topic, loading
+  // flag or error, and the effect never resets state when it starts.
+  const [firstTopicRetryKey, setFirstTopicRetryKey] = useState(0);
+  const [firstTopicOutcome, setFirstTopicOutcome] = useState<{
+    key: string;
+    summary: StartingLeafSummary | null;
+    error: string | null;
+  }>({ key: "", summary: null, error: null });
+  const firstTopicKey = `${subject}:${firstTopicRetryKey}`;
+  const firstTopicResolved = firstTopicOutcome.key === firstTopicKey;
+  const firstTopicLoading = !firstTopicResolved;
+  const firstTopic = firstTopicResolved
+    ? (firstTopicOutcome.summary?.topic ?? null)
+    : null;
+  const firstTopicScope = firstTopicResolved
+    ? firstTopicOutcome.summary
+    : null;
+  const firstTopicError = firstTopicResolved ? firstTopicOutcome.error : null;
   const [diagnosticName, setDiagnosticName] = useState<string | null>(null);
   const [diagnosticEmail, setDiagnosticEmail] = useState<string | null>(null);
 
-  // Pre-fill from diagnostic data if available
+  // Pre-fill only from a diagnostic plan bound to this authenticated identity.
+  // The legacy unscoped plan is accepted once only when its captured email matches
+  // the current account, then migrated to the identity-scoped key.
   useEffect(() => {
+    const identityEmail = user?.email?.trim().toLowerCase();
+    const identityKey = user?.uid
+      ? diagnosticStorageKey(activeAuthProvider, user.uid)
+      : null;
+    if (!identityEmail || !identityKey) return;
+
     try {
-      const raw = localStorage.getItem(DIAGNOSTIC_STORAGE_KEY);
+      const scopedRaw = localStorage.getItem(identityKey);
+      const legacyRaw = scopedRaw ? null : localStorage.getItem(DIAGNOSTIC_STORAGE_KEY);
+      const raw = scopedRaw ?? legacyRaw;
       if (!raw) return;
-      const diagnostic = JSON.parse(raw);
 
-      // Map diagnostic stage to learner level
-      const stageMap: Record<string, LearnerLevel> = {
-        "Fresh start — beginning from scratch": "beginner",
-        "Self-study (6+ months in)": "intermediate",
-        "Coaching student (online/offline)": "intermediate",
-        "Repeat attempt (appeared before)": "advanced",
+      const diagnostic = JSON.parse(raw) as {
+        email?: string;
+        stage?: string;
+        hours?: string;
+        name?: string;
       };
-      if (diagnostic.stage && stageMap[diagnostic.stage]) {
-        setLearnerLevel(stageMap[diagnostic.stage]);
+      const diagnosticEmail = typeof diagnostic.email === "string"
+        ? diagnostic.email.trim().toLowerCase()
+        : "";
+      if (!diagnosticEmail || diagnosticEmail !== identityEmail) return;
+
+      if (!scopedRaw && legacyRaw) {
+        localStorage.setItem(identityKey, legacyRaw);
+        localStorage.removeItem(DIAGNOSTIC_STORAGE_KEY);
       }
 
-      // Map hours to study window
-      const hoursMap: Record<string, number> = {
-        "2–3 hours": 60,
-        "4–5 hours": 90,
-        "6–8 hours": 120,
-        "8+ hours": 180,
-      };
-      if (diagnostic.hours && hoursMap[diagnostic.hours]) {
-        setStudyWindowMinutes(hoursMap[diagnostic.hours]);
-      }
+      queueMicrotask(() => {
+        // Map diagnostic stage to learner level
+        const stageMap: Record<string, LearnerLevel> = {
+          "Fresh start — beginning from scratch": "beginner",
+          "Self-study (6+ months in)": "intermediate",
+          "Coaching student (online/offline)": "intermediate",
+          "Repeat attempt (appeared before)": "advanced",
+        };
+        if (diagnostic.stage && stageMap[diagnostic.stage]) {
+          setLearnerLevel(stageMap[diagnostic.stage]);
+        }
 
-      // Store name/email for engagement trigger
-      if (diagnostic.name) setDiagnosticName(diagnostic.name);
-      if (diagnostic.email) setDiagnosticEmail(diagnostic.email);
+        // Map hours to study window
+        const hoursMap: Record<string, number> = {
+          "2–3 hours": 60,
+          "4–5 hours": 90,
+          "6–8 hours": 120,
+          "8+ hours": 180,
+        };
+        if (diagnostic.hours && hoursMap[diagnostic.hours]) {
+          setStudyWindowMinutes(hoursMap[diagnostic.hours]);
+        }
 
-      // Skip Step 1 (Welcome) if diagnostic was completed — they already know the method
-      setStep(1);
+        // Store name/email for engagement trigger
+        if (diagnostic.name) setDiagnosticName(diagnostic.name);
+        if (diagnostic.email) setDiagnosticEmail(diagnostic.email);
+
+        // Skip Step 1 (Welcome) if diagnostic was completed — they already know the method
+        setStep(1);
+      });
     } catch {
-      // No diagnostic data — start from Step 0
+      // No identity-matching diagnostic data — start from Step 0.
     }
-  }, []);
+  }, [user?.email, user?.uid]);
 
   // Derive bandwidth from study window
   const bandwidth =
     STUDY_WINDOW_OPTIONS.find((o) => o.minutes === studyWindowMinutes)
       ?.topicsPerDay ?? 2;
+  const firstTopicId = firstTopic?.node_id;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    gsLmsService
+      .getSyllabusTree(subject)
+      .then((data) => {
+        if (!cancelled) {
+          setFirstTopicOutcome({
+            key: firstTopicKey,
+            summary: findStartingLeaf(data.tree),
+            error: null,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFirstTopicOutcome({
+            key: firstTopicKey,
+            summary: null,
+            error: "Failed to load the first topic for this subject",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subject, firstTopicKey]);
+
+  const retryFirstTopic = () => {
+    setFirstTopicRetryKey((key) => key + 1);
+  };
 
   const handleGetStarted = async () => {
+    if (firstTopicId == null) {
+      setError(
+        firstTopicScope && firstTopicScope.lockedLeaves > 0
+          ? "No topic is open in the beta yet. Topics unlock as their content, PYQ and practice pass review."
+          : "The first topic for this subject is not available yet",
+      );
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
       await gsLmsService.completeOnboarding(
         subject,
         bandwidth,
-        undefined,
+        firstTopicId,
         learnerLevel,
-        studyWindowMinutes,
+        studyWindowMinutes
       );
 
-      // Setup also counts as the student's self-study profile, so the profile
-      // gate lets them into the rest of UPSC Command afterwards.
-      saveStudentProfile({
-        ...(readStudentProfile() ?? defaultStudentProfile),
-        level: learnerLevel,
-        studyWindow: String(studyWindowMinutes) as StudyWindow,
-        updatedAt: new Date().toISOString(),
-      });
+      // The dashboard's profile gate asks for the same level and study window
+      // later. Seed the canonical profile from this wizard so a learner answers
+      // once, and never overwrite a profile configured on the dashboard.
+      try {
+        if (!readStudentProfile()) {
+          saveStudentProfile({
+            ...defaultStudentProfile,
+            level: learnerLevel,
+            studyWindow: String(studyWindowMinutes) as StudentProfile["studyWindow"],
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch {
+        // Seeding is a convenience; onboarding must complete even without it.
+      }
 
       // Fire welcome engagement (email + WhatsApp) — fire and forget
       if (diagnosticName || diagnosticEmail) {
@@ -200,11 +350,28 @@ export function OnboardingWizard() {
             learnerLevel={learnerLevel}
             studyWindowMinutes={studyWindowMinutes}
             label={label}
-            subject={subject}
+            firstTopic={firstTopic}
+            firstTopicScope={firstTopicScope}
+            firstTopicLoading={firstTopicLoading}
           />
         )}
 
-        {/* Error */}
+        {firstTopicError && step === 2 && (
+          <div
+            role="alert"
+            className="mt-4 flex items-center justify-center gap-3 text-sm text-red-600"
+          >
+            <span>{firstTopicError}</span>
+            <button
+              type="button"
+              onClick={retryFirstTopic}
+              disabled={firstTopicLoading}
+              className="font-semibold underline hover:no-underline disabled:opacity-60"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {error && (
           <p className="mt-4 text-sm text-red-600 text-center">{error}</p>
         )}
@@ -229,7 +396,7 @@ export function OnboardingWizard() {
           ) : (
             <button
               onClick={handleGetStarted}
-              disabled={submitting}
+              disabled={submitting || firstTopicLoading || firstTopic === null}
               className="px-5 py-2 text-sm font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50"
             >
               {submitting ? "Starting…" : "Get Started"}
@@ -261,8 +428,8 @@ function StepWelcome({ label }: { label: string }) {
             1
           </span>
           <span>
-            <strong>AI Discussion</strong> — Engage with an AI tutor to recall
-            what you already know
+            <strong>Optional knowledge check</strong> — A short AI discussion
+            that adds recall evidence; it never locks content
           </span>
         </li>
         <li className="flex items-start gap-2">
@@ -407,22 +574,30 @@ function StepConfirmation({
   learnerLevel,
   studyWindowMinutes,
   label,
-  subject,
+  firstTopic,
+  firstTopicScope,
+  firstTopicLoading,
 }: {
   bandwidth: number;
   learnerLevel: LearnerLevel;
   studyWindowMinutes: number;
   label: string;
-  subject: string;
+  firstTopic: SyllabusNodeOut | null;
+  firstTopicScope: StartingLeafSummary | null;
+  firstTopicLoading: boolean;
 }) {
   const levelLabel =
     LEARNER_LEVELS.find((l) => l.value === learnerLevel)?.title ?? "Beginner";
 
-  const firstTopic = subject === "geography"
-    ? "Physical Geography — Geomorphology"
-    : subject === "csat"
-    ? "Quantitative Aptitude — Number System"
-    : "Introduction & Fundamentals";
+  const firstTopicTitle =
+    firstTopic?.title ?? (firstTopicLoading ? "Loading…" : "Unavailable");
+  const evidence = firstTopic
+    ? `${plural(firstTopic.prelims_pyq_count, "Prelims PYQ")} + ${plural(
+        firstTopic.mains_pyq_count,
+        "Mains PYQ",
+      )} mapped · ${plural(firstTopic.mcq_count, "practice question")} ready`
+    : null;
+  const betaScoped = (firstTopicScope?.lockedLeaves ?? 0) > 0;
 
   return (
     <div className="text-center space-y-4">
@@ -430,20 +605,39 @@ function StepConfirmation({
         You&apos;re All Set!
       </h2>
       <p className="text-sm text-[#13251d]/70 leading-relaxed">
-        Your daily target is set to{" "}
+        Your daily planner will open{" "}
         <span className="font-semibold text-[#1d9e75]">{bandwidth}</span>{" "}
-        {bandwidth === 1 ? "topic" : "topics"} per day ({studyWindowMinutes}{" "}
-        min). The syllabus will guide you through {label} starting from
-        fundamental concepts.
+        {bandwidth === 1 ? "topic slot" : "topic slots"} per day (
+        {studyWindowMinutes} min). A topic usually spans more than one sitting,
+        so these slots set your pace; the funnel records what you actually
+        finish. The syllabus guides you through {label} from fundamental
+        concepts.
       </p>
-      <div className="mt-4 p-4 rounded-xl border border-[#1d9e75]/20 bg-[#1d9e75]/5 space-y-2">
-        <p className="text-sm font-medium text-[#1a3a2a]">
-          Level: {levelLabel}
-        </p>
-        <p className="text-sm font-medium text-[#1a3a2a]">
-          First topic: {firstTopic}
-        </p>
-        <p className="text-xs text-[#13251d]/50 mt-1">
+      <div className="mt-4 rounded-xl border border-[#1d9e75]/20 bg-[#1d9e75]/5 p-4 text-left space-y-3">
+        <div>
+          <p className="text-sm font-medium text-[#1a3a2a]">
+            Level: {levelLabel}
+          </p>
+          <p className="mt-1 text-sm font-medium text-[#1a3a2a]">
+            First topic: {firstTopicTitle}
+          </p>
+          {firstTopic && (
+            <p className="mt-1 text-xs leading-relaxed text-[#13251d]/60">
+              Chosen because it is the first open topic in syllabus order.
+              {evidence ? ` ${evidence}.` : ""}
+            </p>
+          )}
+        </div>
+        {betaScoped && firstTopicScope && (
+          <p className="border-t border-[#1d9e75]/15 pt-2 text-xs leading-relaxed text-[#13251d]/60">
+            <span className="font-semibold text-[#085041]">Beta scope:</span>{" "}
+            {firstTopicScope.openLeaves} of {firstTopicScope.totalLeaves}{" "}
+            {label} topics are open now. The other{" "}
+            {firstTopicScope.lockedLeaves} stay visible on the map and unlock as
+            their content, PYQ and practice pass review.
+          </p>
+        )}
+        <p className="text-xs text-[#13251d]/50">
           Click &quot;Get Started&quot; to begin your journey
         </p>
       </div>

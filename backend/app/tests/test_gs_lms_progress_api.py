@@ -68,6 +68,9 @@ REQUIRED_TABLES = [
     "gs_lms_practice_attempts",
     "gs_lms_gap_snapshots",
     "gs_lms_revisit_schedule",
+    "gs_lms_onboarding",
+    "gs_lms_discussion_sessions",
+    "gs_lms_discussion_turns",
 ]
 
 

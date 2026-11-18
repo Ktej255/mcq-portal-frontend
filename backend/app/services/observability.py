@@ -128,7 +128,12 @@ class ObservabilityService:
                 "narrative_stability": memory_metrics.get("narrative_stability", 0),
             },
             "educational_orchestration": {
+                "eligible_user_count": orchestration_metrics.get("eligible_user_count", 0),
                 "orchestrated_user_count": orchestration_metrics.get("orchestrated_user_count", 0),
+                "orchestration_failure_count": orchestration_metrics.get("orchestration_failure_count", 0),
+                "orchestration_failure_rate": orchestration_metrics.get("orchestration_failure_rate", 0),
+                "orchestration_status": orchestration_metrics.get("orchestration_status", "UNKNOWN"),
+                "orchestration_failure_types": orchestration_metrics.get("orchestration_failure_types", {}),
                 "arbitration_conflict_count": orchestration_metrics.get("arbitration_conflict_count", 0),
                 "blocked_unsafe_adaptation_count": orchestration_metrics.get("blocked_unsafe_adaptation_count", 0),
                 "human_review_escalation_rate": orchestration_metrics.get("human_review_escalation_rate", 0),

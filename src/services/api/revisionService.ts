@@ -6,9 +6,10 @@ export interface RevisionItem {
   reason: string;
   priority: number;
   question_id?: number;
-  category: string;
-  text_en?: string;
+  review_count?: number;
   mastery?: number;
+  category?: string;
+  text_en?: string;
 }
 
 export interface HistoryItem {
@@ -38,7 +39,10 @@ export const revisionService = {
   },
 
   completeRevision: async (itemId: number, masteryDelta: number) => {
-    const response = await api.post(`/revision/${itemId}/complete`, { mastery_delta: masteryDelta });
+    // FastAPI declares mastery_delta as a scalar query parameter, not a JSON body.
+    const response = await api.post(`/revision/${itemId}/complete`, undefined, {
+      params: { mastery_delta: masteryDelta },
+    });
     return response.data;
   },
 

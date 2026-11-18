@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   gsAnswerService,
+  GsEvaluationProviderUnavailableError,
   type AnswerEvalStatus,
   type EvaluationReportOut,
   type GsPaper,
@@ -38,7 +39,6 @@ export function AnswerWorkspace({
   gsPaper,
   year,
   maxMarks,
-  canOverride = false,
 }: AnswerWorkspaceProps) {
   const [mode, setMode] = useState<"type" | "upload">("type");
   const [text, setText] = useState("");
@@ -70,7 +70,7 @@ export function AnswerWorkspace({
           if (["completed", "degraded", "failed", "review_required"].includes(s.status)) {
             stopPolling();
           }
-        } catch (e) {
+        } catch {
           setError("Could not fetch evaluation status.");
           stopPolling();
         }
@@ -104,8 +104,12 @@ export function AnswerWorkspace({
       } else {
         beginPolling(ack.attempt_id);
       }
-    } catch (e) {
-      setError("Submission failed. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof GsEvaluationProviderUnavailableError
+          ? error.message
+          : "Submission failed. Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -140,8 +144,12 @@ export function AnswerWorkspace({
         return;
       }
       beginPolling(id);
-    } catch (e) {
-      setError("Upload/submission failed. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof GsEvaluationProviderUnavailableError
+          ? error.message
+          : "Upload/submission failed. Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -223,7 +231,7 @@ export function AnswerWorkspace({
       {status === "review_required" ? (
         <div className="mt-4 rounded-xl border border-[#f0d59a] bg-[#fff7e8] p-4">
           <p className="text-sm font-semibold text-[#7a5a12]">
-            We weren't fully confident reading your handwriting. Please review the extracted text,
+            We weren&apos;t fully confident reading your handwriting. Please review the extracted text,
             then confirm to evaluate.
           </p>
           <button
@@ -237,9 +245,18 @@ export function AnswerWorkspace({
 
       {/* Status */}
       {status && !report && status !== "review_required" ? (
-        <p className="mt-4 text-sm font-medium text-[#5d675f]">
-          Evaluation status: {status.replace("_", " ")}…
-        </p>
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-sm font-medium ${
+            status === "failed"
+              ? "border-[#e8b4b4] bg-[#fff1f1] text-[#8f2733]"
+              : "border-[#dcd5c7] bg-white text-[#5d675f]"
+          }`}
+          role={status === "failed" ? "alert" : "status"}
+        >
+          {status === "failed"
+            ? "Evaluation failed; no report was produced. Please submit the answer again."
+            : `Evaluation status: ${status.replace("_", " ")}…`}
+        </div>
       ) : null}
 
       {/* Report */}

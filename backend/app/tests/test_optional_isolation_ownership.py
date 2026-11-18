@@ -47,6 +47,8 @@ _ALLOWED_APP_PREFIXES = (
     "app.core.evaluation",
     "app.core.inference",
     "app.core.observability",
+    "app.core.config",
+    "app.core.payments",
     "app.db",
     "app.models",
     "app.schemas",

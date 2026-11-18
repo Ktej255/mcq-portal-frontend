@@ -25,8 +25,10 @@ export function PdfDownloadButton({ nodeId, topicCompleted, topicTitle }: PdfDow
       const blob = await gsLmsService.getTopicPdf(subject, nodeId);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
+      const contentType = blob.type.split(";", 1)[0].trim().toLowerCase();
+      const extension = contentType === "text/html" ? ".html" : ".pdf";
       anchor.href = url;
-      anchor.download = `${topicTitle.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_")}.pdf`;
+      anchor.download = `${topicTitle.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_")}${extension}`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);

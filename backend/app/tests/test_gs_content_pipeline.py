@@ -64,7 +64,7 @@ def test_geography_content_is_importable():
     data = json.loads(DEFAULT_ARTIFACT_PATH.read_text(encoding="utf-8"))
     report = check_subject_content(data)
     assert report.ok_to_import, format_report(report)
-    assert report.topics == 63
+    assert report.topics == 69
 
 
 def test_checker_reports_malformed_content_as_errors():

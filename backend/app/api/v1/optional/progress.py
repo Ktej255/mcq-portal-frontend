@@ -16,7 +16,9 @@ Routes:
 * ``POST /{slug}/progress/events``
     Record a tracked-activity event (read completion / practice pass / recall
     threshold) against a syllabus node (R12.2), then return the freshly
-    recomputed coverage so the UI updates in one round-trip. The rolled-up
+    recomputed coverage so the UI updates in one round-trip. Repeated qualifying
+    events for the same student, subject, node, and event type are bounded,
+    application-level no-ops (not concurrency-safe idempotency); the rolled-up
     ``Coverage`` cache row is upserted opportunistically.
 
 Ownership (design Property 10 / R15.4): events are created for, and coverage is
@@ -29,6 +31,7 @@ references GS Geography (``/upsc/geography``) modules.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -46,6 +49,7 @@ from app.core.optional.student_models import (
     Coverage,
 )
 from app.core.optional.coverage import (
+    CoverageIntegrityError,
     CoverageMath,
     compute_subject_coverage,
     compute_paper_coverage,
@@ -59,6 +63,19 @@ from app.api.v1.optional.schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _coverage_integrity_http() -> HTTPException:
+    """Return the sanitized retryable response for malformed authored data."""
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "COVERAGE_INTEGRITY_ERROR",
+            "message": "Coverage data is temporarily unavailable. Please retry.",
+            "retryable": True,
+        },
+    )
 
 
 def _get_subject_or_404(db: Session, slug: str) -> OptionalSubject:
@@ -142,7 +159,14 @@ def get_progress(
 ) -> Any:
     """Return the student's weighted coverage for the subject (R12.3/R12.4)."""
     subject = _get_subject_or_404(db, slug)
-    panel = _build_gap_panel(db, subject, current_user.id)
+    try:
+        panel = _build_gap_panel(db, subject, current_user.id)
+    except CoverageIntegrityError as exc:
+        logger.warning(
+            "Optional coverage data integrity failure error_type=%s",
+            type(exc).__name__,
+        )
+        raise _coverage_integrity_http() from exc
 
     # Refresh the cache opportunistically (best-effort; never blocks the read).
     overall = CoverageMath(
@@ -172,7 +196,13 @@ def record_progress_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Record a tracked-activity event and return updated coverage (R12.2)."""
+    """Record a tracked-activity event and return updated coverage (R12.2).
+
+    Duplicate detection is deliberately bounded to this application-level
+    request path: an existing qualifying event for the same student, subject,
+    syllabus node, and event type makes this request a no-op. It is not a
+    database constraint and is not concurrency-safe idempotency.
+    """
     subject = _get_subject_or_404(db, slug)
 
     event_type = (payload.event_type or "").strip().upper()
@@ -189,18 +219,46 @@ def record_progress_event(
             detail=f"Syllabus node {payload.syllabus_node_id} does not belong to subject '{slug}'",
         )
 
-    event = ProgressEvent(
-        student_id=current_user.id,
-        subject_id=subject.id,
-        syllabus_node_id=payload.syllabus_node_id,
-        event_type=ProgressEventTypeEnum(event_type),
-        value=payload.value,
-        event_metadata=payload.metadata,
+    # Candidate 2: bounded application-level deduplication. Do not compare
+    # value/metadata: the first event remains authoritative, while a repeated
+    # qualifying event for this owner/node/type is an application-level no-op.
+    duplicate = (
+        db.query(ProgressEvent.id)
+        .filter(
+            ProgressEvent.student_id == current_user.id,
+            ProgressEvent.subject_id == subject.id,
+            ProgressEvent.syllabus_node_id == payload.syllabus_node_id,
+            ProgressEvent.event_type == ProgressEventTypeEnum(event_type),
+        )
+        .first()
+        is not None
     )
-    db.add(event)
-    db.flush()
 
-    panel = _build_gap_panel(db, subject, current_user.id)
+    if not duplicate:
+        event = ProgressEvent(
+            student_id=current_user.id,
+            subject_id=subject.id,
+            syllabus_node_id=payload.syllabus_node_id,
+            event_type=ProgressEventTypeEnum(event_type),
+            value=payload.value,
+            event_metadata=payload.metadata,
+        )
+        db.add(event)
+        db.flush()
+
+    try:
+        panel = _build_gap_panel(db, subject, current_user.id)
+    except CoverageIntegrityError as exc:
+        # Roll back both newly inserted events and any pending cache work. The
+        # duplicate path also rolls back so malformed authored weights have the
+        # same POST failure semantics regardless of whether an insert was needed.
+        db.rollback()
+        logger.warning(
+            "Optional coverage data integrity failure error_type=%s",
+            type(exc).__name__,
+        )
+        raise _coverage_integrity_http() from exc
+
     overall = CoverageMath(
         total_weight=0.0,
         covered_weight=0.0,
@@ -216,6 +274,10 @@ def record_progress_event(
 
     return StandardResponse(
         success=True,
-        message="Progress event recorded",
+        message=(
+            "Progress event already recorded; no-op (coverage recomputed)"
+            if duplicate
+            else "Progress event recorded"
+        ),
         data=panel,
     )

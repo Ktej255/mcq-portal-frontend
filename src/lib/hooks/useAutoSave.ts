@@ -17,10 +17,17 @@ export const useAutoSave = (attemptId: string | null, disabled = false) => {
   const wasOffline = useRef(false);
 
   const syncToBackendRef = useRef<(isRetry?: boolean) => Promise<void>>(() => Promise.resolve());
+  const clearScheduledSave = useCallback(() => {
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+    }
+  }, []);
 
   const syncToBackend = useCallback(async (isRetry = false) => {
     if (!attemptId || disabled) return;
 
+    clearScheduledSave();
     const payload = Object.values(answers).filter(answer => {
       if (answer.status === 'NOT_VISITED') return false;
       if (answer.lastAction === 'VISITED') return false;
@@ -64,11 +71,15 @@ export const useAutoSave = (attemptId: string | null, disabled = false) => {
       if (retryCount.current < 3) {
         retryCount.current += 1;
         setSaveError(`Sync failed. Retrying... (${retryCount.current}/3)`);
-        saveTimeout.current = setTimeout(() => syncToBackendRef.current(true), 5000); // Retry after 5s
+        clearScheduledSave();
+        saveTimeout.current = setTimeout(() => {
+          saveTimeout.current = null;
+          void syncToBackendRef.current(true);
+        }, 5000); // Retry after 5s
       } else {
-        setSaveError('Offline. Answers saved locally.');
+        setSaveError('Offline. Server sync is pending.');
         if (!wasOffline.current) {
-          toast.error('Network disconnected. Your answers are saved locally and will sync when reconnected.', { duration: 5000 });
+          toast.error('Network disconnected. Server sync is pending and will retry when connection returns.', { duration: 5000 });
           wasOffline.current = true;
         }
       }
@@ -77,35 +88,51 @@ export const useAutoSave = (attemptId: string | null, disabled = false) => {
       setIsSaving(false);
       if (queued.current) {
         queued.current = false;
-        syncToBackendRef.current(false);
+        void syncToBackendRef.current(false);
       }
     }
-  }, [answers, attemptId, disabled]);
+  }, [answers, attemptId, clearScheduledSave, disabled]);
 
   useEffect(() => {
     syncToBackendRef.current = syncToBackend;
   }, [syncToBackend]);
 
   useEffect(() => {
-    if (disabled) {
-      if (saveTimeout.current) {
-        clearTimeout(saveTimeout.current);
+    if (disabled || !attemptId) return;
+
+    const handleOnline = () => {
+      retryCount.current = 0;
+      clearScheduledSave();
+      if (inFlight.current) {
+        queued.current = true;
+        return;
       }
+      void syncToBackendRef.current(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [attemptId, clearScheduledSave, disabled]);
+
+  useEffect(() => {
+    if (disabled) {
+      clearScheduledSave();
       return;
     }
     if (!attemptId || Object.keys(answers).length === 0) return;
 
-    if (saveTimeout.current) {
-      clearTimeout(saveTimeout.current);
-    }
+    // A changed answer is a fresh sync opportunity after an exhausted retry budget.
+    retryCount.current = 0;
+    clearScheduledSave();
 
     // Debounce the save attempt by 2 seconds
-    saveTimeout.current = setTimeout(() => syncToBackend(false), 2000);
+    saveTimeout.current = setTimeout(() => {
+      saveTimeout.current = null;
+      void syncToBackendRef.current(false);
+    }, 2000);
 
-    return () => {
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    };
-  }, [answers, attemptId, disabled, syncToBackend]);
+    return clearScheduledSave;
+  }, [answers, attemptId, clearScheduledSave, disabled]);
 
   return { isSaving, lastSaved, saveError };
 };

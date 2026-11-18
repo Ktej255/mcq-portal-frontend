@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { DiscussionTurnOut, DiscussionSessionOut } from "@/services/api/gsLmsService";
-import { gsLmsService } from "@/services/api/gsLmsService";
+import type { DiscussionTurnOut } from "@/services/api/gsLmsService";
+import {
+  DiscussionProviderUnavailableError,
+  gsLmsService,
+} from "@/services/api/gsLmsService";
+import { DiscussionThread } from "./DiscussionThread";
 import { useSubjectLms } from "./SubjectLmsContext";
 
 // ---------------------------------------------------------------------------
@@ -19,6 +23,8 @@ interface DiscussionOverlayProps {
   nodeId: number;
   topicTitle: string;
   onComplete: () => void;
+  /** Optional dismiss control. Discussion is a voluntary check, not a gate. */
+  onClose?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,8 +206,9 @@ function WelcomeScreen({
       <h1 className="text-2xl font-bold text-slate-800 mb-2">Knowledge Check</h1>
       <p className="text-slate-500 text-sm mb-1 font-medium">{topicTitle}</p>
       <p className="text-slate-400 text-sm mb-8 max-w-sm leading-relaxed">
-        Before we begin, tell us what you already know about this topic. Speak or type — our AI
-        will guide you through a short discussion.
+        Tell us what you already know about this topic. Our AI will guide you through a short
+        discussion. This is optional: it feeds recall evidence into your readiness report and
+        can unlock skip allowances, but it never locks content.
       </p>
 
       <form onSubmit={handleSubmit} className="w-full max-w-lg space-y-3">
@@ -237,7 +244,7 @@ function WelcomeScreen({
 }
 
 // ---------------------------------------------------------------------------
-// Active Discussion Screen (Phase 1 — turns exist, gate not passed)
+// Active Discussion Screen (Phase 1 — turns exist, not yet complete)
 // ---------------------------------------------------------------------------
 
 function ActiveDiscussionScreen({
@@ -245,7 +252,6 @@ function ActiveDiscussionScreen({
   input,
   setInput,
   onSubmit,
-  onForceComplete,
   sending,
   listening,
   micSupported,
@@ -255,7 +261,6 @@ function ActiveDiscussionScreen({
   input: string;
   setInput: (v: string) => void;
   onSubmit: (text: string) => void;
-  onForceComplete: () => void;
   sending: boolean;
   listening: boolean;
   micSupported: boolean;
@@ -266,129 +271,63 @@ function ActiveDiscussionScreen({
     if (input.trim()) onSubmit(input.trim());
   };
 
-  // Get last AI question and last student answer (if any)
-  const lastAiTurn = [...turns].reverse().find((t) => t.role === "ai");
-  const lastStudentTurn = [...turns].reverse().find((t) => t.role === "student");
-
-  // Detect if the AI's last message is a gate-pass message
-  const lastAiText = (lastAiTurn?.content ?? "").toLowerCase();
-  const isGatePassMessage =
-    lastAiText.includes("proceed to the content") ||
-    lastAiText.includes("let's proceed") ||
-    lastAiText.includes("lets proceed") ||
-    lastAiText.includes("demonstrated a solid") ||
-    lastAiText.includes("you've unlocked") ||
-    lastAiText.includes("you have unlocked");
-
-  // Show escape-hatch link after 2+ rounds
-  const canEscape = turns.length >= 4; // 2 student + 2 AI turns
-
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4">
-        {/* Previous student answer (soft recap) */}
-        {lastStudentTurn && (
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Your last answer
-            </p>
-            <p className="text-sm text-slate-500 leading-relaxed line-clamp-3">
-              {lastStudentTurn.content}
-            </p>
-          </div>
-        )}
-
-        {/* Current AI question — prominent */}
-        {lastAiTurn && (
-          <div
-            className={`rounded-3xl px-5 py-5 shadow-md ${
-              isGatePassMessage
-                ? "bg-emerald-600 shadow-emerald-100"
-                : "bg-emerald-600 shadow-emerald-100"
-            }`}
-          >
-            <p className="text-[11px] font-bold text-emerald-200 uppercase tracking-widest mb-2">
-              {isGatePassMessage ? "✓ Gate Passed" : "AI Tutor asks"}
-            </p>
-            <p className="text-white text-base leading-relaxed font-medium">
-              {lastAiTurn.content}
-            </p>
-          </div>
-        )}
+      {/* Scrollable discussion thread */}
+      <div className="flex-1 overflow-y-auto">
+        <DiscussionThread turns={turns} />
       </div>
 
-      {/* Bottom area — Proceed button if gate text detected, else input form */}
-      {isGatePassMessage ? (
-        <div className="border-t border-emerald-100 bg-emerald-50 px-4 py-5 flex flex-col items-center gap-3">
-          <p className="text-sm font-semibold text-emerald-800">🎉 You&apos;ve unlocked this topic!</p>
-          <button
-            onClick={onForceComplete}
-            className="w-full max-w-sm py-3.5 px-6 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-2xl transition-all shadow-lg shadow-emerald-200"
-          >
-            Proceed to Content →
-          </button>
-        </div>
-      ) : (
-        <div className="border-t border-slate-100 bg-white px-4 py-4">
-          <form onSubmit={handleSubmit} className="space-y-2.5">
-            <div className="relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your response or tap the mic…"
-                rows={3}
-                disabled={sending}
-                className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (input.trim() && !sending) onSubmit(input.trim());
-                  }
-                }}
-              />
-              {listening && (
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 text-red-500 text-xs font-semibold animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                  Listening…
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <MicButton listening={listening} supported={micSupported} onToggle={onToggleMic} />
-              <button
-                type="submit"
-                disabled={!input.trim() || sending}
-                className="flex-1 py-2.5 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all active:scale-[0.98]"
-              >
-                {sending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Analysing…
-                  </span>
-                ) : (
-                  "Submit Answer →"
-                )}
-              </button>
-            </div>
-          </form>
-          {/* Escape hatch after sufficient discussion */}
-          {canEscape && (
+      {/* Only backend-authoritative completion can leave this input form. */}
+      <div className="border-t border-slate-100 bg-white px-4 py-4">
+        <form onSubmit={handleSubmit} className="space-y-2.5">
+          <div className="relative">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your response or tap the mic…"
+              rows={3}
+              disabled={sending}
+              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (input.trim() && !sending) onSubmit(input.trim());
+                }
+              }}
+            />
+            {listening && (
+              <div className="absolute top-3 right-3 flex items-center gap-1.5 text-red-500 text-xs font-semibold animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                Listening…
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <MicButton listening={listening} supported={micSupported} onToggle={onToggleMic} />
             <button
-              onClick={onForceComplete}
-              className="w-full mt-2 text-xs text-slate-400 hover:text-emerald-600 transition-colors py-1"
+              type="submit"
+              disabled={!input.trim() || sending}
+              className="flex-1 py-2.5 px-5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all active:scale-[0.98]"
             >
-              I&apos;ve understood the topic — skip ahead →
+              {sending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Analysing…
+                </span>
+              ) : (
+                "Submit Answer →"
+              )}
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Completion / Report Screen (Phase 2 — gate passed)
+// Completion / Report Screen (Phase 2 — session completed)
 // ---------------------------------------------------------------------------
 
 function CompletionScreen({
@@ -400,44 +339,48 @@ function CompletionScreen({
 }) {
   const matched = progress?.conceptsMatched ?? [];
   const missed = progress?.conceptsMissed ?? [];
-  const pct = progress ? Math.round(progress.matchPercentage) : 100;
+  // Never invent a coverage number when the backend recorded no concept report.
+  const pct = progress ? Math.round(progress.matchPercentage) : null;
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto px-5 py-8 items-center">
-      {/* Trophy / celebration */}
+      {/* Completion mark */}
       <div className="w-20 h-20 rounded-full bg-emerald-50 border-4 border-emerald-200 flex items-center justify-center mb-4">
         <span className="text-4xl">🎉</span>
       </div>
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">Gate Unlocked!</h2>
+      <h2 className="text-2xl font-bold text-slate-800 mb-1">Knowledge check complete</h2>
       <p className="text-slate-500 text-sm mb-8">
-        Great discussion. Here&apos;s your knowledge summary:
+        {pct === null
+          ? "Your responses were recorded. No concept coverage was reported for this session."
+          : "Your recall evidence has been added to this topic's readiness record."}
       </p>
 
-      {/* Score ring + bar */}
-      <div className="w-full max-w-sm bg-white border border-slate-100 rounded-3xl shadow-sm p-5 mb-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-700">Overall Coverage</span>
-          <span
-            className={`text-sm font-bold px-3 py-1 rounded-full ${
-              pct >= 80
-                ? "bg-emerald-100 text-emerald-700"
-                : pct >= 50
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-rose-100 text-rose-600"
-            }`}
-          >
-            {pct}%
-          </span>
+      {pct !== null && (
+        <div className="w-full max-w-sm bg-white border border-slate-100 rounded-3xl shadow-sm p-5 mb-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-700">Overall Coverage</span>
+            <span
+              className={`text-sm font-bold px-3 py-1 rounded-full ${
+                pct >= 80
+                  ? "bg-emerald-100 text-emerald-700"
+                  : pct >= 50
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-rose-100 text-rose-600"
+              }`}
+            >
+              {pct}%
+            </span>
+          </div>
+          <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-400" : "bg-rose-400"
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
-        <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-1000 ease-out ${
-              pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-400" : "bg-rose-400"
-            }`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
+      )}
 
       {/* Concept breakdown */}
       {matched.length > 0 && (
@@ -481,7 +424,7 @@ function CompletionScreen({
         onClick={onProceed}
         className="w-full max-w-sm py-4 px-6 text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-2xl transition-all shadow-lg shadow-emerald-200"
       >
-        Proceed to Content →
+        Back to topic →
       </button>
     </div>
   );
@@ -491,7 +434,12 @@ function CompletionScreen({
 // Main Overlay
 // ---------------------------------------------------------------------------
 
-export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: DiscussionOverlayProps) {
+export function DiscussionOverlay({
+  nodeId,
+  topicTitle,
+  onComplete,
+  onClose,
+}: DiscussionOverlayProps) {
   const { subject } = useSubjectLms();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [turns, setTurns] = useState<DiscussionTurnOut[]>([]);
@@ -499,8 +447,17 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   const [interimInput, setInterimInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [startError, setStartError] = useState<string | null>(null);
   const [conceptProgress, setConceptProgress] = useState<ConceptProgress | null>(null);
-  // Phase: 0 = welcome (no turns), 1 = active discussion, 2 = gate passed / report
+  const [providerProvenance, setProviderProvenance] = useState<{
+    provider: string;
+    isMock: boolean;
+  } | null>(null);
+  const [providerUnavailable, setProviderUnavailable] = useState<{
+    message: string;
+    provider: string;
+  } | null>(null);
+  // Phase: 0 = welcome (no turns), 1 = active discussion, 2 = completed / report
   const [phase, setPhase] = useState<0 | 1 | 2>(0);
 
   // Voice input state
@@ -513,24 +470,34 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
   const listeningRef = useRef(false);
   // Cache the constructor so startRecognition can create new instances on restart.
   const recognitionCtorRef = useRef<(new () => DSpeechRecognition) | null>(null);
+  const startRecognitionRef = useRef<(() => void) | null>(null);
   // Accumulator for final verified speech text during this microphone session
   const finalTranscriptRef = useRef("");
 
   // Detect browser speech API support
   useEffect(() => {
     const w = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : null;
-    setMicSupported(!!(w?.SpeechRecognition || w?.webkitSpeechRecognition));
+    queueMicrotask(() => {
+      setMicSupported(!!(w?.SpeechRecognition || w?.webkitSpeechRecognition));
+    });
   }, []);
 
   // Load / resume existing session
-  useEffect(() => {
+  // `loading` starts true and every completion path clears it, so the loader
+  // itself never writes state synchronously — which is what keeps calling it
+  // from the mount effect free of cascading renders.
+  const loadSession = useCallback(() => {
     gsLmsService
       .startDiscussion(subject, nodeId)
-      .then((session: DiscussionSessionOut) => {
+      .then((session) => {
+        if ("already_completed" in session) {
+          setPhase(2);
+          return;
+        }
+
         setSessionId(session.session_id);
         setTurns(session.turns);
 
-        // BUG FIX: If session is already COMPLETED, skip straight to report
         if (session.status === "COMPLETED") {
           setPhase(2);
         } else if (session.turns.length > 0) {
@@ -539,8 +506,22 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           setPhase(0);
         }
       })
+      .catch(() => {
+        setSessionId(null);
+        setStartError("Discussion session unavailable. Please retry.");
+      })
       .finally(() => setLoading(false));
-  }, [nodeId]);
+  }, [nodeId, subject]);
+
+  const retryLoadSession = useCallback(() => {
+    setLoading(true);
+    setStartError(null);
+    loadSession();
+  }, [loadSession]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   // Start a fresh recognition instance and attach handlers.
   // Called on first start AND on every auto-restart after onend.
@@ -596,7 +577,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       setInterimInput("");
       if (listeningRef.current) {
         // Small delay prevents rapid-fire restart errors in some browsers
-        setTimeout(() => startRecognition(), 100);
+        setTimeout(() => startRecognitionRef.current?.(), 100);
       } else {
         setListening(false);
       }
@@ -606,8 +587,8 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       setInterimInput("");
       const err = (e as unknown as { error?: string }).error;
       // "no-speech" / "aborted" are normal — just restart. Surface fatal errors
-      // to the user instead of silently failing (the gate must never look
-      // "stuck recording" with no feedback).
+      // to the user instead of silently failing (the optional check must never
+      // look "stuck recording" with no feedback).
       if (err === "not-allowed" || err === "service-not-allowed") {
         listeningRef.current = false;
         setListening(false);
@@ -628,7 +609,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
         setMicError("No speech detected yet — speak clearly, or type your answer.");
       }
       if (listeningRef.current) {
-        setTimeout(() => startRecognition(), 200);
+        setTimeout(() => startRecognitionRef.current?.(), 200);
       } else {
         setListening(false);
       }
@@ -641,6 +622,15 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
       // Already started — ignore
     }
   }, []);
+
+  useEffect(() => {
+    startRecognitionRef.current = startRecognition;
+    return () => {
+      if (startRecognitionRef.current === startRecognition) {
+        startRecognitionRef.current = null;
+      }
+    };
+  }, [startRecognition]);
 
   // Toggle microphone on/off
   const toggleMic = useCallback(() => {
@@ -695,19 +685,18 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
     async (text: string) => {
       if (!text.trim() || !sessionId || sending) return;
 
-      // Stop mic if active
       listeningRef.current = false;
       recognitionRef.current?.stop();
       recognitionRef.current = null;
       setListening(false);
-
-      setInput("");
+      setProviderUnavailable(null);
       setSending(true);
-      setPhase(1); // Move to active discussion phase
 
       try {
         const response = await gsLmsService.submitDiscussionTurn(subject, sessionId, text);
+        setInput("");
         setTurns((prev) => [...prev, response.student_turn, response.ai_turn]);
+        setProviderProvenance({ provider: response.provider, isMock: response.is_mock });
 
         if (
           response.concepts_matched !== null &&
@@ -721,28 +710,26 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           });
         }
 
-        // Multi-signal gate detection:
-        // 1. Explicit gate_passed flag
-        // 2. Session status set to COMPLETED by backend
-        // 3. AI message text contains the proceed phrase (backend sometimes sends
-        //    the congratulatory message before flipping the flag)
-        const aiText = response.ai_turn.content.toLowerCase();
-        const textSignal =
-          aiText.includes("proceed to the content") ||
-          aiText.includes("let's proceed") ||
-          aiText.includes("lets proceed") ||
-          aiText.includes("you've unlocked") ||
-          aiText.includes("you have unlocked") ||
-          aiText.includes("demonstrated a solid");
-
-        if (response.gate_passed || response.status === "COMPLETED" || textSignal) {
+        if (response.gate_passed || response.status === "COMPLETED") {
           setPhase(2);
+        } else {
+          setPhase(1);
+        }
+      } catch (error) {
+        setInput(text);
+        if (error instanceof DiscussionProviderUnavailableError) {
+          setProviderUnavailable({ message: error.message, provider: error.provider });
+        } else {
+          setProviderUnavailable({
+            message: "Your response could not be submitted. Please retry.",
+            provider: "unknown",
+          });
         }
       } finally {
         setSending(false);
       }
     },
-    [sessionId, sending]
+    [sessionId, sending, subject]
   );
 
   // ---------- Render ----------
@@ -753,6 +740,46 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-slate-400">Loading your session…</p>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs font-semibold text-slate-500 underline"
+            >
+              Continue without the knowledge check
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (startError && !sessionId) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white p-6">
+        <div role="alert" className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <p className="text-sm font-semibold text-amber-900">{startError}</p>
+          <p className="mt-2 text-xs text-amber-800">
+            The knowledge check is optional. You can keep reading and try it later.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={retryLoadSession}
+              className="rounded-lg bg-amber-700 px-4 py-2 text-xs font-bold text-white"
+            >
+              Retry discussion
+            </button>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-900"
+              >
+                Back to topic
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -774,7 +801,7 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest">
-            Discussion Gate
+            Optional knowledge check
           </p>
           <h2 className="text-sm font-semibold text-slate-800 truncate">{topicTitle}</h2>
         </div>
@@ -793,10 +820,63 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
             />
           ))}
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close knowledge check"
+            className="ml-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="h-4 w-4"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* ── Progress bar (phases 1 & 2 only) ── */}
       {conceptProgress && phase !== 2 && <ProgressBar progress={conceptProgress} />}
+
+      {/* ── Actual response provider provenance ── */}
+      {providerProvenance && (
+        <div
+          className={`px-5 py-2 border-b text-xs font-semibold ${
+            providerProvenance.isMock
+              ? "bg-violet-50 border-violet-200 text-violet-800"
+              : "bg-slate-50 border-slate-100 text-slate-600"
+          }`}
+        >
+          {providerProvenance.isMock
+            ? `⚠ Deterministic mock provider: ${providerProvenance.provider}`
+            : `AI provider: ${providerProvenance.provider}`}
+        </div>
+      )}
+
+      {/* ── Retryable provider-unavailable path ── */}
+      {providerUnavailable && (
+        <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-3">
+          <span className="flex-1">
+            {providerUnavailable.message} Provider: {providerUnavailable.provider}.
+            Your answer was not recorded and the knowledge check did not advance.
+          </span>
+          <button
+            type="button"
+            disabled={sending || !input.trim()}
+            onClick={() => handleSubmit(input)}
+            className="rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white disabled:opacity-40"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* ── Mic error / guidance banner ── */}
       {micError && (
@@ -826,7 +906,6 @@ export function DiscussionOverlay({ nodeId, topicTitle, onComplete }: Discussion
           input={input + (interimInput ? (input.trim() ? " " : "") + interimInput : "")}
           setInput={setInput}
           onSubmit={handleSubmit}
-          onForceComplete={onComplete}
           sending={sending}
           listening={listening}
           micSupported={micSupported}

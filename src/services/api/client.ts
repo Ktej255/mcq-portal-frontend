@@ -8,24 +8,30 @@ declare module 'axios' {
     skipUpgradePrompt?: boolean;
   }
 }
+import { normalizeApiBaseUrl } from './base-url.mjs';
 
-const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
-// Ensure baseURL ends with /api/v1/ if it's pointing to the root domain
-let normalizedBaseUrl = rawBaseUrl;
+type ClerkUser = {
+  id?: string;
+  primaryEmailAddress?: {
+    emailAddress?: string | null;
+  } | null;
+};
 
-const isBrowser = typeof window !== 'undefined';
-if (isBrowser && rawBaseUrl.startsWith('http://mcq-portal-alb')) {
-  // Use relative path in browser to trigger next.config.ts rewrites proxy and avoid Mixed Content block
-  normalizedBaseUrl = '/api/v1/';
-} else {
-  if (normalizedBaseUrl && !normalizedBaseUrl.includes('/api/v1')) {
-    normalizedBaseUrl = normalizedBaseUrl.endsWith('/') ? `${normalizedBaseUrl}api/v1/` : `${normalizedBaseUrl}/api/v1/`;
-  } else if (!normalizedBaseUrl) {
-    normalizedBaseUrl = '/api/v1/';
-  } else if (!normalizedBaseUrl.endsWith('/')) {
-    normalizedBaseUrl = `${normalizedBaseUrl}/`;
+type ClerkInstance = {
+  user?: ClerkUser | null;
+};
+
+declare global {
+  interface Window {
+    Clerk?: ClerkInstance;
+    MCQ_DEBUG?: Record<string, unknown>;
   }
 }
+
+const rawBaseUrl = env.NEXT_PUBLIC_API_BASE_URL || '';
+const normalizedBaseUrl = normalizeApiBaseUrl(rawBaseUrl, {
+  isBrowser: typeof window !== 'undefined',
+});
 
 // Base Axios instance
 export const apiClient = axios.create({
@@ -39,7 +45,7 @@ const apiDebug = env.NEXT_PUBLIC_DEBUG_API === 'true';
 
 // Initialize debug object
 if (typeof window !== 'undefined') {
-  const debugWindow = window as Window & { MCQ_DEBUG?: Record<string, unknown> };
+  const debugWindow = window;
   debugWindow.MCQ_DEBUG = {
     lastRequest: null,
     lastResponse: null,
@@ -51,12 +57,13 @@ if (typeof window !== 'undefined') {
 }
 
 import { waitForToken, resolveToken } from '@/lib/auth/token-strategy';
+import { gsLmsAccessDenialMessage, notifyGsLmsAccessDenied } from '@/lib/gs-lms/access-events';
 
 // Add the interceptor immediately upon creation
 // Request interceptor: Attach tokens
 apiClient.interceptors.request.use(
   async (config) => {
-    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
+    const debug = typeof window !== 'undefined' ? window.MCQ_DEBUG : null;
     if (debug) {
       debug.lastRequest = {
         url: config.url,
@@ -71,7 +78,7 @@ apiClient.interceptors.request.use(
       const token = await waitForToken();
 
       if (debug) {
-        const clerkUser = typeof window !== 'undefined' ? (window as any).Clerk?.user : null;
+        const clerkUser = typeof window !== 'undefined' ? window.Clerk?.user : null;
         debug.user = clerkUser ? { uid: clerkUser.id, email: clerkUser.primaryEmailAddress?.emailAddress } : null;
         debug.authState = clerkUser ? 'SIGNED_IN' : 'SIGNED_OUT';
         debug.tokenPresent = !!token;
@@ -103,7 +110,7 @@ apiClient.interceptors.request.use(
 // Response interceptor: Log and Retry
 apiClient.interceptors.response.use(
   (response) => {
-    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
+    const debug = typeof window !== 'undefined' ? window.MCQ_DEBUG : null;
     if (debug) {
       debug.lastResponse = {
         status: response.status,
@@ -115,7 +122,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const debug = typeof window !== 'undefined' ? (window as Window & { MCQ_DEBUG?: Record<string, unknown> }).MCQ_DEBUG : null;
+    const debug = typeof window !== 'undefined' ? window.MCQ_DEBUG : null;
     const originalRequest = error.config;
 
     if (debug) {
@@ -139,8 +146,17 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new CustomEvent(upgradeRequiredEvent, { detail: upgradeDetail }));
     }
 
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
-      if (apiDebug) console.warn(`[MCQ_DEBUG] Triggering 401/403 retry for ${originalRequest.url}`);
+    // A 403 is an authorisation verdict, never a stale-token symptom: retrying
+    // it with a refreshed token cannot succeed, so only 401 is retried. GS LMS
+    // entitlement denials are additionally surfaced to the LMS layout, which
+    // owns the deliberate "beta access not active" presentation.
+    const accessDenial = gsLmsAccessDenialMessage(error);
+    if (accessDenial) {
+      notifyGsLmsAccessDenied(accessDenial);
+    }
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (apiDebug) console.warn(`[MCQ_DEBUG] Triggering 401 retry for ${originalRequest.url}`);
       originalRequest._retry = true;
       await new Promise(resolve => setTimeout(resolve, 800));
       try {

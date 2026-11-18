@@ -173,7 +173,7 @@
 
 /* =====================================================================
    Geography Optional — "personal notes" handwritten reading aesthetic
-   Fonts are loaded via next/font in the geography-optional layout and
+   Fonts are self-hosted (see src/app/fonts.css and /public/fonts) and
    exposed as --font-hand (display) and --font-hand-body (running notes).
    ===================================================================== */
 

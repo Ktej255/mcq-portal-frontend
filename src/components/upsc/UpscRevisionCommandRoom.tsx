@@ -31,6 +31,7 @@ import { readLocalQuestionBankAttempts, type QuestionBankAttempt } from "@/lib/u
 import { subjectPlans, type SubjectSession } from "@/lib/upsc/subjectPlans";
 import type { SubjectDayProgress } from "@/lib/upsc/useSubjectProgress";
 import { cn } from "@/lib/utils";
+import { lmsHrefForRoom } from "@/lib/upsc/lmsRoomRouting";
 
 type RevisionSubject = {
   slug: string;
@@ -90,7 +91,7 @@ const revisionSubjects: RevisionSubject[] = [
     title: plan.title,
     window: plan.window,
     href: `/upsc/${plan.slug}`,
-    trackHref: `/upsc/${plan.slug}/track`,
+    trackHref: lmsHrefForRoom(plan.slug, "track"),
     sessions: plan.sessions,
   })),
 ];

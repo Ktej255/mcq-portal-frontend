@@ -48,6 +48,8 @@ export async function scanSourceArchive(rootPath: string): Promise<SourceArchive
       ok: false,
       rootPath,
       rootExists: false,
+      scanComplete: false,
+      scanErrorCount: 1,
       generatedAt: new Date().toISOString(),
       totalFiles: 0,
       totalDirectories: 0,
@@ -66,12 +68,16 @@ export async function scanSourceArchive(rootPath: string): Promise<SourceArchive
   const folderCounts = new Map<string, number>();
   let totalDirectories = 0;
   let totalBytes = 0;
+  let scanErrorCount = 0;
 
   while (stack.length && files.length < maxFilesToScan) {
     const current = stack.pop();
     if (!current) continue;
 
-    const entries = await readdir(current, { withFileTypes: true }).catch(() => []);
+    const entries = await readdir(current, { withFileTypes: true }).catch(() => {
+      scanErrorCount += 1;
+      return [];
+    });
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
@@ -81,7 +87,10 @@ export async function scanSourceArchive(rootPath: string): Promise<SourceArchive
       }
       if (!entry.isFile()) continue;
 
-      const fileStats = await stat(fullPath).catch(() => null);
+      const fileStats = await stat(fullPath).catch(() => {
+        scanErrorCount += 1;
+        return null;
+      });
       if (!fileStats?.isFile()) continue;
 
       const relativePath = toRelative(rootPath, fullPath);
@@ -124,10 +133,15 @@ export async function scanSourceArchive(rootPath: string): Promise<SourceArchive
     .sort((left, right) => Date.parse(right.lastModified) - Date.parse(left.lastModified))
     .forEach((file) => pushLimited(recentFiles, file, 12));
 
+  const scanTruncated = files.length >= maxFilesToScan;
+  const scanComplete = scanErrorCount === 0 && !scanTruncated;
+
   return {
-    ok: true,
+    ok: scanComplete,
     rootPath,
     rootExists: true,
+    scanComplete,
+    scanErrorCount,
     generatedAt: new Date().toISOString(),
     totalFiles: files.length,
     totalDirectories,

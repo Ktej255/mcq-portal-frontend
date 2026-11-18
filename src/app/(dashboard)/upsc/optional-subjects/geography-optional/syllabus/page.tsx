@@ -246,7 +246,7 @@ export default function GeographyOptionalSyllabus() {
 
         <section className="go-card mt-6 rounded-md p-4 text-center">
           <p className="go-hand text-xl text-[#2e7d4f]">
-            More topics&apos; syllabus maps unlock as each Read module is built — Climatology is next.
+            This page maps the {readyTopics.length} authored Paper I Section A topics above. Paper I Section B and Paper II are not authored yet.
           </p>
         </section>
       </div>

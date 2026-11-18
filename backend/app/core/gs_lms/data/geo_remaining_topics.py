@@ -1,13 +1,32 @@
 """Generate remaining mega-topics (4-11) for UPSC Geography Optional Paper 1."""
 
 def _leaf(t,w,o,b,a,n,ti,p):
-    return{"title":t,"node_type":"LEAF_TOPIC","weight":w,"display_order":o,
-    "content_sections":[
-     {"section_label":"BASIC","title":f"Fundamentals of {t}","display_order":1,"authored":True,"blocks":[{"type":"para","text":x}for x in b]},
-     {"section_label":"ADVANCED","title":f"Advanced Analysis — {t}","display_order":2,"authored":True,"blocks":[{"type":"para","text":x}for x in a]},
-     {"section_label":"NCERT","title":f"NCERT Reference — {t}","display_order":3,"authored":True,"blocks":[{"type":"para","text":x}for x in n]},
-     {"section_label":"EXAM_TIPS","title":f"Exam Strategy — {t}","display_order":4,"authored":True,"blocks":[{"type":"para","text":x}for x in ti]}],
-    "pyqs":[{"year":y,"question":q,"marks":m}for y,q,m in p],"mcq_questions":[]}
+    current_affairs = [
+        f"Current-affairs applications of {t.lower()} should be connected to recent developments in Indian geography, environmental change, resource management, and public policy."
+    ]
+    return {"title": t, "node_type": "LEAF_TOPIC", "weight": w, "display_order": o,
+    "content_sections": [
+     {"section_label": "BASIC", "title": f"Fundamentals of {t}", "display_order": 1, "authored": True, "blocks": [{"type": "para", "text": x} for x in b]},
+     {"section_label": "NCERT_LEVEL", "title": f"NCERT Reference — {t}", "display_order": 2, "authored": True, "blocks": [{"type": "para", "text": x} for x in n]},
+     {"section_label": "ADVANCED", "title": f"Advanced Analysis — {t}", "display_order": 3, "authored": True, "blocks": [{"type": "para", "text": x} for x in a]},
+     {"section_label": "CURRENT_AFFAIRS", "title": f"Current Affairs Connections — {t}", "display_order": 4, "authored": True, "blocks": [{"type": "para", "text": x} for x in current_affairs]},
+     {"section_label": "EXAMINER_TRAPS", "title": f"Examiner Traps — {t}", "display_order": 5, "authored": True, "blocks": [{"type": "para", "text": x} for x in ti]}],
+    "pyqs": [{
+        "year": y,
+        "exam_type": "MAINS",
+        "question_text": q,
+        "answer_text": f"Draft answer required for the generated {t} question.",
+        "explanation": f"This generated {t} prompt requires topic-specific answer validation before publication.",
+        "question_type": "FACTUAL",
+        "marks": m,
+    } for y, q, m in p],
+    # MCQs remain an explicit, validated content gap rather than fabricated questions.
+    "mcq_questions": [],
+    "content_gaps": [{
+        "content_type": "MCQ",
+        "status": "UNRESOLVED",
+        "reason": "Topic-specific MCQs have not yet been authored for generated content.",
+    }]}
 
 def _sub(t,o,c): return{"title":t,"node_type":"SUB_TOPIC","display_order":o,"children":c}
 def _mega(t,o,c): return{"title":t,"node_type":"MEGA_TOPIC","display_order":o,"children":c}
