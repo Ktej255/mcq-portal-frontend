@@ -226,7 +226,13 @@ export function PracticePage() {
                 disabled={starting === topic.node_id}
                 className="min-h-11 shrink-0 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 shadow-sm"
               >
-                {starting === topic.node_id ? "Starting…" : "Start Practice →"}
+                {starting === topic.node_id ? (
+                  "Starting…"
+                ) : (
+                  <>
+                    Start Practice <span aria-hidden="true">→</span>
+                  </>
+                )}
               </button>
             </div>
           ))}
