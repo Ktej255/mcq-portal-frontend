@@ -2061,6 +2061,8 @@ export function UpscDailyMissionControl() {
                       { label: "Readiness & Gaps", href: `/upsc/${activeSubject.slug}/lms/gaps`, gated: false },
                       { label: "Sunday Review", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
                       { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+                      // The timed mock-test lobby had no link anywhere.
+                      { label: "Timed Mock Test", href: "/simulation/lobby", gated: false },
                     ]
                 ).map((item) => {
                   const isLocked = item.gated && profile && !profile.inductionCompleted;
