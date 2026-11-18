@@ -197,9 +197,8 @@ export function UpscSyllabusPyqLibrary() {
   }, [archiveIntake]);
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
-        <section data-testid="upsc-source-library-hero" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+    <div className="flex flex-col gap-5 text-[#13251d]">
+      <section data-testid="upsc-source-library-hero" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Syllabus and PYQ source library</p>
@@ -244,7 +243,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsArchiveIntakeOpen(!isArchiveIntakeOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Internal Archive</p>
@@ -263,12 +262,12 @@ export function UpscSyllabusPyqLibrary() {
                   <button
                     type="button"
                     onClick={() => void loadArchiveIntake()}
-                    className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
+                    className="inline-flex min-h-11 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Rescan archive
                   </button>
-                  <Link href="/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue" className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-[#1d9e75] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#126245]">
+                  <Link href="/upsc/prelims-2027-strategy#prelims-2026-question-proof-queue" className="inline-flex min-h-11 items-center rounded-md border border-[#1d9e75] bg-[#1d9e75] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#126245]">
                     Open proof queue <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </div>
@@ -444,7 +443,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsPreloadProofOpen(!isPreloadProofOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#085041]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#085041]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em]">Audit Proof</p>
@@ -485,7 +484,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsReadinessMatrixOpen(!isReadinessMatrixOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Readiness Matrix</p>
@@ -582,7 +581,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsPaperIndexOpen(!isPaperIndexOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Paper Index</p>
@@ -646,7 +645,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsPriorityQueueOpen(!isPriorityQueueOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1d9e75]">Extraction Queue</p>
@@ -720,7 +719,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsReadinessGateOpen(!isReadinessGateOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ef9f27]">Student Gate</p>
@@ -739,7 +738,7 @@ export function UpscSyllabusPyqLibrary() {
                   </p>
                   <Link
                     href="/admin/pyq-import"
-                    className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
+                    className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
                   >
                     Open exact import room <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -892,7 +891,7 @@ export function UpscSyllabusPyqLibrary() {
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d9e75]">GS source pack</p>
                     <h2 className="mt-1 text-xl font-black tracking-tight">{subject.title}</h2>
                   </div>
-                  <Link href={subject.route} className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
+                  <Link href={subject.route} className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
                     Subject <ArrowRight className="ml-2 h-3.5 w-3.5" />
                   </Link>
                 </div>
@@ -1029,7 +1028,7 @@ export function UpscSyllabusPyqLibrary() {
           <button
             type="button"
             onClick={() => setIsOptionalSourcePacksOpen(!isOptionalSourcePacksOpen)}
-            className="flex w-full items-center justify-between text-left font-black text-[#13251d]"
+            className="flex min-h-11 w-full items-center justify-between py-2 text-left font-black text-[#13251d]"
           >
             <span className="flex items-center gap-2 text-base">
               <BookMarked className="h-5 w-5 text-[#1d9e75]" />
@@ -1066,8 +1065,7 @@ export function UpscSyllabusPyqLibrary() {
             </div>
           )}
         </section>
-      </div>
-    </main>
+    </div>
   );
 }
 

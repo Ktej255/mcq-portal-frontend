@@ -804,8 +804,14 @@ export function RichBlock({ block }: { block: ContentBlock }) {
     case "ncert":
       return <NcertReference block={block} />;
     case "para":
+    case "paragraph":
       return text !== undefined ? (
         <p className="text-sm leading-7 text-[#31443a]">{renderInline(text)}</p>
+      ) : <UnsupportedBlock />;
+    case "source":
+    case "citation":
+      return text !== undefined ? (
+        <p className="border-l-2 border-[#dcd5c7] pl-3 py-1 text-xs italic text-[#5d675f]">{renderInline(text)}</p>
       ) : <UnsupportedBlock />;
     default:
       return <UnsupportedBlock type={type} />;

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { KeyRound, LockKeyhole, LogOut, Settings, X } from 'lucide-react';
@@ -48,6 +48,15 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const renderNavLink = (item: StudentNavItem) => {
     const isActive = isItemActive(item);
     return (
@@ -56,7 +65,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
         href={item.href}
         onClick={onClose}
         aria-current={isActive ? 'page' : undefined}
-        className={`group flex items-center gap-3 rounded-lg px-4 py-3 transition-all duration-300 ${
+        className={`group flex min-h-11 items-center gap-3 rounded-lg px-4 py-3 transition-all duration-300 ${
           isActive
             ? 'bg-[#1a3a2a] font-bold text-white shadow-lg shadow-[#1a3a2a]/10'
             : 'text-[#5d675f] hover:bg-[#f2eadc] hover:text-[#13251d]'
@@ -75,11 +84,15 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 md:hidden"
+          aria-hidden="true"
           onClick={onClose}
         />
       )}
 
-      <aside className={`
+      <aside
+        id="dashboard-sidebar"
+        aria-label="Main navigation"
+        className={`
         fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col border-r border-[#dcd5c7] bg-[#fffdf8] transition-all duration-500 md:relative md:translate-x-0
         ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
       `}>
@@ -90,8 +103,14 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
             </div>
             <h2 className="text-xl font-black uppercase italic tracking-tighter text-[#13251d]">{examBrandName(pathname)}</h2>
           </div>
-          <Button variant="ghost" size="icon" className="rounded-full md:hidden" onClick={onClose}>
-            <X className="h-5 w-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 rounded-full p-0 md:hidden"
+            onClick={onClose}
+            aria-label="Close navigation"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
           </Button>
         </div>
 
@@ -99,7 +118,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
           {hasMasterAccess ? (
             <div className="space-y-1">
               <p className="mb-3 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-[#7b7469]">Operator</p>
-              <nav className="space-y-1">{adminNavItems.map(renderNavLink)}</nav>
+              <nav aria-label="Operator navigation" className="space-y-1">{adminNavItems.map(renderNavLink)}</nav>
             </div>
           ) : (
             <>
@@ -108,7 +127,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                   <p className="mb-3 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-[#7b7469]">
                     {section.label}
                   </p>
-                  <nav className="space-y-1">{section.items.map(renderNavLink)}</nav>
+                  <nav aria-label={section.label} className="space-y-1">{section.items.map(renderNavLink)}</nav>
                 </div>
               ))}
 
@@ -123,11 +142,11 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                     ) : (
                     <div
                       key={item.name}
-                      aria-disabled
+                      aria-disabled="true"
                       title="Opens soon"
-                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-4 py-3 text-[#a59f93]"
+                      className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-lg px-4 py-3 text-[#a59f93]"
                     >
-                      <LockKeyhole className="h-5 w-5" />
+                      <LockKeyhole className="h-5 w-5" aria-hidden="true" />
                       <span className="text-sm tracking-tight">{item.name}</span>
                       <span className="ml-auto rounded-full border border-[#dcd5c7] bg-[#f2eadc] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#8c5d14]">
                         Soon
@@ -159,7 +178,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                 type="button"
                 data-testid="master-one-pass"
                 onClick={openMasterPass}
-                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#10291d]"
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#10291d]"
               >
                 One Pass
               </button>
@@ -176,7 +195,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                     style={{ backgroundImage: `url(${user.photoURL})` }}
                   />
                 ) : (
-                  <span className="text-xs font-bold">{user?.displayName?.[0] || 'U'}</span>
+                  <span aria-label="User avatar" className="text-xs font-bold">{user?.displayName?.[0] || 'U'}</span>
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -189,7 +208,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                <Link
                 href="/settings"
                 onClick={onClose}
-                className="flex items-center justify-center gap-2 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest text-[#5d675f] transition-colors hover:bg-white"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-widest text-[#5d675f] transition-colors hover:bg-white"
               >
                 <Settings className="h-3.5 w-3.5" /> Settings
               </Link>
@@ -198,7 +217,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                   logout();
                   onClose?.();
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest text-red-500 transition-colors hover:bg-red-50"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 transition-colors hover:bg-red-50"
               >
                 <LogOut className="h-3.5 w-3.5" /> Exit
               </button>

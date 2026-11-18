@@ -485,7 +485,11 @@ export function RecallCheckStep({
                 <span className="text-xs font-black text-red-700">Listening... speak now</span>
                 {textInput.length > 0 && <span className="text-[10px] text-green-600">({textInput.length} chars received)</span>}
               </div>
-              <button onClick={stopLiveTranscription} className="text-xs font-black text-red-600 px-2 py-1 rounded bg-red-100">
+              <button
+                type="button"
+                onClick={stopLiveTranscription}
+                className="min-h-9 px-3 py-1.5 rounded-lg text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 transition-colors"
+              >
                 Stop
               </button>
             </div>
@@ -509,25 +513,27 @@ export function RecallCheckStep({
               setTextInput(value);
             }}
             placeholder="Click here and speak using Win+H (Windows) or tap the mic on your phone keyboard..."
-            className="w-full h-32 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+            className="w-full h-32 rounded-xl border border-[#b9d9cd] bg-white p-3 text-base sm:text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30 shadow-2xs"
           />
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-[#49675e]">{textInput.length} chars</span>
               {!isListening && (
                 <button
+                  type="button"
                   onClick={() => startLiveTranscription()}
-                  className="flex items-center gap-1 text-[10px] font-black text-[#1d9e75]"
+                  className="min-h-9 inline-flex items-center gap-1.5 text-xs font-bold text-[#1d9e75] px-2.5 py-1 rounded-md hover:bg-[#e7f5ee] transition-colors"
                 >
-                  <Mic className="h-3 w-3" /> Speak more
+                  <Mic className="h-3.5 w-3.5" /> Speak more
                 </button>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
+                type="button"
                 onClick={handleTextSubmit}
                 disabled={isListening || textInput.length < 5 || submissionUnavailable}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50"
+                className="min-h-11 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs sm:text-sm font-bold disabled:opacity-50 shadow-sm active:scale-[0.98] transition-all"
               >
                 Submit Recall
               </button>
@@ -585,20 +591,22 @@ export function RecallCheckStep({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 justify-center pt-2">
+          <div className="flex flex-wrap gap-2.5 justify-center pt-3">
             {retryCount <= MAX_RECALL_RETRIES && (
               <button
+                type="button"
                 onClick={handleRetry}
-                className="px-3 py-1.5 rounded-lg border border-[#b9d9cd] text-xs font-semibold text-[#49675e]"
+                className="min-h-11 px-4 py-2 rounded-xl border border-[#b9d9cd] text-xs sm:text-sm font-bold text-[#49675e] bg-white hover:bg-gray-50 active:scale-[0.98] transition-all"
               >
                 {retryCount === MAX_RECALL_RETRIES ? 'Start typed retry' : 'Retry'}
               </button>
             )}
             <button
+              type="button"
               onClick={onComplete}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black"
+              className="min-h-11 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs sm:text-sm font-bold shadow-sm active:scale-[0.98] transition-all"
             >
-              Continue →
+              Continue &rarr;
             </button>
           </div>
         </div>

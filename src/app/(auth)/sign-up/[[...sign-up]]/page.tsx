@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { SignUp } from "@clerk/nextjs";
 
 import { clerkConfigReady, missingClerkEnvVars } from "@/env";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function SignUpPage() {
   return (
@@ -53,6 +54,15 @@ export default function SignUpPage() {
                     <p className="mt-1 text-sm font-semibold leading-6">
                       Missing {missingClerkEnvVars.join(", ")}. Add the Clerk publishable key locally and in Vercel.
                     </p>
+                    <div className="mt-3">
+                      <Link
+                        href="/login"
+                        className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]"
+                      >
+                        Go to login & preview
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>

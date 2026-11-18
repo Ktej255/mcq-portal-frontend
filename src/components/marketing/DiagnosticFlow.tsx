@@ -220,7 +220,7 @@ export function DiagnosticFlow() {
                 value={contact.name}
                 onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
                 placeholder="Your name"
-                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-base sm:text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -230,7 +230,7 @@ export function DiagnosticFlow() {
                 value={contact.email}
                 onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
                 placeholder="you@example.com"
-                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-base sm:text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -239,7 +239,7 @@ export function DiagnosticFlow() {
                 value={contact.phone}
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
                 placeholder="+91…"
-                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
+                className="h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-base sm:text-sm font-semibold text-[#13251d] outline-none focus:border-[#1d9e75]"
               />
             </div>
           </div>
@@ -304,7 +304,7 @@ export function DiagnosticFlow() {
                   key={name}
                   type="button"
                   onClick={() => toggleSubject(name)}
-                  className={`rounded-xl border p-3 text-left text-sm font-bold transition ${
+                  className={`flex min-h-11 items-center rounded-xl border p-3 text-left text-sm font-bold transition ${
                     active ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : "border-[#dcd5c7] bg-[#fffdf8] text-[#33443b] hover:border-[#1d9e75]/50"
                   }`}
                 >
@@ -331,7 +331,7 @@ export function DiagnosticFlow() {
                     key={o}
                     type="button"
                     onClick={() => setAnswers((a) => ({ ...a, optional: o }))}
-                    className={`rounded-lg border p-2.5 text-left text-xs font-bold transition ${
+                    className={`flex min-h-11 items-center rounded-lg border p-2.5 text-left text-xs font-bold transition ${
                       active ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]" : "border-[#dcd5c7] bg-[#fffdf8] text-[#33443b] hover:border-[#1d9e75]/50"
                     }`}
                   >

@@ -107,7 +107,7 @@ export default function PricingPage() {
           <p className="text-sm font-bold text-[#085041]">
             Free for everyone: previous year questions, study resources, guides and the 2-minute diagnostic. Daily current affairs opens as reviewed items publish.
           </p>
-          <Link href="/start" className="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
+          <Link href="/start" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]">
             Take the free diagnostic
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>

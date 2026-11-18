@@ -98,11 +98,11 @@ export default function AdminNewItemPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee]">
+    <div className="min-h-screen bg-[#f7f4ee]">
       <div className="mx-auto max-w-4xl px-4 py-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-black text-[#13251d]">New Current Affairs Item</h1>
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50 shadow-sm">
             <Save className="h-3.5 w-3.5" /> {saving ? 'Saving...' : 'Save as Draft'}
           </button>
         </div>
@@ -115,57 +115,57 @@ export default function AdminNewItemPage() {
 
           <div>
             <label className="text-[10px] font-black text-[#49675e] uppercase">Title *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-sm" placeholder="Item title..." />
+            <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" placeholder="Item title..." />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">Date</label>
-              <input type="date" value={publishDate} onChange={e => setPublishDate(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs" />
+              <input type="date" value={publishDate} onChange={e => setPublishDate(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white" />
             </div>
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">Subject</label>
-              <select value={subject} onChange={e => setSubject(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs">
+              <select value={subject} onChange={e => setSubject(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                 {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">GS Paper</label>
-              <select value={gsPaper} onChange={e => setGsPaper(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs">
+              <select value={gsPaper} onChange={e => setGsPaper(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                 {GS_PAPERS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">Exam Type</label>
-              <select value={examRelevance} onChange={e => setExamRelevance(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs">
+              <select value={examRelevance} onChange={e => setExamRelevance(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                 {EXAM_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">Source Authority</label>
-              <select value={sourceAuthority} onChange={e => setSourceAuthority(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs">
+              <select value={sourceAuthority} onChange={e => setSourceAuthority(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                 {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] font-black text-[#49675e] uppercase">Relevance (1-5)</label>
-              <input type="number" min={1} max={5} value={relevanceScore} onChange={e => setRelevanceScore(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs" />
+              <input type="number" min={1} max={5} value={relevanceScore} onChange={e => setRelevanceScore(Number(e.target.value))} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" />
             </div>
           </div>
 
           <div>
             <label className="text-[10px] font-black text-[#49675e] uppercase">Video URL (optional)</label>
-            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} className="mt-1 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs" placeholder="https://..." />
+            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" placeholder="https://..." />
           </div>
         </section>
 
         {/* Content */}
         <section className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-3">
           <h2 className="text-sm font-black text-[#13251d]">Content</h2>
-          <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={8} className="w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-sm resize-none" placeholder="Write the news content..." />
+          <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={8} className="w-full rounded-lg border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm resize-none" placeholder="Write the news content..." />
         </section>
 
         {/* UPSC Statement Frames */}
@@ -173,57 +173,57 @@ export default function AdminNewItemPage() {
           <h2 className="text-sm font-black text-[#7c3aed]">UPSC Statement Frames</h2>
           {prelimsStatements.map((s, i) => (
             <input key={i} value={s} onChange={e => { const arr = [...prelimsStatements]; arr[i] = e.target.value; setPrelimsStatements(arr); }}
-              className="w-full rounded-lg border border-[#7c3aed]/20 px-3 py-2 text-xs bg-white" placeholder={`Prelims statement ${i + 1}...`} />
+              className="w-full min-h-11 rounded-lg border border-[#7c3aed]/20 px-3 py-2 text-base sm:text-sm bg-white" placeholder={`Prelims statement ${i + 1}...`} />
           ))}
-          <input value={mainsAngle} onChange={e => setMainsAngle(e.target.value)} className="w-full rounded-lg border border-[#7c3aed]/20 px-3 py-2 text-xs bg-white" placeholder="Mains question angle..." />
+          <input value={mainsAngle} onChange={e => setMainsAngle(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#7c3aed]/20 px-3 py-2 text-base sm:text-sm bg-white" placeholder="Mains question angle..." />
         </section>
 
         {/* So-What Analysis */}
         <section className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 space-y-3">
           <h2 className="text-sm font-black text-[#085041]">So-What Analysis</h2>
-          <input value={whoBenefits} onChange={e => setWhoBenefits(e.target.value)} className="w-full rounded-lg border border-[#b9d9cd] px-3 py-2 text-xs bg-white" placeholder="Who benefits..." />
-          <input value={whoLoses} onChange={e => setWhoLoses(e.target.value)} className="w-full rounded-lg border border-[#b9d9cd] px-3 py-2 text-xs bg-white" placeholder="Who loses..." />
-          <input value={whatChanges} onChange={e => setWhatChanges(e.target.value)} className="w-full rounded-lg border border-[#b9d9cd] px-3 py-2 text-xs bg-white" placeholder="What changes next..." />
-          <input value={upscAngle} onChange={e => setUpscAngle(e.target.value)} className="w-full rounded-lg border border-[#b9d9cd] px-3 py-2 text-xs bg-white" placeholder="UPSC angle..." />
-          <input value={connectedTopic} onChange={e => setConnectedTopic(e.target.value)} className="w-full rounded-lg border border-[#b9d9cd] px-3 py-2 text-xs bg-white" placeholder="Connected static topic..." />
+          <input value={whoBenefits} onChange={e => setWhoBenefits(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#b9d9cd] px-3 py-2 text-base sm:text-sm bg-white" placeholder="Who benefits..." />
+          <input value={whoLoses} onChange={e => setWhoLoses(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#b9d9cd] px-3 py-2 text-base sm:text-sm bg-white" placeholder="Who loses..." />
+          <input value={whatChanges} onChange={e => setWhatChanges(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#b9d9cd] px-3 py-2 text-base sm:text-sm bg-white" placeholder="What changes next..." />
+          <input value={upscAngle} onChange={e => setUpscAngle(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#b9d9cd] px-3 py-2 text-base sm:text-sm bg-white" placeholder="UPSC angle..." />
+          <input value={connectedTopic} onChange={e => setConnectedTopic(e.target.value)} className="w-full min-h-11 rounded-lg border border-[#b9d9cd] px-3 py-2 text-base sm:text-sm bg-white" placeholder="Connected static topic..." />
         </section>
 
         {/* MCQs */}
         <section className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-black text-[#13251d]">MCQs ({mcqs.length}/10)</h2>
-            <button onClick={addMcq} disabled={mcqs.length >= 10} className="flex items-center gap-1 text-xs font-black text-[#1d9e75] disabled:opacity-50">
+            <button onClick={addMcq} disabled={mcqs.length >= 10} className="flex min-h-9 items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-black text-[#1d9e75] disabled:opacity-50">
               <Plus className="h-3 w-3" /> Add MCQ
             </button>
           </div>
           {mcqs.map((mcq, idx) => (
             <div key={idx} className="rounded-lg border border-[#dcd5c7] p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-[#49675e]">MCQ {idx + 1}</span>
-                <button onClick={() => removeMcq(idx)} className="text-red-500"><Trash2 className="h-3 w-3" /></button>
+                <span className="text-xs font-black text-[#49675e]">MCQ {idx + 1}</span>
+                <button onClick={() => removeMcq(idx)} className="min-h-9 min-w-9 flex items-center justify-center text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
               </div>
               <input value={mcq.question_text} onChange={e => { const arr = [...mcqs]; arr[idx].question_text = e.target.value; setMcqs(arr); }}
-                className="w-full rounded border border-[#dcd5c7] px-2 py-1.5 text-xs" placeholder="Question text..." />
+                className="w-full min-h-11 rounded border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" placeholder="Question text..." />
               <select value={mcq.question_type} onChange={e => { const arr = [...mcqs]; arr[idx].question_type = e.target.value; setMcqs(arr); }}
-                className="rounded border border-[#dcd5c7] px-2 py-1 text-[10px]">
+                className="min-h-11 w-full sm:w-auto rounded border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                 {QUESTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
               {mcq.options.map((opt, oi) => (
                 <input key={oi} value={opt.text} onChange={e => { const arr = [...mcqs]; arr[idx].options[oi].text = e.target.value; setMcqs(arr); }}
-                  className="w-full rounded border border-[#dcd5c7] px-2 py-1 text-[10px]" placeholder={`Option ${opt.label}...`} />
+                  className="w-full min-h-11 rounded border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" placeholder={`Option ${opt.label}...`} />
               ))}
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <select value={mcq.correct_answer} onChange={e => { const arr = [...mcqs]; arr[idx].correct_answer = e.target.value; setMcqs(arr); }}
-                  className="rounded border border-[#dcd5c7] px-2 py-1 text-[10px]">
+                  className="min-h-11 rounded border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm bg-white">
                   {['A', 'B', 'C', 'D'].map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
                 <input value={mcq.explanation} onChange={e => { const arr = [...mcqs]; arr[idx].explanation = e.target.value; setMcqs(arr); }}
-                  className="flex-1 rounded border border-[#dcd5c7] px-2 py-1 text-[10px]" placeholder="Explanation..." />
+                  className="flex-1 min-h-11 rounded border border-[#dcd5c7] px-3 py-2 text-base sm:text-sm" placeholder="Explanation..." />
               </div>
             </div>
           ))}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

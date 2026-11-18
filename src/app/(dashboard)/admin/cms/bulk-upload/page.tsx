@@ -120,15 +120,15 @@ export default function AdminBulkUploadPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee]">
+    <div className="min-h-screen bg-[#f7f4ee]">
       <div className="mx-auto max-w-4xl px-4 py-6 space-y-6">
-        <Link href="/admin/cms" className="flex items-center gap-1.5 text-xs font-semibold text-[#5d675f] hover:text-[#1d9e75]">
+        <Link href="/admin/cms" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-[#5d675f] hover:text-[#1d9e75]">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to CMS
         </Link>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-black text-[#13251d]">Bulk Upload</h1>
-          <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f]">
+          <button onClick={downloadTemplate} className="flex min-h-11 items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f] hover:bg-white transition-colors">
             <Download className="h-3.5 w-3.5" /> Download Template
           </button>
         </div>
@@ -173,7 +173,7 @@ export default function AdminBulkUploadPage() {
           <button
             onClick={handleUpload}
             disabled={uploading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black disabled:opacity-50"
+            className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black disabled:opacity-50 shadow-sm"
           >
             {uploading ? 'Uploading...' : 'Validate & Import'}
           </button>
@@ -205,6 +205,6 @@ export default function AdminBulkUploadPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

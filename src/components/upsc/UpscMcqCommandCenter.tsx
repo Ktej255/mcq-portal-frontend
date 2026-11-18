@@ -527,13 +527,13 @@ export function UpscMcqCommandCenter({
                   <button
                     type="button"
                     onClick={lockStrategyHandoff}
-                    className="mt-4 inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
+                    className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
                   >
                     Lock into batch
                   </button>
                   <Link
                     href={`/upsc/question-bank?subject=${activeStrategyHandoff.subjectSlug}&strategyBlueprint=${activeStrategyHandoff.blueprintId}`}
-                    className="ml-2 mt-4 inline-flex min-h-10 items-center rounded-md border border-[#1f5d8f] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1f5d8f] transition hover:bg-[#eef5ff]"
+                    className="ml-2 mt-4 inline-flex min-h-11 items-center rounded-md border border-[#1f5d8f] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1f5d8f] transition hover:bg-[#eef5ff]"
                   >
                     Open student practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
                   </Link>
@@ -551,7 +551,7 @@ export function UpscMcqCommandCenter({
                     max={100}
                     value={activePlanningState.planned}
                     onChange={(event) => saveBatchState({ planned: Math.max(1, Number(event.target.value) || 1) })}
-                    className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                    className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-base sm:text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
                 </div>
                 <div className="rounded-lg border border-[#dcd5c7] bg-[#fdfaf3] p-4">
@@ -564,7 +564,7 @@ export function UpscMcqCommandCenter({
                     max={100}
                     value={activePlanningState.drafted}
                     onChange={(event) => saveBatchState({ drafted: Math.max(0, Number(event.target.value) || 0) })}
-                    className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                    className="mt-3 h-11 w-full rounded-md border border-[#cfc6b6] bg-white px-3 text-base sm:text-sm font-black text-[#13251d] outline-none focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
                 </div>
               </div>
@@ -608,13 +608,13 @@ export function UpscMcqCommandCenter({
                 <button
                   type="button"
                   onClick={markReady}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
                 >
                   <CheckCircle2 className="h-4 w-4" /> Mark ready
                 </button>
                 <Link
                   href={lmsHrefForRoom(activeSubject.slug, "mcq-readiness")}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
                   Daily MCQ room
                 </Link>
@@ -640,13 +640,13 @@ export function UpscMcqCommandCenter({
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-sm font-bold text-white transition hover:bg-[#10291d]"
                 >
                   <Download className="h-4 w-4" /> Download CSV
                 </button>
                 <Link
                   href="/admin/questions/bulk"
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfc6b6] bg-white px-3 text-sm font-bold text-[#1a3a2a] transition hover:bg-[#f2eadc]"
                 >
                   <UploadCloud className="h-4 w-4" /> Bulk upload
                 </Link>

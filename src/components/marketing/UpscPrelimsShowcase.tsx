@@ -1667,14 +1667,14 @@ function MainWebsiteIntegrationMap() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href={item.publicAnchor}
-                    className="inline-flex min-h-10 items-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+                    className="inline-flex min-h-11 items-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
                   >
                     Public section
                     <ArrowRight className="ml-2 h-3.5 w-3.5" />
                   </Link>
                   <Link
                     href={item.dashboardRoute}
-                    className="inline-flex min-h-10 items-center rounded-md border border-[#d8891c]/45 bg-[#fffaf1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#7b4d0d] transition hover:bg-white"
+                    className="inline-flex min-h-11 items-center rounded-md border border-[#d8891c]/45 bg-[#fffaf1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#7b4d0d] transition hover:bg-white"
                   >
                     Portal owner
                     <ArrowRight className="ml-2 h-3.5 w-3.5" />
@@ -1728,7 +1728,7 @@ function PublicWebsiteCopyKit() {
                 <button
                   type="button"
                   onClick={() => void copyBlock(block.id, block.body)}
-                  className="inline-flex min-h-10 items-center rounded-md border border-[#1b6b4a]/35 bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-[#eef6f1]"
+                  className="inline-flex min-h-11 items-center rounded-md border border-[#1b6b4a]/35 bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-[#eef6f1]"
                 >
                   <Clipboard className="mr-2 h-4 w-4" />
                   {copiedId === block.id ? "Copied" : "Copy"}
@@ -3376,7 +3376,7 @@ function SourceArchiveSummaryApiPreview() {
             </div>
             <Link
               href={summary?.internalIntakeRoute ?? "/upsc/source-library#upsc-morning-batch-archive-intake"}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
             >
               Open internal intake
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -3920,7 +3920,7 @@ function QuestionEvidenceSection({
               id="showcase-status-filter"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as QuestionStatusFilter)}
-              className="h-10 rounded-md border border-[#cbd8ce] bg-white px-3 text-sm font-bold text-[#12251d] outline-none focus:border-[#1b6b4a]"
+              className="min-h-11 rounded-md border border-[#cbd8ce] bg-white px-3 text-base sm:text-sm font-bold text-[#12251d] outline-none focus:border-[#1b6b4a]"
             >
               {statusFilterOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -3931,7 +3931,7 @@ function QuestionEvidenceSection({
               id="showcase-subject-filter"
               value={subjectFilter}
               onChange={(event) => setSubjectFilter(event.target.value)}
-              className="h-10 rounded-md border border-[#cbd8ce] bg-white px-3 text-sm font-bold text-[#12251d] outline-none focus:border-[#1b6b4a]"
+              className="min-h-11 rounded-md border border-[#cbd8ce] bg-white px-3 text-base sm:text-sm font-bold text-[#12251d] outline-none focus:border-[#1b6b4a]"
             >
               {subjects.map((subject) => (
                 <option key={subject} value={subject}>{subject}</option>
@@ -3952,11 +3952,15 @@ function QuestionEvidenceSection({
 
 export function UpscPrelimsShowcase({
   questionEvidence,
+  inDashboard = false,
 }: {
   questionEvidence: ShowcaseQuestionEvidence[];
+  inDashboard?: boolean;
 }) {
+  const Shell = inDashboard ? "div" : "main";
+
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f5f8f4] text-[#12251d]">
+    <Shell className="min-h-screen overflow-hidden bg-[#f5f8f4] text-[#12251d]">
       <section className="relative border-b border-[#cbd8ce] bg-[#eef6f1]">
         <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(0deg,rgba(18,37,29,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(18,37,29,0.05)_1px,transparent_1px)] [background-size:44px_44px]" />
         <div className="relative mx-auto grid min-h-[92vh] max-w-7xl gap-8 px-4 py-8 md:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
@@ -4246,13 +4250,13 @@ export function UpscPrelimsShowcase({
               <TabsList className="h-auto w-full flex-wrap justify-start rounded-md bg-[#edf4ef] p-1">
                 <TabsTrigger
                   value="pressure"
-                  className="h-10 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
+                  className="min-h-11 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
                 >
                   Subject pressure
                 </TabsTrigger>
                 <TabsTrigger
                   value="subtopics"
-                  className="h-10 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
+                  className="min-h-11 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
                 >
                   Subtopic shifts
                 </TabsTrigger>
@@ -4510,7 +4514,7 @@ export function UpscPrelimsShowcase({
                     </div>
                     <Link
                       href={row.route}
-                      className="mt-3 inline-flex h-9 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-[11px] font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+                      className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-[11px] font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
                     >
                       Open route
                       <ArrowRight className="ml-2 h-3.5 w-3.5" />
@@ -4962,7 +4966,7 @@ export function UpscPrelimsShowcase({
               </p>
               <Link
                 href="/upsc/prelims-2027-strategy"
-                className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
               >
                 Open strategy command
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -5019,7 +5023,7 @@ export function UpscPrelimsShowcase({
                 <p className="mt-3 text-sm font-semibold leading-6 text-[#53645b]">{module.detail}</p>
                 <Link
                   href={module.route}
-                  className="mt-4 inline-flex h-10 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md border border-[#1b6b4a]/35 bg-[#eef6f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
                 >
                   Open path
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -5069,7 +5073,7 @@ export function UpscPrelimsShowcase({
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="h-10 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
+                    className="min-h-11 flex-none rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] data-active:bg-white data-active:text-[#1b6b4a]"
                   >
                     <tab.icon className="h-4 w-4" />
                     {tab.label}
@@ -5127,6 +5131,6 @@ export function UpscPrelimsShowcase({
           </div>
         </div>
       </section>
-    </main>
+    </Shell>
   );
 }

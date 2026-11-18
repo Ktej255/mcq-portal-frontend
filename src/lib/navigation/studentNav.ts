@@ -312,6 +312,7 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "2026 Showcase", href: "/upsc/prelims-2026-showcase", icon: BarChart3 },
   { name: "PYQ Import", href: "/admin/pyq-import", icon: FileInput },
   { name: "Current Affairs", href: "/upsc/current-affairs", icon: Newspaper },
+  { name: "Current Affairs CMS", href: "/admin/cms", icon: Newspaper },
   { name: "Prelims V2", href: "/admin/prelims-audit-v2", icon: FileSearch },
   { name: "Tests", href: "/admin/tests", icon: ClipboardList },
   { name: "Question Bank", href: "/admin/questions", icon: Database },

@@ -44,6 +44,10 @@ from app.core.gs_lms.student_models import (
     GsLmsRevisitSchedule,
     GsLmsStudentSectionProgress,
 )
+from app.core.gs_lms.funnel_models import (
+    GsLmsMcqLabAttempt,
+    GsLmsMcqLabSession,
+)
 
 MODEL_VERSION = "readiness-v1"
 DEMAND_CACHE_MAX_AGE_DAYS = 7
@@ -245,6 +249,36 @@ def load_topic_evidence(
         .all()
     ):
         practice_by_node[node_id] = (int(total or 0), int(correct or 0))
+
+    # Also aggregate 15-question MCQ Lab attempts from the topic funnel
+    for node_id, total, correct in (
+        db.query(
+            GsLmsMcqLabSession.syllabus_node_id,
+            func.count(GsLmsMcqLabAttempt.id),
+            func.sum(
+                case(
+                    (GsLmsMcqLabAttempt.is_correct.is_(True), 1),
+                    else_=0,
+                )
+            ),
+        )
+        .join(
+            GsLmsMcqLabAttempt,
+            GsLmsMcqLabAttempt.session_id == GsLmsMcqLabSession.id,
+        )
+        .filter(
+            GsLmsMcqLabSession.student_id == student_id,
+            GsLmsMcqLabSession.syllabus_node_id.in_(leaf_ids),
+            GsLmsMcqLabAttempt.is_correct.is_not(None),
+        )
+        .group_by(GsLmsMcqLabSession.syllabus_node_id)
+        .all()
+    ):
+        prev_total, prev_correct = practice_by_node.get(node_id, (0, 0))
+        practice_by_node[node_id] = (
+            prev_total + int(total or 0),
+            prev_correct + int(correct or 0),
+        )
 
     today = _today()
     revisit_by_node: dict[int, int] = defaultdict(int)

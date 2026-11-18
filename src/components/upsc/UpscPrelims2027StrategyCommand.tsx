@@ -2116,9 +2116,8 @@ export function UpscPrelims2027StrategyCommand() {
   }
 
   return (
-    <main className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
-        <section
+    <div className="flex w-full flex-col gap-5 text-[#13251d]">
+      <section
           data-testid="prelims-2027-strategy-hero"
           className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
         >
@@ -2700,7 +2699,7 @@ export function UpscPrelims2027StrategyCommand() {
                         type="button"
                         onClick={() => setPriorityStatus(priority.id, status)}
                         className={cn(
-                          "min-h-9 rounded-md px-2 text-[10px] font-black uppercase tracking-[0.08em] transition",
+                          "min-h-11 rounded-md px-2 text-[10px] font-black uppercase tracking-[0.08em] transition",
                           priority.status === status
                             ? statusTone(status)
                             : "border border-transparent text-[#746f66] hover:bg-white"
@@ -2712,7 +2711,7 @@ export function UpscPrelims2027StrategyCommand() {
                   </div>
                   <Link
                     href={priority.targetRoute}
-                    className="mt-3 inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black text-[#085041]"
+                    className="mt-3 inline-flex min-h-11 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black text-[#085041]"
                   >
                     Open owner surface <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -4126,7 +4125,7 @@ export function UpscPrelims2027StrategyCommand() {
                 type="button"
                 onClick={() => void refreshPublicProofFeedApi()}
                 disabled={publicProofFeedApi.status === "loading"}
-                className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee] disabled:cursor-wait disabled:opacity-70"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee] disabled:cursor-wait disabled:opacity-70"
               >
                 <RefreshCw className="mr-2 h-3.5 w-3.5" />
                 {publicProofFeedApi.status === "loading" ? "Checking" : "Refresh endpoint"}
@@ -4220,7 +4219,7 @@ export function UpscPrelims2027StrategyCommand() {
                     <button
                       type="button"
                       onClick={() => void copyReleaseClaim(row)}
-                      className="inline-flex min-h-10 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
+                      className="inline-flex min-h-11 items-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
                     >
                       <Clipboard className="mr-2 h-3.5 w-3.5" />
                       {copiedReleaseId === String(row.question.number) ? "Copied" : "Copy claim"}
@@ -4767,7 +4766,7 @@ export function UpscPrelims2027StrategyCommand() {
                           <button
                             type="button"
                             onClick={() => archiveCandidateForProof(file)}
-                            className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
+                            className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-[10px] font-black uppercase tracking-[0.1em] text-[#085041] transition hover:bg-[#e7f5ee]"
                           >
                             Use source
                           </button>
@@ -4788,7 +4787,7 @@ export function UpscPrelims2027StrategyCommand() {
                     <input
                       value={selectedProofPacket.sourceRef}
                       onChange={(event) => updateProofPacket(selectedProofRow.question.number, { sourceRef: event.target.value })}
-                      className="min-h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-bold text-[#13251d] outline-none focus:border-[#1d9e75]"
+                      className="min-h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-base sm:text-sm font-bold text-[#13251d] outline-none focus:border-[#1d9e75]"
                       placeholder={selectedProofRow.question.sourceLead}
                     />
                   </label>
@@ -4797,7 +4796,7 @@ export function UpscPrelims2027StrategyCommand() {
                     <input
                       value={selectedProofPacket.pageRef}
                       onChange={(event) => updateProofPacket(selectedProofRow.question.number, { pageRef: event.target.value })}
-                      className="min-h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-bold text-[#13251d] outline-none focus:border-[#1d9e75]"
+                      className="min-h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-base sm:text-sm font-bold text-[#13251d] outline-none focus:border-[#1d9e75]"
                       placeholder="Page, slide, timestamp or file section"
                     />
                   </label>
@@ -4807,7 +4806,7 @@ export function UpscPrelims2027StrategyCommand() {
                   <textarea
                     value={selectedProofPacket.teacherNote}
                     onChange={(event) => updateProofPacket(selectedProofRow.question.number, { teacherNote: event.target.value })}
-                    className="min-h-24 rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-bold leading-6 text-[#13251d] outline-none focus:border-[#1d9e75]"
+                    className="min-h-24 rounded-md border border-[#dcd5c7] bg-white p-3 text-base sm:text-sm font-bold leading-6 text-[#13251d] outline-none focus:border-[#1d9e75]"
                     placeholder="Why this source makes the MCQ answerable, or why it remains only conceptual."
                   />
                 </label>
@@ -4816,7 +4815,7 @@ export function UpscPrelims2027StrategyCommand() {
                   <textarea
                     value={selectedProofPacket.publicClaim}
                     onChange={(event) => updateProofPacket(selectedProofRow.question.number, { publicClaim: event.target.value })}
-                    className="min-h-20 rounded-md border border-[#dcd5c7] bg-white p-3 text-sm font-bold leading-6 text-[#13251d] outline-none focus:border-[#1d9e75]"
+                    className="min-h-20 rounded-md border border-[#dcd5c7] bg-white p-3 text-base sm:text-sm font-bold leading-6 text-[#13251d] outline-none focus:border-[#1d9e75]"
                     placeholder="Short claim that can be used only after proof review."
                   />
                 </label>
@@ -4913,7 +4912,7 @@ export function UpscPrelims2027StrategyCommand() {
                         type="button"
                         onClick={() => setQuestionProofDecision(question.number, option)}
                         className={cn(
-                          "min-h-10 rounded-md border px-2 text-[10px] font-black uppercase tracking-[0.08em] transition",
+                          "min-h-11 rounded-md border px-2 text-[10px] font-black uppercase tracking-[0.08em] transition",
                           decision === option
                             ? questionProofDecisionTone(option)
                             : "border-[#dcd5c7] bg-white text-[#746f66] hover:border-[#1d9e75]"
@@ -4927,7 +4926,7 @@ export function UpscPrelims2027StrategyCommand() {
                     type="button"
                     onClick={() => setSelectedProofQuestionNumber(question.number)}
                     className={cn(
-                      "inline-flex min-h-10 items-center justify-center rounded-md border px-3 text-xs font-black uppercase tracking-[0.1em]",
+                      "inline-flex min-h-11 items-center justify-center rounded-md border px-3 text-xs font-black uppercase tracking-[0.1em]",
                       selectedProofQuestionNumber === question.number
                         ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
                         : "border-[#dcd5c7] bg-white text-[#31443a]"
@@ -4937,7 +4936,7 @@ export function UpscPrelims2027StrategyCommand() {
                   </button>
                   <Link
                     href={`/upsc-prelims-2026-showcase#question-ledger`}
-                    className="inline-flex min-h-10 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
+                    className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1d9e75] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#085041]"
                   >
                     Open full MCQ ledger <FileSearch className="ml-2 h-3.5 w-3.5" />
                   </Link>
@@ -5178,7 +5177,7 @@ export function UpscPrelims2027StrategyCommand() {
                             aria-pressed={blueprint.queued}
                             onClick={() => toggleBlueprint(blueprint.id)}
                             className={cn(
-                              "inline-flex min-h-10 items-center rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] transition",
+                              "inline-flex min-h-11 items-center rounded-md px-3 text-xs font-black uppercase tracking-[0.1em] transition",
                               blueprint.queued
                                 ? "border border-[#1d9e75] bg-[#1d9e75] text-white"
                                 : "border border-[#1d9e75] bg-white text-[#085041] hover:bg-[#e7f5ee]"
@@ -5189,20 +5188,20 @@ export function UpscPrelims2027StrategyCommand() {
                           <button
                             type="button"
                             onClick={() => generateBlueprint(blueprint.id)}
-                            className="inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
+                            className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#10291d]"
                           >
                             {blueprint.handoff ? "Regenerate set" : "Generate practice set"}
                           </button>
                           <Link
                             href={generatorHref}
-                            className="inline-flex min-h-10 items-center rounded-md border border-[#dcd5c7] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#31443a]"
+                            className="inline-flex min-h-11 items-center rounded-md border border-[#dcd5c7] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#31443a]"
                           >
                             Open generator <ArrowRight className="ml-2 h-3.5 w-3.5" />
                           </Link>
                           {blueprint.handoff ? (
                             <Link
                               href={`/upsc/question-bank?subject=${blueprint.handoff.subjectSlug}&strategyBlueprint=${blueprint.id}`}
-                              className="inline-flex min-h-10 items-center rounded-md border border-[#1f5d8f] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1f5d8f]"
+                              className="inline-flex min-h-11 items-center rounded-md border border-[#1f5d8f] bg-white px-3 text-xs font-black uppercase tracking-[0.1em] text-[#1f5d8f]"
                             >
                               Student practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
                             </Link>
@@ -5484,7 +5483,6 @@ export function UpscPrelims2027StrategyCommand() {
             </article>
           ))}
         </section>
-      </div>
-    </main>
+    </div>
   );
 }

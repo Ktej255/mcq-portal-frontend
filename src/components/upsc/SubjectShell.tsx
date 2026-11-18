@@ -396,10 +396,10 @@ function ResolvedSubjectShell({
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-5 md:px-8">
         {/* Header */}
-        <section className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+        <section className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm sm:p-6 md:p-7">
           <Link
             href={OPTIONAL_CATALOG_ROUTE}
-            className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
+            className="inline-flex min-h-11 items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> All optionals
           </Link>
@@ -418,7 +418,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-syllabus-view"
                 onClick={() => setShowSyllabus(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <Layers className="h-4 w-4" />
                 Syllabus
@@ -427,7 +427,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-pyq-explorer"
                 onClick={() => setShowPyqs(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <ScrollText className="h-4 w-4" />
                 PYQs
@@ -436,7 +436,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-practice-board"
                 onClick={() => setShowPractice(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <Dumbbell className="h-4 w-4" />
                 Practice
@@ -445,7 +445,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-gap-panel"
                 onClick={() => setShowGap(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <PieChart className="h-4 w-4" />
                 Gap
@@ -454,7 +454,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-recall-player"
                 onClick={() => setShowRecall(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <PlayCircle className="h-4 w-4" />
                 Recall
@@ -464,7 +464,7 @@ function ResolvedSubjectShell({
                   type="button"
                   data-testid="open-mapping-module"
                   onClick={() => setShowMapping(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
                 >
                   <MapPin className="h-4 w-4" />
                   Mapping
@@ -475,7 +475,7 @@ function ResolvedSubjectShell({
                   type="button"
                   data-testid="open-thinkers-module"
                   onClick={() => setShowThinkers(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
                 >
                   <Users className="h-4 w-4" />
                   Thinkers
@@ -492,7 +492,7 @@ function ResolvedSubjectShell({
                 type="button"
                 data-testid="open-current-affairs"
                 onClick={() => setShowCurrentAffairs(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
               >
                 <Newspaper className="h-4 w-4" />
                 Current affairs
@@ -549,7 +549,7 @@ function ResolvedSubjectShell({
             aria-labelledby={paperOneTabId}
             data-testid="paper-1-panel"
             tabIndex={0}
-            className="flex flex-col gap-4 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+            className="flex flex-col gap-4 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm sm:p-6"
           >
             <div className="flex flex-wrap items-center gap-3">
               <label
@@ -564,7 +564,7 @@ function ResolvedSubjectShell({
                 data-testid="section-select"
                 value={activeSection}
                 onChange={(e) => setActiveSection(e.target.value as SectionId)}
-                className="rounded-xl border border-[#dcd5c7] bg-[#faf6ee] px-3 py-2 text-sm font-bold text-[#13251d] focus:border-[#1d9e75] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+                className="min-h-11 rounded-xl border border-[#dcd5c7] bg-[#faf6ee] px-3 py-2 text-base font-bold text-[#13251d] focus:border-[#1d9e75] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 sm:text-sm"
               >
                 {structure.paperOne.sections.map((section) => (
                   <option key={section.id} value={section.id}>
@@ -597,7 +597,7 @@ function ResolvedSubjectShell({
             aria-labelledby={paperTwoTabId}
             data-testid="paper-2-panel"
             tabIndex={0}
-            className="flex flex-col gap-4 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-6"
+            className="flex flex-col gap-4 rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm sm:p-6"
           >
             <div className="flex items-center gap-2">
               <Library className="h-4 w-4 text-[#1d9e75]" />
@@ -650,7 +650,7 @@ function PaperTab({
       data-testid={`paper-tab-${paper}`}
       onClick={() => onSelect(paper)}
       onKeyDown={onKeyDown}
-      className={`inline-flex items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-black uppercase tracking-[0.1em] transition-all ${
+      className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-black uppercase tracking-[0.1em] transition-all ${
         active
           ? "border-[#1a3a2a] bg-[#1a3a2a] text-white shadow-sm"
           : "border-[#dcd5c7] bg-[#fffdf8] text-[#31443a] hover:border-[#1d9e75]"
@@ -788,7 +788,7 @@ function TopicList({
               type="button"
               data-testid={`${testid}-availability-retry`}
               onClick={onRetryAvailability}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#8a7a52] bg-[#fffdf8] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#8a7a52] transition-colors hover:bg-[#8a7a52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a7a52]/40"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#8a7a52] bg-[#fffdf8] px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-[#8a7a52] transition-colors hover:bg-[#8a7a52] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8a7a52]/40"
             >
               <RotateCw className="h-3.5 w-3.5" />
               Check availability again
@@ -823,7 +823,7 @@ function TopicList({
                   type="button"
                   data-testid={`${testid}-read`}
                   onClick={() => onOpenRead?.(topic)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                   Read
@@ -954,7 +954,7 @@ function SubjectNotFound({ slug }: { slug: string }) {
       <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-10 md:px-8">
         <Link
           href={OPTIONAL_CATALOG_ROUTE}
-          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
+          className="inline-flex min-h-11 items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> All optionals
         </Link>
@@ -970,7 +970,7 @@ function SubjectNotFound({ slug }: { slug: string }) {
           </p>
           <Link
             href={OPTIONAL_CATALOG_ROUTE}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1a3a2a] px-5 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-white hover:bg-[#10291d]"
+            className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1a3a2a] px-5 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-white hover:bg-[#10291d]"
           >
             Browse optionals
           </Link>

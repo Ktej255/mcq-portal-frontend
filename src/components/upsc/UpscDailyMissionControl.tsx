@@ -278,7 +278,8 @@ function labelForDailyDoubt(href: string) {
 }
 
 export function UpscDailyMissionControl() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === "ADMIN";
   const [isLoaded, setIsLoaded] = useState(false);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [localWelcomeVideoCompleted, setLocalWelcomeVideoCompleted] = useState<boolean>(() => {
@@ -640,7 +641,7 @@ export function UpscDailyMissionControl() {
       label: "Adaptive MCQ",
       status: questionBankRecommendation.unresolvedIncorrectCount ? "repair" : "ready",
       proof: `${questionBankRecommendation.recommendedDifficulty.replace("_", " ")} set, ${questionBankRecommendation.recommendedCount} questions, ${questionBankRecommendation.adaptiveLevel} level; ${activeSubjectExactPyqs.length} exact PYQ import row${activeSubjectExactPyqs.length === 1 ? "" : "s"} ready for this subject.`,
-      href: `/upsc/question-bank?subject=${activeSubject.slug}`,
+      href: `/upsc/${activeSubject.slug}/lms/practice`,
     },
     {
       id: "revision-report",
@@ -754,7 +755,7 @@ export function UpscDailyMissionControl() {
                   type="button"
                   onClick={() => selectTab(item.id as TabId)}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all active:scale-95",
+                    "flex min-h-11 items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all active:scale-95",
                     isActive
                       ? "border-[#1d9e75] bg-[#e7f5ee] text-[#13251d]"
                       : "border-[#e8e2d5] bg-white text-[#495c52] hover:border-[#1d9e75]/40 hover:bg-[#e7f5ee] hover:text-[#13251d]"
@@ -857,7 +858,7 @@ export function UpscDailyMissionControl() {
                       setSaved(false);
                     }}
                     placeholder="Write down your goals, tricky concepts, or doubts you want to check today."
-                    className="min-h-32 w-full resize-none rounded-xl border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-sm font-semibold leading-relaxed text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
+                    className="min-h-32 w-full resize-none rounded-xl border border-[#dcd5c7] bg-[#fdfaf3] p-4 text-base sm:text-sm font-semibold leading-relaxed text-[#25382f] outline-none transition placeholder:text-[#8a8174] focus:border-[#1d9e75] focus:ring-2 focus:ring-[#1d9e75]/20"
                   />
                 </div>
 
@@ -865,7 +866,7 @@ export function UpscDailyMissionControl() {
                   <button
                     type="button"
                     onClick={saveNote}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#1a3a2a] px-4 text-xs font-bold text-white transition hover:bg-[#10291d]"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1a3a2a] px-4 text-xs font-bold text-white transition hover:bg-[#10291d]"
                   >
                     <Save className="h-3.5 w-3.5" /> Save Session Note
                   </button>
@@ -899,7 +900,7 @@ export function UpscDailyMissionControl() {
                           type="button"
                           onClick={() => saveMeTime(option)}
                           className={cn(
-                            "rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5",
+                            "flex min-h-11 flex-col justify-center rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5",
                             isActive
                               ? "border-[#1a3a2a] bg-[#1a3a2a] text-white shadow-sm"
                               : "border-[#dcd5c7] bg-[#f7f4ee]/50 text-[#34453b] hover:border-[#1d9e75]"
@@ -1172,7 +1173,7 @@ export function UpscDailyMissionControl() {
                     <button
                       type="button"
                       onClick={() => setIsSessionReadinessOpen(!isSessionReadinessOpen)}
-                      className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                      className="inline-flex min-h-11 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
                     >
                       {isSessionReadinessOpen ? "Hide Details" : "Show Details"}
                     </button>
@@ -1256,7 +1257,7 @@ export function UpscDailyMissionControl() {
                     <button
                       type="button"
                       onClick={() => setIsNextSessionProofOpen(!isNextSessionProofOpen)}
-                      className="inline-flex min-h-8 items-center rounded-md border border-[#1d9e75] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#1d9e75] hover:text-white transition"
+                      className="inline-flex min-h-11 items-center rounded-md border border-[#1d9e75] bg-white/50 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#1d9e75] hover:text-white transition"
                     >
                       {isNextSessionProofOpen ? "Hide Evidence" : "Show Evidence"}
                     </button>
@@ -1334,13 +1335,13 @@ export function UpscDailyMissionControl() {
                     <div className="flex gap-2">
                       <Link
                         href={automaticHandoff.reportHref}
-                        className="flex-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
+                        className="flex-1 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
                       >
                         Reports
                       </Link>
                       <Link
                         href={automaticHandoff.questionBankHref}
-                        className="flex-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
+                        className="flex-1 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-[#b9d9cd] bg-white/75 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] transition hover:bg-white"
                       >
                         MCQ bank
                       </Link>
@@ -1365,7 +1366,7 @@ export function UpscDailyMissionControl() {
                     <button
                       type="button"
                       onClick={() => setIsAutoHandoffOpen(!isAutoHandoffOpen)}
-                      className="inline-flex min-h-8 items-center rounded-md border border-[#085041] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#085041] hover:text-white transition"
+                      className="inline-flex min-h-11 items-center rounded-md border border-[#085041] bg-white/50 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#085041] hover:bg-[#085041] hover:text-white transition"
                     >
                       {isAutoHandoffOpen ? "Hide Metrics" : "Show Handoff Metrics"}
                     </button>
@@ -1423,7 +1424,7 @@ export function UpscDailyMissionControl() {
                     type="button"
                     disabled
                     data-testid="daily-funnel-locked"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
                   >
                     Locked (Complete Induction) <LockKeyhole className="h-3.5 w-3.5" />
                   </button>
@@ -1431,7 +1432,7 @@ export function UpscDailyMissionControl() {
                   <Link
                     href={dailyPlanner.sessionReadiness.href}
                     data-testid="daily-funnel-primary-action"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
                   >
                     {dailyPlanner.sessionReadiness.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
@@ -1453,7 +1454,7 @@ export function UpscDailyMissionControl() {
                 <button
                   type="button"
                   onClick={() => setIsSimplePathOpen(!isSimplePathOpen)}
-                  className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                  className="inline-flex min-h-11 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
                 >
                   {isSimplePathOpen ? "Hide Details" : "Show Details"}
                 </button>
@@ -1531,7 +1532,7 @@ export function UpscDailyMissionControl() {
                   <button
                     type="button"
                     onClick={() => setIsOperatingContractOpen(!isOperatingContractOpen)}
-                    className="inline-flex min-h-8 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-2 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                    className="inline-flex min-h-11 items-center rounded-md border border-[#1a3a2a] bg-white/50 px-3 text-xs font-black uppercase tracking-[0.08em] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
                   >
                     {isOperatingContractOpen ? "Hide Contract" : "Show Full Contract"}
                   </button>
@@ -1609,7 +1610,7 @@ export function UpscDailyMissionControl() {
                     Complete onboarding induction to unlock planning tracks.
                   </span>
                 </span>
-                <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64]">
+                <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64]">
                   Locked <LockKeyhole className="h-4 w-4" />
                 </span>
               </div>
@@ -1634,7 +1635,7 @@ export function UpscDailyMissionControl() {
                     {dailyPlanner.tomorrowAdjustment.detail}
                   </span>
                 </span>
-                <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
+                <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black uppercase tracking-[0.12em] text-white">
                   {dailyPlanner.tomorrowAdjustment.statusLabel} <ArrowRight className="h-4 w-4" />
                 </span>
               </Link>
@@ -1898,14 +1899,14 @@ export function UpscDailyMissionControl() {
                     <button
                       type="button"
                       disabled
-                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
+                      className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black text-[#756f64] cursor-not-allowed"
                     >
                       Locked (Complete Induction) <LockKeyhole className="h-4 w-4" />
                     </button>
                   ) : (
                     <Link
                       href={`/upsc/question-bank?subject=${activeSubject.slug}`}
-                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
+                      className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white transition hover:bg-[#10291d]"
                     >
                       Open PYQ practice lane <ArrowRight className="h-4 w-4" />
                     </Link>
@@ -1953,14 +1954,14 @@ export function UpscDailyMissionControl() {
                     <button
                       type="button"
                       disabled
-                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64] cursor-not-allowed"
+                      className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#dcd5c7] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#756f64] cursor-not-allowed"
                     >
                       Locked <LockKeyhole className="h-4 w-4" />
                     </button>
                   ) : (
                     <Link
                       href={dailyPlanner.todayOriginProof.href}
-                      className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
+                      className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#cfe5dc] bg-[#e7f5ee] px-3 text-xs font-black uppercase tracking-[0.12em] text-[#085041] transition hover:bg-[#d7efe5]"
                     >
                       {dailyPlanner.todayOriginProof.statusLabel} <ArrowRight className="h-4 w-4" />
                     </Link>
@@ -2032,21 +2033,35 @@ export function UpscDailyMissionControl() {
             <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">Global controls</p>
-                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">Jump to command centers</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1d9e75]">
+                    {isAdmin ? "Global controls" : "Learning Hub"}
+                  </p>
+                  <h2 className="text-2xl font-black tracking-tight text-[#13251d]">
+                    {isAdmin ? "Jump to command centers" : "Quick study actions"}
+                  </h2>
                 </div>
                 <Gauge className="h-6 w-6 text-[#085041]" />
               </div>
-              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-                {[
-                  { label: "Prelims Showcase", href: "/upsc/prelims-2026-showcase", gated: false },
-                  { label: "2027 Strategy", href: "/upsc/prelims-2027-strategy", gated: false },
-                  { label: "Content Command", href: "/upsc/content-command", gated: false },
-                  { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
-                  { label: "Revision Command", href: "/upsc/revision-command", gated: false },
-                  { label: "Sunday AI Retro", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
-                  { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
-                ].map((item) => {
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+                {(isAdmin
+                  ? [
+                      { label: "Prelims Showcase", href: "/upsc/prelims-2026-showcase", gated: false },
+                      { label: "2027 Strategy", href: "/upsc/prelims-2027-strategy", gated: false },
+                      { label: "Content Command", href: "/upsc/content-command", gated: false },
+                      { label: "MCQ Command", href: "/upsc/mcq-command", gated: false },
+                      { label: "Revision Command", href: "/upsc/revision-command", gated: false },
+                      { label: "Sunday AI Retro", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
+                      { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+                    ]
+                  : [
+                      { label: "Daily Planner", href: `/upsc/${activeSubject.slug}/lms/planner`, gated: false },
+                      { label: "Syllabus & Topics", href: `/upsc/${activeSubject.slug}/lms/syllabus`, gated: false },
+                      { label: "MCQ Practice Lab", href: `/upsc/${activeSubject.slug}/lms/practice`, gated: false },
+                      { label: "Readiness & Gaps", href: `/upsc/${activeSubject.slug}/lms/gaps`, gated: false },
+                      { label: "Sunday Review", href: lmsHrefForRoom(activeSubject.slug, "retro"), gated: true },
+                      { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
+                    ]
+                ).map((item) => {
                   const isLocked = item.gated && profile && !profile.inductionCompleted;
                   if (isLocked) {
                     return (

@@ -79,7 +79,7 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
 
   // Determine tab states
   const tabStates = useMemo(() => {
-    const states: Record<TabId, 'active' | 'visited' | 'locked'> = {
+    const states: Record<TabId, 'active' | 'completed' | 'visited' | 'locked'> = {
       'learn': 'locked',
       'ncert': 'locked',
       'current': 'locked',
@@ -89,12 +89,15 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
     };
 
     for (const tab of visibleTabs) {
-      const anyStepAccessible = tab.steps.some((s) => canAccessStep(s));
+      const allStepsCompleted = tab.steps.every((s) => isStepComplete(s));
       const anyStepCompleted = tab.steps.some((s) => isStepComplete(s));
+      const anyStepAccessible = tab.steps.some((s) => canAccessStep(s));
       const isCurrentTab = displayTab === tab.id;
 
       if (isCurrentTab) {
         states[tab.id] = 'active';
+      } else if (allStepsCompleted) {
+        states[tab.id] = 'completed';
       } else if (anyStepAccessible || anyStepCompleted) {
         states[tab.id] = 'visited';
       } else {
@@ -148,8 +151,8 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
         />
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      {/* Tab Navigation with touch-friendly 44px min-height targets */}
+      <div className="flex gap-2 overflow-x-auto pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibleTabs.map((tab) => {
           const state = tabStates[tab.id];
           return (
@@ -160,18 +163,21 @@ export function FunnelOrchestrator({ nodeId, subject = "geography", children }: 
               }}
               disabled={state === 'locked'}
               className={`
-                flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black
-                whitespace-nowrap transition-all duration-200
+                min-h-[44px] flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-xs font-bold
+                whitespace-nowrap transition-all duration-200 active:scale-[0.98]
                 ${state === 'active'
-                  ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md scale-105'
-                  : state === 'visited'
-                    ? 'text-[#1d9e75] bg-white border border-[#b9d9cd]'
-                    : 'text-[#5d675f] bg-white/50 border border-[#dcd5c7] opacity-60 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-md'
+                  : state === 'completed'
+                    ? 'text-[#085041] bg-[#e7f5ee] border border-[#1d9e75]/40 hover:bg-[#d8efe3]'
+                    : state === 'visited'
+                      ? 'text-[#1a3a2a] bg-white border border-[#b9d9cd] hover:border-[#1d9e75]'
+                      : 'text-[#5d675f] bg-white/50 border border-[#dcd5c7] opacity-60 cursor-not-allowed'
                 }
               `}
             >
-              {state === 'locked' ? <Lock className="h-3 w-3" /> : null}
-              {state === 'visited' ? <CheckCircle2 className="h-3 w-3" /> : null}
+              {state === 'locked' ? <Lock className="h-3.5 w-3.5" /> : null}
+              {state === 'completed' ? <CheckCircle2 className="h-3.5 w-3.5 text-[#1d9e75]" /> : null}
+              {state === 'visited' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
               {state === 'active' || state === 'locked' ? tab.icon : null}
               <span>{tab.id === 'mains' && !enabledSteps.includes(13) ? 'Report' : tab.label}</span>
             </button>

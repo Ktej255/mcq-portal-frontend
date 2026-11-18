@@ -42,6 +42,22 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
       // Storage may be unavailable in privacy-restricted browser contexts.
     }
 
+    const draftKey = `gs-lms:mains-draft:${subject}:${nodeId}`;
+    try {
+      const rawDraft = window.sessionStorage.getItem(draftKey);
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft);
+        queueMicrotask(() => {
+          if (!active) return;
+          if (draft.intro) setIntroduction(draft.intro);
+          if (draft.body) setBody(draft.body);
+          if (draft.conclusion) setConclusion(draft.conclusion);
+        });
+      }
+    } catch {
+      // Storage may be unavailable
+    }
+
     if (savedJobId) {
       queueMicrotask(() => {
         if (!active) return;
@@ -68,6 +84,23 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
   }, [jobStorageKey, nodeId, subject]);
 
   const activeQuestion = questions[activeQIdx] || null;
+
+  // Auto-save draft to sessionStorage
+  const draftKey = `gs-lms:mains-draft:${subject}:${nodeId}`;
+  useEffect(() => {
+    if (mode === 'result') {
+      try { window.sessionStorage.removeItem(draftKey); } catch { /* ignore */ }
+      return;
+    }
+    if (introduction || body || conclusion) {
+      try {
+        window.sessionStorage.setItem(
+          draftKey,
+          JSON.stringify({ intro: introduction, body, conclusion })
+        );
+      } catch { /* ignore */ }
+    }
+  }, [introduction, body, conclusion, mode, draftKey]);
 
   // Word count
   const wordCount = useMemo(() => {
@@ -227,19 +260,37 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
             )}
           </details>
         )}
-        <button
-          onClick={() => {
-            try {
-              window.sessionStorage.removeItem(jobStorageKey);
-            } catch {
-              // Ignore unavailable browser storage.
-            }
-            onComplete();
-          }}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
-        >
-          Continue to Growth Report →
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                window.sessionStorage.removeItem(jobStorageKey);
+              } catch {
+                // Ignore unavailable browser storage.
+              }
+              setJobId(null);
+              setMode('writing');
+            }}
+            className="min-h-11 flex-1 py-3 px-4 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] text-[#085041] text-xs sm:text-sm font-black transition hover:bg-[#1d9e75] hover:text-white inline-flex items-center justify-center active:scale-[0.98]"
+          >
+            ✍️ Rewrite Answer (Integrate Insights)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                window.sessionStorage.removeItem(jobStorageKey);
+              } catch {
+                // Ignore unavailable browser storage.
+              }
+              onComplete();
+            }}
+            className="min-h-11 flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs sm:text-sm font-black transition hover:opacity-95 inline-flex items-center justify-center active:scale-[0.98]"
+          >
+            Continue to Growth Report →
+          </button>
+        </div>
       </div>
     );
   }
@@ -248,7 +299,7 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
   // resumed through the same status endpoint without submitting again.
   if (mode === 'timed_out') {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center space-y-3">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-8 text-center space-y-3">
         <RefreshCw className="h-8 w-8 text-amber-700 mx-auto" />
         <p className="text-sm font-black text-amber-900">Evaluation is still pending</p>
         <p className="text-xs text-amber-800">
@@ -265,9 +316,9 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
             setMode('polling');
           }}
           disabled={!jobId}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black disabled:opacity-50"
+          className="min-h-11 inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs sm:text-sm font-bold disabled:opacity-50 active:scale-[0.98]"
         >
-          <RefreshCw className="h-3 w-3" /> Resume checking
+          <RefreshCw className="h-3.5 w-3.5" /> Resume checking
         </button>
       </div>
     );
@@ -276,7 +327,7 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
   // Polling view
   if (mode === 'polling') {
     return (
-      <div className="rounded-2xl border border-[#b9d9cd] bg-[#fffdf8] p-8 text-center space-y-3">
+      <div className="rounded-2xl border border-[#b9d9cd] bg-[#fffdf8] p-4 sm:p-8 text-center space-y-3">
         <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }}>
           <RefreshCw className="h-8 w-8 text-[#1d9e75] mx-auto" />
         </motion.div>
@@ -291,15 +342,16 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
     <div className="space-y-4">
       {/* Question Selector */}
       {questions.length > 1 && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {questions.map((q, idx) => (
             <button
               key={q.question_id}
+              type="button"
               onClick={() => setActiveQIdx(idx)}
-              className={`px-3 py-1.5 rounded-full text-xs font-black ${
+              className={`min-h-11 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-[0.98] ${
                 idx === activeQIdx
-                  ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white'
-                  : 'bg-white border border-[#dcd5c7] text-[#5d675f]'
+                  ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-sm'
+                  : 'bg-white border border-[#dcd5c7] text-[#5d675f] hover:border-[#1d9e75]'
               }`}
             >
               {q.gs_paper} • {q.year}
@@ -310,82 +362,84 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
 
       {/* Question Display */}
       {activeQuestion && (
-        <div className="rounded-xl border border-[#dcd5c7] bg-white p-4">
+        <div className="rounded-xl border border-[#dcd5c7] bg-white p-4 sm:p-5 shadow-2xs">
           <div className="flex items-center gap-2 mb-2">
-            <span className="rounded-full bg-[#0f766e]/10 border border-[#0f766e]/20 px-2 py-0.5 text-[9px] font-black text-[#0f766e]">
+            <span className="rounded-full bg-[#0f766e]/10 border border-[#0f766e]/20 px-2.5 py-0.5 text-[10px] font-bold text-[#0f766e]">
               {activeQuestion.gs_paper} • {activeQuestion.year}
             </span>
-            <span className="text-[10px] text-[#49675e]">{activeQuestion.marks} marks • {activeQuestion.word_limit} words</span>
+            <span className="text-xs text-[#49675e] font-semibold">{activeQuestion.marks} marks • {activeQuestion.word_limit} words</span>
           </div>
-          <p className="text-sm text-[#1f2e26] leading-relaxed">{activeQuestion.question_text}</p>
+          <p className="text-sm sm:text-base text-[#1f2e26] leading-relaxed">{activeQuestion.question_text}</p>
         </div>
       )}
 
       {/* Answer Workspace */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* Introduction */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-[10px] font-black flex items-center justify-center">1</span>
-            <span className="text-xs font-black text-[#1a3a2a]">Introduction</span>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-xs font-bold flex items-center justify-center">1</span>
+            <span className="text-xs sm:text-sm font-bold text-[#1a3a2a]">Introduction</span>
           </div>
           <textarea
             value={introduction}
             onChange={(e) => setIntroduction(e.target.value)}
-            placeholder="Open with context..."
-            className="w-full h-20 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+            placeholder="Open with context, key definitions, or direct thesis..."
+            className="w-full h-24 rounded-xl border border-[#b9d9cd] bg-white p-3 text-base sm:text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30 shadow-2xs"
           />
         </div>
 
         {/* Body */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-[10px] font-black flex items-center justify-center">2</span>
-            <span className="text-xs font-black text-[#1a3a2a]">Body</span>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-xs font-bold flex items-center justify-center">2</span>
+            <span className="text-xs sm:text-sm font-bold text-[#1a3a2a]">Body (Arguments, Evidence & Examples)</span>
           </div>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Develop the argument..."
-            className="w-full h-40 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+            placeholder="Develop points with analytical headings, spatial/temporal dynamics, and UPSC reference framework..."
+            className="w-full h-44 rounded-xl border border-[#b9d9cd] bg-white p-3 text-base sm:text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30 shadow-2xs"
           />
         </div>
 
         {/* Conclusion */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-[10px] font-black flex items-center justify-center">3</span>
-            <span className="text-xs font-black text-[#1a3a2a]">Conclusion</span>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-5 h-5 rounded-full bg-[#1d9e75] text-white text-xs font-bold flex items-center justify-center">3</span>
+            <span className="text-xs sm:text-sm font-bold text-[#1a3a2a]">Conclusion & Forward Outlook</span>
           </div>
           <textarea
             value={conclusion}
             onChange={(e) => setConclusion(e.target.value)}
-            placeholder="Tie together, way forward..."
-            className="w-full h-20 rounded-xl border border-[#b9d9cd] bg-white p-3 text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+            placeholder="Synthesize insights with forward-looking, policy-aligned recommendations..."
+            className="w-full h-24 rounded-xl border border-[#b9d9cd] bg-white p-3 text-base sm:text-sm text-[#1f2e26] resize-none focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30 shadow-2xs"
           />
         </div>
       </div>
 
       {/* Word Counter + Actions */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[#49675e]">{wordCount} words {activeQuestion ? `/ ${activeQuestion.word_limit}` : ''}</span>
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+        <span className="text-xs text-[#49675e] font-semibold">{wordCount} words {activeQuestion ? `/ ${activeQuestion.word_limit}` : ''}</span>
+        <div className="flex items-center gap-2.5">
           <button
+            type="button"
             onClick={onComplete}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-[#dcd5c7] text-xs font-semibold text-[#5d675f]"
+            className="min-h-11 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#dcd5c7] text-xs sm:text-sm font-bold text-[#5d675f] bg-white hover:bg-gray-50 active:scale-[0.98] transition-all"
           >
-            <SkipForward className="h-3 w-3" /> Skip
+            <SkipForward className="h-3.5 w-3.5" /> Skip
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={!canSubmit || mode === 'submitting'}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black ${
+            className={`min-h-11 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-[0.98] ${
               canSubmit
-                ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white'
+                ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white hover:opacity-95'
                 : 'bg-[#dcd5c7] text-[#5d675f] cursor-not-allowed'
             }`}
           >
-            <PenLine className="h-3 w-3" />
+            <PenLine className="h-3.5 w-3.5" />
             {mode === 'submitting' ? 'Submitting...' : '🎯 Evaluate'}
           </button>
         </div>

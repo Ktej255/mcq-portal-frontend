@@ -165,9 +165,9 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
   const isCurrentlyActive = profile?.subscriptionPlanId === selectedPlan.tier && profile?.billingCycle === selectedPlan.cycle;
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8">
-        <Link href="/upsc/pricing" className="inline-flex w-fit items-center text-xs font-black uppercase tracking-[0.14em] text-[#1a3a2a]">
+    <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 sm:px-6 md:px-8">
+        <Link href="/upsc/pricing" className="inline-flex min-h-11 w-fit items-center text-xs font-black uppercase tracking-[0.14em] text-[#1a3a2a]">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to pricing
         </Link>
 
@@ -347,10 +347,10 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             ))}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/upsc/daily-command?tab=today" className="inline-flex min-h-10 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
+            <Link href="/upsc/daily-command?tab=today" className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white">
               Open UPSC workspace <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <Link href={selectedPlanUrl} className="inline-flex min-h-10 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a]">
+            <Link href={selectedPlanUrl} className="inline-flex min-h-11 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a]">
               Copyable plan URL
             </Link>
           </div>
@@ -365,7 +365,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
                 <Link
                   key={plan.id}
                   href={pricingCheckoutPath(plan.id)}
-                  className={`rounded-md border px-3 py-2 text-xs font-black ${
+                  className={`inline-flex min-h-11 items-center rounded-md border px-3 text-xs font-black ${
                     plan.id === selectedPlan.id
                       ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                       : "border-[#dcd5c7] bg-[#f7f4ee] text-[#31443a]"
@@ -377,6 +377,6 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

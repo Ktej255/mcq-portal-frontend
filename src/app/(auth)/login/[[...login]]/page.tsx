@@ -260,7 +260,7 @@ export default function LoginPage() {
                   onChange={(event) => setEmail(event.target.value)}
                   required
                   placeholder="student@example.com"
-                  className="h-12 rounded-md border-[#cfc6b6] bg-white pl-10 text-sm font-bold text-[#13251d]"
+                  className="h-12 rounded-md border-[#cfc6b6] bg-white pl-10 text-base sm:text-sm font-bold text-[#13251d]"
                   autoComplete="email"
                 />
               </div>

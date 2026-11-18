@@ -334,7 +334,7 @@ export function CashfreeCheckout({
           <button
             type="button"
             onClick={handleRetry}
-            className="inline-flex w-fit items-center gap-2 rounded-md bg-[#1d9e75] px-4 py-2 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
+            className="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-md bg-[#1d9e75] px-4 py-2 text-sm font-black text-white hover:bg-[#126245] transition shadow-sm"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             {hasSubmittedOrder ? "Retry confirmation" : "Retry Payment"}

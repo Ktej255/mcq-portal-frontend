@@ -42,46 +42,52 @@ export function CAFilterBar({ filters, onFiltersChange }: CAFilterBarProps) {
       {/* Search + toggle */}
       <div className="flex gap-2">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#5d675f]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5d675f]" />
           <input
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder="Search current affairs..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#dcd5c7] bg-white text-xs text-[#1f2e26] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+            className="w-full pl-9 pr-3 py-2.5 min-h-11 rounded-lg border border-[#dcd5c7] bg-white text-base sm:text-sm text-[#1f2e26] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
           />
         </div>
         <button
+          type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-black transition-colors ${
+          className={`min-h-11 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-black transition-colors ${
             showAdvanced ? 'border-[#1d9e75] bg-[#e7f5ee] text-[#085041]' : 'border-[#dcd5c7] text-[#5d675f]'
           }`}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <SlidersHorizontal className="h-4 w-4" />
           Filters {activeCount > 0 && `(${activeCount})`}
         </button>
         {activeCount > 0 && (
-          <button onClick={clearAll} className="flex items-center gap-1 px-2 py-2 text-[10px] font-black text-red-600">
-            <X className="h-3 w-3" /> Clear
+          <button
+            type="button"
+            onClick={clearAll}
+            className="min-h-11 inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-black text-red-600"
+          >
+            <X className="h-3.5 w-3.5" /> Clear
           </button>
         )}
       </div>
 
       {/* Advanced filters */}
       {showAdvanced && (
-        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-3">
+        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-4">
           {/* Subject */}
           <div>
-            <label className="text-[10px] font-black text-[#49675e] uppercase">Subject</label>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <label className="text-xs font-black text-[#49675e] uppercase tracking-wide">Subject</label>
+            <div className="flex flex-wrap gap-2 mt-2">
               {SUBJECTS.map(s => (
                 <button
                   key={s}
+                  type="button"
                   onClick={() => updateFilter('subject', filters.subject === s ? null : s)}
-                  className={`px-2 py-1 rounded-md text-[10px] font-black border transition-colors ${
+                  className={`min-h-9 sm:min-h-8 inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                     filters.subject === s
                       ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white'
-                      : 'border-[#dcd5c7] text-[#5d675f] hover:border-[#1d9e75]'
+                      : 'border-[#dcd5c7] bg-white text-[#5d675f] hover:border-[#1d9e75]'
                   }`}
                 >
                   {s.replace('-', ' ')}
@@ -92,16 +98,17 @@ export function CAFilterBar({ filters, onFiltersChange }: CAFilterBarProps) {
 
           {/* GS Paper */}
           <div>
-            <label className="text-[10px] font-black text-[#49675e] uppercase">GS Paper</label>
-            <div className="flex gap-1.5 mt-1.5">
+            <label className="text-xs font-black text-[#49675e] uppercase tracking-wide">GS Paper</label>
+            <div className="flex flex-wrap gap-2 mt-2">
               {GS_PAPERS.map(p => (
                 <button
                   key={p}
+                  type="button"
                   onClick={() => updateFilter('gs_paper', filters.gs_paper === p ? null : p)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-black border transition-colors ${
+                  className={`min-h-9 sm:min-h-8 inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                     filters.gs_paper === p
                       ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white'
-                      : 'border-[#dcd5c7] text-[#5d675f] hover:border-[#1d9e75]'
+                      : 'border-[#dcd5c7] bg-white text-[#5d675f] hover:border-[#1d9e75]'
                   }`}
                 >
                   {p}
@@ -112,16 +119,17 @@ export function CAFilterBar({ filters, onFiltersChange }: CAFilterBarProps) {
 
           {/* Exam Type */}
           <div>
-            <label className="text-[10px] font-black text-[#49675e] uppercase">Exam Type</label>
-            <div className="flex gap-1.5 mt-1.5">
+            <label className="text-xs font-black text-[#49675e] uppercase tracking-wide">Exam Type</label>
+            <div className="flex flex-wrap gap-2 mt-2">
               {EXAM_TYPES.map(e => (
                 <button
                   key={e}
+                  type="button"
                   onClick={() => updateFilter('exam_relevance', filters.exam_relevance === e ? null : e)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-black border transition-colors capitalize ${
+                  className={`min-h-9 sm:min-h-8 inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors capitalize ${
                     filters.exam_relevance === e
                       ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white'
-                      : 'border-[#dcd5c7] text-[#5d675f] hover:border-[#1d9e75]'
+                      : 'border-[#dcd5c7] bg-white text-[#5d675f] hover:border-[#1d9e75]'
                   }`}
                 >
                   {e}
@@ -132,20 +140,22 @@ export function CAFilterBar({ filters, onFiltersChange }: CAFilterBarProps) {
 
           {/* Sort */}
           <div>
-            <label className="text-[10px] font-black text-[#49675e] uppercase">Sort by</label>
-            <div className="flex gap-1.5 mt-1.5">
+            <label className="text-xs font-black text-[#49675e] uppercase tracking-wide">Sort by</label>
+            <div className="flex flex-wrap gap-2 mt-2">
               <button
+                type="button"
                 onClick={() => updateFilter('sort_by', 'publish_date')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-black border ${
-                  filters.sort_by !== 'relevance_score' ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] text-[#5d675f]'
+                className={`min-h-9 sm:min-h-8 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold border ${
+                  filters.sort_by !== 'relevance_score' ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] bg-white text-[#5d675f]'
                 }`}
               >
                 Newest
               </button>
               <button
+                type="button"
                 onClick={() => updateFilter('sort_by', 'relevance_score')}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-black border ${
-                  filters.sort_by === 'relevance_score' ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] text-[#5d675f]'
+                className={`min-h-9 sm:min-h-8 inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold border ${
+                  filters.sort_by === 'relevance_score' ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] bg-white text-[#5d675f]'
                 }`}
               >
                 Most Relevant

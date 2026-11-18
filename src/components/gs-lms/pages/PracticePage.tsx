@@ -134,7 +134,7 @@ export function PracticePage() {
         <button
           type="button"
           onClick={fetchTopics}
-          className="mt-3 rounded-md border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
+          className="mt-3 inline-flex min-h-11 items-center rounded-md border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75] hover:bg-[#e7f5ee]"
         >
           Retry
         </button>
@@ -155,22 +155,22 @@ export function PracticePage() {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-[#1a3a2a] mb-2">Practice</h1>
-      <p className="text-sm text-[#13251d]/60 mb-4 max-w-2xl">
-        Answer reviewed UPSC-style questions on one topic at a time. Every
-        attempt becomes accuracy evidence in your readiness report, so practice
-        where your evidence is thin rather than everywhere at once. Each row
-        shows the reviewed Prelims and Mains PYQs behind that topic&apos;s
-        demand weight.
-      </p>
+    <div className="py-4 sm:py-6 px-1 sm:px-0 space-y-5">
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1a3a2a] mb-1">Practice</h1>
+        <p className="text-xs sm:text-sm text-[#13251d]/65 max-w-2xl leading-relaxed">
+          Answer reviewed UPSC-style questions on one topic at a time. Every
+          attempt becomes accuracy evidence in your readiness report, so practice
+          where your evidence is thin rather than everywhere at once.
+        </p>
+      </div>
 
-      <div className="mb-6 flex flex-wrap gap-3 text-xs font-bold text-[#536259]">
-        <span className="px-2 py-1 rounded-md bg-[#e7f5ee] text-[#085041]">
+      <div className="flex flex-wrap gap-2.5 text-xs font-bold text-[#536259]">
+        <span className="px-3 py-1.5 rounded-lg bg-[#e7f5ee] text-[#085041] border border-[#1d9e75]/20">
           {readyTopics.length} topics with practice sets
         </span>
         {uncoveredTopics.length > 0 && (
-          <span className="px-2 py-1 rounded-md bg-[#f7f4ee] text-[#13251d]">
+          <span className="px-3 py-1.5 rounded-lg bg-[#f7f4ee] text-[#13251d] border border-[#dcd5c7]">
             {uncoveredTopics.length}{" "}
             {betaScoped ? "in preparation" : "awaiting question coverage"}
           </span>
@@ -178,11 +178,11 @@ export function PracticePage() {
       </div>
 
       {betaScoped && readyTopics.length === 0 && uncoveredTopics.length > 0 && (
-        <p className="mb-4 max-w-2xl text-xs text-[#536259]">
+        <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 text-xs text-[#536259] leading-relaxed shadow-2xs">
           Practice opens topic by topic. The topics below are still being
           authored — each one becomes available once it has reviewed content,
           measured PYQ demand, and a complete 15-question reviewed lab.
-        </p>
+        </div>
       )}
 
       {readyTopics.length === 0 ? (
@@ -191,20 +191,20 @@ export function PracticePage() {
           description="No topic in this subject has a reviewed practice set yet. Read a topic and use its knowledge check for now; practice opens here as questions are reviewed."
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {readyTopics.map((topic) => (
             <div
               key={topic.node_id}
-              className="flex items-center justify-between gap-3 p-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] hover:border-[#1d9e75]/50 transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] hover:border-[#1d9e75]/50 transition-colors shadow-2xs"
             >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[#1a3a2a]">{topic.title}</p>
-                <p className="text-xs text-[#13251d]/50 mt-0.5">
-                  {topic.mcq_count} reviewed question{topic.mcq_count === 1 ? "" : "s"}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm sm:text-base font-bold text-[#1a3a2a]">{topic.title}</p>
+                <p className="text-xs text-[#13251d]/60 mt-0.5">
+                  <span className="font-semibold text-[#1a3a2a]/80">{topic.mcq_count} reviewed question{topic.mcq_count === 1 ? "" : "s"}</span>
                   {demandByNode?.[topic.node_id]
                     ? ` · ${demandSummary(demandByNode[topic.node_id])}`
                     : ""}
-                  {topic.completed === true ? " · topic completed" : ""}
+                  {topic.completed === true ? " · ✅ topic completed" : ""}
                 </p>
                 {startError?.nodeId === topic.node_id ? (
                   <div role="alert" className="mt-2 flex items-center gap-2 text-xs text-red-700">
@@ -221,11 +221,12 @@ export function PracticePage() {
                 ) : null}
               </div>
               <button
+                type="button"
                 onClick={() => handleStartPractice(topic.node_id)}
                 disabled={starting === topic.node_id}
-                className="shrink-0 px-3 py-1.5 text-xs font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50"
+                className="min-h-11 shrink-0 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 shadow-sm"
               >
-                {starting === topic.node_id ? "Starting…" : "Start Practice"}
+                {starting === topic.node_id ? "Starting…" : "Start Practice →"}
               </button>
             </div>
           ))}

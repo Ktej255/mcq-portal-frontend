@@ -56,8 +56,7 @@ export function UpscYearlyPlanner() {
   )?.launchPrice ?? 399;
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+    <div className="flex w-full flex-col gap-5 text-[#13251d]">
         
         {/* Active subscription summary displaying current plan */}
         <section className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
@@ -84,7 +83,7 @@ export function UpscYearlyPlanner() {
             <div className="flex items-center gap-2">
               <Link
                 href="/upsc/pricing"
-                className="rounded-lg border border-[#1a3a2a] bg-white px-4 py-2 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition"
+                className="inline-flex min-h-11 items-center rounded-lg border border-[#1a3a2a] bg-white px-4 py-2 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition"
               >
                 {publicCommerceLaunchBoundary.readyForPayment ? "Manage / Upgrade Subscription" : "Review pilot plans"}
               </Link>
@@ -263,13 +262,13 @@ export function UpscYearlyPlanner() {
                       <p className="text-[10px] font-black uppercase text-[#746f66]">{subject.primaryPaper}</p>
                     </div>
                     {blueprintIsOpen ? (
-                      <Link href={subject.route} className="inline-flex min-h-8 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] transition">
+                      <Link href={subject.route} className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-3.5 text-xs font-black text-white hover:bg-[#10291d] transition">
                         Open
                       </Link>
                     ) : (
                       <span
                         aria-disabled="true"
-                        className="inline-flex min-h-8 items-center gap-1 rounded-md border border-[#dcd5c7] bg-[#faf6ee] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7a52]"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#dcd5c7] bg-[#faf6ee] px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#8a7a52]"
                       >
                         <Lock className="h-3 w-3" /> In preparation
                       </span>
@@ -317,7 +316,7 @@ export function UpscYearlyPlanner() {
                   and Sociology included — are catalogued with an honest coming-soon status and
                   unlock as their material is authored and reviewed.
                 </p>
-                <Link href="/upsc/optional-subjects" className="mt-4 inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
+                <Link href="/upsc/optional-subjects" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition">
                   Open Optional catalog <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </div>
@@ -332,9 +331,7 @@ export function UpscYearlyPlanner() {
             </div>
           )}
         </section>
-
       </div>
-    </main>
   );
 }
 
@@ -343,8 +340,7 @@ export function UpscYearlyPlanner() {
  **********************************************************************************/
 export function OptionalSubjectsCatalog() {
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+    <div className="flex w-full flex-col gap-5 text-[#13251d]">
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Optional catalog</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">Optional subject command pages</h1>
@@ -370,7 +366,6 @@ export function OptionalSubjectsCatalog() {
           ))}
         </section>
       </div>
-    </main>
   );
 }
 
@@ -393,9 +388,9 @@ export function OptionalSubjectDetail({
   const assemblyProof = sourcePack?.assemblyProof;
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+    <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8">
-        <Link href="/upsc/optional-subjects" className="inline-flex w-fit items-center text-xs font-black uppercase tracking-[0.14em] text-[#1a3a2a]">
+        <Link href="/upsc/optional-subjects" className="inline-flex min-h-11 w-fit items-center text-xs font-black uppercase tracking-[0.14em] text-[#1a3a2a]">
           Back to optional catalog
         </Link>
         <section data-testid="upsc-optional-detail" className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
@@ -546,7 +541,7 @@ export function OptionalSubjectDetail({
                   {sourcePack.paperRows.length} Paper I/II source rows seeded across {sourcePack.yearRows.length} years
                 </h2>
               </div>
-              <Link href="/upsc/source-library" className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white">
+              <Link href="/upsc/source-library" className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white">
                 Source library
               </Link>
             </div>
@@ -585,6 +580,6 @@ export function OptionalSubjectDetail({
           </section>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

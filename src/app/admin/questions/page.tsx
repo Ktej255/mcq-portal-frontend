@@ -151,7 +151,7 @@ export default function QuestionsControlRoom() {
           <p className="text-muted-foreground mt-1">Manage content governance and authoring workflow.</p>
         </div>
         <Link href="/admin/questions/bulk">
-          <Button className="gap-2 bg-emerald-800 hover:bg-emerald-900">
+          <Button className="min-h-11 gap-2 bg-emerald-800 hover:bg-emerald-900 font-bold">
             <UploadCloud className="h-4 w-4" />
             Bulk upload
           </Button>
@@ -179,7 +179,7 @@ export default function QuestionsControlRoom() {
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-emerald-700 text-white">{localDraftQuestionCount} local questions</Badge>
             <Link href="/admin/questions/bulk">
-              <Button variant="outline" className="gap-2 bg-white/80">
+              <Button variant="outline" className="min-h-11 gap-2 bg-white/80 font-bold">
                 <UploadCloud className="h-4 w-4" />
                 Upload more
               </Button>
@@ -356,7 +356,7 @@ export default function QuestionsControlRoom() {
                     </td>
                     <td className="p-4 align-top text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-md border border-transparent opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-100 dark:hover:bg-zinc-800 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
+                        <DropdownMenuTrigger className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-transparent opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-zinc-100 dark:hover:bg-zinc-800 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
                           <MoreVertical className="w-4 h-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">

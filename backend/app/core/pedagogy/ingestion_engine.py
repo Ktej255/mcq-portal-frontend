@@ -73,7 +73,43 @@ class MCQIngestionEngine:
                 # 3. Content Forensics
                 fingerprint = MCQForensics.generate_fingerprint(mcq)
                 
-                # 4. Safe Option Shuffling (Deterministic if needed, or verified)
+                # 4. Idempotency / Duplicate Check:
+                # If a question with the same test_id and content_hash exists, update it rather than creating a duplicate.
+                existing_q = (
+                    db.query(Question)
+                    .filter(
+                        Question.test_id == test_id,
+                        Question.content_hash == fingerprint.content_hash,
+                        Question.is_deleted.is_(False),
+                    )
+                    .first()
+                )
+                if existing_q:
+                    existing_q.topic_id = raw_q.get("topic_id") or existing_q.topic_id
+                    existing_q.text_en = mcq.text_en
+                    existing_q.text_hi = mcq.text_hi
+                    existing_q.options_en = [{"id": o.id, "text": o.text_en} for o in mcq.options]
+                    existing_q.options_hi = [{"id": o.id, "text": o.text_hi} for o in mcq.options] if mcq.text_hi else None
+                    existing_q.correct_option = mcq.correct_option
+                    existing_q.statements_en = mcq.statements_en
+                    existing_q.statements_hi = mcq.statements_hi
+                    existing_q.explanation_en = mcq.explanation_en
+                    existing_q.explanation_hi = mcq.explanation_hi
+                    existing_q.difficulty = mcq.difficulty
+                    existing_q.question_number = mcq.question_number
+                    existing_q.quality_notes = raw_q.get("quality_notes")
+                    existing_q.structure_hash = fingerprint.structure_hash
+                    existing_q.options_hash = fingerprint.options_hash
+                    existing_q.integrity_metadata = {
+                        "integrity_hash": fingerprint.integrity_hash,
+                        "question_type": mcq.question_type.value,
+                        "statements_count": len(mcq.statements_en),
+                        "ingested_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    created_questions.append(existing_q)
+                    continue
+
+                # 5. Safe Option Shuffling (Deterministic if needed, or verified)
                 # For ingestion, we usually store the "Canonical" order first.
                 
                 db_obj = Question(

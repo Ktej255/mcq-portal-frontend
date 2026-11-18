@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Target } from "lucide-react";
+import { AlertCircle, BarChart3, RefreshCw, Target } from "lucide-react";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import type { ProgressOut, ReadinessOut } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
@@ -21,28 +21,63 @@ export function LmsProgressCard() {
   const [progress, setProgress] = useState<ProgressOut | null>(null);
   const [readiness, setReadiness] = useState<ReadinessOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const fetchLmsData = useCallback(() => {
+    if (!isLoaded || !isSignedIn) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setFetchError(null);
+    Promise.all([
+      gsLmsService.getProgress("geography").catch((err) => {
+        throw err;
+      }),
+      gsLmsService.getReadiness("geography", { persist: false }).catch((err) => {
+        throw err;
+      }),
+    ])
+      .then(([prog, ready]) => {
+        setProgress(prog);
+        setReadiness(ready);
+      })
+      .catch((err) => {
+        setFetchError(err instanceof Error ? err.message : "Unable to reach LMS server");
+      })
+      .finally(() => setLoading(false));
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     const requestTimer = window.setTimeout(() => {
-      if (!isLoaded || !isSignedIn) {
-        setLoading(false);
-        return;
-      }
-
-      Promise.all([
-        gsLmsService.getProgress("geography").catch(() => null),
-        gsLmsService.getReadiness("geography", { persist: false }).catch(() => null),
-      ])
-        .then(([prog, ready]) => {
-          setProgress(prog);
-          setReadiness(ready);
-        })
-        .finally(() => setLoading(false));
+      fetchLmsData();
     }, 0);
     return () => window.clearTimeout(requestTimer);
-  }, [isLoaded, isSignedIn]);
+  }, [fetchLmsData]);
 
-  if (loading || (!progress && !readiness)) return null;
+  if (loading && !progress && !readiness) return null;
+
+  if (fetchError && !progress && !readiness) {
+    return (
+      <section className="mb-6 rounded-2xl border border-[#e8b061] bg-[#fff8ed] p-4 text-[#6f4a12]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-[#9b6517]" />
+            <p className="text-sm font-bold">Unable to load Geography LMS progress ({fetchError})</p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchLmsData}
+            className="inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d]"
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry LMS Progress
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!progress && !readiness) return null;
 
   return (
     <section className="mb-6 rounded-2xl border border-[#b9d9cd] bg-gradient-to-br from-[#e7f5ee] to-[#fffdf8] p-5 shadow-sm">
@@ -53,7 +88,7 @@ export function LmsProgressCard() {
         </div>
         <Link
           href="/upsc/geography/lms/gaps"
-          className="text-xs font-bold text-[#1d9e75] hover:underline"
+          className="inline-flex min-h-11 items-center text-xs font-bold text-[#1d9e75] hover:underline"
         >
           Full readiness analysis →
         </Link>
@@ -157,7 +192,7 @@ export function LmsProgressCard() {
                 <Link
                   key={action.node_id}
                   href={`/upsc/geography/lms/topic/${action.node_id}`}
-                  className="rounded-md border border-[#dcd5c7] bg-white px-2 py-0.5 text-[11px] font-bold text-[#1a3a2a] hover:border-[#1d9e75]"
+                  className="inline-flex min-h-11 items-center rounded-md border border-[#dcd5c7] bg-white px-3 py-1 text-xs font-bold text-[#1a3a2a] hover:border-[#1d9e75]"
                 >
                   {action.title} · {action.marks_at_stake.toFixed(1)} marks
                 </Link>

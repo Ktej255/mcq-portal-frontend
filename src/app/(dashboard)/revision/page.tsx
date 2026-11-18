@@ -67,7 +67,7 @@ function StateMessage({
             <button
               type="button"
               onClick={onRetry}
-              className="mt-3 inline-flex h-9 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d]"
+              className="mt-3 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d]"
             >
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
             </button>
@@ -150,7 +150,7 @@ export default function RevisionPage() {
   const isLoaded = queueState === "ready" && historyState === "ready";
 
   return (
-    <main className="text-[#13251d]">
+    <div className="text-[#13251d]">
       <section
         data-testid="student-revision-command"
         data-loaded={String(isLoaded)}
@@ -190,7 +190,7 @@ export default function RevisionPage() {
         <div className="mt-5 flex flex-wrap gap-3 text-xs font-black text-[#4f5e55]">
           <span className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] px-3 py-2">{queue.length} pending</span>
           <span className="rounded-md border border-[#e4dccf] bg-[#f7f4ee] px-3 py-2">{history.length} reviewed records</span>
-          <Link href="/exam/revision" className="inline-flex items-center px-1 py-2 text-[#1d9e75] hover:underline">
+          <Link href="/exam/revision" className="inline-flex min-h-11 items-center px-1 py-2 text-[#1d9e75] hover:underline">
             Open rapid drill <ArrowRight className="ml-1 h-3.5 w-3.5" />
           </Link>
         </div>
@@ -239,7 +239,7 @@ export default function RevisionPage() {
                     type="button"
                     onClick={() => void completeItem(item)}
                     disabled={completingId !== null}
-                    className="mt-4 inline-flex h-10 items-center rounded-md bg-[#1a3a2a] px-3 text-xs font-black text-white hover:bg-[#10291d] disabled:cursor-wait disabled:opacity-60"
+                    className="mt-4 inline-flex min-h-11 items-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] disabled:cursor-wait disabled:opacity-60"
                   >
                     {completingId === item.id ? <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                     {completingId === item.id ? "Saving..." : "Complete revision"}
@@ -281,6 +281,6 @@ export default function RevisionPage() {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }

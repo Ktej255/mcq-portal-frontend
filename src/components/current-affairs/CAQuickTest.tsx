@@ -107,7 +107,7 @@ export function CAQuickTest() {
                   type="button"
                   onClick={() => { setIsOpen(false); setScope(null); setMcqs([]); setLoadFailed(false); setError(null); }}
                   aria-label="Close Quick Test"
-                  className="text-[#5d675f] hover:text-[#13251d]"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 rounded-lg text-[#5d675f] hover:text-[#13251d]"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -182,14 +182,15 @@ export function CAQuickTest() {
                           {mcq.options.map(opt => (
                             <button
                               key={opt.label}
+                              type="button"
                               onClick={() => setAnswers(prev => ({ ...prev, [mcq.id]: opt.label }))}
-                              className={`w-full text-left rounded-md border p-2 text-[10px] transition-colors ${
+                              className={`w-full min-h-11 text-left rounded-lg border p-3 text-xs sm:text-sm font-medium transition-colors ${
                                 answers[mcq.id] === opt.label
-                                  ? 'border-[#1a3a2a] bg-[#e7f5ee]'
-                                  : 'border-[#dcd5c7] hover:border-[#b9d9cd]'
+                                  ? 'border-[#1a3a2a] bg-[#e7f5ee] font-bold text-[#085041]'
+                                  : 'border-[#dcd5c7] hover:border-[#b9d9cd] text-[#1f2e26]'
                               }`}
                             >
-                              <strong>{opt.label}.</strong> {opt.text}
+                              <strong className="mr-1">{opt.label}.</strong> {opt.text}
                             </button>
                           ))}
                         </div>
@@ -228,8 +229,9 @@ export function CAQuickTest() {
                       This score is authoritative for this submission. It is not saved to history or progress.
                     </p>
                     <button
+                      type="button"
                       onClick={() => { setScope(null); setMcqs([]); setSubmitted(false); setResult(null); setAnswers({}); setError(null); setLoadFailed(false); }}
-                      className="mt-3 px-4 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f]"
+                      className="mt-3 min-h-11 inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-[#dcd5c7] text-xs font-black text-[#13251d] hover:border-[#1d9e75] transition-colors"
                     >
                       Take Another Test
                     </button>

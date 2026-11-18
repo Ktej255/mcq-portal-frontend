@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { PlannerUI } from "../PlannerUI";
 import { gsLmsService } from "@/services/api/gsLmsService";
 import { useApiConfig } from "@/lib/hooks/useApi";
@@ -35,39 +36,46 @@ function RecallGateBanner({
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-[#ef9f27]/40 bg-[#fff4df] p-4">
+    <div className="mb-6 rounded-xl border border-[#ef9f27]/40 bg-[#fff4df] p-4 sm:p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="text-lg">🔔</span>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-[#6f4a12]">
+        <span className="text-xl sm:text-2xl mt-0.5" aria-hidden="true">🔔</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-[#6f4a12]">
             Quick Recall before you start
           </p>
-          <p className="text-sm text-[#6f4a12]/80 mt-1">
+          <p className="text-sm text-[#6f4a12]/90 mt-1">
             Recall yesterday&apos;s topic:{" "}
-            <span className="font-medium">{gate.topic_title}</span>
+            <span className="font-semibold text-[#5a3b0a]">{gate.topic_title}</span>
           </p>
           {gate.concepts && gate.concepts.length > 0 && (
-            <p className="text-xs text-[#6f4a12]/70 mt-1.5">
-              Key concepts: {gate.concepts.join(" · ")}
-            </p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {gate.concepts.map((concept, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#ef9f27]/20 text-[#6f4a12]"
+                >
+                  {concept}
+                </span>
+              ))}
+            </div>
           )}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
             <button
+              type="button"
               onClick={handleClear}
               disabled={clearing}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-[#ef9f27] hover:bg-[#d98c1e] rounded-lg transition-colors disabled:opacity-50"
+              className="min-h-11 inline-flex items-center justify-center px-4 py-2.5 text-xs sm:text-sm font-bold text-white bg-[#ef9f27] hover:bg-[#d98c1e] active:scale-[0.98] rounded-lg transition-all disabled:opacity-50 shadow-sm"
             >
-              {clearing ? "Marking done…" : "Done — I recalled it"}
+              {clearing ? "Marking done…" : "✓ Done — I recalled it"}
             </button>
-            <button
-              onClick={() =>
-                gate.topic_id &&
-                window.open(`${lmsBase}/topic/${gate.topic_id}`, "_self")
-              }
-              className="px-3 py-1.5 text-xs font-medium text-[#6f4a12] border border-[#ef9f27]/40 hover:bg-[#ef9f27]/10 rounded-lg transition-colors"
-            >
-              Review topic first
-            </button>
+            {gate.topic_id && (
+              <Link
+                href={`${lmsBase}/topic/${gate.topic_id}`}
+                className="min-h-11 inline-flex items-center justify-center px-4 py-2.5 text-xs sm:text-sm font-bold text-[#6f4a12] border border-[#ef9f27]/50 hover:bg-[#ef9f27]/10 active:scale-[0.98] rounded-lg transition-all"
+              >
+                Review topic first →
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -116,17 +124,19 @@ export function PlannerPage() {
   }, [isLoaded, isSignedIn, fetchRecallGate]);
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold text-[#1a3a2a] mb-6">
-        Daily Planner
-      </h1>
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1a3a2a]">
+          Daily Planner
+        </h1>
+      </div>
       {recallGateError && (
-        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-800">{recallGateError}</p>
           <button
             type="button"
             onClick={fetchRecallGate}
-            className="mt-3 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-semibold text-white"
+            className="mt-3 min-h-11 px-4 py-2 inline-flex items-center justify-center rounded-lg bg-red-800 text-xs sm:text-sm font-bold text-white transition hover:bg-red-900"
           >
             Retry recall check
           </button>

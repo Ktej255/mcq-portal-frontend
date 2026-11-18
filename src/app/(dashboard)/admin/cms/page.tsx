@@ -95,7 +95,7 @@ export default function AdminCmsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee]">
+    <div className="min-h-screen bg-[#f7f4ee]">
       <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -103,11 +103,11 @@ export default function AdminCmsPage() {
             <h1 className="text-2xl font-black text-[#13251d]">Admin CMS</h1>
             <p className="text-sm text-[#5d675f]">Manage current affairs content</p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/admin/cms/new" className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black">
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/cms/new" className="flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-xs font-black shadow-sm">
               <Plus className="h-3.5 w-3.5" /> New Item
             </Link>
-            <Link href="/admin/cms/bulk-upload" className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f]">
+            <Link href="/admin/cms/bulk-upload" className="flex min-h-11 items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#dcd5c7] text-xs font-black text-[#5d675f] hover:bg-white transition-colors">
               <Upload className="h-3.5 w-3.5" /> Bulk Upload
             </Link>
           </div>
@@ -129,13 +129,13 @@ export default function AdminCmsPage() {
         </div>
 
         {/* Status filter tabs */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {['', 'DRAFT', 'IN_REVIEW', 'PUBLISHED'].map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-md text-xs font-black border transition-colors ${
-                statusFilter === s ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] text-[#5d675f]'
+              className={`min-h-11 sm:min-h-9 px-3.5 py-2 rounded-md text-xs font-black border transition-colors ${
+                statusFilter === s ? 'border-[#1a3a2a] bg-[#1a3a2a] text-white' : 'border-[#dcd5c7] text-[#5d675f] hover:bg-white'
               }`}
             >
               {s || 'All'}
@@ -163,7 +163,7 @@ export default function AdminCmsPage() {
             <button
               type="button"
               onClick={() => void load()}
-              className="mt-3 rounded-lg bg-red-800 px-3 py-1.5 text-[11px] font-black text-white"
+              className="mt-3 min-h-11 px-4 py-2 rounded-lg bg-red-800 text-xs font-black text-white hover:bg-red-900 transition-colors"
             >
               Retry
             </button>
@@ -206,17 +206,17 @@ export default function AdminCmsPage() {
                             data-testid={`admin-cms-status-${action.to}`}
                             disabled={pendingItemId === item.id}
                             onClick={() => void changeStatus(item, action.to)}
-                            className="rounded-md bg-[#1a3a2a] px-2 py-1 text-[10px] font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="min-h-9 px-2.5 py-1.5 rounded-md bg-[#1a3a2a] text-xs font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center justify-center"
                           >
                             {pendingItemId === item.id ? 'Saving…' : action.label}
                           </button>
                         ))}
                         {NEXT_STATUS_ACTIONS[(item.review_status as ReviewStatus)]?.length ? null : (
-                          <span className="text-[10px] font-bold text-[#8a8377]">No transition available</span>
+                          <span className="text-[11px] font-bold text-[#8a8377]">No transition available</span>
                         )}
                         <Link
                           href={`/upsc/current-affairs/${item.id}`}
-                          className="text-[#1d9e75] font-black hover:underline"
+                          className="min-h-9 px-2 py-1.5 inline-flex items-center text-xs text-[#1d9e75] font-black hover:underline"
                         >
                           Preview
                         </Link>
@@ -232,7 +232,7 @@ export default function AdminCmsPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
 
