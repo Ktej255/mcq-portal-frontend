@@ -16,6 +16,7 @@
 import axios from "axios";
 import { useRef, useState, useCallback, useEffect } from "react";
 import { apiClient } from "@/services/api/client";
+import { compressImageForUpload, getAdaptiveCompressionSettings } from "@/lib/imageCompression";
 import {
   ArrowLeft,
   Camera,
@@ -429,8 +430,28 @@ export function MobileAnswerUploader({
     const formData = new FormData();
     formData.append("subject", subject);
     formData.append("question_hint", questionHint);
-    pages.forEach((page) => {
-      formData.append("files", page.file, page.file.name);
+
+    // Compress & downscale pages client-side before sending to server.
+    // Guarantees JPEG format and adaptively sizes batches so total request stays < 3.8 MB (well within Vercel's 4.5 MB limit).
+    const compressionSettings = getAdaptiveCompressionSettings(pages.length);
+    const processedFiles = await Promise.all(
+      pages.map((page) =>
+        compressImageForUpload(page.file, compressionSettings.maxDim, compressionSettings.quality)
+      )
+    );
+
+    // Pre-flight validation against Vercel's 4.5 MB serverless limit
+    const totalBytes = processedFiles.reduce((sum, f) => sum + f.size, 0);
+    if (totalBytes > 4.2 * 1024 * 1024) {
+      setUploadState({
+        status: "error",
+        message: "Total payload exceeds 4.2 MB. Please remove a few pages or retake in standard resolution.",
+      });
+      return;
+    }
+
+    processedFiles.forEach((file) => {
+      formData.append("files", file, file.name);
     });
 
     // Shared apiClient attaches the Clerk token; onUploadProgress drives the bar.
@@ -580,15 +601,19 @@ export function MobileAnswerUploader({
             style={{
               display: "inline-flex",
               alignItems: "center",
+              justifyContent: "center",
+              minHeight: "44px",
+              minWidth: "44px",
+              padding: "0 0.5rem",
               gap: "0.35rem",
-              fontSize: "0.8rem",
+              fontSize: "0.875rem",
               fontWeight: 900,
               color: "#13251d",
               textDecoration: "none",
-              opacity: 0.75,
+              opacity: 0.85,
             }}
           >
-            <ArrowLeft style={{ width: "1rem", height: "1rem" }} />
+            <ArrowLeft style={{ width: "1.1rem", height: "1.1rem" }} />
             Back
           </a>
         )}
@@ -873,6 +898,87 @@ export function MobileAnswerUploader({
                 Previewing {selectedPage.label} of {pages.length}
               </p>
             )}
+            {selectedPage && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.5rem",
+                  marginTop: "0.75rem",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => movePageLeft(pages.findIndex((p) => p.id === selectedPage.id))}
+                  disabled={pages.findIndex((p) => p.id === selectedPage.id) === 0 || isUploading}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    minHeight: "44px",
+                    padding: "0 0.875rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #dcd5c7",
+                    background: "#fdfaf3",
+                    color: "#13251d",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: pages.findIndex((p) => p.id === selectedPage.id) === 0 ? "not-allowed" : "pointer",
+                    opacity: pages.findIndex((p) => p.id === selectedPage.id) === 0 ? 0.4 : 1,
+                  }}
+                >
+                  <ChevronLeft style={{ width: "1rem", height: "1rem" }} />
+                  Move Earlier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => movePageRight(pages.findIndex((p) => p.id === selectedPage.id))}
+                  disabled={pages.findIndex((p) => p.id === selectedPage.id) === pages.length - 1 || isUploading}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    minHeight: "44px",
+                    padding: "0 0.875rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #dcd5c7",
+                    background: "#fdfaf3",
+                    color: "#13251d",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: pages.findIndex((p) => p.id === selectedPage.id) === pages.length - 1 ? "not-allowed" : "pointer",
+                    opacity: pages.findIndex((p) => p.id === selectedPage.id) === pages.length - 1 ? 0.4 : 1,
+                  }}
+                >
+                  Move Later
+                  <ChevronRight style={{ width: "1rem", height: "1rem" }} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removePage(selectedPage.id)}
+                  disabled={isUploading}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    minHeight: "44px",
+                    padding: "0 0.875rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #f5c6c6",
+                    background: "#fff5f5",
+                    color: "#a23b46",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Trash2 style={{ width: "0.9rem", height: "0.9rem" }} />
+                  Remove
+                </button>
+              </div>
+            )}
           </section>
         )}
 
@@ -931,7 +1037,7 @@ export function MobileAnswerUploader({
                 borderRadius: "0.5rem",
                 background: "#fdfaf3",
                 color: "#13251d",
-                fontSize: "0.875rem",
+                fontSize: "1rem",
                 fontWeight: 700,
                 marginBottom: "0.875rem",
                 outline: "none",
@@ -973,7 +1079,7 @@ export function MobileAnswerUploader({
                 borderRadius: "0.5rem",
                 background: "#fdfaf3",
                 color: "#13251d",
-                fontSize: "0.875rem",
+                fontSize: "1rem",
                 fontWeight: 600,
                 marginBottom: "1.25rem",
                 outline: "none",

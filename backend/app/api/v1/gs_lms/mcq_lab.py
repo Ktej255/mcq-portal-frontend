@@ -45,6 +45,7 @@ from app.api.v1.gs_lms.dependencies import (
     ensure_leaf_unlocked,
     resolve_subject,
 )
+from app.core.gs_lms.coverage import create_gap_snapshot
 
 
 router = APIRouter()
@@ -333,6 +334,14 @@ def submit_mcq_lab(
     refresh_mastery(db, current_user.id, node_id)
 
     db.commit()
+
+    # Refresh the gap snapshot so readiness counts MCQ Lab work. The result
+    # above is already saved, so a failure here must not fail the request.
+    try:
+        create_gap_snapshot(db, current_user.id)
+        db.commit()
+    except Exception:
+        db.rollback()
 
     # Build response
     show_marks = scoring.include_marks(exam_code_of(subject), (g.answer_format for g in graded))

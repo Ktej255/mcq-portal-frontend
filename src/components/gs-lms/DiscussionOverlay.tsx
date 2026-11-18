@@ -219,7 +219,7 @@ function WelcomeScreen({
             placeholder="Start speaking or type your answer here…"
             rows={4}
             disabled={sending}
-            className="w-full px-4 py-3 text-sm bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none shadow-sm placeholder:text-slate-300 text-slate-700 transition-all"
+            className="w-full px-4 py-3 text-base sm:text-sm bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none shadow-sm placeholder:text-slate-300 text-slate-700 transition-all"
           />
           {listening && (
             <div className="absolute top-3 right-3 flex items-center gap-1.5 text-red-500 text-xs font-semibold animate-pulse">
@@ -288,7 +288,7 @@ function ActiveDiscussionScreen({
               placeholder="Type your response or tap the mic…"
               rows={3}
               disabled={sending}
-              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
+              className="w-full px-4 py-3 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none placeholder:text-slate-300 text-slate-700 transition-all"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -827,7 +827,7 @@ export function DiscussionOverlay({
             type="button"
             onClick={onClose}
             aria-label="Close knowledge check"
-            className="ml-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="ml-1 flex min-h-[44px] min-w-[44px] h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

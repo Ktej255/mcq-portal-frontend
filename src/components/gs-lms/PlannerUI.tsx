@@ -150,15 +150,15 @@ export function PlannerUI() {
   return (
     <div className="space-y-6">
       {operationError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg">
           {operationError}
         </p>
       )}
 
       {/* Header with date and streak */}
-      <div className="flex items-center justify-between p-4 rounded-xl border border-[#dcd5c7] bg-[#fffdf8]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-xl border border-[#dcd5c7] bg-[#fffdf8] shadow-sm">
         <div>
-          <p className="text-sm font-medium text-[#1a3a2a]">
+          <p className="text-base sm:text-lg font-bold text-[#1a3a2a]">
             {new Date(plan.plan_date).toLocaleDateString("en-IN", {
               weekday: "long",
               day: "numeric",
@@ -166,204 +166,273 @@ export function PlannerUI() {
             })}
           </p>
           {plan.projected_completion_date && (
-            <p className="text-xs text-[#13251d]/50 mt-0.5">
+            <p className="text-xs sm:text-sm text-[#13251d]/60 mt-1 max-w-xl">
               Pacing estimate:{" "}
-              {new Date(plan.projected_completion_date).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}{" "}
-              if every slot finishes its topic. A topic often needs more than one
-              sitting, so treat this as a floor, not a deadline.
+              <span className="font-semibold text-[#1a3a2a]">
+                {new Date(plan.projected_completion_date).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>{" "}
+              if every slot finishes its topic. Treat this as a pacing floor, not a rigid deadline.
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-orange-500">
-          <span className="text-lg">🔥</span>
-          <span className="text-sm font-semibold">{plan.streak_days} day streak</span>
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-orange-200 bg-orange-50 text-orange-600 self-start sm:self-auto shrink-0 shadow-sm">
+          <span className="text-base" aria-hidden="true">🔥</span>
+          <span className="text-xs sm:text-sm font-bold">{plan.streak_days} day streak</span>
         </div>
       </div>
 
       {/* Bandwidth selector */}
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-3 p-4 rounded-lg border border-[#dcd5c7] bg-white">
-        <label className="text-sm text-[#13251d]/70">Daily topic slots:</label>
-        <input
-          type="number"
-          min={1}
-          max={20}
-          value={bandwidth}
-          onChange={(e) => setBandwidthVal(Number(e.target.value))}
-          className="w-16 px-2 py-1.5 text-sm border border-[#dcd5c7] rounded-lg text-center focus:border-[#1d9e75] outline-none"
-        />
-        <span className="text-xs text-[#13251d]/50">
-          topics/day · a full topic spans several sittings
-        </span>
-        <button
-          onClick={handleUpdateBandwidth}
-          disabled={updating || bandwidth === plan.bandwidth}
-          className="ml-auto px-3 py-1.5 text-xs font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg disabled:opacity-50 transition-colors"
-        >
-          {updating ? "Saving…" : "Update"}
-        </button>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-xl border border-[#dcd5c7] bg-white shadow-sm">
+        <div className="space-y-0.5">
+          <label htmlFor="daily-bandwidth-input" className="text-sm font-bold text-[#1a3a2a]">
+            Daily topic slots:
+          </label>
+          <p className="text-xs text-[#13251d]/55">
+            Topics per day · 1–4 slots recommended for balanced daily retention
+          </p>
+        </div>
+        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end">
+          <div className="flex items-center border border-[#dcd5c7] rounded-lg overflow-hidden bg-white">
+            <button
+              type="button"
+              onClick={() => setBandwidthVal((prev) => Math.max(1, prev - 1))}
+              disabled={bandwidth <= 1 || updating}
+              className="min-h-11 min-w-11 flex items-center justify-center text-sm font-bold text-[#13251d] hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              aria-label="Decrease slots"
+            >
+              −
+            </button>
+            <input
+              id="daily-bandwidth-input"
+              type="number"
+              min={1}
+              max={20}
+              value={bandwidth}
+              onChange={(e) => setBandwidthVal(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+              className="w-12 h-11 text-center font-bold text-base sm:text-sm text-[#1a3a2a] outline-none border-x border-[#dcd5c7]"
+            />
+            <button
+              type="button"
+              onClick={() => setBandwidthVal((prev) => Math.min(20, prev + 1))}
+              disabled={bandwidth >= 20 || updating}
+              className="min-h-11 min-w-11 flex items-center justify-center text-sm font-bold text-[#13251d] hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              aria-label="Increase slots"
+            >
+              +
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleUpdateBandwidth}
+            disabled={updating || bandwidth === plan.bandwidth}
+            className="min-h-11 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg disabled:opacity-40 transition-colors shadow-sm"
+          >
+            {updating ? "Saving…" : "Update"}
+          </button>
+        </div>
       </div>
 
       {/* Due spaced recalls: completed topics returning for review */}
       {revisitItems.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-[#1a3a2a] uppercase tracking-wide">
-            Topic revisits due
-          </h3>
-          <p className="text-xs text-[#13251d]/55">
-            Completed topics return here on their Day 3, Day 7, and Day 21
-            revisit dates. Open the topic, recall it from memory, then mark it
-            reviewed so it leaves today&apos;s queue. Section recall scheduled
-            inside a topic&apos;s growth report is a separate track.
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs sm:text-sm font-bold text-[#6f4a12] uppercase tracking-wider">
+              Topic Revisits Due ({revisitItems.length})
+            </h3>
+          </div>
+          <p className="text-xs text-[#13251d]/60">
+            Completed topics return here on Day 3, 7, and 21 spaced intervals.
+            Recall the core concepts from memory, then mark reviewed.
           </p>
-          {revisitItems.map((item) => (
-            <div
-              key={`revisit-${item.revisit_id ?? item.node_id}`}
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-[#ef9f27]/40 bg-[#fff4df] p-2.5 md:p-3"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-white/70 text-xs" aria-hidden="true">
-                🔁
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[#6f4a12]">
-                  {stripRevisitPrefix(item.title)}
-                </p>
-                <p className="text-xs text-[#6f4a12]/60">
-                  {revisitLabel(item.revisit_type)}
-                  {item.overdue && (
-                    <span className="font-semibold text-[#b56b0c]"> · Overdue</span>
-                  )}
-                </p>
+          <div className="space-y-2.5">
+            {revisitItems.map((item) => (
+              <div
+                key={`revisit-${item.revisit_id ?? item.node_id}`}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#ef9f27]/40 bg-[#fff4df] p-3.5 sm:p-4 shadow-sm"
+              >
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/80 text-sm shadow-2xs" aria-hidden="true">
+                    🔁
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm sm:text-base font-bold text-[#6f4a12] truncate">
+                      {stripRevisitPrefix(item.title)}
+                    </p>
+                    <p className="text-xs text-[#6f4a12]/75 mt-0.5">
+                      {revisitLabel(item.revisit_type)}
+                      {item.overdue && (
+                        <span className="font-bold text-[#b56b0c]"> · Overdue</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-stretch sm:self-auto">
+                  <Link
+                    href={`${lmsBase}/topic/${item.node_id}`}
+                    className="min-h-11 flex-1 sm:flex-initial inline-flex items-center justify-center rounded-lg border border-[#ef9f27]/60 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-[#6f4a12] transition-colors hover:bg-[#ef9f27]/10"
+                  >
+                    Open topic
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      item.revisit_id && handleCompleteRevisit(item.revisit_id)
+                    }
+                    disabled={!item.revisit_id || completingRevisitId === item.revisit_id}
+                    className="min-h-11 flex-1 sm:flex-initial inline-flex items-center justify-center rounded-lg bg-[#ef9f27] px-4 py-2 text-xs sm:text-sm font-bold text-white transition-colors hover:bg-[#d98c1e] disabled:opacity-50 shadow-sm"
+                  >
+                    {completingRevisitId === item.revisit_id ? "Recording…" : "Mark reviewed"}
+                  </button>
+                </div>
               </div>
-              <Link
-                href={`${lmsBase}/topic/${item.node_id}`}
-                className="rounded-lg border border-[#ef9f27]/50 bg-white px-3 py-1.5 text-xs font-semibold text-[#6f4a12] transition-colors hover:bg-[#ef9f27]/10"
-              >
-                Open topic
-              </Link>
-              <button
-                type="button"
-                onClick={() =>
-                  item.revisit_id && handleCompleteRevisit(item.revisit_id)
-                }
-                disabled={!item.revisit_id || completingRevisitId === item.revisit_id}
-                className="rounded-lg bg-[#ef9f27] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#d98c1e] disabled:opacity-50"
-              >
-                {completingRevisitId === item.revisit_id ? "Recording…" : "Mark reviewed"}
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
       {/* Planned items checklist */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-[#1a3a2a] uppercase tracking-wide">
+          <h3 className="text-xs sm:text-sm font-bold text-[#1a3a2a] uppercase tracking-wider">
             Today&apos;s Plan
           </h3>
           {dayItems.length > 0 && (
-            <span className="text-xs font-medium text-[#13251d]/55">
-              {completedDayItems} of {dayItems.length} done
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#e7f5ee] text-[#085041]">
+              {completedDayItems} of {dayItems.length} completed
             </span>
           )}
         </div>
-        <p className="text-xs text-[#13251d]/55">
-          Each item is a full topic, shown with its place in the beta sequence
-          and the reviewed PYQs mapped to it. Open it to read, recall,
-          practise, and finish the report; the tick here follows your recorded
-          progress, not a manual checkbox.
+        <p className="text-xs text-[#13251d]/60">
+          Each item is a full topic with its sequence position and PYQ demand.
+          Tapping an item opens its 14-step study flow; progress updates automatically as you complete each step.
         </p>
+
         {dayItems.length === 0 ? (
-          <div className="space-y-2 py-4">
-            <p className="text-sm text-[#13251d]/60">No items planned for today.</p>
+          <div className="rounded-xl border border-dashed border-[#dcd5c7] bg-white p-6 text-center space-y-3">
+            <p className="text-sm text-[#13251d]/70 font-medium">No items scheduled for today.</p>
             <Link
               href={`${lmsBase}/syllabus`}
-              className="text-sm font-medium text-[#1d9e75] hover:underline"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-4 py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-[#178a65]"
             >
-              Open the syllabus to see what is next →
+              Open Syllabus Tree to queue a topic →
             </Link>
           </div>
         ) : (
-          dayItems.map((item, idx) => {
-            const dest =
-              item.item_type === "retro"
-                ? `${lmsBase}/retro`
-                : item.item_type === "practice"
-                  ? `${lmsBase}/practice`
-                  : `${lmsBase}/topic/${item.node_id}`;
-            const typeLabel =
-              item.item_type === "retro"
-                ? "Weekly retrospective"
-                : item.item_type === "practice"
-                  ? "Practice"
-                  : "Topic";
-            const context = planItemContext(item);
-            return (
-              <button
-                key={`${item.node_id}-${item.item_type}-${idx}`}
-                onClick={() => router.push(dest)}
-                className={`w-full text-left flex items-center gap-3 p-2.5 md:p-3 rounded-lg border transition-colors ${
-                  item.item_type === "retro"
-                    ? "border-[#1d9e75]/30 bg-[#e7f5ee] hover:border-[#1d9e75]"
-                    : "border-[#dcd5c7] bg-white hover:border-[#1d9e75]/40"
-                }`}
-              >
-                <span
-                  className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center ${
-                    item.completed
-                      ? "bg-[#1d9e75] border-[#1d9e75] text-white"
-                      : item.item_type === "retro"
-                        ? "border-[#1d9e75] text-[#1d9e75]"
-                        : "border-[#dcd5c7]"
+          <div className="space-y-2.5">
+            {dayItems.map((item, idx) => {
+              const dest =
+                item.item_type === "retro"
+                  ? `${lmsBase}/retro`
+                  : item.item_type === "practice"
+                    ? `${lmsBase}/practice`
+                    : `${lmsBase}/topic/${item.node_id}`;
+              const typeLabel =
+                item.item_type === "retro"
+                  ? "Weekly Retrospective"
+                  : item.item_type === "practice"
+                    ? "Practice Lab"
+                    : "Topic";
+              const context = planItemContext(item);
+              return (
+                <button
+                  key={`${item.node_id}-${item.item_type}-${idx}`}
+                  type="button"
+                  onClick={() => router.push(dest)}
+                  className={`w-full text-left flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border min-h-[58px] transition-all active:scale-[0.99] cursor-pointer shadow-xs ${
+                    item.item_type === "retro"
+                      ? "border-[#1d9e75]/40 bg-[#e7f5ee] hover:border-[#1d9e75]"
+                      : item.completed
+                        ? "border-[#dcd5c7]/60 bg-gray-50/70 hover:bg-gray-50"
+                        : "border-[#dcd5c7] bg-white hover:border-[#1d9e75]/50 hover:shadow-sm"
                   }`}
                 >
-                  {item.completed ? (
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : item.item_type === "retro" ? (
-                    <span className="text-[10px]">📝</span>
-                  ) : null}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${item.completed ? "text-[#13251d]/50 line-through" : "text-[#1a3a2a]"}`}>
-                    {item.title}
-                  </p>
-                  <p className="text-xs text-[#13251d]/40">
-                    {typeLabel}
-                    {context ? ` · ${context}` : ""}
-                  </p>
-                </div>
-              </button>
-            );
-          })
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span
+                      className={`flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                        item.completed
+                          ? "bg-[#1d9e75] border-[#1d9e75] text-white"
+                          : item.item_type === "retro"
+                            ? "border-[#1d9e75] text-[#1d9e75]"
+                            : "border-[#dcd5c7] bg-white"
+                      }`}
+                    >
+                      {item.completed ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : item.item_type === "retro" ? (
+                        <span className="text-xs">📝</span>
+                      ) : null}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm sm:text-base font-bold truncate ${item.completed ? "text-[#13251d]/50 line-through" : "text-[#1a3a2a]"}`}>
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-[#13251d]/55 mt-0.5">
+                        <span className="font-semibold text-[#1a3a2a]/70">{typeLabel}</span>
+                        {context ? ` · ${context}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[#13251d]/40 font-bold text-lg sm:text-xl shrink-0 ml-1" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         )}
+
         {allDayItemsDone && (
-          <p className="rounded-lg border border-[#b9d9cd] bg-[#f3faf6] px-3 py-2 text-xs text-[#1a3a2a]">
-            Everything planned for today is recorded. The next plan opens
-            tomorrow; use the remaining time for a quick recall or practice.
-          </p>
+          <div className="rounded-xl border border-[#b9d9cd] bg-[#f3faf6] p-4 sm:p-5 shadow-xs">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5" aria-hidden="true">🎉</span>
+              <div className="flex-1">
+                <h4 className="text-sm sm:text-base font-bold text-[#085041]">
+                  All planned topics for today are completed!
+                </h4>
+                <p className="text-xs sm:text-sm text-[#13251d]/75 mt-1">
+                  Your daily progress is saved. New topics will open tomorrow. Keep your retention sharp:
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2.5">
+                  <Link
+                    href={`${lmsBase}/practice`}
+                    className="min-h-11 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#1d9e75] text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-[#178a65] transition-colors"
+                  >
+                    Practice Lab (MCQs) →
+                  </Link>
+                  <Link
+                    href={`${lmsBase}/syllabus`}
+                    className="min-h-11 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-[#1d9e75]/40 bg-white text-xs sm:text-sm font-bold text-[#085041] hover:bg-[#e7f5ee] transition-colors"
+                  >
+                    Browse Syllabus Map →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
       {/* Weekly review + replan */}
-      <div className="flex flex-wrap items-center gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3">
         <button
+          type="button"
           onClick={handleReplan}
           disabled={replanning}
-          className="px-4 py-2 text-sm font-medium text-[#1a3a2a] border border-[#dcd5c7] hover:border-[#1d9e75] rounded-lg transition-colors disabled:opacity-50"
+          className="min-h-11 px-5 py-2.5 text-xs sm:text-sm font-bold text-[#1a3a2a] border border-[#dcd5c7] hover:border-[#1d9e75] bg-white rounded-lg transition-all active:scale-[0.98] disabled:opacity-50 shadow-xs"
         >
-          {replanning ? "Replanning…" : "Replan"}
+          {replanning ? "Replanning…" : "⚡ Replan Schedule"}
         </button>
         <Link
           href={`${lmsBase}/retro`}
-          className="text-sm font-medium text-[#1d9e75] hover:underline"
+          className="min-h-11 inline-flex items-center justify-center px-4 py-2.5 text-xs sm:text-sm font-bold border border-[#1d9e75]/30 bg-[#e7f5ee] text-[#085041] rounded-lg transition-all hover:bg-[#1d9e75] hover:text-white"
         >
-          Open weekly retrospective →
+          Open Weekly Retrospective →
         </Link>
       </div>
     </div>

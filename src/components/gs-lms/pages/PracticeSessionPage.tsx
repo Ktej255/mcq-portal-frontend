@@ -45,6 +45,12 @@ export function PracticeSessionPage() {
     setNotFound(false);
     try {
       const data = await gsLmsService.getPracticeSession(subject, sessionId);
+      if (data.status === "SUBMITTED") {
+        const res = await gsLmsService.submitPractice(subject, sessionId);
+        setResult(res);
+        setLoading(false);
+        return;
+      }
       setSession(data);
       try {
         sessionStorage.setItem(
@@ -58,7 +64,15 @@ export function PracticeSessionPage() {
           ? (err as { response?: { status?: number } }).response?.status
           : undefined;
       if (status === 404) {
-        setNotFound(true);
+        // Attempt to replay submitted result before declaring 404
+        try {
+          const res = await gsLmsService.submitPractice(subject, sessionId);
+          setResult(res);
+          setLoading(false);
+          return;
+        } catch {
+          setNotFound(true);
+        }
       } else {
         setError("Could not load session. Please check your connection and try again.");
       }
@@ -157,7 +171,7 @@ export function PracticeSessionPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (sessionId === null || submitInFlightRef.current) return;
 
     submitInFlightRef.current = true;
@@ -178,7 +192,15 @@ export function PracticeSessionPage() {
       submitInFlightRef.current = false;
       setSubmitting(false);
     }
-  };
+  }, [sessionId, subject]);
+
+  // If session is already completed (all questions answered/skipped) and no result is set, auto-submit
+  useEffect(() => {
+    if (!session || result || submitting) return;
+    if (session.status === "COMPLETED" || session.current_question === null) {
+      void handleSubmit();
+    }
+  }, [session, result, submitting, handleSubmit]);
 
   if (sessionId === null) {
     return (

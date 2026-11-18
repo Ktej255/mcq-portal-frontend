@@ -73,14 +73,14 @@ export function OptionalHomeEntry() {
         <div className="flex items-center gap-2">
           <Link
             href={optionalSubjectRoute(selected.slug)}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#13251d] active:scale-95"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#13251d] active:scale-95"
           >
             Continue
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           <Link
             href={OPTIONAL_CATALOG_ROUTE}
-            className="inline-flex items-center rounded-lg border border-[#b9d9cd] bg-white px-3 py-2 text-xs font-bold text-[#34453b] transition-all hover:border-[#1d9e75]/50 hover:text-[#13251d] active:scale-95"
+            className="inline-flex min-h-11 items-center rounded-lg border border-[#b9d9cd] bg-white px-3 py-2 text-xs font-bold text-[#34453b] transition-all hover:border-[#1d9e75]/50 hover:text-[#13251d] active:scale-95"
           >
             Change
           </Link>
@@ -112,7 +112,7 @@ export function OptionalHomeEntry() {
           coming-soon status until their material is reviewed.
         </p>
       </div>
-      <span className="inline-flex items-center gap-2 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-bold text-white">
+      <span className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-bold text-white">
         Browse subjects
         <ArrowRight className="h-3.5 w-3.5" />
       </span>

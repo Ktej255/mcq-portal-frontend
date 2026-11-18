@@ -84,13 +84,13 @@ export function RetroPage() {
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-4 sm:p-6">
         <div className="rounded-xl border border-[#ef9f27]/30 bg-[#fff4df] p-5 space-y-3">
           <h1 className="text-lg font-semibold text-[#6f4a12]">Unable to load your retrospective</h1>
           <p className="text-sm text-[#6f4a12]/80">{error}</p>
           <button
             onClick={retryFetchRetro}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors"
+            className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm font-bold text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors"
           >
             Try again
           </button>
@@ -101,7 +101,7 @@ export function RetroPage() {
 
   if (!retro) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-4 sm:p-6">
         <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5">
           <h1 className="text-lg font-semibold text-[#1a3a2a]">No retrospective available</h1>
           <p className="text-sm text-[#13251d]/60 mt-1">
@@ -113,7 +113,7 @@ export function RetroPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
       <div>
         <p className="text-xs font-semibold text-[#1d9e75] uppercase tracking-widest mb-1">
           Week {retro.week_number} · {new Date(retro.plan_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
@@ -186,7 +186,7 @@ export function RetroPage() {
             onChange={(e) => setReflection(e.target.value)}
             rows={4}
             placeholder="Write your reflection here…"
-            className="w-full px-3 py-2 text-sm border border-[#dcd5c7] rounded-lg focus:border-[#1d9e75] focus:ring-1 focus:ring-[#1d9e75] outline-none resize-none"
+            className="w-full px-3 py-2 text-base sm:text-sm border border-[#dcd5c7] rounded-lg focus:border-[#1d9e75] focus:ring-1 focus:ring-[#1d9e75] outline-none resize-none"
           />
         )}
       </section>
@@ -200,7 +200,7 @@ export function RetroPage() {
           <button
             onClick={handleSubmit}
             disabled={submitting || !reflection.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm font-bold text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors disabled:opacity-50"
           >
             Try again
           </button>
@@ -208,27 +208,27 @@ export function RetroPage() {
       )}
 
       {done ? (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-[#1d9e75] font-medium">✓ Retro complete for week {retro.week_number}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span className="text-sm text-[#1d9e75] font-semibold">✓ Retro complete for week {retro.week_number}</span>
           <button
             onClick={() => router.push(`${lmsBase}/planner`)}
-            className="ml-auto px-4 py-2 text-sm font-medium text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors"
+            className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm font-bold text-white bg-[#1d9e75] rounded-lg hover:bg-[#178a65] transition-colors w-full sm:w-auto"
           >
             Back to Planner
           </button>
         </div>
       ) : (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
           <button
             onClick={() => router.push(`${lmsBase}/planner`)}
-            className="px-4 py-2 text-sm text-[#13251d]/60 hover:text-[#1a3a2a] transition-colors"
+            className="inline-flex min-h-11 items-center justify-center px-4 py-2.5 text-sm font-medium text-[#13251d]/70 hover:text-[#1a3a2a] transition-colors w-full sm:w-auto"
           >
             Skip for now
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting || !reflection.trim()}
-            className="px-5 py-2 text-sm font-medium text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center px-6 py-2.5 text-sm font-bold text-white bg-[#1d9e75] hover:bg-[#178a65] rounded-lg transition-colors disabled:opacity-50 w-full sm:w-auto"
           >
             {submitting ? "Saving…" : "Complete Retro"}
           </button>

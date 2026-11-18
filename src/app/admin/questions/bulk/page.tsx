@@ -552,11 +552,11 @@ export default function BulkUploadPage() {
           <h1 className="text-3xl font-bold tracking-tight">Bulk Question Ingestion</h1>
           <p className="text-muted-foreground">Import large question banks via CSV for scaling subjects.</p>
         </div>
-        <div className="flex gap-4">
-          <Button variant="outline" onClick={() => window.open('/templates/question_import_template.csv')}>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" className="min-h-11 font-bold" onClick={() => window.open('/templates/question_import_template.csv')}>
             Legacy Template
           </Button>
-          <Button variant="outline" onClick={() => window.open('/templates/upsc_mcq_command_template.csv')}>
+          <Button variant="outline" className="min-h-11 font-bold" onClick={() => window.open('/templates/upsc_mcq_command_template.csv')}>
             UPSC Template
           </Button>
         </div>
@@ -674,7 +674,7 @@ export default function BulkUploadPage() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Select Target Test</label>
                 <select 
-                  className="w-full p-2 rounded-lg border bg-background"
+                  className="min-h-11 w-full p-2.5 rounded-lg border bg-background text-base sm:text-sm"
                   value={selectedTestId || ''}
                   onChange={(e) => setSelectedTestId(Number(e.target.value))}
                 >
@@ -686,7 +686,7 @@ export default function BulkUploadPage() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Select Default Topic</label>
                 <select 
-                  className="w-full p-2 rounded-lg border bg-background"
+                  className="min-h-11 w-full p-2.5 rounded-lg border bg-background text-base sm:text-sm"
                   value={selectedTopicId || ''}
                   onChange={(e) => setSelectedTopicId(Number(e.target.value))}
                 >

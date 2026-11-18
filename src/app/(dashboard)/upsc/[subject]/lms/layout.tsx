@@ -53,7 +53,7 @@ function SubjectNotOpen({
   const [firstOpen] = openSubjects;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-16">
+    <div className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-16">
       <div className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-8 shadow-sm">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-[#8c5d14]">
           Not open in the beta yet

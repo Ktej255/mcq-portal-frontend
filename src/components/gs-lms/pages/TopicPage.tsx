@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { gsLmsService, getGateError } from "@/services/api/gsLmsService";
 import { BETA_LOCKED_ERROR_FRAGMENT } from "@/services/api/gsLmsService";
@@ -89,6 +90,7 @@ export function TopicPage() {
     nodeId: number;
     row: ReadinessTopicOut;
   } | null>(null);
+  const [selectedLearnSection, setSelectedLearnSection] = useState<'BASIC' | 'ADVANCED' | null>(null);
   const [revisitSaving, setRevisitSaving] = useState(false);
   // Both messages are keyed to the topic they belong to, so navigating to
   // another topic never shows the previous topic's confirmation or failure.
@@ -223,11 +225,17 @@ export function TopicPage() {
 
   if (nodeId === null) {
     return (
-      <div className="p-6 text-center">
+      <div className="p-6 text-center space-y-3">
         <h1 className="text-lg font-semibold text-[#1a3a2a]">Topic not found</h1>
-        <p className="mt-2 text-sm text-[#13251d]/60">
-          The topic URL is invalid. Choose a topic from the syllabus.
+        <p className="text-sm text-[#13251d]/60 max-w-md mx-auto">
+          The topic URL is invalid or missing. Choose a topic from the syllabus tree.
         </p>
+        <Link
+          href={`${lmsBase}/syllabus`}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-4 py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-[#178a65]"
+        >
+          ← Return to Syllabus Map
+        </Link>
       </div>
     );
   }
@@ -290,7 +298,7 @@ export function TopicPage() {
   const demandRow = demand && demand.nodeId === nodeId ? demand.row : null;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <h1 className="text-xl font-semibold text-[#1a3a2a]">{data.title}</h1>
 
       {demandRow && (
@@ -465,12 +473,29 @@ export function TopicPage() {
 
       <FunnelOrchestrator nodeId={nodeId} subject={subject}>
         {({ currentStep, completeStep: advanceStep, gateMessage, displayTab }) => {
+          const handleAdvance = async (step: number) => {
+            setActionError(null);
+            try {
+              await advanceStep(step);
+            } catch (err: unknown) {
+              const detail =
+                err && typeof err === 'object' && 'response' in err
+                  ? (err as { response?: { data?: { detail?: string; message?: string } } }).response?.data
+                  : undefined;
+              setActionError(
+                detail?.detail ||
+                  detail?.message ||
+                  (err instanceof Error ? err.message : "Failed to advance step. Please retry.")
+              );
+            }
+          };
 
           const getActiveSectionLabel = (): string => {
             if (displayTab === 'ncert') return 'NCERT_LEVEL';
             if (displayTab === 'current') return 'CURRENT_AFFAIRS';
             if (displayTab === 'traps') return 'EXAMINER_TRAPS';
             if (displayTab === 'learn') {
+              if (selectedLearnSection) return selectedLearnSection;
               if (currentStep >= 6 && currentStep <= 7) return 'ADVANCED';
               return 'BASIC';
             }
@@ -552,6 +577,34 @@ export function TopicPage() {
 
             {(displayTab === 'learn' || displayTab === 'ncert' || displayTab === 'current' || displayTab === 'traps') && (
               <div className="space-y-6">
+                {/* Learn Tab Sub-Section Selector (Basic vs Advanced) */}
+                {displayTab === 'learn' && (currentStep >= 6 || data.topic_completed || currentStep > 14) && (
+                  <div className="flex items-center gap-2 p-1.5 bg-[#f7f4ee] rounded-xl border border-[#dcd5c7] w-full sm:w-fit shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLearnSection('BASIC')}
+                      className={`min-h-10 flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        activeLabel === 'BASIC'
+                          ? 'bg-white text-[#1a3a2a] shadow-xs border border-[#dcd5c7]'
+                          : 'text-[#13251d]/60 hover:text-[#1a3a2a]'
+                      }`}
+                    >
+                      📖 Basic Foundations
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLearnSection('ADVANCED')}
+                      className={`min-h-10 flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        activeLabel === 'ADVANCED'
+                          ? 'bg-white text-[#1a3a2a] shadow-xs border border-[#dcd5c7]'
+                          : 'text-[#13251d]/60 hover:text-[#1a3a2a]'
+                      }`}
+                    >
+                      🚀 Advanced Depth
+                    </button>
+                  </div>
+                )}
+
                 {data.video_url && displayTab === 'learn' && (
                   <VideoPlayer
                     videoUrl={data.video_url}
@@ -562,16 +615,17 @@ export function TopicPage() {
                 )}
 
                 {currentStep === 1 ? (
-                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-3">
-                    <h2 className="text-base font-black text-[#13251d]">Start this topic</h2>
+                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-3 shadow-xs">
+                    <h2 className="text-base font-bold text-[#13251d]">Start this topic</h2>
                     <p className="text-sm text-[#5d675f]">
                       Work through each reviewed section, complete the recall check, then move
                       to the MCQ lab and Mains practice. The knowledge check above is optional
                       and never locks content.
                     </p>
                     <button
-                      onClick={() => void advanceStep(1)}
-                      className="w-full rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] py-3 text-sm font-black text-white"
+                      type="button"
+                      onClick={() => void handleAdvance(1)}
+                      className="w-full min-h-11 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-95 active:scale-[0.99]"
                     >
                       Start with the BASIC section &rarr;
                     </button>
@@ -585,8 +639,8 @@ export function TopicPage() {
                     enabled={!activeSection.locked}
                     completionRequested={transitioningStep === currentStep}
                   >
-                    <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4">
-                      <h2 className="text-base font-black text-[#13251d]">{activeSection.title}</h2>
+                    <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 space-y-4 shadow-xs">
+                      <h2 className="text-base font-bold text-[#13251d]">{activeSection.title}</h2>
                       {activeSection.blocks && activeSection.blocks.length > 0 ? (
                         <RichBlocks blocks={activeSection.blocks} />
                       ) : activeSection.locked ? (
@@ -597,7 +651,7 @@ export function TopicPage() {
                     </div>
                   </ReadingTrackedSection>
                 ) : (
-                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5">
+                  <div className="rounded-xl border border-[#dcd5c7] bg-white p-5 shadow-xs">
                     <p className="text-sm text-[#5d675f]">Content for this section is not available.</p>
                   </div>
                 )}
@@ -622,7 +676,7 @@ export function TopicPage() {
                       nodeId={nodeId}
                       sectionLabel={activeSection.section_label}
                       subject={subject}
-                      onComplete={() => advanceStep(currentStep)}
+                      onComplete={() => void handleAdvance(currentStep)}
                     />
                   );
                 })()}
@@ -639,15 +693,15 @@ export function TopicPage() {
                   if (expectedRecallTab === undefined || displayTab !== expectedRecallTab) return null;
                   if (activeSection) return null;
                   return (
-                    <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-2">
+                    <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-2 shadow-xs">
                       <p className="text-sm text-[#5d675f]">
                         No reviewed content is available for this recall check yet.
                         You can continue without it.
                       </p>
                       <button
                         type="button"
-                        onClick={() => void advanceStep(currentStep)}
-                        className="w-full rounded-xl border border-[#dcd5c7] bg-white py-3 text-sm font-black text-[#1a3a2a] transition hover:border-[#1d9e75]"
+                        onClick={() => void handleAdvance(currentStep)}
+                        className="w-full min-h-11 rounded-xl border border-[#dcd5c7] bg-white py-3 text-sm font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
                       >
                         Continue without this recall check &rarr;
                       </button>
@@ -668,15 +722,15 @@ export function TopicPage() {
                   if (displayTab !== expectedTab) return null;
                   if (!activeSection) {
                     return (
-                      <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-2">
+                      <div className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-4 space-y-2 shadow-xs">
                         <p className="text-sm text-[#5d675f]">
                           No reviewed content is available for this section yet.
                           Nothing is locked; you can continue without it.
                         </p>
                         <button
                           type="button"
-                          onClick={() => void advanceStep(currentStep)}
-                          className="w-full rounded-xl border border-[#dcd5c7] bg-white py-3 text-sm font-black text-[#1a3a2a] transition hover:border-[#1d9e75]"
+                          onClick={() => void handleAdvance(currentStep)}
+                          className="w-full min-h-11 rounded-xl border border-[#dcd5c7] bg-white py-3 text-sm font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
                         >
                           Continue without this section &rarr;
                         </button>
@@ -685,9 +739,10 @@ export function TopicPage() {
                   }
                   return (
                     <button
+                      type="button"
                       onClick={() => void handleContentContinue()}
                       disabled={transitioningStep === currentStep || activeSection.locked}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
                     >
                       {transitioningStep === currentStep
                         ? 'Saving Section...'
@@ -702,7 +757,7 @@ export function TopicPage() {
               <McqLabStep
                 nodeId={nodeId}
                 subject={subject}
-                onComplete={() => advanceStep(12)}
+                onComplete={() => void handleAdvance(12)}
               />
             )}
 
@@ -712,7 +767,7 @@ export function TopicPage() {
                 <MainsPracticeStep
                   nodeId={nodeId}
                   subject={subject}
-                  onComplete={() => advanceStep(13)}
+                  onComplete={() => void handleAdvance(13)}
                 />
               </div>
             )}
@@ -727,12 +782,13 @@ export function TopicPage() {
 
             {currentStep > 14 && (
               <div className="space-y-4">
-                <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-8 text-center text-white">
-                  <h2 className="text-lg font-black">Topic Complete!</h2>
-                  <p className="text-sm opacity-80 mt-2">
-                    You&apos;ve completed all 14 steps for this topic.
+                <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#1d9e75] p-6 sm:p-8 text-center text-white shadow-md">
+                  <span className="text-3xl" aria-hidden="true">🎉</span>
+                  <h2 className="text-xl sm:text-2xl font-black mt-2">Topic Complete!</h2>
+                  <p className="text-sm opacity-90 mt-1 max-w-md mx-auto">
+                    You&apos;ve completed all 14 steps for this topic. Your learning, recall, and practice evidence have been recorded.
                   </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                     {data.topic_completed && (
                       <PdfDownloadButton
                         nodeId={nodeId}
@@ -744,10 +800,25 @@ export function TopicPage() {
                       type="button"
                       onClick={() => setShowCompletedReport((visible) => !visible)}
                       aria-expanded={showCompletedReport}
-                      className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/20"
+                      className="min-h-11 rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-white/20 active:scale-[0.98]"
                     >
-                      {showCompletedReport ? 'Hide growth report' : 'View growth report'}
+                      {showCompletedReport ? 'Hide Growth Report' : '📊 View Growth Report'}
                     </button>
+                  </div>
+
+                  <div className="mt-6 pt-5 border-t border-white/20 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Link
+                      href={`${lmsBase}/planner`}
+                      className="min-h-11 w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-white text-xs sm:text-sm font-bold text-[#085041] shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+                    >
+                      📅 Return to Today&apos;s Plan
+                    </Link>
+                    <Link
+                      href={`${lmsBase}/syllabus`}
+                      className="min-h-11 w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-white/50 bg-white/10 text-xs sm:text-sm font-bold text-white hover:bg-white/20 active:scale-[0.98] transition-all"
+                    >
+                      🗺️ Next Topic in Syllabus →
+                    </Link>
                   </div>
                 </div>
                 {showCompletedReport && (

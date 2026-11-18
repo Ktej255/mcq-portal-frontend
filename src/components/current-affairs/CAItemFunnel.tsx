@@ -474,12 +474,15 @@ function CAMcqSection({ itemId, onComplete }: { itemId: number; onComplete: () =
             {(mcq.options || []).map((opt) => (
               <button
                 key={opt.label}
+                type="button"
                 onClick={() => setAnswers(prev => ({ ...prev, [mcq.id]: opt.label }))}
-                className={`w-full text-left rounded-md border p-2 text-[11px] ${
-                  answers[mcq.id] === opt.label ? 'border-[#1a3a2a] bg-[#e7f5ee]' : 'border-[#dcd5c7]'
+                className={`w-full min-h-11 text-left rounded-lg border p-3 text-xs sm:text-sm font-medium transition-colors ${
+                  answers[mcq.id] === opt.label
+                    ? 'border-[#1a3a2a] bg-[#e7f5ee] font-bold text-[#085041]'
+                    : 'border-[#dcd5c7] hover:border-[#b9d9cd] text-[#1f2e26]'
                 }`}
               >
-                <strong>{opt.label}.</strong> {opt.text}
+                <strong className="mr-1">{opt.label}.</strong> {opt.text}
               </button>
             ))}
           </div>

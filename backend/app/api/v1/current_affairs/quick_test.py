@@ -108,7 +108,7 @@ def _option_labels(question: CAMcq) -> Optional[set[str]]:
 
 @router.get("/quick-test", response_model=QuickTestOut)
 def get_quick_test(
-    scope: str = Query("today", regex="^(today|this_week|this_month|subject)$"),
+    scope: str = Query("today", pattern="^(today|this_week|this_month|subject)$"),
     subject: Optional[str] = Query(None),
     count: int = Query(10, ge=5, le=30),
     current_user: User = Depends(get_current_user),

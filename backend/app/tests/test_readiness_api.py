@@ -53,6 +53,10 @@ from app.core.gs_lms.student_models import (  # noqa: F401 - registers tables
     GsLmsRevisitSchedule,
     GsLmsStudentSectionProgress,
 )
+from app.core.gs_lms.funnel_models import (  # noqa: F401 - registers lab tables
+    GsLmsMcqLabSession,
+    GsLmsMcqLabAttempt,
+)
 from app.db.session import Base, get_db
 from app.main import app
 from app.models.domain import RoleEnum, User
@@ -72,6 +76,8 @@ REQUIRED_TABLES = [
     "gs_lms_student_section_progress",
     "gs_lms_practice_sessions",
     "gs_lms_practice_attempts",
+    "gs_lms_mcq_lab_sessions",
+    "gs_lms_mcq_lab_attempts",
     "gs_lms_discussion_sessions",
     "gs_lms_onboarding",
     "gs_lms_revisit_schedule",

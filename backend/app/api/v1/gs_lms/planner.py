@@ -43,11 +43,14 @@ from app.core.gs_lms.planner import (
 from app.core.gs_lms.student_models import (
     GsLmsDailyPlan,
     GsLmsOnboardingStatus,
+    GsLmsPracticeSession,
+    GsLmsPracticeSessionStatusEnum,
     GsLmsReplanEvent,
     GsLmsRevisitSchedule,
     GsLmsStudentSectionProgress,
     GsLmsWeeklyRetro,
 )
+from app.core.gs_lms.funnel_models import GsLmsMcqLabSession
 from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsContentSection, GsLmsPyq
 from app.api.v1.gs_lms.dependencies import resolve_subject
 from app.api.v1.gs_lms.schemas import (
@@ -275,12 +278,41 @@ def _plan_to_response(
         .scalar()
     ) if db else 0
     if all_plans_count and all_plans_count % 7 == 0:
+        retro_completed = False
+        retro_completed_at = None
+        target_week = max(1, all_plans_count // 7)
+        if db:
+            retro_record = (
+                db.query(GsLmsWeeklyRetro)
+                .filter(
+                    GsLmsWeeklyRetro.student_id == plan.student_id,
+                    GsLmsWeeklyRetro.week_number == target_week,
+                    GsLmsWeeklyRetro.completed == True,
+                )
+                .first()
+            )
+            if not retro_record:
+                retro_record = (
+                    db.query(GsLmsWeeklyRetro)
+                    .filter(
+                        GsLmsWeeklyRetro.student_id == plan.student_id,
+                        GsLmsWeeklyRetro.plan_date == plan.plan_date,
+                        GsLmsWeeklyRetro.completed == True,
+                    )
+                    .first()
+                )
+            if retro_record:
+                retro_completed = True
+                if retro_record.completed_at:
+                    retro_completed_at = retro_record.completed_at.isoformat()
+
         items_out.append(
             GsLmsPlanItemOut(
                 node_id=0,
                 title="📝 Weekly Retrospective",
                 item_type="retro",
-                completed=False,
+                completed=retro_completed,
+                completed_at=retro_completed_at,
             )
         )
 
@@ -376,18 +408,65 @@ def evaluate_and_update_plans(db: Session, student_id: int, subject_id: int) -> 
                         completed_at_str = revisit.updated_at.isoformat()
 
             elif item_type == "retro":
+                all_plans_cnt = (
+                    db.query(func.count(GsLmsDailyPlan.id))
+                    .filter(GsLmsDailyPlan.student_id == student_id)
+                    .scalar()
+                ) or 1
+                cur_week = max(1, all_plans_cnt // 7)
                 retro = (
                     db.query(GsLmsWeeklyRetro)
                     .filter(
                         GsLmsWeeklyRetro.student_id == student_id,
+                        GsLmsWeeklyRetro.week_number == cur_week,
                         GsLmsWeeklyRetro.completed == True,
                     )
                     .first()
                 )
+                if not retro:
+                    retro = (
+                        db.query(GsLmsWeeklyRetro)
+                        .filter(
+                            GsLmsWeeklyRetro.student_id == student_id,
+                            GsLmsWeeklyRetro.plan_date == plan.plan_date,
+                            GsLmsWeeklyRetro.completed == True,
+                        )
+                        .first()
+                    )
                 if retro:
                     is_completed = True
                     if retro.completed_at:
                         completed_at_str = retro.completed_at.isoformat()
+
+            elif item_type == "practice":
+                practice = (
+                    db.query(GsLmsPracticeSession)
+                    .filter(
+                        GsLmsPracticeSession.student_id == student_id,
+                        GsLmsPracticeSession.syllabus_node_id == node_id,
+                        GsLmsPracticeSession.status == GsLmsPracticeSessionStatusEnum.SUBMITTED,
+                    )
+                    .order_by(GsLmsPracticeSession.submitted_at.desc())
+                    .first()
+                )
+                if practice:
+                    is_completed = True
+                    if practice.submitted_at:
+                        completed_at_str = practice.submitted_at.isoformat()
+                else:
+                    lab = (
+                        db.query(GsLmsMcqLabSession)
+                        .filter(
+                            GsLmsMcqLabSession.student_id == student_id,
+                            GsLmsMcqLabSession.syllabus_node_id == node_id,
+                        )
+                        .order_by(GsLmsMcqLabSession.submitted_at.desc())
+                        .first()
+                    )
+                    if lab:
+                        is_completed = True
+                        if lab.submitted_at:
+                            completed_at_str = lab.submitted_at.isoformat()
 
             if is_completed:
                 completed_items.append({

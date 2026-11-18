@@ -253,7 +253,7 @@ export function LmsLayoutShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={retryAccessCheck}
             disabled={rechecking}
-            className="mt-5 rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {rechecking ? "Checking access…" : "Retry access check"}
           </button>
@@ -276,7 +276,7 @@ export function LmsLayoutShell({ children }: { children: React.ReactNode }) {
               setGateChecked(false);
               setStatusRetryCount((count) => count + 1);
             }}
-            className="mt-5 rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white"
           >
             Retry status check
           </button>
@@ -301,9 +301,9 @@ export function LmsLayoutShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#fffdf8]">
       {/* Breadcrumb header */}
-      <div className="border-b border-[#dcd5c7] bg-white/60 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 py-3">
-          <nav className="flex items-center gap-1.5 text-sm text-[#13251d]/60">
+      <div className="border-b border-[#dcd5c7] bg-white/70 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs sm:text-sm text-[#13251d]/60">
             <span>{label}</span>
             <span className="text-[#13251d]/30">›</span>
             <span>LMS</span>
@@ -314,7 +314,7 @@ export function LmsLayoutShell({ children }: { children: React.ReactNode }) {
         {showTabs && (
           <nav
             aria-label="Learning workspace"
-            className="max-w-5xl mx-auto px-6 flex gap-1 overflow-x-auto"
+            className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {LMS_TABS.map((tab) => {
               const active = tab.pages.includes(pageSegment ?? "");
@@ -323,7 +323,7 @@ export function LmsLayoutShell({ children }: { children: React.ReactNode }) {
                   key={tab.segment}
                   href={`${lmsBase}/${tab.segment}`}
                   aria-current={active ? "page" : undefined}
-                  className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`shrink-0 border-b-2 px-3.5 py-2.5 sm:py-3 min-h-[44px] inline-flex items-center text-xs sm:text-sm font-semibold transition-colors ${
                     active
                       ? "border-[#1d9e75] text-[#1a3a2a]"
                       : "border-transparent text-[#13251d]/55 hover:text-[#1a3a2a]"

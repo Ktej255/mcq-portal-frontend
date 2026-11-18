@@ -20,11 +20,10 @@ export function SiteNav() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled
           ? "border-b border-[#dcd5c7] bg-[#f7f4ee]/85 backdrop-blur-md shadow-[0_2px_20px_rgba(19,37,29,0.06)]"
           : "border-b border-transparent bg-transparent"
-      }`}
+        }`}
     >
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
         <Link href="/" className="flex items-center gap-2.5">
@@ -61,7 +60,7 @@ export function SiteNav() {
           type="button"
           aria-label="Toggle menu"
           onClick={() => setOpen((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-md border border-[#dcd5c7] bg-[#fffdf8] text-[#13251d] md:hidden"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-[#dcd5c7] bg-[#fffdf8] text-[#13251d] md:hidden"
         >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -81,14 +80,22 @@ export function SiteNav() {
                   key={l.href}
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-md px-3 py-2 text-sm font-bold text-[#33443b] hover:bg-[#e7f5ee]"
+                  className="flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-bold text-[#33443b] hover:bg-[#e7f5ee]"
                 >
                   {l.label}
                 </Link>
               ))}
               <Link
+                href="/login?redirect=/upsc"
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-black text-[#13251d] hover:bg-[#e7f5ee]"
+              >
+                Log in
+              </Link>
+              <Link
                 href="/start"
-                className="mt-2 inline-flex h-10 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white"
+                onClick={() => setOpen(false)}
+                className="mt-2 inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white hover:bg-[#10291d]"
               >
                 Start free
               </Link>

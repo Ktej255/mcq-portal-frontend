@@ -78,6 +78,29 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
   const [coverageGap, setCoverageGap] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const submissionInFlight = useRef(false);
+  const answersStorageKey = `gs-lms:mcq-lab-answers:${subject}:${nodeId}`;
+
+  // Restore cached answers from sessionStorage when in answering mode
+  useEffect(() => {
+    if (mode !== 'answering' || Object.keys(answers).length > 0) return;
+    let cached: Record<number, AnswerValue> | null = null;
+    try {
+      const raw = window.sessionStorage.getItem(answersStorageKey);
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object') cached = parsed as Record<number, AnswerValue>;
+    } catch {
+      // sessionStorage unavailable
+    }
+    if (!cached) return;
+    let active = true;
+    const restored = cached;
+    queueMicrotask(() => {
+      if (active) setAnswers((prev) => (Object.keys(prev).length === 0 ? restored : prev));
+    });
+    return () => {
+      active = false;
+    };
+  }, [mode, answersStorageKey, answers]);
 
   // Restore a submitted result when returning to the step; otherwise load a
   // fresh reviewed set. A missing result is the normal first-attempt path.
@@ -145,8 +168,16 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
   const allAnswered = questions.length > 0 && answeredCount === questions.length;
 
   const handleAnswer = useCallback((questionId: number, value: AnswerValue) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }));
-  }, []);
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: value };
+      try {
+        window.sessionStorage.setItem(answersStorageKey, JSON.stringify(next));
+      } catch {
+        // sessionStorage unavailable: answers still live in state
+      }
+      return next;
+    });
+  }, [answersStorageKey]);
 
   const handleSubmit = useCallback(async () => {
     if (!allAnswered) return;
@@ -160,13 +191,18 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
       const res = await funnelService.submitMcqLab(subject, nodeId, payload);
       setResult(res);
       setMode('result');
+      try {
+        window.sessionStorage.removeItem(answersStorageKey);
+      } catch {
+        // ignore
+      }
     } catch {
       setError('Submission failed. Your answers remain on this page while you retry.');
       setMode('answering');
     } finally {
       submissionInFlight.current = false;
     }
-  }, [allAnswered, answers, questions, subject, nodeId]);
+  }, [allAnswered, answers, questions, subject, nodeId, answersStorageKey]);
 
   const handleContinueWithoutLab = async () => {
     if (advancing) return;
@@ -305,26 +341,29 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
         <div className="space-y-2">
           <h4 className="text-xs font-black text-[#49675e] uppercase">Per-Question Results</h4>
           {result.attempts.map((attempt, idx) => (
-            <details key={idx} className="rounded-lg border border-[#dcd5c7] bg-white">
-              <summary className="flex items-center gap-2 p-3 cursor-pointer text-xs">
+            <details key={idx} className="rounded-xl border border-[#dcd5c7] bg-white overflow-hidden shadow-2xs">
+              <summary className="flex items-center gap-2 p-3.5 sm:p-4 cursor-pointer text-xs sm:text-sm font-semibold min-h-[44px] hover:bg-gray-50 transition-colors">
                 {attempt.is_correct ? (
-                  <CheckCircle2 className="h-4 w-4 text-[#1d9e75]" />
+                  <CheckCircle2 className="h-4 w-4 text-[#1d9e75] shrink-0" />
                 ) : (
-                  <XCircle className="h-4 w-4 text-red-500" />
+                  <XCircle className="h-4 w-4 text-red-500 shrink-0" />
                 )}
-                <span className="font-semibold text-[#1f2e26]">Q{idx + 1}</span>
-                <span className="rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-2 py-0.5 text-[8px] font-black text-white">
+                <span className="font-bold text-[#1f2e26]">Q{idx + 1}</span>
+                <span className="rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-2.5 py-0.5 text-[9px] font-bold text-white">
                   {attempt.question_type.replace(/_/g, ' ')}
                 </span>
                 {attempt.marks !== undefined && (
                   <span className="ml-auto font-black text-[#49675e]">{signedMarks(attempt.marks)}</span>
                 )}
               </summary>
-              <div className="px-3 pb-3 text-xs text-[#49675e]">
-                <p>Your answer: <strong>{showAnswer(attempt.answer_format, attempt.chosen_answer)}</strong></p>
+              <div className="px-4 pb-4 text-xs sm:text-sm text-[#49675e] space-y-1.5 border-t border-[#dcd5c7]/40 pt-3">
+                <p>Your answer: <strong className={attempt.is_correct ? "text-[#1d9e75]" : "text-red-600"}>{showAnswer(attempt.answer_format, attempt.chosen_answer)}</strong></p>
                 <p>Correct answer: <strong className="text-[#1d9e75]">{showAnswer(attempt.answer_format, attempt.correct_answer)}</strong></p>
                 {attempt.explanation && (
-                  <p className="mt-1 text-[#1f2e26]">{attempt.explanation}</p>
+                  <div className="mt-2 p-3 rounded-lg bg-[#f7f4ee] border border-[#dcd5c7]/60 text-xs leading-relaxed text-[#1f2e26]">
+                    <span className="font-bold text-[#1a3a2a]">Explanation: </span>
+                    {attempt.explanation}
+                  </div>
                 )}
               </div>
             </details>
@@ -332,8 +371,9 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
         </div>
 
         <button
+          type="button"
           onClick={onComplete}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-black"
+          className="w-full min-h-12 py-3.5 rounded-xl bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white text-sm font-bold shadow-sm active:scale-[0.99] transition-all"
         >
           {completeLabel}
         </button>
@@ -346,17 +386,17 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
     <div className="space-y-4">
       {/* Questions */}
       {questions.map((q, idx) => (
-        <div key={q.question_id} className="rounded-xl border border-[#dcd5c7] bg-white p-4 space-y-3">
+        <div key={q.question_id} className="rounded-xl border border-[#dcd5c7] bg-white p-4 sm:p-5 space-y-3.5 shadow-xs">
           {/* Type badge */}
           <div className="flex items-center gap-2">
-            <span className="rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-2.5 py-0.5 text-[8px] font-black text-white">
+            <span className="rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] px-2.5 py-0.5 text-[9px] font-bold text-white">
               {q.question_type.replace(/_/g, ' ')}
             </span>
-            <span className="text-[10px] text-[#49675e]">Q{idx + 1}</span>
+            <span className="text-xs font-bold text-[#49675e]">Question {idx + 1} of {questions.length}</span>
           </div>
 
           {/* Question text */}
-          <p className="text-sm text-[#1f2e26] leading-relaxed whitespace-pre-wrap">
+          <p className="text-sm sm:text-base text-[#1f2e26] leading-relaxed whitespace-pre-wrap font-medium">
             {q.question_text}
           </p>
 
@@ -369,15 +409,16 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
         </div>
       ))}
 
-      {/* Submit Button (Sticky) */}
-      <div className="sticky bottom-4 pt-4">
+      {/* Submit Button (Sticky with safe-area padding) */}
+      <div className="sticky bottom-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 bg-white/95 backdrop-blur-sm border-t border-[#dcd5c7]/60 -mx-2 px-2 sm:mx-0 sm:px-0">
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!allAnswered || mode === 'submitting'}
           className={`
-            w-full py-3 rounded-xl text-sm font-black transition-all
+            w-full min-h-12 py-3.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-[0.99]
             ${allAnswered
-              ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-lg'
+              ? 'bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white hover:opacity-95'
               : 'bg-[#dcd5c7] text-[#5d675f] cursor-not-allowed'
             }
           `}
@@ -390,7 +431,7 @@ export function McqLabStep({ nodeId, subject = "geography", completeLabel = 'Con
             `Submit All (${answeredCount}/${questions.length} answered)`
           )}
         </button>
-        {error && <p className="text-xs text-red-600 text-center mt-2">{error}</p>}
+        {error && <p className="text-xs text-red-600 text-center mt-2 font-medium">{error}</p>}
       </div>
     </div>
   );

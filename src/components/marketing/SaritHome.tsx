@@ -614,7 +614,7 @@ function PricingSection() {
               </p>
               <Link
                 href="/pricing"
-                className={`mt-4 inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-black transition ${
+                className={`mt-4 inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-black transition ${
                   tier.featured
                     ? "bg-[#ef9f27] text-[#3a2706] hover:bg-[#f4b04b]"
                     : "border border-[#1a3a2a] text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white"

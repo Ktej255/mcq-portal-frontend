@@ -266,7 +266,7 @@ export default function ReportsPage() {
   }, [completedStrategyTasks, strategyPracticeHandoffs, strategyQuestionAttempts]);
 
   return (
-    <main className="text-[#13251d]">
+    <div className="text-[#13251d]">
       <div>
         {/* LMS Backend Progress — real data from the Geography LMS */}
         <LmsProgressCard />
@@ -285,17 +285,89 @@ export default function ReportsPage() {
                     if (attemptReportId) loadAttemptReport(attemptReportId);
                   }}
                   disabled={attemptReportLoading}
-                  className="rounded-md border border-[#c98f8f] px-3 py-1.5 text-xs font-black text-[#8c2424] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-11 items-center rounded-md border border-[#c98f8f] px-4 py-2 text-xs font-black text-[#8c2424] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {attemptReportLoading ? "Retrying…" : "Retry"}
                 </button>
               </div>
             )}
             {attemptReport && (
-              <div className="mt-4 grid gap-3 text-sm font-semibold text-[#315044] sm:grid-cols-3">
-                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Status</span>{attemptReport.processingStatus ?? attemptReport.processing_status}</div>
-                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Score</span>{attemptReport.totalScore}</div>
-                <div><span className="block text-xs uppercase tracking-wide text-[#657066]">Accuracy</span>{attemptReport.accuracy}%</div>
+              <div className="mt-4 space-y-4">
+                {/* Score & Key Metrics */}
+                <div className="grid gap-3 rounded-lg border border-[#dcd5c7] bg-white p-4 sm:grid-cols-4">
+                  <div className="text-center sm:text-left">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-[#657066]">Score</span>
+                    <span className="text-2xl font-black text-[#1a3a2a]">{attemptReport.totalScore}</span>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-[#657066]">Accuracy</span>
+                    <span className="text-2xl font-black text-[#1d9e75]">{attemptReport.accuracy}%</span>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-[#657066]">Questions</span>
+                    <span className="text-sm font-bold text-[#1f2e26]">
+                      <span className="text-emerald-700">{attemptReport.correctCount ?? 0} correct</span> ·{" "}
+                      <span className="text-rose-700">{attemptReport.incorrectCount ?? 0} wrong</span> ·{" "}
+                      <span className="text-slate-500">{attemptReport.unattemptedCount ?? 0} skipped</span>
+                    </span>
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-[#657066]">Avg Time / Q</span>
+                    <span className="text-sm font-bold text-[#1f2e26]">
+                      {attemptReport.averageTimePerQuestion ? `${Math.round(attemptReport.averageTimePerQuestion)}s` : "Recorded"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Narrative Diagnostic if available */}
+                {attemptReport.narrative && (
+                  <div className="rounded-lg border border-[#b9d9cd] bg-[#f3faf6] p-4 text-xs leading-relaxed text-[#1a3a2a]">
+                    <span className="font-bold">Evaluation Insight: </span>
+                    {attemptReport.narrative}
+                  </div>
+                )}
+
+                {/* Subject & Topic Breakdown */}
+                {attemptReport.subjectScores && attemptReport.subjectScores.length > 0 && (
+                  <div className="rounded-lg border border-[#dcd5c7] bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-wider text-[#1d9e75] mb-2">Subject Breakdown</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {attemptReport.subjectScores.map((sub, idx) => (
+                        <div key={idx} className="flex items-center justify-between rounded border border-[#eae5db] px-3 py-2 text-xs">
+                          <span className="font-bold capitalize text-[#1a3a2a]">{sub.subject}</span>
+                          <span className="font-semibold text-[#5d675f]">{sub.score} / {sub.total} marks</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Strengths & Focus Areas */}
+                {((attemptReport.strengths && attemptReport.strengths.length > 0) ||
+                  (attemptReport.weaknesses && attemptReport.weaknesses.length > 0)) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {attemptReport.strengths && attemptReport.strengths.length > 0 && (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                        <p className="text-xs font-black text-emerald-800 uppercase tracking-wider mb-1.5">Strong Areas</p>
+                        <ul className="list-disc pl-4 text-xs text-emerald-900 space-y-0.5 font-medium">
+                          {attemptReport.strengths.map((str, idx) => (
+                            <li key={idx}>{str}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {attemptReport.weaknesses && attemptReport.weaknesses.length > 0 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                        <p className="text-xs font-black text-amber-800 uppercase tracking-wider mb-1.5">Focus Next</p>
+                        <ul className="list-disc pl-4 text-xs text-amber-900 space-y-0.5 font-medium">
+                          {attemptReport.weaknesses.map((weak, idx) => (
+                            <li key={idx}>{weak}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -847,7 +919,7 @@ export default function ReportsPage() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

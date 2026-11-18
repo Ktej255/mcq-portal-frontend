@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties, KeyboardEvent } from "react";
 import type { SyllabusNodeOut } from "@/services/api/gsLmsService";
 
 interface SyllabusNodeRowProps {
@@ -31,7 +32,7 @@ export function SyllabusNodeRow({
 
   const badgeColors: Record<string, string> = {
     MEGA_TOPIC: "bg-[#1a3a2a] text-white",
-    SUB_TOPIC: "bg-[#1d9e75]/20 text-[#1a3a2a]",
+    SUB_TOPIC: "bg-[#1d9e75]/20 text-[#085041]",
     LEAF_TOPIC: "bg-[#dcd5c7] text-[#13251d]",
   };
 
@@ -44,6 +45,13 @@ export function SyllabusNodeRow({
       onLeafClick(node.node_id);
     } else if (hasChildren) {
       onToggle();
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
     }
   };
 
@@ -60,11 +68,13 @@ export function SyllabusNodeRow({
 
   return (
     <div
-      className={`flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 rounded-lg transition-colors ${
+      className={`min-h-11 flex items-center gap-2 sm:gap-3 py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg transition-colors pl-[calc(var(--node-depth)*10px+6px)] sm:pl-[calc(var(--node-depth)*18px+8px)] ${
         locked ? "opacity-60 cursor-not-allowed" : isLocked ? "" : "cursor-pointer"
       } ${rowBg}`}
-      style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      style={{ "--node-depth": depth } as CSSProperties}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={locked ? -1 : 0}
       role="treeitem"
       aria-expanded={!isLeaf ? expanded : undefined}
       aria-selected={false}
@@ -81,30 +91,31 @@ export function SyllabusNodeRow({
       {/* Expand/Collapse toggle */}
       {hasChildren && !isLeaf ? (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[#13251d] shrink-0"
-          aria-label={expanded ? "Collapse" : "Expand"}
+          className="w-8 h-8 sm:w-7 sm:h-7 -ml-1 flex items-center justify-center text-[#13251d] shrink-0 rounded-lg hover:bg-black/5 active:bg-black/10 transition-colors touch-manipulation"
+          aria-label={expanded ? `Collapse ${node.title}` : `Expand ${node.title}`}
         >
           <svg
-            className={`w-3.5 h-3.5 md:w-4 md:h-4 transition-transform ${expanded ? "rotate-90" : ""}`}
+            className={`w-4 h-4 transition-transform ${expanded ? "rotate-90" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       ) : (
-        <span className="w-4 md:w-5 shrink-0" />
+        <span className="w-5 sm:w-6 shrink-0" />
       )}
 
       {/* Title */}
       <span className="flex-1 min-w-0">
         <span
-          className={`block text-xs md:text-sm font-medium truncate ${isLocked ? "text-[#5d675f]" : "text-[#13251d]"}`}
+          className={`block text-xs sm:text-sm font-semibold break-words sm:truncate ${isLocked ? "text-[#5d675f]" : "text-[#13251d]"}`}
         >
           {node.title}
         </span>
@@ -130,7 +141,7 @@ export function SyllabusNodeRow({
       {/* Reviewed PYQ evidence: the demand question, answered per leaf. */}
       {isLeaf && (node.prelims_pyq_count > 0 || node.mains_pyq_count > 0) && (
         <span
-          className="text-[9px] md:text-[10px] font-semibold px-1.5 md:px-2 py-0.5 rounded-full shrink-0 border border-[#dcd5c7] bg-[#f7f4ee] text-[#536259]"
+          className="text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 border border-[#dcd5c7] bg-[#f7f4ee] text-[#536259]"
           title={`Demand evidence: ${node.prelims_pyq_count} reviewed Prelims PYQ${
             node.prelims_pyq_count === 1 ? "" : "s"
           } and ${node.mains_pyq_count} reviewed Mains PYQ${
@@ -142,16 +153,22 @@ export function SyllabusNodeRow({
         </span>
       )}
 
-      {/* Node type badge */}
+      {/* Node type badge - for leaf topics, hidden on mobile to maximize title space */}
       <span
-        className={`text-[9px] md:text-[10px] font-semibold px-1.5 md:px-2 py-0.5 rounded-full uppercase shrink-0 ${badgeColors[node.node_type]}`}
+        className={`text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full uppercase shrink-0 ${
+          isLeaf ? "hidden sm:inline-flex" : "inline-flex"
+        } ${badgeColors[node.node_type]}`}
       >
-        {node.node_type.replace("_", " ")}
+        {node.node_type === "MEGA_TOPIC"
+          ? "Unit"
+          : node.node_type === "SUB_TOPIC"
+            ? "Module"
+            : "Topic"}
       </span>
 
       {/* Beta availability badge */}
       {locked && (
-        <span className="text-[9px] md:text-[10px] font-semibold px-1.5 md:px-2 py-0.5 rounded-full uppercase shrink-0 bg-[#f3e4c8] text-[#7a5a1e]">
+        <span className="text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full uppercase shrink-0 bg-[#f3e4c8] text-[#7a5a1e]">
           Soon
         </span>
       )}
@@ -174,7 +191,7 @@ export function SyllabusNodeRow({
       {isLeaf ? (
         locked || isLocked ? (
           <svg
-            className="w-4 h-4 md:w-5 md:h-5 text-[#a39a86] shrink-0"
+            className="w-5 h-5 text-[#a39a86] shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -189,7 +206,7 @@ export function SyllabusNodeRow({
             />
           </svg>
         ) : node.completed ? (
-          <svg className="w-4 h-4 md:w-5 md:h-5 text-[#1d9e75] shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-5 h-5 text-[#1d9e75] shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -197,10 +214,10 @@ export function SyllabusNodeRow({
             />
           </svg>
         ) : (
-          <span className="w-4 h-4 md:w-5 md:h-5 rounded-full border-2 border-[#dcd5c7] shrink-0" />
+          <span className="w-5 h-5 rounded-full border-2 border-[#dcd5c7] shrink-0" />
         )
       ) : (
-        <div className="w-14 md:w-20 h-1.5 md:h-2 bg-[#dcd5c7] rounded-full overflow-hidden shrink-0">
+        <div className="w-14 sm:w-20 h-2 bg-[#dcd5c7] rounded-full overflow-hidden shrink-0">
           <div
             className="h-full bg-[#1d9e75] rounded-full transition-all"
             style={{ width: `${node.completion_percent ?? 0}%` }}

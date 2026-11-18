@@ -30,6 +30,7 @@ export const STEP_TAB_MAP: Record<number, TabId> = {
   12: 'mcq-lab',    // MCQ Lab
   13: 'mains',      // Mains Practice
   14: 'mains',      // Growth Report (overlay within mains tab)
+  15: 'mains',      // Completed topic view
 };
 
 export interface UseFunnelStateReturn {

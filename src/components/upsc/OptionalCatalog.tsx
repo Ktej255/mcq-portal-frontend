@@ -135,7 +135,7 @@ export function OptionalCatalog() {
                 if (failedSubject) void handleSelect(failedSubject);
               }}
               disabled={selectingSlug !== null}
-              className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-3 text-xs font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#9a6a16] px-4 text-xs font-black text-white transition hover:bg-[#7a5410] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {selectingSlug === failedSlug ? "Retrying..." : "Retry selection"}
             </button>

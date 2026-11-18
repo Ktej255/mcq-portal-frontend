@@ -721,7 +721,7 @@ export default function ContentPreviewPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5] text-[#13251d]">
+    <div className="min-h-screen bg-gradient-to-b from-[#f7f4ee] to-[#f0ede5] text-[#13251d]">
       <div className="mx-auto max-w-4xl px-4 py-6 md:px-8">
 
         {/* Header */}
@@ -829,6 +829,6 @@ export default function ContentPreviewPage() {
           );
         })()}
       </div>
-    </main>
+    </div>
   );
 }

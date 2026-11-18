@@ -203,7 +203,7 @@ export function UpscPrelimsReviewCommand() {
     },
     {
       label: "Archive candidates",
-      value: sourceData?.candidateQuestions ?? "Checking",
+      value: sourceReadiness.status === "error" ? "Unavailable" : (sourceData?.candidateQuestions ?? "Checking"),
       detail: sourceData
         ? `${sourceData.blindSpotQuestions} blind spots require source-gap work orders.`
         : sourceReadiness.message,
@@ -224,7 +224,7 @@ export function UpscPrelimsReviewCommand() {
   ];
 
   return (
-    <main
+    <div
       data-testid="prelims-review-command"
       data-effective-coverage={corrected.effectiveCoveragePercent}
       data-question-count={questionLedger.summary.totalQuestions}
@@ -352,7 +352,7 @@ export function UpscPrelimsReviewCommand() {
             </div>
             <Link
               href="/upsc/prelims-2027-strategy#prelims-2027-task-ledger"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#1b6b4a]/30 bg-[#eef7f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#1b6b4a]/30 bg-[#eef7f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
             >
               Task ledger
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -426,7 +426,7 @@ export function UpscPrelimsReviewCommand() {
             </p>
             <Link
               href="/upsc/prelims-2027-strategy#prelims-2026-source-gap-work-orders"
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg border border-[#1b6b4a]/30 bg-[#eef7f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#1b6b4a]/30 bg-[#eef7f1] px-3 text-xs font-black uppercase tracking-[0.1em] text-[#154f39] transition hover:bg-white"
             >
               Source-gap work orders
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -477,7 +477,7 @@ export function UpscPrelimsReviewCommand() {
               <Link
                 href="/api/upsc/prelims-2026/release-decision"
                 data-testid="prelims-review-command-main-site-link"
-                className="mt-4 inline-flex items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
+                className="mt-4 inline-flex min-h-11 items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
               >
                 Release-decision API
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -493,7 +493,7 @@ export function UpscPrelimsReviewCommand() {
               </p>
               <Link
                 href="/upsc-prelims-2026-showcase#surprise-action-matrix"
-                className="mt-4 inline-flex items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
+                className="mt-4 inline-flex min-h-11 items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
               >
                 Public matrix
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -509,7 +509,7 @@ export function UpscPrelimsReviewCommand() {
               </p>
               <Link
                 href="/upsc/mcq-command"
-                className="mt-4 inline-flex items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
+                className="mt-4 inline-flex min-h-11 items-center text-xs font-black uppercase tracking-[0.1em] text-[#1b6b4a]"
               >
                 MCQ command
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -536,6 +536,6 @@ export function UpscPrelimsReviewCommand() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

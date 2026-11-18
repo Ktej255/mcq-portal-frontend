@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { compressImageForUpload } from "@/lib/imageCompression";
 import {
   gsAnswerService,
   GsEvaluationProviderUnavailableError,
@@ -56,6 +57,7 @@ export function AnswerWorkspace({
   const [report, setReport] = useState<EvaluationReportOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Upload mode state.
@@ -155,6 +157,7 @@ export function AnswerWorkspace({
       return;
     }
     setBusy(true);
+    setUploadStatusText("Preparing pages…");
     try {
       let id = attemptId;
       if (id == null) {
@@ -168,9 +171,12 @@ export function AnswerWorkspace({
         setAttemptId(id);
       }
       // Upload any pages not saved yet (a retry continues where it stopped).
+      // Photos are compressed first so a phone upload stays under the size limit.
       let results = pageResults;
       for (let i = results.length; i < pages.length; i++) {
-        const r = await gsAnswerService.uploadPage(subject, id, pages[i], i + 1);
+        setUploadStatusText(`Compressing & uploading page ${i + 1} of ${pages.length}…`);
+        const compressed = await compressImageForUpload(pages[i], 1600, 0.8);
+        const r = await gsAnswerService.uploadPage(subject, id, compressed, i + 1);
         results = [...results, r];
         setPageResults(results);
       }
@@ -178,6 +184,7 @@ export function AnswerWorkspace({
         // Pages are saved; the student retries reading them before submitting.
         return;
       }
+      setUploadStatusText("Submitting for evaluation…");
       const sub = await gsAnswerService.submitAttempt(subject, id, acknowledgeReview);
       setStatus(sub.status);
       if (sub.status === "review_required") {
@@ -193,6 +200,7 @@ export function AnswerWorkspace({
       );
     } finally {
       setBusy(false);
+      setUploadStatusText(null);
     }
   };
 
@@ -231,7 +239,7 @@ export function AnswerWorkspace({
   const failedPages = pageResults.filter((p) => p.ocr_status === "failed");
 
   return (
-    <div className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-5">
+    <div className="rounded-2xl border border-[#dcd5c7] bg-[#fffdf8] p-4 sm:p-6">
       {/* Header: GS paper + year + marks */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {gsPaper ? (
@@ -253,13 +261,14 @@ export function AnswerWorkspace({
       ) : null}
 
       {/* Mode toggle */}
-      <div className="mb-3 inline-flex rounded-lg border border-[#dcd5c7] p-0.5">
+      <div className="mb-4 inline-flex rounded-xl border border-[#dcd5c7] bg-[#f7f4ee] p-1">
         {(["type", "upload"] as const).map((m) => (
           <button
             key={m}
+            type="button"
             onClick={() => setMode(m)}
-            className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-              mode === m ? "bg-[#1d9e75] text-white" : "text-[#5d675f]"
+            className={`min-h-11 sm:min-h-9 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              mode === m ? "bg-[#1d9e75] text-white shadow-xs" : "text-[#5d675f] hover:text-[#13251d]"
             }`}
           >
             {m === "type" ? "Type answer" : "Upload pages"}
@@ -274,12 +283,13 @@ export function AnswerWorkspace({
             onChange={(e) => setText(e.target.value)}
             rows={10}
             placeholder="Write your answer here…"
-            className="w-full rounded-lg border border-[#dcd5c7] bg-white p-3 text-sm leading-7 text-[#13251d] focus:border-[#1d9e75] focus:outline-none"
+            className="w-full rounded-xl border border-[#dcd5c7] bg-white p-3 text-base sm:text-sm leading-7 text-[#13251d] focus:border-[#1d9e75] focus:outline-none"
           />
           <button
+            type="button"
             onClick={submitTyped}
             disabled={busy || checkingDown}
-            className="mt-3 rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#178a65] disabled:opacity-60"
+            className="mt-3 min-h-11 w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-[#1d9e75] px-5 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-[#178a65] disabled:opacity-60 transition-all active:scale-[0.98]"
           >
             {busy ? "Submitting…" : "Submit for evaluation"}
           </button>
@@ -297,11 +307,12 @@ export function AnswerWorkspace({
             <p className="mt-1 text-xs text-[#5d675f]">{pages.length} page(s) selected (in order)</p>
           ) : null}
           <button
+            type="button"
             onClick={() => submitUpload(false)}
             disabled={busy || checkingDown}
-            className="mt-3 rounded-lg bg-[#1d9e75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#178a65] disabled:opacity-60"
+            className="mt-3 min-h-11 w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-[#1d9e75] px-5 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-[#178a65] disabled:opacity-60 transition-all active:scale-[0.98]"
           >
-            {busy ? "Uploading…" : failedPages.length > 0 ? "Evaluate" : "Upload & evaluate"}
+            {busy ? (uploadStatusText ?? "Uploading…") : failedPages.length > 0 ? "Evaluate" : "Upload & evaluate"}
           </button>
 
           {pageResults.length > 0 ? (
@@ -367,8 +378,9 @@ export function AnswerWorkspace({
             then confirm to evaluate.
           </p>
           <button
+            type="button"
             onClick={() => submitUpload(true)}
-            className="mt-2 rounded-lg bg-[#ef9f27] px-3 py-1.5 text-xs font-semibold text-white"
+            className="mt-2 min-h-11 w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-[#ef9f27] px-4 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-[#d88c1e] transition-all active:scale-[0.98]"
           >
             Looks correct — evaluate
           </button>

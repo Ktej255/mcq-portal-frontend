@@ -31,10 +31,8 @@ test("later topics are locked in the syllabus and open to a locked screen", asyn
   await page.goto("/upsc/geography/lms/syllabus");
   await expect(page.getByRole("heading", { name: "Geography Syllabus" })).toBeVisible();
   await expect(page.getByText("Geomorphology")).toBeVisible();
-  const collapsed = page.getByRole("button", { name: "Expand", exact: true });
-  while ((await collapsed.count()) > 0) {
-    await collapsed.first().click();
-  }
+  await page.getByRole("button", { name: "Expand All", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Collapse All", exact: true })).toBeVisible();
   const lockedRow = page.locator('[role="treeitem"][data-locked]').first();
   await expect(lockedRow).toBeVisible();
   await expect(lockedRow.getByTestId("lock-reason")).toContainText(locked!.lock_reason!);

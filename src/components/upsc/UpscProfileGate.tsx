@@ -20,7 +20,10 @@ type AutoCreatedProfile = {
   name: string;
   targetYear: string;
   level: string;
-  studyWindow: number;
+  studyWindow: string | number;
+  learningStyle?: string;
+  weakSignal?: string;
+  studyTime?: string;
   optional?: string | null;
   weakSubjects: string[];
   createdAt: string;
@@ -41,23 +44,26 @@ function tryAutoCreateProfileFromDiagnostic(): StudentProfileInput | null {
 
     // Map diagnostic answers to a minimal student profile
     const levelMap: Record<string, string> = {
-      "Fresh start — beginning from scratch": "Beginner",
-      "Self-study (6+ months in)": "Intermediate",
-      "Coaching student (online/offline)": "Intermediate",
-      "Repeat attempt (appeared before)": "Advanced",
+      "Fresh start — beginning from scratch": "beginner",
+      "Self-study (6+ months in)": "intermediate",
+      "Coaching student (online/offline)": "intermediate",
+      "Repeat attempt (appeared before)": "advanced",
     };
-    const hoursMap: Record<string, number> = {
-      "2–3 hours": 150,
-      "4–5 hours": 270,
-      "6–8 hours": 420,
-      "8+ hours": 540,
+    const hoursMap: Record<string, string> = {
+      "2–3 hours": "120",
+      "4–5 hours": "180",
+      "6–8 hours": "180",
+      "8+ hours": "180",
     };
 
     const profile: AutoCreatedProfile = {
       name: diagnostic.name,
       targetYear: diagnostic.year || "2027",
-      level: levelMap[diagnostic.stage] || "Beginner",
-      studyWindow: hoursMap[diagnostic.hours] || 270,
+      level: levelMap[diagnostic.stage] || "beginner",
+      studyWindow: hoursMap[diagnostic.hours] || "90",
+      learningStyle: "mixed",
+      weakSignal: "retention",
+      studyTime: "morning",
       optional: diagnostic.optional === "Not decided yet" ? null : diagnostic.optional,
       weakSubjects: diagnostic.subjects || [],
       createdAt: new Date().toISOString(),
@@ -148,20 +154,20 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
 
   if (state === "checking") {
     return (
-      <main className="min-h-[60vh] bg-[#f7f4ee] p-4 text-[#13251d]">
+      <div className="min-h-[60vh] bg-[#f7f4ee] p-4 text-[#13251d]">
         <div className="mx-auto mt-12 max-w-xl rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 text-sm font-black shadow-sm">
           Checking self-study profile...
         </div>
-      </main>
+      </div>
     );
   }
 
   if (state === "persistence-error") {
     return (
-      <main className="min-h-[70vh] bg-[#f7f4ee] p-4 text-[#13251d]">
+      <div className="min-h-[70vh] bg-[#f7f4ee] p-4 text-[#13251d]">
         <section
           data-testid="upsc-profile-save-error"
-          className="mx-auto mt-10 max-w-2xl rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 shadow-sm md:p-8"
+          className="mx-auto mt-10 max-w-2xl rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 sm:p-6 md:p-8 shadow-sm"
         >
           <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md bg-[#fff1e8] text-[#a94718]">
             <UserRoundCheck className="h-5 w-5" />
@@ -189,7 +195,7 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 
@@ -198,10 +204,10 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
     // which handles new student setup properly. This prevents the
     // "complete your setup" dead-end loop.
     return (
-      <main className="min-h-[70vh] bg-[#f7f4ee] p-4 text-[#13251d]">
+      <div className="min-h-[70vh] bg-[#f7f4ee] p-4 text-[#13251d]">
         <section
           data-testid="upsc-profile-required"
-          className="mx-auto mt-10 max-w-2xl rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-6 shadow-sm md:p-8"
+          className="mx-auto mt-10 max-w-2xl rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 sm:p-6 md:p-8 shadow-sm"
         >
           <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md bg-[#e7f5ee] text-[#085041]">
             <UserRoundCheck className="h-5 w-5" />
@@ -227,8 +233,11 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
                 const defaultProfile = {
                   name: "Student",
                   targetYear: "2027",
-                  level: "Beginner",
-                  studyWindow: 90,
+                  level: "beginner",
+                  studyWindow: "90",
+                  learningStyle: "mixed",
+                  weakSignal: "retention",
+                  studyTime: "morning",
                   createdAt: new Date().toISOString(),
                   autoCreated: true,
                 };
@@ -240,7 +249,7 @@ export function UpscProfileGate({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 

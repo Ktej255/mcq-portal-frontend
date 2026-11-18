@@ -14,21 +14,30 @@ import { EXAM_BRAND, examBrandName, isExamRouteCode } from '@/lib/exams/examRout
 
 interface HeaderProps {
   onMenuClick?: () => void;
+  isOpen?: boolean;
 }
 
 type Crumb = { label: string; href?: string };
 
-export function DashboardHeader({ onMenuClick }: HeaderProps) {
+export function DashboardHeader({ onMenuClick, isOpen = false }: HeaderProps) {
   const pathname = usePathname();
   const crumbs = buildBreadcrumbs(pathname);
   const pageTitle = crumbs[crumbs.length - 1]?.label ?? 'Today';
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#dcd5c7] bg-[#fffdf8] px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dcd5c7] bg-[#fffdf8] px-4 md:px-6">
       {/* Mobile: menu + current page */}
       <div className="flex min-w-0 items-center gap-3 md:hidden">
-        <Button variant="ghost" size="icon" onClick={onMenuClick} className="-ml-2 shrink-0" aria-label="Open navigation">
-          <Menu className="h-6 w-6" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMenuClick}
+          className="-ml-2 h-11 w-11 shrink-0 p-0"
+          aria-label="Open navigation"
+          aria-expanded={isOpen}
+          aria-controls="dashboard-sidebar"
+        >
+          <Menu className="h-6 w-6" aria-hidden="true" />
         </Button>
         <div className="min-w-0">
           <p className="truncate text-base font-black tracking-tight text-[#13251d]">{examBrandName(pathname)}</p>
@@ -102,6 +111,13 @@ const SEGMENT_LABELS: Record<string, string> = {
   history_root: 'Progress',
   tests: 'Practice',
   settings: 'Settings',
+  billing: 'Billing',
+  checkout: 'Checkout',
+  onboarding: 'Onboarding',
+  syllabus: 'Syllabus',
+  planner: 'Today',
+  topic: 'Topic',
+  threads: 'Threads',
   // subject sub-rooms
   watch: 'Watch',
   talk: 'Discuss',
@@ -153,12 +169,19 @@ function buildBreadcrumbs(pathname: string): Crumb[] {
 
   if (segments[0] !== 'upsc') {
     const root = segments[0];
-    if (root === 'history') return [{ label: 'Progress' }];
-    if (root === 'reports') return [{ label: 'Learning Gaps' }];
-    if (root === 'revision') return [{ label: 'Revise' }];
-    if (root === 'practice' || root === 'tests') return [{ label: 'Practice' }];
-    if (root === 'settings') return [{ label: 'Settings' }];
-    return [{ label: labelForSegment(root) }];
+    const rootCrumb =
+      root === 'history'
+        ? { label: 'Progress' }
+        : root === 'reports'
+        ? { label: 'Learning Gaps' }
+        : root === 'revision'
+        ? { label: 'Revise' }
+        : root === 'practice' || root === 'tests'
+        ? { label: 'Practice' }
+        : root === 'settings'
+        ? { label: 'Settings' }
+        : { label: labelForSegment(root) };
+    return [{ label: 'Today', href: '/upsc' }, rootCrumb];
   }
 
   // /upsc/* — build a clickable trail.

@@ -36,6 +36,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [reloadKey, setReloadKey] = useState(0);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -51,35 +53,64 @@ export default function BillingPage() {
         setLoading(false);
       }
     }
-    fetchData();
-  }, []);
+    void fetchData();
+  }, [reloadKey]);
+
+  const retryFetch = () => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((key) => key + 1);
+  };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-        <div className="mx-auto flex max-w-4xl items-center justify-center px-4 py-20">
+      <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+        <div className="mx-auto flex max-w-4xl items-center justify-center px-4 py-20 sm:px-6 md:px-8">
           <Loader2 className="h-6 w-6 animate-spin text-[#1d9e75]" />
           <span className="ml-3 text-sm font-black">Loading billing…</span>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-        <div className="mx-auto max-w-4xl px-4 py-10">
-          <p className="text-sm font-bold text-red-700">{error}</p>
+      <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:px-8">
+          <div
+            data-testid="billing-fetch-error"
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-5 sm:p-6 md:p-7 shadow-sm text-red-700"
+          >
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-700">Billing Sync</p>
+            <h2 className="mt-2 text-xl font-black text-red-900">Unable to load billing data</h2>
+            <p className="mt-2 text-sm font-semibold text-red-800">{error}</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={retryFetch}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1a3a2a] px-5 text-sm font-black text-white hover:bg-[#10291d] transition"
+              >
+                Retry
+              </button>
+              <Link
+                href="/upsc"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#dcd5c7] bg-white px-5 text-sm font-black text-[#13251d] hover:bg-[#f7f4ee] transition"
+              >
+                Back to Today
+              </Link>
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   const isActive = subscription?.status === "active";
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 md:px-8">
+    <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+      <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 sm:px-6 md:px-8">
         {/* Header */}
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
@@ -91,7 +122,7 @@ export default function BillingPage() {
         </div>
 
         {/* Active Subscription Card */}
-        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 sm:p-6 md:p-7 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <BadgeIndianRupee className="h-5 w-5 text-[#1d9e75]" />
             <h2 className="text-lg font-black">Current Subscription</h2>
@@ -142,7 +173,7 @@ export default function BillingPage() {
               </p>
               <Link
                 href="/upsc/pricing"
-                className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-[#1a3a2a] px-4 text-sm font-black text-white hover:bg-[#10291d] transition"
+                className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-[#1a3a2a] px-4 text-sm font-black text-white hover:bg-[#10291d] transition"
               >
                 {publicCommerceLaunchBoundary.readyForPayment ? "View Plans" : "Review plans & record intent"}
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -162,16 +193,16 @@ export default function BillingPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/upsc/pricing"
-                className="inline-flex min-h-9 items-center rounded-md border border-[#1a3a2a] px-3 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
+                className="inline-flex min-h-11 items-center rounded-md border border-[#1a3a2a] px-4 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a] hover:text-white transition"
               >
-                Upgrade Plan
+                {publicCommerceLaunchBoundary.readyForPayment ? "Upgrade Plan" : "Change plan intent"}
               </Link>
             </div>
           )}
         </section>
 
         {/* Order History */}
-        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+        <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 sm:p-6 md:p-7 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="h-5 w-5 text-[#1d9e75]" />
             <h2 className="text-lg font-black">Order History</h2>
@@ -228,6 +259,6 @@ export default function BillingPage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

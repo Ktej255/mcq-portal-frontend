@@ -70,15 +70,15 @@ export default function SettingsPage() {
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#f7f4ee] px-4 py-6 text-[#13251d] md:px-8 md:py-10">
+      <main className="min-h-screen bg-[#f7f4ee] px-4 py-6 text-[#13251d] sm:px-6 md:px-8 md:py-10">
         <div className="mx-auto max-w-5xl">
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-black text-[#085041] hover:underline">
+          <Link href="/upsc" className="inline-flex min-h-11 items-center gap-2 text-sm font-black text-[#085041] hover:underline">
             <ArrowLeft className="h-4 w-4" /> Back to Today
           </Link>
 
           <section
             data-testid="student-settings-learning-preferences"
-            className="mt-6 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+            className="mt-6 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm sm:p-6 md:p-7"
           >
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Settings</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Learning preferences</h1>
@@ -89,15 +89,15 @@ export default function SettingsPage() {
 
           <section className="mt-5 grid gap-4 sm:grid-cols-2">
             {preferences.map((item) => (
-              <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+              <div key={item.label} className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm sm:p-6">
                 <item.icon className="h-5 w-5 text-[#085041]" />
-                <p className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</p>
-                <h2 className="mt-2 text-xl font-black tracking-tight">{item.value}</h2>
+                <h3 className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">{item.label}</h3>
+                <p className="mt-2 text-xl font-black tracking-tight">{item.value}</p>
               </div>
             ))}
           </section>
 
-          <section className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+          <section className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm sm:p-6 md:p-7">
             <div>
               <h2 className="text-lg font-black tracking-tight">Adjust your plan</h2>
               <p className="mt-1 text-sm font-medium leading-6 text-[#657066]">
@@ -105,8 +105,8 @@ export default function SettingsPage() {
               </p>
             </div>
             <Link
-              href="/upsc#upsc-intake"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+              href="/upsc/geography/lms/onboarding"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
             >
               Review preferences <ArrowRight className="ml-2 h-4 w-4" />
             </Link>

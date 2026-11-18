@@ -331,9 +331,8 @@ function UpscQuestionBankBuilderContent({
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
-        <section
+    <div className="flex flex-col gap-5 text-[#13251d]">
+      <section
           data-testid="upsc-question-bank-hero"
           data-active-subject={selectedSubject.slug}
           data-active-difficulty={customMode ? "CUSTOM_MIX" : activeDifficulty}
@@ -598,7 +597,7 @@ function UpscQuestionBankBuilderContent({
                     setCustomMix(emptyQuestionBankMix);
                   }}
                   className={cn(
-                    "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                    "min-h-11 rounded-md border px-3 text-sm font-black transition",
                     isActive
                       ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                       : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
@@ -836,7 +835,7 @@ function UpscQuestionBankBuilderContent({
                 aria-pressed={customMode}
                 onClick={() => enableCustomMix(recommendedMix)}
                 className={cn(
-                  "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                  "min-h-11 rounded-md border px-3 text-sm font-black transition",
                   customMode
                     ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                     : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
@@ -847,7 +846,7 @@ function UpscQuestionBankBuilderContent({
               <button
                 type="button"
                 onClick={() => setCustomMix(recommendedMix)}
-                className="min-h-10 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+                className="min-h-11 rounded-md border border-[#dcd5c7] bg-white px-3 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
               >
                 Load recommended mix
               </button>
@@ -856,7 +855,7 @@ function UpscQuestionBankBuilderContent({
                 aria-pressed={!customMode}
                 onClick={() => setCustomMode(false)}
                 className={cn(
-                  "min-h-10 rounded-md border px-3 text-sm font-black transition",
+                  "min-h-11 rounded-md border px-3 text-sm font-black transition",
                   !customMode
                     ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                     : "border-[#dcd5c7] bg-[#f7f4ee] text-[#34453b] hover:border-[#1d9e75]"
@@ -926,7 +925,7 @@ function UpscQuestionBankBuilderContent({
             </div>
             <Link
               href={`/upsc/mcq-command?subject=${selectedSubject.slug}`}
-              className="inline-flex min-h-10 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
+              className="inline-flex min-h-11 items-center rounded-md border border-[#cfc6b6] bg-white px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f2eadc]"
             >
               Admin batch map <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -1004,7 +1003,7 @@ function UpscQuestionBankBuilderContent({
                         aria-pressed={attempt?.selectedOption === option}
                         onClick={() => markQuestionSolved(question, option as QuestionOption)}
                         className={cn(
-                          "rounded-md border p-3 text-left text-sm font-semibold transition",
+                          "flex min-h-11 items-center rounded-md border p-3 text-left text-sm font-semibold transition",
                           attempt?.selectedOption === option
                             ? attempt.isCorrect
                               ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
@@ -1030,7 +1029,7 @@ function UpscQuestionBankBuilderContent({
                     </div>
                   ) : null}
                   <details className="mt-4 rounded-md border border-[#cfe5dc] bg-white p-3">
-                    <summary className="cursor-pointer list-none text-sm font-black text-[#085041]">
+                    <summary className="inline-flex min-h-11 cursor-pointer list-none items-center text-sm font-black text-[#085041]">
                       Answer and UPSC trap
                     </summary>
                     <p className="mt-3 text-sm font-black text-[#13251d]">Correct: {question.correctOption}</p>
@@ -1057,7 +1056,6 @@ function UpscQuestionBankBuilderContent({
             )}
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   );
 }

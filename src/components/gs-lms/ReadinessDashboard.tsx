@@ -478,7 +478,7 @@ export function ReadinessDashboard() {
         <button
           type="button"
           onClick={() => fetchData()}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#1d9e75] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#178362]"
+          className="mt-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-[#1d9e75] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#178362]"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Retry
@@ -545,7 +545,7 @@ export function ReadinessDashboard() {
         <button
           type="button"
           onClick={() => fetchData()}
-          className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-[#dcd5c7] bg-white px-3 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh
@@ -902,7 +902,7 @@ export function ReadinessDashboard() {
                     setShowAll(false);
                   }}
                   aria-pressed={filter === option.id}
-                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition ${
+                  className={`inline-flex min-h-9 items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold transition sm:min-h-8 sm:px-2.5 sm:py-0.5 sm:text-[11px] ${
                     filter === option.id
                       ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                       : "border-[#dcd5c7] bg-white text-[#536259] hover:border-[#1d9e75]"
@@ -1095,7 +1095,7 @@ export function ReadinessDashboard() {
             <button
               type="button"
               onClick={() => setShowAll((current) => !current)}
-              className="rounded-lg border border-[#dcd5c7] bg-white px-4 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#dcd5c7] bg-white px-5 py-2.5 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75] sm:w-auto"
             >
               {showAll
                 ? `Show top ${TOPIC_PREVIEW_COUNT}`

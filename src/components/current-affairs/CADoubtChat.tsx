@@ -97,8 +97,9 @@ export function CADoubtChat({ itemId, itemTitle }: CADoubtChatProps) {
       {/* Floating trigger button */}
       {!isOpen && (
         <button
+          type="button"
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-lg hover:shadow-xl transition-shadow"
+          className="fixed bottom-6 right-6 z-50 min-h-11 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-[#1a3a2a] to-[#1d9e75] text-white shadow-lg hover:shadow-xl transition-shadow"
         >
           <MessageSquare className="h-4 w-4" />
           <span className="text-xs font-black">Ask a Doubt</span>
@@ -124,9 +125,9 @@ export function CADoubtChat({ itemId, itemTitle }: CADoubtChatProps) {
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Close doubt chat"
-                className="text-white/80 hover:text-white"
+                className="min-h-11 min-w-11 inline-flex items-center justify-center p-2 rounded-lg text-white/80 hover:text-white"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -200,7 +201,7 @@ export function CADoubtChat({ itemId, itemTitle }: CADoubtChatProps) {
                   </button>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <input
                   value={input}
                   onChange={e => {
@@ -209,15 +210,16 @@ export function CADoubtChat({ itemId, itemTitle }: CADoubtChatProps) {
                   }}
                   onKeyDown={e => e.key === 'Enter' && handleSend()}
                   placeholder="Ask your doubt..."
-                  className="flex-1 rounded-lg border border-[#dcd5c7] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
+                  className="flex-1 min-h-11 rounded-lg border border-[#dcd5c7] px-3.5 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/30"
                 />
                 <button
+                  type="button"
                   onClick={handleSend}
                   disabled={!input.trim() || sending}
                   aria-label={sendFailed ? 'Retry sending doubt' : 'Send doubt'}
-                  className="rounded-lg bg-[#1d9e75] p-2 text-white disabled:opacity-50"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg bg-[#1d9e75] p-2.5 text-white disabled:opacity-50"
                 >
-                  <Send className="h-3.5 w-3.5" />
+                  <Send className="h-4 w-4" />
                 </button>
               </div>
             </div>

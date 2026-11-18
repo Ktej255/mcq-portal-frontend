@@ -16,18 +16,30 @@ export function LanguageSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex h-7 items-center justify-center gap-2 rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-[0.8rem] font-medium whitespace-nowrap transition-all outline-none select-none hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px dark:border-input dark:bg-input/30 dark:hover:bg-input/50">
-        <Globe className="h-4 w-4" />
+      <DropdownMenuTrigger
+        aria-label="Select language"
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#dcd5c7] bg-white px-3 text-xs font-bold text-[#13251d] transition-colors hover:bg-[#f7f4ee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d9e75]"
+      >
+        <Globe className="h-4 w-4" aria-hidden="true" />
         <span className="hidden sm:inline-block">{labels[mode]}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setMode('ENGLISH')} className={mode === 'ENGLISH' ? 'bg-accent' : ''}>
+        <DropdownMenuItem
+          onClick={() => setMode('ENGLISH')}
+          className={`flex min-h-11 items-center px-3 text-xs font-semibold ${mode === 'ENGLISH' ? 'bg-accent font-bold' : ''}`}
+        >
           English
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setMode('HINDI')} className={mode === 'HINDI' ? 'bg-accent' : ''}>
+        <DropdownMenuItem
+          onClick={() => setMode('HINDI')}
+          className={`flex min-h-11 items-center px-3 text-xs font-semibold ${mode === 'HINDI' ? 'bg-accent font-bold' : ''}`}
+        >
           हिंदी (Hindi)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setMode('HYBRID')} className={mode === 'HYBRID' ? 'bg-accent' : ''}>
+        <DropdownMenuItem
+          onClick={() => setMode('HYBRID')}
+          className={`flex min-h-11 items-center px-3 text-xs font-semibold ${mode === 'HYBRID' ? 'bg-accent font-bold' : ''}`}
+        >
           Hybrid Mode
         </DropdownMenuItem>
       </DropdownMenuContent>

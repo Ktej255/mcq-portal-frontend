@@ -49,6 +49,8 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
   const [recallGate, setRecallGate] = useState<RecallGateState | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeSubject, setActiveSubject] = useState<SupportedGsLmsSubject | null>(null);
 
   useEffect(() => {
@@ -64,8 +66,12 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
       }
 
       setLoading(true);
+      setLoadError(false);
       Promise.all([
-        gsLmsService.getTodayPlan(activeSubject).catch(() => null),
+        gsLmsService.getTodayPlan(activeSubject).catch(() => {
+          setLoadError(true);
+          return null;
+        }),
         gsLmsService.checkRecallGate(activeSubject).catch(() => null),
         paymentService.getSubscription().catch(() => null),
       ])
@@ -73,14 +79,43 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           setPlan(planData);
           setRecallGate(gateData);
           setSubscription(subData);
+          if (planData || gateData) {
+            setLoadError(false);
+          }
         })
         .finally(() => setLoading(false));
     }, 0);
     return () => window.clearTimeout(requestTimer);
-  }, [isLoaded, isSignedIn, activeSubject]);
+  }, [isLoaded, isSignedIn, activeSubject, reloadKey]);
 
-  // Don't show anything while loading or if backend is unreachable
-  if (!activeSubject || loading || (!plan && !recallGate)) return null;
+  // Don't show anything while loading
+  if (!activeSubject || loading) return null;
+
+  // Honest surface: when the server read failed, explain rather than vanishing
+  if (!plan && !recallGate) {
+    if (loadError) {
+      return (
+        <section className="rounded-2xl border border-[#dcd5c7] bg-[#faf6ee] p-4 text-xs font-semibold text-[#5d675f] flex flex-wrap items-center justify-between gap-3">
+          <div className="max-w-xl">
+            <p className="font-black uppercase tracking-[0.1em] text-[#8a7a52]">
+              Daily plan sync unavailable
+            </p>
+            <p className="mt-0.5 text-[#5d675f]">
+              Could not load today&apos;s schedule from the server. Your offline session tracker below remains active.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="inline-flex min-h-11 items-center rounded-lg border border-[#8a7a52] bg-white px-4 text-xs font-black uppercase tracking-[0.1em] text-[#8a7a52] transition hover:bg-[#8a7a52] hover:text-white"
+          >
+            Retry
+          </button>
+        </section>
+      );
+    }
+    return null;
+  }
 
   const streakDays = plan?.streak_days ?? 0;
   const completedCount = plan?.completed_count ?? 0;
@@ -138,7 +173,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
         </div>
         <Link
           href={`/upsc/${activeSubject}/lms/planner`}
-          className="text-xs font-bold text-[#1d9e75] hover:text-[#178a65] transition"
+          className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[#1d9e75] transition hover:text-[#178a65]"
         >
           Full planner →
         </Link>
@@ -159,7 +194,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           </div>
           <Link
             href={`/upsc/${activeSubject}/lms/planner`}
-            className="shrink-0 px-3 py-1.5 text-xs font-bold text-white bg-[#ef9f27] rounded-lg hover:bg-[#d98c1e] transition"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#ef9f27] px-4 text-xs font-bold text-white transition hover:bg-[#d98c1e]"
           >
             Recall
           </Link>
@@ -198,7 +233,7 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href={`/upsc/${activeSubject}/lms`}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-[#1a3a2a] rounded-lg hover:bg-[#10291d] transition"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#1a3a2a] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#10291d]"
         >
           <BookOpen className="h-3.5 w-3.5" />
           Continue GS
@@ -206,13 +241,13 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
         </Link>
         <Link
           href="/upsc/current-affairs"
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#dcd5c7] bg-white px-3.5 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
         >
           📰 Current Affairs
         </Link>
         <Link
           href={`/upsc/${activeSubject}/lms/gaps`}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#1a3a2a] border border-[#dcd5c7] bg-white rounded-lg hover:border-[#1d9e75] transition"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#dcd5c7] bg-white px-3.5 py-2 text-xs font-bold text-[#1a3a2a] transition hover:border-[#1d9e75]"
         >
           View Readiness
         </Link>
@@ -225,7 +260,10 @@ export function LmsHomeSummary({ greeting }: { greeting?: string | null }) {
           <p className="text-xs font-bold text-[#8c5d14]">Today&apos;s Current Affairs</p>
           <p className="text-[11px] text-[#536259] truncate">Daily UPSC-relevant news, filtered and explained</p>
         </div>
-        <Link href="/upsc/current-affairs" className="text-xs font-bold text-[#1d9e75] hover:underline shrink-0">
+        <Link
+          href="/upsc/current-affairs"
+          className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[#1d9e75] hover:underline shrink-0"
+        >
           Read →
         </Link>
       </div>

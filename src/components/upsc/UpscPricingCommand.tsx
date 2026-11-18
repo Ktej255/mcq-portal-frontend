@@ -78,12 +78,12 @@ export function UpscPricingCommand() {
   const currentPlanCycle = profile?.billingCycle ?? "monthly";
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+    <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 md:px-8">
         
         {/* Active Plan Status Header */}
         {profile && (
-          <section className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm">
+          <section className="rounded-xl border border-[#b9d9cd] bg-[#e7f5ee] p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#085041]">
@@ -111,7 +111,7 @@ export function UpscPricingCommand() {
                 </span>
                 <Link
                   href="/upsc/daily-command?tab=today"
-                  className="rounded-lg bg-[#1a3a2a] px-4 py-2 text-xs font-black text-white hover:bg-[#10291d] transition"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1a3a2a] px-4 text-xs font-black text-white hover:bg-[#10291d] transition"
                 >
                   Open Study Workspace
                 </Link>
@@ -478,10 +478,10 @@ export function UpscPricingCommand() {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href="/upsc/yearly-planner" className="inline-flex min-h-9 items-center rounded-md bg-[#1a3a2a] px-3 py-1.5 text-xs font-black text-white hover:bg-[#10291d] transition">
+                  <Link href="/upsc/yearly-planner" className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-3.5 py-1.5 text-xs font-black text-white hover:bg-[#10291d] transition">
                     Yearly planner
                   </Link>
-                  <Link href="/upsc/optional-subjects" className="inline-flex min-h-9 items-center rounded-md border border-[#1a3a2a] px-3 py-1.5 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition">
+                  <Link href="/upsc/optional-subjects" className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-3.5 py-1.5 text-xs font-black text-[#1a3a2a] hover:bg-[#1a3a2a]/5 transition">
                     Optional subjects
                   </Link>
                 </div>
@@ -491,6 +491,6 @@ export function UpscPricingCommand() {
         </section>
         
       </div>
-    </main>
+    </div>
   );
 }
