@@ -29,6 +29,8 @@ import {
   type StudentReportProgressMap,
 } from "@/lib/upsc/studentReportEngine";
 import { readStudentProfile } from "@/lib/upsc/studentProfile";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { practiceHrefFor } from "@/lib/navigation/studentNav";
 
 type DailyReportState = {
   subjectSlug: string;
@@ -77,6 +79,8 @@ function readStrategyPracticeHandoffs() {
 }
 
 export default function ReportsPage() {
+  const { role } = useAuth();
+  const isAdmin = role === "ADMIN";
   const [progressBySubject, setProgressBySubject] = useState<Record<string, StudentReportProgressMap>>({});
   const [questionBankAttemptsBySubject, setQuestionBankAttemptsBySubject] =
     useState<StudentReportQuestionBankAttemptMap>({});
@@ -552,7 +556,7 @@ export default function ReportsPage() {
                 ))}
               </div>
               <Link
-                href="/upsc/question-bank"
+                href={practiceHrefFor(isAdmin, "geography", "/upsc/question-bank")}
                 data-testid="upsc-2027-audit-readiness-action"
                 className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
               >
@@ -564,7 +568,7 @@ export default function ReportsPage() {
               {strategyAuditReadiness.priorityRows.map((row) => (
                 <Link
                   key={row.priority.id}
-                  href={`/upsc/question-bank?subject=${row.subjectSlug}`}
+                  href={practiceHrefFor(isAdmin, row.subjectSlug)}
                   data-testid="upsc-2027-audit-readiness-row"
                   data-priority-id={row.priority.id}
                   data-subject-slug={row.subjectSlug}
@@ -663,7 +667,7 @@ export default function ReportsPage() {
                   {autoSessionHandoff?.actionLabel ?? "Open Daily Command"} <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href={autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`}
+                  href={isAdmin ? (autoSessionHandoff?.questionBankHref ?? `/upsc/question-bank?subject=${activeReportSubject.slug}`) : practiceHrefFor(false, activeReportSubject.slug)}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#b9d9cd] bg-white/70 px-4 text-sm font-black text-[#085041] transition hover:bg-white"
                 >
                   MCQ bank <ArrowRight className="h-4 w-4" />

@@ -23,6 +23,7 @@ import {
   Route,
   Search,
   UploadCloud,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -96,6 +97,16 @@ export const operatorRoutes = new Set<string>([
  * badges rather than admin-gated. See Requirement 11.2.
  */
 export const futureSubjectPrefixes: string[] = [];
+
+/**
+ * Where an MCQ practice link should go. The question bank builder is an
+ * operator page, so students following it were bounced away; they practise in
+ * the subject's MCQ lab instead.
+ */
+export function practiceHrefFor(isAdmin: boolean, subjectSlug = "geography", adminHref?: string) {
+  if (isAdmin) return adminHref ?? `/upsc/question-bank?subject=${subjectSlug}`;
+  return `/upsc/${subjectSlug || "geography"}/lms/practice`;
+}
 
 export function isOperatorRoute(pathname: string) {
   if (operatorRoutes.has(pathname)) return true;
@@ -318,6 +329,7 @@ export const adminNavItems: StudentNavItem[] = [
   { name: "Question Bank", href: "/admin/questions", icon: Database },
   { name: "Bulk Upload", href: "/admin/questions/bulk", icon: UploadCloud },
   { name: "Leads", href: "/admin/leads", icon: Mail },
+  { name: "Beta access", href: "/admin/beta-access", icon: UserCheck },
   { name: "Content studio", href: "/admin/content", icon: BookOpen },
   { name: "Content requests", href: "/admin/content-requests", icon: Inbox },
 ];

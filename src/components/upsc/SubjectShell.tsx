@@ -33,6 +33,7 @@ import {
 } from "@/lib/upsc/optionalSubjectStructure";
 import { OPTIONAL_CATALOG_ROUTE } from "@/lib/upsc/selectedOptional";
 import { ReadView } from "@/components/upsc/ReadView";
+import { readyTopics } from "@/lib/upsc/optional/geographyOptionalTopics";
 import { PyqExplorer } from "@/components/upsc/PyqExplorer";
 import { PracticeBoard } from "@/components/upsc/PracticeBoard";
 import { SyllabusView } from "@/components/upsc/SyllabusView";
@@ -510,6 +511,7 @@ function ResolvedSubjectShell({
             </p>
           ) : null}
           {status === "available" ? <SubjectCompletenessLine slug={slug} /> : null}
+          {slug === "geography" ? <GeographyNotesShelf /> : null}
         </section>
 
         {/* Paper I / Paper II tabs (R3.1) */}
@@ -977,5 +979,48 @@ function SubjectNotFound({ slug }: { slug: string }) {
         </section>
       </div>
     </main>
+  );
+}
+
+/**
+ * The hand-written Geography Optional notes live at
+ * /upsc/optional-subjects/geography-optional and do not depend on the backend.
+ * Nothing linked to them, so a student could only reach them by typing the
+ * URL. They are shown here, on the page the optional catalogue opens.
+ */
+const GEOGRAPHY_NOTES_ROUTE = "/upsc/optional-subjects/geography-optional";
+
+function GeographyNotesShelf() {
+  if (readyTopics.length === 0) return null;
+  return (
+    <div
+      data-testid="geography-notes-shelf"
+      className="mt-4 rounded-xl border border-[#cfe5dc] bg-[#f3faf6] p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#085041]">
+          Full notes ready to read
+        </p>
+        <Link
+          href={`${GEOGRAPHY_NOTES_ROUTE}/syllabus`}
+          className="inline-flex min-h-11 items-center text-xs font-black uppercase tracking-[0.1em] text-[#1a3a2a] underline-offset-4 hover:underline"
+        >
+          Syllabus map
+        </Link>
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {readyTopics.map((topic) => (
+          <li key={topic.slug}>
+            <Link
+              href={`${GEOGRAPHY_NOTES_ROUTE}/read/${topic.slug}`}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#1d9e75] bg-white px-4 py-2 text-xs font-black text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
+            >
+              {topic.title}
+              <span className="font-semibold opacity-70">{topic.readMinutes} min</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
