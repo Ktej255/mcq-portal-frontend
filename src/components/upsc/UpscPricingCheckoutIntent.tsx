@@ -11,7 +11,6 @@ import {
   productPricingPlans,
 } from "@/lib/upsc/yearlyPlanner";
 import { publicCommerceLaunchBoundary } from "@/lib/upsc/publicCommerceLaunchBoundary";
-import { UpscPricingIntentRecorder } from "@/components/upsc/UpscPricingIntentRecorder";
 import { CashfreeCheckout } from "@/components/upsc/CashfreeCheckout";
 import type { SubscriptionResponse } from "@/services/api/paymentService";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -287,7 +286,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           <section className="rounded-xl border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
             <h2 className="text-xl font-black text-[#13251d]">Record your plan intent</h2>
             <p className="mt-1 text-sm font-semibold text-[#5d675f]">
-              This saves your preferred plan for the pilot. No payment is collected and no
+              This saves your preferred plan to your account for the pilot. No payment is collected and no
               subscription or usage quota changes until live payments open and a payment is
               confirmed.
             </p>
@@ -295,7 +294,7 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
             <div className="mt-4 flex flex-wrap gap-3 items-center">
               {isCurrentlyActive ? (
                 <div className="rounded-lg bg-[#e7f5ee] border border-[#b9d9cd] px-4 py-2 text-xs font-black text-[#085041]">
-                  ✓ Plan intent saved on this device
+                  ✓ Saved to your account
                 </div>
               ) : (
                 <button
@@ -317,12 +316,6 @@ export function UpscPricingCheckoutIntent({ planId }: { planId?: string | null }
           </section>
         )}
 
-        <UpscPricingIntentRecorder
-          plan={selectedPlan}
-          savings={savings}
-          commerceMode={publicCommerceLaunchBoundary.mode}
-          readyForPayment={publicCommerceLaunchBoundary.readyForPayment}
-        />
 
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

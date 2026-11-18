@@ -1,5 +1,10 @@
 import { geographySessions } from "@/lib/upsc/plan";
 import {
+  loadRemoteSubjectProgress,
+  mergeProgressMaps,
+  saveRemoteSubjectProgress,
+} from "@/lib/upsc/learnerPersistence";
+import {
   isOfficialUpscSourceHref,
   readLocalPyqImportRecords,
   type PyqImportRecord,
@@ -1075,7 +1080,47 @@ export function saveLocalQuestionBankAttempt(question: PracticeQuestion, selecte
     [question.id]: attempt,
   };
   window.localStorage.setItem(questionBankAttemptStorageKey, JSON.stringify(next));
+  void saveRemoteSubjectProgress(questionBankRemoteSlug, withUpdatedAt(next));
   return readLocalQuestionBankAttempts(question.subjectSlug);
+}
+
+// Attempts are also kept on the account (the free-form subject progress store,
+// under its own slug) so they follow the user to another device.
+const questionBankRemoteSlug = "question-bank";
+
+type SyncedAttempt = QuestionBankAttempt & { updatedAt?: string };
+
+function withUpdatedAt(attempts: Record<string, QuestionBankAttempt>): Record<string, SyncedAttempt> {
+  return Object.fromEntries(
+    Object.entries(attempts).map(([key, attempt]) => [key, { ...attempt, updatedAt: attempt.solvedAt }])
+  );
+}
+
+/**
+ * Merge the account's saved attempts into this browser (newest answer per
+ * question wins), push the merged set back, and return the subject's attempts.
+ */
+export async function syncQuestionBankAttempts(subjectSlug?: string): Promise<QuestionBankAttempt[]> {
+  if (typeof window === "undefined") return [];
+  const local = withUpdatedAt(readStoredQuestionBankAttempts());
+  let remote: Record<string, SyncedAttempt> | null = null;
+  try {
+    remote = await loadRemoteSubjectProgress<SyncedAttempt>(questionBankRemoteSlug);
+  } catch {
+    remote = null;
+  }
+  if (remote && Object.keys(remote).length > 0) {
+    const merged = mergeProgressMaps(local, remote);
+    window.localStorage.setItem(questionBankAttemptStorageKey, JSON.stringify(merged));
+    const remoteKeys = Object.keys(remote);
+    const needsPush =
+      Object.keys(merged).length !== remoteKeys.length ||
+      Object.entries(merged).some(([key, attempt]) => remote?.[key]?.solvedAt !== attempt.solvedAt);
+    if (needsPush) void saveRemoteSubjectProgress(questionBankRemoteSlug, withUpdatedAt(readStoredQuestionBankAttempts()));
+  } else if (Object.keys(local).length > 0) {
+    void saveRemoteSubjectProgress(questionBankRemoteSlug, local);
+  }
+  return readLocalQuestionBankAttempts(subjectSlug);
 }
 
 function average(values: number[]) {
