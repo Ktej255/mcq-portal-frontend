@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 import json
 from urllib.parse import urlsplit
 
@@ -118,7 +118,31 @@ class Settings(BaseSettings):
     # Clerk Auth Settings
     CLERK_JWT_KEY: Optional[str] = None
     CLERK_JWKS_URL: Optional[str] = None
+    # Gemini key. GEMINI_API_KEY is the one name used across the backend and
+    # the web app; GOOGLE_API_KEY is still read so older setups keep working.
+    GEMINI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
+    # A current stable model. Old model names are retired by Google on a
+    # schedule, so this is a setting rather than a constant in the code.
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+    # Longest a single Gemini call may take before it is abandoned.
+    AI_REQUEST_TIMEOUT_SECONDS: float = 30.0
+
+    @property
+    def gemini_api_key(self) -> Optional[str]:
+        key = (self.GEMINI_API_KEY or "").strip() or (self.GOOGLE_API_KEY or "").strip()
+        return key or None
+
+    # GS LMS learning loop. GS_LMS_ENFORCE_PROGRESSION is the MASTER switch for all
+    # new rules (step-1 discussion gate, recall gates, step-12 MCQ requirement,
+    # topic order lock, checkpoint blocking). Off (default) = old behaviour: step
+    # order only. GS_LMS_ENFORCE_ORDER is a sub-switch for the order lock/checkpoint
+    # blocking; it only matters when the master switch is on (admins always exempt).
+    GS_LMS_ENFORCE_PROGRESSION: bool = False
+    GS_LMS_ENFORCE_ORDER: bool = True
+    # Topics whose step 14 was completed before this moment count as mastered
+    # regardless of MCQ score (grandfathering when the switch is turned on).
+    GS_LMS_PROGRESSION_START: Optional[datetime] = None
 
     # GS LMS discussion runtime. Gemini is the non-fabricating default; the
     # deterministic provider requires both explicit selection and enablement.
@@ -215,6 +239,20 @@ class Settings(BaseSettings):
     # When off, a `MOCK_TOKEN` is treated as an invalid credential (401).
     ALLOW_MOCK_AUTH: bool = False
 
+    # Security/honesty: the AI providers (OCR + answer evaluation) default to a
+    # deterministic MOCK that returns fake text and fake scores. That is a
+    # dev/test/e2e affordance ONLY. It is gated behind this flag and defaults to
+    # OFF so a production deploy that forgot to configure a real provider says
+    # "Answer checking is not set up yet" (503) instead of showing fake results
+    # as real. Enable it explicitly (e.g. `ALLOW_MOCK_AI=true` in an untracked
+    # local `.env` or a CI/e2e env).
+    ALLOW_MOCK_AI: bool = False
+
+    # Student answer images are deleted after this many days by
+    # `python -m app.core.gs_lms.answer_retention`. The extracted text and the
+    # evaluation report are kept.
+    ANSWER_IMAGE_RETENTION_DAYS: int = 180
+
     # Per-user caps on AI-backed endpoints (Gemini discussion, OCR,
     # transcription, evaluation) so one account can't run up the AI bill.
     AI_RATE_LIMIT_PER_MINUTE: int = 30
@@ -247,6 +285,14 @@ class Settings(BaseSettings):
     # mechanics tests and authoring tools can build partial topics; production
     # startup refuses to boot unless this is `true`.
     GS_LMS_BETA_SCOPE: bool = False
+
+    # Per-attempt MCQ variation: shuffles options and may invert "correct /
+    # incorrect" wording for each attempt. Off by default because the exam
+    # screen loads the original question from `tests/{id}/questions`; with
+    # variation on, the saved answer would be remapped away from the option the
+    # student actually clicked. Turn on only once the exam screen reads
+    # `attempts/{id}/questions` and the review screens show the varied form.
+    MCQ_VARIATION_ENABLED: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

@@ -17,6 +17,7 @@ interface RecallCheckStepProps {
   nodeId: number;
   sectionLabel: string;
   subject?: string;
+  /** Hide "Continue without recall" (the server rejects it when progression is enforced). */
   onComplete: () => void;
 }
 

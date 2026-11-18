@@ -31,7 +31,7 @@ from app.core.gs_lms.recall_scoring import (
     score_recall,
 )
 from app.core.gs_lms.stt_provider import get_stt_provider, STT_CONFIDENCE_THRESHOLD
-from app.api.v1.gs_lms.dependencies import resolve_subject
+from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
 
 router = APIRouter()
@@ -101,6 +101,7 @@ def submit_recall_text(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Find the section
     section = db.query(GsLmsContentSection).filter(
@@ -189,6 +190,7 @@ async def submit_recall_audio(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Find the section
     section = db.query(GsLmsContentSection).filter(
@@ -327,6 +329,7 @@ def get_recall_attempt(
     if node is None:
         raise HTTPException(status_code=404, detail="Topic node not found")
 
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     attempt = (
         db.query(GsLmsRecallAttempt)
         .filter(

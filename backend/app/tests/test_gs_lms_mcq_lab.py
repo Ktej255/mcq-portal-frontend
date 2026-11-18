@@ -56,6 +56,9 @@ def seeded_mcq_lab():
             "gs_lms_mcq_lab_attempts",
             "gs_lms_weakness_patterns",
         }
+        # Submitting a lab refreshes topic mastery, which reads the rest of the
+        # learning tables.
+        or name.startswith("gs_lms_")
     ]
     Base.metadata.create_all(engine, tables=tables)
     TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)

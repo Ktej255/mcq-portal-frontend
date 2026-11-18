@@ -16,6 +16,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, Literal, Optional
 
+from app.core.config import settings
+
 StructuredOutputMode = Literal["native", "prompt"]
 
 
@@ -52,7 +54,11 @@ class ProviderConfig:
         """Resolve the actual API key from the referenced env var (if any)."""
         if not self.api_key_ref:
             return None
-        return os.environ.get(self.api_key_ref)
+        value = os.environ.get(self.api_key_ref)
+        if not value and self.api_key_ref == "GEMINI_API_KEY":
+            # Older setups named the same key GOOGLE_API_KEY.
+            value = os.environ.get("GOOGLE_API_KEY")
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -61,9 +67,14 @@ class ProviderConfig:
 # Built-in defaults always available without any env configuration.
 _BUILTIN_CONFIGS: Dict[str, ProviderConfig] = {
     "mock": ProviderConfig(key="mock", model_id="mock", structured_output_mode="prompt"),
+    # Model id / timeout come from settings (GEMINI_MODEL_ID, GEMINI_TIMEOUT_SECONDS)
+    # and the key is read by GeminiProvider from GOOGLE_API_KEY (fallback
+    # GEMINI_API_KEY); the env var NAME is recorded here, never the value.
     "gemini": ProviderConfig(
         key="gemini",
-        model_id=os.environ.get("GEMINI_MODEL_ID", "gemini-1.5-flash"),
+        model_id=os.environ.get("GEMINI_MODEL_ID")
+        or os.environ.get("GEMINI_MODEL")
+        or "gemini-3.8-flash",
         api_key_ref="GEMINI_API_KEY",
         structured_output_mode="native",
         supports_vision=True,

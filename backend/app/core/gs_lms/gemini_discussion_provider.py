@@ -7,10 +7,15 @@ silent deterministic fallback and no fabricated AI response.
 from __future__ import annotations
 
 import logging
-import os
+from typing import Optional
 
-import google.generativeai as genai
+from google.genai import types
 
+from app.core.inference.gemini_client import (
+    build_gemini_client,
+    gemini_api_key,
+    gemini_model,
+)
 from app.core.gs_lms.discussion import (
     AIResponseProvider,
     DiscussionProviderUnavailableError,
@@ -34,16 +39,12 @@ class GeminiAIResponseProvider:
     provider_id = "gemini"
     is_mock = False
 
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
-        from app.core.config import settings
-        api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
+    def __init__(self, model_name: Optional[str] = None):
+        api_key = gemini_api_key()
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY is required for GeminiAIResponseProvider")
-        genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel(
-            model_name,
-            system_instruction=_SYSTEM_INSTRUCTION,
-        )
+            raise ValueError("GEMINI_API_KEY is required for GeminiAIResponseProvider")
+        self._model_name = model_name or gemini_model()
+        self._client = build_gemini_client(api_key)
 
     def generate_response(
         self,
@@ -60,7 +61,11 @@ class GeminiAIResponseProvider:
             match_percentage=match_percentage,
         )
         try:
-            response = self._model.generate_content(prompt)
+            response = self._client.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION),
+            )
             text = response.text
             if not isinstance(text, str) or not text.strip():
                 raise ValueError("Gemini returned an empty response")
@@ -142,8 +147,7 @@ def register_discussion_provider() -> None:
         logger.error("Unsupported GS LMS discussion provider selection")
         return
 
-    api_key = os.environ.get("GOOGLE_API_KEY", "") or (settings.GOOGLE_API_KEY or "")
-    if not api_key:
+    if not gemini_api_key():
         clear_default_provider("gemini")
         logger.warning("Gemini discussion provider is not configured")
         return

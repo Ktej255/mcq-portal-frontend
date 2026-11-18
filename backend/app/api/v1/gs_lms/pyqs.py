@@ -25,6 +25,7 @@ from app.models.domain import User
 from app.api.dependencies import get_current_user
 from app.schemas.common import StandardResponse
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
+from app.core.gs_lms.exam_profiles import profile_for_subject
 from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
     GsLmsPyq,
@@ -112,7 +113,7 @@ def get_topic_pyqs(
     node_id: int,
     exam_type: Optional[str] = Query(
         None,
-        description="Filter by exam type: PRELIMS or MAINS",
+        description="Filter by exam type (UPSC: PRELIMS or MAINS; NEET: NEET; JEE: JEE_MAIN or JEE_ADVANCED)",
     ),
     subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
@@ -132,10 +133,12 @@ def get_topic_pyqs(
     # Validate exam_type if provided
     if exam_type is not None:
         exam_type_upper = exam_type.upper()
-        if exam_type_upper not in ("PRELIMS", "MAINS"):
+        # The allowed values come from the subject's exam profile (UPSC: PRELIMS, MAINS).
+        allowed = profile_for_subject(db.get(GsSubject, node.subject_id)).pyq_exam_types
+        if exam_type_upper not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="exam_type must be PRELIMS or MAINS",
+                detail="exam_type must be " + " or ".join(allowed),
             )
     else:
         exam_type_upper = None

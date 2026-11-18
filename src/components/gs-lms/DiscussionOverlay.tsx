@@ -441,6 +441,8 @@ export function DiscussionOverlay({
   onClose,
 }: DiscussionOverlayProps) {
   const { subject } = useSubjectLms();
+  // When progression is enforced the server rejects step 1 without a completed
+  // discussion, so the "skip ahead" escape is removed.
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [turns, setTurns] = useState<DiscussionTurnOut[]>([]);
   const [input, setInput] = useState("");

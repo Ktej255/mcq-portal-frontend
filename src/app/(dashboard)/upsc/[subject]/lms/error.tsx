@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSubjectLms } from "@/components/gs-lms/SubjectLmsContext";
+import { usePathname } from "next/navigation";
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -9,8 +9,10 @@ interface ErrorBoundaryProps {
 }
 
 export default function LmsErrorBoundary({ error, reset }: ErrorBoundaryProps) {
-  const { lmsBase } = useSubjectLms();
-
+  // /<exam>/<subject>/lms/... -> that subject's syllabus (stays inside the exam).
+  const pathname = usePathname() ?? "";
+  const lmsIdx = pathname.split("/").indexOf("lms");
+  const lmsBase = lmsIdx > 0 ? pathname.split("/").slice(0, lmsIdx + 1).join("/") : "/upsc/geography/lms";
   useEffect(() => {
     console.error("[LMS Error Boundary]", error);
   }, [error]);

@@ -283,6 +283,30 @@ def _stable_slug_resolution(tree: ast.Module, source: str) -> Finding:
             CRITERIA[3], "proved",
             "local seed imports the slug-resolving _ensure_subjects helper and uses its IDs",
         )
+    # The production seed delegates to the shared loader (also used by the
+    # admin endpoint). Read that module's source, without importing it, to
+    # confirm the slug lookup is really there.
+    loader_import = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "app.core.gs_lms.content_loader"
+        and any(alias.name == "ensure_gs_subjects" for alias in node.names)
+        for node in ast.walk(tree)
+    )
+    loader_call = any(_call_name(call).endswith("ensure_gs_subjects") for call in _calls(tree))
+    if loader_import and loader_call and helper_call and uses_resolved_id:
+        loader_path = (
+            Path(__file__).resolve().parents[2] / "app" / "core" / "gs_lms" / "content_loader.py"
+        )
+        try:
+            loader_source = loader_path.read_text(encoding="utf-8")
+        except OSError:
+            loader_source = ""
+        if "GsSubject.slug" in loader_source and ".filter" in loader_source:
+            return _finding(
+                CRITERIA[3], "proved",
+                "subjects are resolved by the shared loader, which queries GsSubject.slug, "
+                "and the returned ID mapping is used",
+            )
     dynamic = "subject" in source and ("query" in source or "getattr" in source)
     return _finding(
         CRITERIA[3], "indeterminate" if dynamic else "definite_failure",

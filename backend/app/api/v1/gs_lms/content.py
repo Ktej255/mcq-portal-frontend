@@ -42,7 +42,11 @@ from app.core.gs_lms.student_models import (
     GsLmsVideoWatch,
     GsLmsOnboardingStatus,
 )
-from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
+from app.api.v1.gs_lms.dependencies import (
+    ensure_beta_topic,
+    ensure_leaf_unlocked,
+    resolve_subject,
+)
 from app.api.v1.gs_lms.schemas import (
     GsLmsTopicSectionsOut,
     GsLmsContentSectionOut,
@@ -298,6 +302,7 @@ def get_topic_sections(
     node = _get_node_or_404(db, node_id, subject.id)
     # Paid-beta scope: a visible-but-unfinished topic must not open.
     ensure_beta_topic(db, subject.id, node.id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Fetch reviewed sections only (review-gate: R10.3)
     sections = _get_reviewed_sections(db, node_id)
@@ -397,6 +402,7 @@ def complete_section(
     node = _get_node_or_404(db, node_id, subject.id)
     # Paid-beta scope: a visible-but-unfinished topic must not open.
     ensure_beta_topic(db, subject.id, node.id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
     # Verify the section exists and belongs to this node
     section = (

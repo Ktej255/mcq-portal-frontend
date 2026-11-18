@@ -33,7 +33,7 @@ def generate_rule_based_narrative(report_data: Dict[str, Any], behavioral_data: 
     return narrative
 
 def generate_performance_narrative(report_data: Dict[str, Any], behavioral_data: Dict[str, Any]) -> str:
-    if not settings.GOOGLE_API_KEY:
+    if not settings.gemini_api_key:
         return generate_rule_based_narrative(report_data, behavioral_data)
 
     prompt = f"""

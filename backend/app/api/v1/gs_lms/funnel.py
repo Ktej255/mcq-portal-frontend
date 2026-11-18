@@ -28,15 +28,21 @@ from app.core.gs_lms.models import (
     GsLmsSyllabusNode,
 )
 from app.core.gs_lms.funnel_models import GsLmsReadingTime, GsLmsRecallAttempt
+from app.core.gs_lms.exam_profiles import profile_for_subject
 from app.core.gs_lms.funnel_engine import (
     get_funnel_state,
     complete_step,
     StepNotReachableError,
     StepAlreadyCompletedError,
     FunnelCompletionSideEffectError,
+    StepGateError,
     TOTAL_STEPS,
 )
-from app.api.v1.gs_lms.dependencies import ensure_beta_topic, resolve_subject
+from app.api.v1.gs_lms.dependencies import (
+    ensure_beta_topic,
+    ensure_leaf_unlocked,
+    resolve_subject,
+)
 
 
 router = APIRouter()
@@ -62,6 +68,9 @@ class FunnelStateOut(BaseModel):
     completed_steps: List[int]
     started_at: str | None
     last_activity_at: str | None
+    # Steps this subject's exam includes; the client hides the others. Always
+    # sent by the server; a client that does not see it treats all 14 as enabled.
+    enabled_steps: List[int] = Field(default_factory=lambda: list(range(1, 15)))
 
     class Config:
         from_attributes = True
@@ -96,12 +105,16 @@ def get_funnel_state_endpoint(
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
     ensure_beta_topic(db, subject.id, node_id)
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
 
-    state = get_funnel_state(db, current_user.id, node_id)
+    state = get_funnel_state(
+        db, current_user.id, node_id, profile_for_subject(subject).enabled_funnel_steps
+    )
 
     return FunnelStateOut(
         node_id=node_id,
         current_step=state.current_step,
+        enabled_steps=sorted(state.enabled_steps),
         completed_steps=sorted(state.completed_steps),
         started_at=state.started_at.isoformat() if state.started_at else None,
         last_activity_at=state.last_activity_at.isoformat() if state.last_activity_at else None,
@@ -119,7 +132,8 @@ def complete_funnel_step(
     """Mark a funnel step as complete and advance to the next step.
 
     The step must be the current active step — out-of-order completions
-    are rejected with 409.
+    are rejected with 409, as are steps whose gate is unmet (discussion for step 1,
+    recall for 3/5/7/9/11, MCQ lab for 12).
     """
     # Verify node exists
     node = db.query(GsLmsSyllabusNode).filter(
@@ -128,6 +142,7 @@ def complete_funnel_step(
     ).first()
     if not node:
         raise HTTPException(status_code=404, detail="Topic node not found")
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     ensure_beta_topic(db, subject.id, node_id)
 
     required_section = RECALL_STEP_TO_SECTION.get(body.step)
@@ -165,7 +180,9 @@ def complete_funnel_step(
                 )
 
     try:
-        state = complete_step(db, current_user.id, node_id, body.step)
+        state = complete_step(
+            db, current_user.id, node_id, body.step, profile_for_subject(subject).enabled_funnel_steps
+        )
         db.commit()
     except StepNotReachableError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -185,12 +202,16 @@ def complete_funnel_step(
                 "retryable": True,
             },
         ) from exc
+    except StepGateError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
     return FunnelStateOut(
         node_id=node_id,
         current_step=state.current_step,
+        enabled_steps=sorted(state.enabled_steps),
         completed_steps=sorted(state.completed_steps),
         started_at=state.started_at.isoformat() if state.started_at else None,
         last_activity_at=state.last_activity_at.isoformat() if state.last_activity_at else None,
@@ -221,6 +242,7 @@ def submit_reading_time(
         raise HTTPException(status_code=404, detail="Topic node not found")
     ensure_beta_topic(db, subject.id, node_id)
 
+    ensure_leaf_unlocked(db, current_user, subject, node_id)
     # Validate section belongs to the node
     from app.core.gs_lms.models import GsLmsContentSection
     section = db.query(GsLmsContentSection).filter(

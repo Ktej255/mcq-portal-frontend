@@ -6,12 +6,9 @@ test("a new student sets up their plan and reaches the Geography syllabus", asyn
   await signInAs(page, "e2e-new");
   await page.goto("/upsc/geography/lms");
 
-  // No profile yet, so the setup gate shows.
+  // A first-time student is taken straight to the Geography setup, with no
+  // separate "set up your profile" gate in front of it.
   const gate = page.getByTestId("upsc-profile-required");
-  await expect(gate).toBeVisible();
-  await page.getByTestId("upsc-profile-required-action").click();
-
-  // Regression: the setup page used to show the same gate again (a loop).
   await expect(page).toHaveURL(/\/lms\/onboarding$/);
   await expect(gate).toHaveCount(0);
 

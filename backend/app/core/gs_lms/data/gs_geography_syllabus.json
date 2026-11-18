@@ -14568,7 +14568,7 @@
               ],
               "pyqs": [],
               "mcq_questions": [],
-              "video_url": "https://www.youtube.com/watch?v=earths_origin_structure"
+              "video_url": null
             },
             {
               "title": "Geological Time Scale, Coal, and Deccan Basalt",
@@ -15231,7 +15231,7 @@
               ],
               "pyqs": [],
               "mcq_questions": [],
-              "video_url": "https://www.youtube.com/watch?v=continental_drift_wegener",
+              "video_url": null,
               "concept_checklist": [
                 "Wegener's continental drift hypothesis",
                 "Pangaea and Panthalassa",
@@ -15343,7 +15343,7 @@
               ],
               "pyqs": [],
               "mcq_questions": [],
-              "video_url": "https://www.youtube.com/watch?v=plate_tectonics_divergent",
+              "video_url": null,
               "concept_checklist": [
                 "seafloor spreading hypothesis (Harry Hess)",
                 "mid-ocean ridges and rift valleys",
@@ -15452,7 +15452,7 @@
               ],
               "pyqs": [],
               "mcq_questions": [],
-              "video_url": "https://www.youtube.com/watch?v=plate_tectonics_intro"
+              "video_url": null
             },
             {
               "title": "Plate Tectonics – Convergent Boundaries (Ocean-Ocean & Trijunctions)",
@@ -24892,7 +24892,7 @@
               ],
               "pyqs": [],
               "mcq_questions": [],
-              "video_url": "https://www.youtube.com/watch?v=monsoon_mechanisms",
+              "video_url": null,
               "concept_checklist": [
                 "Indian monsoon mechanism (thermal and dynamic factors)",
                 "El Nino Southern Oscillation (ENSO) and its impact on monsoon",

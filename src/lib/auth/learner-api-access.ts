@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { auth as clerkAuth } from "@clerk/nextjs/server";
 
 import { activeAuthProvider } from "@/env";
+import { allowsServerMockToken } from "@/lib/auth/server-mock-auth";
 import { supabase } from "@/lib/supabase/client";
 
 function readBearerToken(request: NextRequest) {
@@ -9,35 +10,35 @@ function readBearerToken(request: NextRequest) {
   return authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
 }
 
-function isLocalRequest(request: NextRequest) {
-  const hostname = request.nextUrl.hostname;
-  return hostname === "localhost" || hostname === "127.0.0.1";
-}
-
-export async function hasLearnerApiAccess(request: NextRequest) {
+/** The signed-in learner's id, or null when the request is not signed in. */
+export async function getLearnerId(request: NextRequest): Promise<string | null> {
   const token = readBearerToken(request);
 
-  if (token && isLocalRequest(request) && token.startsWith("MOCK_TOKEN")) {
-    return true;
+  if (token && allowsServerMockToken(request) && token.startsWith("MOCK_TOKEN")) {
+    return `mock:${token}`;
   }
 
   if (activeAuthProvider === "clerk") {
     try {
       const { userId } = await clerkAuth();
-      return Boolean(userId);
+      return userId ?? null;
     } catch {
-      return false;
+      return null;
     }
   }
 
-  if (!token) return false;
+  if (!token) return null;
 
-  if (!supabase) return false;
+  if (!supabase) return null;
 
   try {
     const { data, error } = await supabase.auth.getUser(token);
-    return !error && Boolean(data.user?.id);
+    return !error && data.user?.id ? data.user.id : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function hasLearnerApiAccess(request: NextRequest) {
+  return (await getLearnerId(request)) !== null;
 }

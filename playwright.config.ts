@@ -36,14 +36,17 @@ export default defineConfig({
       url: `${BACKEND_URL}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
-      env: { E2E_BACKEND_PORT: String(BACKEND_PORT) },
+      // Progression rules (topic order, step gates, checkpoints) are on for the whole run.
+      env: { E2E_BACKEND_PORT: String(BACKEND_PORT), E2E_ENFORCE_PROGRESSION: "true" },
     },
     {
       command: process.env.E2E_DEV ? "npx next dev -p 3000" : "npm run build && npx next start -p 3000",
       url: `${FRONTEND_URL}/login`,
       reuseExistingServer: !process.env.CI,
       timeout: 600_000,
-      env: { NEXT_PUBLIC_API_BASE_URL: BACKEND_URL },
+      // No Clerk keys in the test run: the app uses its local sign-in, which the
+      // throwaway backend accepts because it runs with APP_ENVIRONMENT=test.
+      env: { NEXT_PUBLIC_API_BASE_URL: BACKEND_URL, NEXT_PUBLIC_USE_MOCK_AUTH: "true" },
     },
   ],
 });

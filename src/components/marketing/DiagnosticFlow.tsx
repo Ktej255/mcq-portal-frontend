@@ -42,10 +42,10 @@ const dailyMcqByHours: Record<string, number> = {
 const totalSteps = 5;
 
 type Phase = "questions" | "capture" | "result";
-type LeadDeliveryState = "delivered" | "unavailable";
+type LeadDeliveryState = "received" | "unavailable";
 
 type LeadResponse = {
-  delivered?: boolean;
+  received?: boolean;
 };
 
 export function DiagnosticFlow() {
@@ -96,8 +96,8 @@ export function DiagnosticFlow() {
         body: JSON.stringify(payload),
       });
       const result = (await response.json().catch(() => null)) as LeadResponse | null;
-      if (response.ok && result?.delivered === true) {
-        delivery = "delivered";
+      if (response.ok && result?.received === true) {
+        delivery = "received";
       }
     } catch {
       // The plan remains available locally/on-page when delivery cannot be reached.
@@ -187,11 +187,11 @@ export function DiagnosticFlow() {
             <ArrowRight className="ml-1.5 h-4 w-4" />
           </Link>
           <p className="mt-3 text-xs font-semibold text-[#6b7a70]">
-            {leadDelivery === "delivered"
-              ? `Your plan is ready, and a copy with helpful next steps was sent to ${contact.email}.`
+            {leadDelivery === "received"
+              ? "Your plan is ready, and your details have reached the Sarit Classes team."
               : planSavedLocally
-                ? "Your plan is ready on this page. Email delivery is temporarily unavailable, but your answers are saved on this device."
-                : "Your plan is ready on this page. Email delivery is temporarily unavailable; keep this page open to retain it."}
+                ? "Your plan is ready on this page. We could not send your details to the team just now, but your answers are saved on this device."
+                : "Your plan is ready on this page. We could not send your details to the team just now; keep this page open to retain it."}
           </p>
         </div>
       </section>

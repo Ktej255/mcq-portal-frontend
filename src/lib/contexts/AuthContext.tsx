@@ -1,5 +1,6 @@
 "use client";
 
+import { normalizeApiBaseUrl } from "@/services/api/base-url.mjs";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser as useClerkUser } from "@clerk/nextjs";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -149,9 +150,15 @@ function reconcileAuthenticatedBrowserState(userId: string) {
   }
 }
 
+// Same address rules as the API client: the configured backend URL may be
+// given with or without a trailing /api/v1. Building this by hand sent the
+// role lookup to <backend>/auth/me, which does not exist, so no account ever
+// resolved as ADMIN when the URL was set the way the deploy guide says.
 function profileEndpoint() {
-  const base = (env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
-  return `${base}/auth/me`;
+  const base = normalizeApiBaseUrl(env.NEXT_PUBLIC_API_BASE_URL || "", {
+    isBrowser: typeof window !== "undefined",
+  });
+  return `${base}auth/me`;
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -297,11 +304,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (typeof window !== "undefined") {
       const existingMockToken = readLocalMockToken();
-      if (mockAuthEnabled && isLocalTestingHost() && !existingMockToken) {
+      // Local preview sign-in starts on the sign-in page only. Elsewhere a
+      // signed-out visitor stays signed out, so protected pages send them to
+      // /login exactly as they would in production.
+      if (
+        mockAuthEnabled &&
+        isLocalTestingHost() &&
+        !existingMockToken &&
+        window.location.pathname.startsWith("/login")
+      ) {
         const params = new URLSearchParams(window.location.search);
         const redirectPath = params.get("redirect") || "/dashboard";
         window.setTimeout(() => {
-          devLogin("student@example.com", "local-dev-student", window.location.pathname.startsWith("/login") ? redirectPath : undefined);
+          devLogin("student@example.com", "local-dev-student", redirectPath);
         }, 0);
         return;
       }

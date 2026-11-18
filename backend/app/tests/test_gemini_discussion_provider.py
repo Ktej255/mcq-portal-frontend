@@ -22,10 +22,9 @@ from app.core.gs_lms.gemini_discussion_provider import GeminiAIResponseProvider
 @pytest.fixture()
 def provider():
     """Create a GeminiAIResponseProvider with a mocked API key."""
-    with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}):
-        with patch("google.generativeai.configure"):
-            with patch("google.generativeai.GenerativeModel"):
-                return GeminiAIResponseProvider()
+    with patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}):
+        # Building the client makes no network call.
+        return GeminiAIResponseProvider()
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +57,7 @@ class TestBuildPromptWithMissedConcepts:
             transcript=[],
             student_message="Rivers form valleys.",
             concepts_missed=["erosion types"],
-            match_percentage=0.6,
+            match_percentage=60.0,
         )
 
         assert "60%" in prompt
@@ -127,7 +126,7 @@ class TestBuildPromptWithMissedConcepts:
             transcript=transcript,
             student_message="Plates move on the asthenosphere.",
             concepts_missed=["subduction zones"],
-            match_percentage=0.6,
+            match_percentage=60.0,
         )
 
         assert "plate tectonics is important" in prompt.lower()

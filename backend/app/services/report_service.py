@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from app.models.domain import Attempt, AttemptStatusEnum, AttemptAnswer, Question, Report, Topic, Subject, ConfidenceEnum, ExamEvent
 from app.services.narrative_service import generate_performance_narrative
@@ -9,6 +9,22 @@ from app.services.domain_contracts import detect_analytics_anomalies
 from app.services.scoring_engine import ScoringEngine
 from app.services.test_engine_service import published_question_query
 
+def _closing_time(attempt: Attempt) -> datetime:
+    """When the attempt ended: now, but never later than its time limit.
+
+    An attempt that is closed after its clock ran out (the student came back
+    late, or it was closed for them) ended when the clock did.
+    """
+    now = datetime.now(timezone.utc)
+    duration_minutes = attempt.test.duration_minutes if attempt.test else None
+    if not attempt.start_time or not duration_minutes:
+        return now
+    start = attempt.start_time
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return min(now, start + timedelta(minutes=duration_minutes))
+
+
 def generate_report(db: Session, attempt_id: int, user_id: int) -> Report:
     attempt = db.query(Attempt).filter(Attempt.id == attempt_id, Attempt.user_id == user_id).first()
     if not attempt:
@@ -16,7 +32,7 @@ def generate_report(db: Session, attempt_id: int, user_id: int) -> Report:
         
     if attempt.status != AttemptStatusEnum.SUBMITTED:
         attempt.status = AttemptStatusEnum.SUBMITTED
-        attempt.end_time = datetime.now(timezone.utc)
+        attempt.end_time = _closing_time(attempt)
         db.commit()
 
     # Check if report already exists
@@ -98,22 +114,58 @@ def generate_report(db: Session, attempt_id: int, user_id: int) -> Report:
     
     return report
 
-def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
+NARRATIVE_TIME_BUDGET_SECONDS = 15
+
+
+def _narrative_within_budget(narrative_input: dict, behavioral_data: dict) -> str:
+    """AI narrative with a hard time budget.
+
+    The report is finished inside the submit request, so a slow AI provider
+    must not hold the student's result hostage. Past the budget the
+    rule-based narrative is used instead.
     """
-    Handles heavy cognitive analysis, AI narratives, and mastery updates.
-    Run in background tasks with GRACEFUL DEGRADATION.
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+    from app.services.narrative_service import generate_rule_based_narrative
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(generate_performance_narrative, narrative_input, behavioral_data)
+    try:
+        return future.result(timeout=NARRATIVE_TIME_BUDGET_SECONDS)
+    except FutureTimeout:
+        print("AI narrative exceeded its time budget; using the rule-based narrative.")
+        return generate_rule_based_narrative(narrative_input, behavioral_data)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
+    """Run the pipeline on its own database session (scripts, repair jobs)."""
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        run_cognitive_pipeline(db, attempt_id, user_id)
+    finally:
+        db.close()
+
+
+def run_cognitive_pipeline(db: Session, attempt_id: int, user_id: int) -> Optional[Report]:
+    """
+    Finishes a report: telemetry, cognitive analysis, reliability, narrative,
+    truth check, then the revision queue. Runs inside the submit request so the
+    result does not depend on work that continues after the response is sent.
+    Each layer degrades gracefully; a failure marks the report FAILED so a
+    retry can run it again.
     """
     import os
     import time
-    from app.db.session import SessionLocal
     from app.services.cognitive_engine import cognitive_engine
     from app.services.narrative_evaluator import narrative_evaluator
     from app.services.student_longitudinal_profile import create_cognitive_snapshot, update_longitudinal_profile
     from app.core.observability.tracer import trace_execution
     from app.core.pedagogy.reliability_engine import EducationalReliabilityEngine
     from app.services.revision_service import populate_revision_queue_from_attempt
-    
-    db = SessionLocal()
+
     report = None
     try:
         validation_delay = float(os.getenv("REPORT_PIPELINE_DELAY_SECONDS", "0") or 0)
@@ -122,7 +174,8 @@ def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
 
         with trace_execution(db=db, module="report_service", function="run_async_cognitive_pipeline") as trace:
             report = db.query(Report).filter(Report.attempt_id == attempt_id).first()
-            if not report: return
+            if not report:
+                return None
 
             # --- CORE PEDAGOGICAL TRUTH ---
             attempt = report.attempt
@@ -188,7 +241,7 @@ def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
                     "unattempted_count": report.unattempted_count,
                     "topic_wise_analysis": report.topic_wise_analysis
                 }
-                report.narrative = generate_performance_narrative(narrative_input, behavioral_data)
+                report.narrative = _narrative_within_budget(narrative_input, behavioral_data)
                 
                 # Narrative Evaluation
                 evaluation = narrative_evaluator.evaluate(report.narrative, narrative_input, behavioral_data)
@@ -222,9 +275,11 @@ def run_async_cognitive_pipeline(attempt_id: int, user_id: int):
         import traceback
         print(f"Async Pipeline Critical Error: {str(e)}")
         traceback.print_exc()
+        db.rollback()
         if report:
             report.processing_status = "FAILED"
             db.commit()
+    return report
 
 def verify_report_integrity(report: Report, questions: list[Question], answers: list[AttemptAnswer]) -> bool:
     """

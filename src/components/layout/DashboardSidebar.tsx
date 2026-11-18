@@ -7,14 +7,15 @@ import { KeyRound, LockKeyhole, LogOut, Settings, X } from 'lucide-react';
 
 import {
   adminNavItems,
-  lockedSubjectNavItems,
-  studentNavSections,
+  studentNavSectionsFor,
+  subjectNavItemsFor,
   type StudentNavItem,
 } from '@/lib/navigation/studentNav';
+import { EXAM_BRAND, examBrandName, examFromPathname } from '@/lib/exams/examRoutes';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { activateUpscMasterPass } from '@/lib/upsc/masterPass';
-import { gsLmsService } from '@/services/api/gsLmsService';
+import { gsLmsService, type GsSubjectAvailabilityOut } from '@/services/api/gsLmsService';
 
 interface SidebarProps {
   isAdmin?: boolean;
@@ -31,12 +32,14 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   // from the email address here.
   const hasMasterAccess = isAdmin;
   const currentTab = currentSearchParams.get('tab');
-  const openSubjectSlugs = useOpenSubjectSlugs(!isAdmin && !!user);
-  const subjectSlug = (item: StudentNavItem) => item.href.split('/').pop() ?? '';
+  const exam = examFromPathname(pathname);
+  const { openSlugs: openSubjectSlugs, subjects: apiSubjects } = useOpenSubjectSlugs(!isAdmin && !!user, exam);
+  const subjectNavItems = subjectNavItemsFor(apiSubjects, exam);
+  const subjectSlug = (item: StudentNavItem) => item.slug ?? item.href.split('/').pop() ?? '';
 
   const openMasterPass = () => {
     activateUpscMasterPass(user?.email, { notify: true });
-    router.push('/admin/feature-inventory');
+    router.push('/admin/dashboard');
     onClose?.();
   };
 
@@ -83,9 +86,9 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
         <div className="flex h-24 items-center justify-between px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1a3a2a]">
-              <span className="text-sm font-black text-white">U</span>
+              <span className="text-sm font-black text-white">{EXAM_BRAND[exam].charAt(0)}</span>
             </div>
-            <h2 className="text-xl font-black uppercase italic tracking-tighter text-[#13251d]">UPSC Command</h2>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter text-[#13251d]">{examBrandName(pathname)}</h2>
           </div>
           <Button variant="ghost" size="icon" className="rounded-full md:hidden" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -100,7 +103,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
             </div>
           ) : (
             <>
-              {studentNavSections.map((section) => (
+              {studentNavSectionsFor(exam).map((section) => (
                 <div key={section.label} className="space-y-1">
                   <p className="mb-3 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-[#7b7469]">
                     {section.label}
@@ -114,7 +117,7 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
                   More subjects
                 </p>
                 <div className="space-y-1">
-                  {lockedSubjectNavItems.map((item) =>
+                  {subjectNavItems.map((item) =>
                     openSubjectSlugs.has(subjectSlug(item)) ? (
                       renderNavLink(item)
                     ) : (
@@ -207,22 +210,35 @@ export function DashboardSidebar({ isAdmin = false, isOpen = false, onClose }: S
   );
 }
 
-/** Slugs of GS subjects whose content is live. Until the backend answers (or
- *  if it fails) every subject in `lockedSubjectNavItems` stays locked. */
-function useOpenSubjectSlugs(enabled: boolean): Set<string> {
-  const [slugs, setSlugs] = React.useState<Set<string>>(() => new Set());
+/** Slugs of GS subjects whose content is live, plus the subject list of the
+ *  student's exam. Until the backend answers (or if it fails) every subject in
+ *  the static `lockedSubjectNavItems` stays locked. */
+function useOpenSubjectSlugs(enabled: boolean, exam: string): {
+  openSlugs: Set<string>;
+  subjects: GsSubjectAvailabilityOut[] | null;
+} {
+  const [state, setState] = React.useState<{
+    openSlugs: Set<string>;
+    subjects: GsSubjectAvailabilityOut[] | null;
+  }>(() => ({ openSlugs: new Set(), subjects: null }));
   React.useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     gsLmsService
-      .getSubjects()
+      // UPSC: the student's own exam list (unchanged call); NEET/JEE: that exam's list.
+      .getSubjects(exam === 'upsc' ? undefined : exam)
       .then((subjects) => {
-        if (!cancelled) setSlugs(new Set(subjects.filter((s) => s.available).map((s) => s.slug)));
+        if (!cancelled) {
+          setState({
+            openSlugs: new Set(subjects.filter((s) => s.available).map((s) => s.slug)),
+            subjects,
+          });
+        }
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
-  return slugs;
+  }, [enabled, exam]);
+  return state;
 }

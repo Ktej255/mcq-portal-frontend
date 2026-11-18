@@ -175,12 +175,11 @@ class TestExtractMatchedConcepts:
         assert "continental drift" in matched
 
     def test_no_false_positive_partial_words(self):
-        """Concepts don't match inside unrelated words (substring semantics)."""
+        """Concepts don't match inside unrelated words (word-level grading)."""
         messages = ["The atomic structure is interesting."]
-        checklist = ["atom"]  # "atom" IS a substring of "atomic"
+        checklist = ["atom"]  # "atom" is only part of the word "atomic"
         matched, missed = extract_matched_concepts(messages, checklist)
-        # substring matching means "atom" is found within "atomic"
-        assert "atom" in matched
+        assert "atom" in missed
 
     def test_whitespace_in_concepts_handled(self):
         """Concepts with extra whitespace are trimmed."""

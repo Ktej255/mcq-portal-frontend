@@ -73,7 +73,8 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
             # can never fall through to this ADMIN account.
             user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
             if not user:
-                user = User(
+                user = _create_user_once(
+                    db,
                     google_uid="dev-validator-id",
                     # Reserved documentation domain: clearly fictitious, and the
                     # only kind of address UserResponse's EmailStr will serialise
@@ -82,15 +83,6 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
                     full_name="Institutional Validator",
                     role=RoleEnum.ADMIN,
                 )
-                db.add(user)
-                try:
-                    db.commit()
-                    db.refresh(user)
-                except IntegrityError:
-                    db.rollback()
-                    user = db.query(User).filter(User.google_uid == "dev-validator-id").first()
-                    if not user:
-                        raise credentials_exception
             return user
 
         decoded_token = verify_token(token_cred)
@@ -196,6 +188,23 @@ def get_current_user(db: Session = Depends(get_db), auth: Optional[HTTPAuthoriza
             return refresh_mutable_fields(concurrent_user)
         raise reconciliation_required()
 
+def _create_user_once(db: Session, **fields) -> User:
+    """Create a user on first sign-in. Two first requests can race; the loser
+    rolls back and reads the row the winner created instead of failing."""
+    user = User(**fields)
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(User).filter(User.google_uid == fields["google_uid"]).first()
+        if existing is None:
+            raise
+        return existing
+    db.refresh(user)
+    return user
+
+
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     logger.info("Admin authorization check for local user id=%s role=%s", current_user.id, current_user.role)
     if current_user.role != "ADMIN" and current_user.role != RoleEnum.ADMIN:
@@ -208,48 +217,126 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 # ---------------------------------------------------------------------------
-# Per-user rate limit for AI-backed endpoints (Gemini discussion, OCR,
+# Per-user limits for AI-backed endpoints (Gemini discussion, OCR,
 # transcription, evaluation). Attach with
-# ``dependencies=[Depends(ai_rate_limit)]``. Counts live in process memory (a
-# sliding window per user for the last minute and the last day), which suits
-# the single ECS task this service runs as; move the store to Redis or
-# Postgres before running several tasks.
+# ``dependencies=[Depends(ai_rate_limit)]``.
+#
+# The daily cap is what protects the AI bill, so it is counted in the database
+# (``daily_usage``, metric ``ai_requests``, India calendar day) and holds no
+# matter how many server instances are running. The per-minute cap only smooths
+# bursts and is kept in process memory: on serverless hosting each instance
+# counts its own, which is acceptable because the daily cap is the hard stop.
 # ---------------------------------------------------------------------------
 
 _AI_MINUTE = 60
-_AI_DAY = 24 * 60 * 60
+_AI_USAGE_METRIC = "ai_requests"
 _ai_lock = threading.Lock()
 _ai_hits: "defaultdict[int, deque[float]]" = defaultdict(deque)
 
 
 def reset_ai_rate_limits() -> None:
-    """Clear all AI rate-limit counters (used by tests)."""
+    """Clear the in-memory burst counters (used by tests)."""
     with _ai_lock:
         _ai_hits.clear()
 
 
-def ai_rate_limit(current_user: User = Depends(get_current_user)) -> None:
+def _seconds_until_india_midnight() -> int:
+    now = datetime.now(_INDIA)
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, int((tomorrow - now).total_seconds()))
+
+
+def _count_ai_request_today(db: Session, user_id: int) -> int:
+    """Add one to today's count in a single statement and return the new total.
+
+    The increment happens inside the database, so two requests landing on two
+    instances at the same moment cannot both read the old number.
+    """
+    today = datetime.now(_INDIA).date()
+    match = (
+        DailyUsage.user_id == user_id,
+        DailyUsage.usage_date == today,
+        DailyUsage.metric == _AI_USAGE_METRIC,
+    )
+    for _ in range(2):
+        updated = (
+            db.query(DailyUsage)
+            .filter(*match)
+            .update({DailyUsage.count: DailyUsage.count + 1}, synchronize_session=False)
+        )
+        if updated:
+            db.commit()
+            break
+        try:
+            db.add(DailyUsage(user_id=user_id, usage_date=today, metric=_AI_USAGE_METRIC, count=1))
+            db.commit()
+            break
+        except IntegrityError:
+            # Another request created today's row first; count on that one.
+            db.rollback()
+    return db.query(DailyUsage.count).filter(*match).scalar() or 0
+
+
+def ai_rate_limit(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
     now = time.time()
     with _ai_lock:
         hits = _ai_hits[current_user.id]
-        while hits and hits[0] <= now - _AI_DAY:
+        while hits and hits[0] <= now - _AI_MINUTE:
             hits.popleft()
-
-        recent = [t for t in hits if t > now - _AI_MINUTE]
-        if len(recent) >= settings.AI_RATE_LIMIT_PER_MINUTE:
+        if len(hits) >= settings.AI_RATE_LIMIT_PER_MINUTE:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many AI requests. Please wait a minute and try again.",
-                headers={"Retry-After": str(max(1, int(recent[0] + _AI_MINUTE - now) + 1))},
+                headers={"Retry-After": str(max(1, int(hits[0] + _AI_MINUTE - now) + 1))},
             )
-        if len(hits) >= settings.AI_RATE_LIMIT_PER_DAY:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Daily AI limit reached. It resets within 24 hours.",
-                headers={"Retry-After": str(max(1, int(hits[0] + _AI_DAY - now) + 1))},
-            )
-
         hits.append(now)
+
+    if _count_ai_request_today(db, current_user.id) > settings.AI_RATE_LIMIT_PER_DAY:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Daily AI limit reached. It resets at midnight India time.",
+            headers={"Retry-After": str(_seconds_until_india_midnight())},
+        )
+
+
+# ---------------------------------------------------------------------------
+# AI readiness guards. The OCR / evaluation providers default to a mock that
+# returns fake text and scores, so endpoints that need them answer 503 instead
+# unless a real provider is configured (or settings.ALLOW_MOCK_AI is on).
+# ---------------------------------------------------------------------------
+
+def _ai_not_set_up() -> HTTPException:
+    from app.core.evaluation.providers import readiness
+
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=readiness.NOT_SET_UP_DETAIL,
+    )
+
+
+def require_ocr_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.ocr_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_gs_evaluation_available() -> None:
+    from app.core.evaluation.providers import readiness
+    from app.core.evaluation.providers.config import active_provider_key
+
+    if not readiness.is_available(active_provider_key()):
+        raise _ai_not_set_up()
+
+
+def require_optional_evaluation_available(key: Optional[str] = None) -> None:
+    from app.core.evaluation.providers import readiness
+
+    if not readiness.is_available(key or readiness.optional_evaluation_provider_key()):
+        raise _ai_not_set_up()
 
 
 # ---------------------------------------------------------------------------

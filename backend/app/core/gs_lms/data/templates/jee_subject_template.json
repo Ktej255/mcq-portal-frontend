@@ -1,0 +1,485 @@
+{
+  "_readme": "Template for one JEE subject (Maths style). Copy it, set subject_slug (JEE slugs are prefixed: jee-maths, jee-physics, jee-chemistry) and add mega-topics > sub-topics > leaf topics. \"exam\": \"jee\" selects the JEE profile: a leaf needs the 4 sections (BASIC, NCERT_LEVEL, ADVANCED, EXAMINER_TRAPS; no CURRENT_AFFAIRS), 2-8 concepts, 15 MCQs and at least one PYQ with exam_type JEE_MAIN or JEE_ADVANCED to be 'ready'. MCQ question types: FACTUAL, ASSERTION_REASON, STATEMENT_BASED, MATCH_THE_FOLLOWING, plus MULTI_CORRECT (four options and \"correct_options\": [\"A\", \"C\"], one or more labels) and NUMERICAL (\"numeric_answer\": 19, optional \"numeric_tolerance\", \"options\": []). The sample content below is original and for illustration, and every answer was checked by calculation; the PYQ is a clearly marked SAMPLE with a placeholder year of 0: replace it with a verified question before publishing. See docs/EXAMS.md.",
+  "exam": "jee",
+  "subject_slug": "jee-maths",
+  "tree": [
+    {
+      "title": "Algebra",
+      "node_type": "MEGA_TOPIC",
+      "weight": 1.0,
+      "display_order": 1,
+      "children": [
+        {
+          "title": "Quadratic Equations",
+          "node_type": "SUB_TOPIC",
+          "weight": 1.0,
+          "display_order": 1,
+          "children": [
+            {
+              "title": "Quadratic Equations: roots and discriminant",
+              "node_type": "LEAF_TOPIC",
+              "weight": 1.0,
+              "display_order": 1,
+              "ordering_justification": "Roots, sum and product and the discriminant are used in nearly every later Algebra topic, from inequalities to conic sections.",
+              "video_url": null,
+              "concept_checklist": [
+                "Standard form and the quadratic formula",
+                "The discriminant and the nature of roots",
+                "Sum and product of roots",
+                "Forming an equation from its roots"
+              ],
+              "concepts": [
+                {
+                  "title": "Quadratic formula and the discriminant",
+                  "key_points": [
+                    "The roots of ax^2 + bx + c = 0 (a not 0) are (-b +/- sqrt(D)) / (2a), where D = b^2 - 4ac",
+                    "D > 0 gives two distinct real roots, D = 0 gives equal real roots, D < 0 gives two non-real conjugate roots",
+                    "With rational coefficients, D a perfect square means rational roots"
+                  ],
+                  "misconceptions": [
+                    "D < 0 means the equation has no roots; it has two non-real complex roots"
+                  ]
+                },
+                {
+                  "title": "Sum and product of roots",
+                  "key_points": [
+                    "For roots alpha and beta: alpha + beta = -b/a and alpha*beta = c/a",
+                    "alpha^2 + beta^2 = (alpha + beta)^2 - 2*alpha*beta, so such expressions need no explicit roots"
+                  ],
+                  "misconceptions": [
+                    "The sum of the roots is b/a; the sign is negative: -b/a"
+                  ]
+                },
+                {
+                  "title": "Forming a quadratic from its roots",
+                  "key_points": [
+                    "An equation with roots p and q is x^2 - (p + q)x + pq = 0",
+                    "A root can be tested by substituting it into the equation"
+                  ],
+                  "misconceptions": []
+                }
+              ],
+              "content_sections": [
+                {
+                  "section_label": "BASIC",
+                  "title": "Foundation Understanding",
+                  "display_order": 1,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "callout",
+                      "tone": "hook",
+                      "title": "Start Here",
+                      "text": "A quadratic equation has the form ax^2 + bx + c = 0 with a not 0. The discriminant D = b^2 - 4ac tells you what kind of roots it has before you solve it."
+                    },
+                    {
+                      "type": "para",
+                      "text": "The roots are x = (-b +/- sqrt(D)) / (2a). If **D > 0** the roots are real and distinct, if **D = 0** they are real and equal, and if **D < 0** they are a pair of non-real complex conjugates."
+                    },
+                    {
+                      "type": "para",
+                      "text": "You rarely need the roots themselves. The **sum** of the roots is -b/a and the **product** is c/a, which is enough to find expressions such as alpha^2 + beta^2 or 1/alpha + 1/beta."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "NCERT_LEVEL",
+                  "title": "NCERT Reference: Quadratic Equations",
+                  "display_order": 2,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "ncert_reference",
+                      "book": "Mathematics",
+                      "class": "11",
+                      "chapter": "5",
+                      "key_facts": [
+                        "Quadratic equations with real coefficients and negative discriminant have complex roots",
+                        "The quadratic formula holds for real and complex coefficients",
+                        "The chapter number depends on the NCERT edition you use; check it before publishing"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "section_label": "ADVANCED",
+                  "title": "Beyond the Textbook: Symmetric Expressions",
+                  "display_order": 3,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "heading",
+                      "text": "Work with sum and product"
+                    },
+                    {
+                      "type": "para",
+                      "text": "Any symmetric expression in the roots can be written using alpha + beta and alpha*beta. For example, alpha^3 + beta^3 = (alpha + beta)^3 - 3*alpha*beta*(alpha + beta). Also, a quadratic with real coefficients has its minimum (if a > 0) at x = -b/(2a), with value -D/(4a)."
+                    }
+                  ]
+                },
+                {
+                  "section_label": "EXAMINER_TRAPS",
+                  "title": "Examiner Traps",
+                  "display_order": 4,
+                  "authored": true,
+                  "blocks": [
+                    {
+                      "type": "trap",
+                      "wrong": "The sum of the roots is b/a.",
+                      "correct": "The sum of the roots is -b/a; b/a has the wrong sign."
+                    },
+                    {
+                      "type": "trap",
+                      "wrong": "If D < 0 the equation has no roots.",
+                      "correct": "It has two non-real complex roots; it has no real roots."
+                    },
+                    {
+                      "type": "trap",
+                      "wrong": "Equal roots need D > 0.",
+                      "correct": "Equal roots need D = 0."
+                    }
+                  ]
+                }
+              ],
+              "pyqs": [
+                {
+                  "exam_type": "JEE_MAIN",
+                  "year": 0,
+                  "question_text": "[SAMPLE, replace with a verified JEE Main PYQ and its real year] If the roots of x^2 - 5x + 6 = 0 are alpha and beta, then alpha + beta equals:\n(1) -5\n(2) 5\n(3) 6\n(4) -6",
+                  "answer_text": "2",
+                  "explanation": "Sample entry showing the PYQ format for JEE. The sum of the roots is -b/a = 5.",
+                  "question_type": "FACTUAL",
+                  "marks": 4
+                }
+              ],
+              "mcq_questions": [
+                {
+                  "question_text": "The equation x^2 - 6x + 9 = 0 has roots that are:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "real and distinct"
+                    },
+                    {
+                      "label": "B",
+                      "text": "real and equal"
+                    },
+                    {
+                      "label": "C",
+                      "text": "non-real complex conjugates"
+                    },
+                    {
+                      "label": "D",
+                      "text": "irrational and unequal"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "D = (-6)^2 - 4(1)(9) = 36 - 36 = 0, so the two roots coincide (both equal 3).",
+                  "question_type": "FACTUAL",
+                  "display_order": 1
+                },
+                {
+                  "question_text": "The sum of the roots of 3x^2 - 12x + 7 = 0 is:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "4"
+                    },
+                    {
+                      "label": "B",
+                      "text": "-4"
+                    },
+                    {
+                      "label": "C",
+                      "text": "7/3"
+                    },
+                    {
+                      "label": "D",
+                      "text": "-7/3"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "Sum of roots = -b/a = 12/3 = 4. The value 7/3 is the product of the roots.",
+                  "question_type": "FACTUAL",
+                  "display_order": 2
+                },
+                {
+                  "question_text": "The product of the roots of 2x^2 + 5x - 3 = 0 is:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "5/2"
+                    },
+                    {
+                      "label": "B",
+                      "text": "3/2"
+                    },
+                    {
+                      "label": "C",
+                      "text": "-5/2"
+                    },
+                    {
+                      "label": "D",
+                      "text": "-3/2"
+                    }
+                  ],
+                  "correct_option": "D",
+                  "explanation": "Product of roots = c/a = -3/2. The value -5/2 is the sum of the roots (-b/a).",
+                  "question_type": "FACTUAL",
+                  "display_order": 3
+                },
+                {
+                  "question_text": "If x^2 + kx + 4 = 0 has equal roots and k > 0, then k equals:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "2"
+                    },
+                    {
+                      "label": "B",
+                      "text": "8"
+                    },
+                    {
+                      "label": "C",
+                      "text": "4"
+                    },
+                    {
+                      "label": "D",
+                      "text": "16"
+                    }
+                  ],
+                  "correct_option": "C",
+                  "explanation": "Equal roots need D = k^2 - 16 = 0, so k = 4 (k = -4 is rejected because k > 0).",
+                  "question_type": "FACTUAL",
+                  "display_order": 4
+                },
+                {
+                  "question_text": "The quadratic equation with roots 2 and -3 is:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "x^2 - x - 6 = 0"
+                    },
+                    {
+                      "label": "B",
+                      "text": "x^2 + x - 6 = 0"
+                    },
+                    {
+                      "label": "C",
+                      "text": "x^2 + x + 6 = 0"
+                    },
+                    {
+                      "label": "D",
+                      "text": "x^2 - 5x - 6 = 0"
+                    }
+                  ],
+                  "correct_option": "B",
+                  "explanation": "x^2 - (sum)x + (product) = x^2 - (-1)x + (-6) = x^2 + x - 6 = 0.",
+                  "question_type": "FACTUAL",
+                  "display_order": 5
+                },
+                {
+                  "question_text": "If alpha and beta are the roots of x^2 - 4x + 1 = 0, then alpha^2 + beta^2 equals:",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "12"
+                    },
+                    {
+                      "label": "B",
+                      "text": "16"
+                    },
+                    {
+                      "label": "C",
+                      "text": "18"
+                    },
+                    {
+                      "label": "D",
+                      "text": "14"
+                    }
+                  ],
+                  "correct_option": "D",
+                  "explanation": "alpha + beta = 4 and alpha*beta = 1, so alpha^2 + beta^2 = (alpha + beta)^2 - 2*alpha*beta = 16 - 2 = 14.",
+                  "question_type": "FACTUAL",
+                  "display_order": 6
+                },
+                {
+                  "question_text": "Assertion (A): If a, b, c are rational and b^2 - 4ac is a positive perfect square, the roots of ax^2 + bx + c = 0 are rational and unequal.\nReason (R): The roots are given by x = (-b +/- sqrt(b^2 - 4ac)) / (2a).",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "Both A and R are true and R is the correct explanation of A"
+                    },
+                    {
+                      "label": "B",
+                      "text": "Both A and R are true but R is not the correct explanation of A"
+                    },
+                    {
+                      "label": "C",
+                      "text": "A is true but R is false"
+                    },
+                    {
+                      "label": "D",
+                      "text": "A is false but R is true"
+                    }
+                  ],
+                  "correct_option": "A",
+                  "explanation": "With rational a, b, c and D a perfect square, sqrt(D) is rational, so both values from the quadratic formula are rational; D > 0 makes them unequal. R is exactly the formula that shows this.",
+                  "question_type": "ASSERTION_REASON",
+                  "display_order": 7
+                },
+                {
+                  "question_text": "Which of the following equations have real roots?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "x^2 + 2x + 5 = 0"
+                    },
+                    {
+                      "label": "B",
+                      "text": "x^2 - 2x - 3 = 0"
+                    },
+                    {
+                      "label": "C",
+                      "text": "2x^2 - 4x + 2 = 0"
+                    },
+                    {
+                      "label": "D",
+                      "text": "x^2 + x + 1 = 0"
+                    }
+                  ],
+                  "correct_options": [
+                    "B",
+                    "C"
+                  ],
+                  "explanation": "D values: 4 - 20 = -16 (no), 4 + 12 = 16 (yes), 16 - 16 = 0 (yes, equal roots), 1 - 4 = -3 (no). So the second and third equations have real roots.",
+                  "question_type": "MULTI_CORRECT",
+                  "display_order": 8
+                },
+                {
+                  "question_text": "For the equation x^2 - 7x + 10 = 0, which statements are correct?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The sum of the roots is 7"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The product of the roots is 10"
+                    },
+                    {
+                      "label": "C",
+                      "text": "Both roots are prime numbers"
+                    },
+                    {
+                      "label": "D",
+                      "text": "Both roots are negative"
+                    }
+                  ],
+                  "correct_options": [
+                    "A",
+                    "B",
+                    "C"
+                  ],
+                  "explanation": "x^2 - 7x + 10 = (x - 2)(x - 5), so the roots are 2 and 5: sum 7, product 10, both prime, both positive.",
+                  "question_type": "MULTI_CORRECT",
+                  "display_order": 9
+                },
+                {
+                  "question_text": "Consider x^2 + 2x - 15 = 0. Which of the following are true?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "The sum of the roots is 2"
+                    },
+                    {
+                      "label": "B",
+                      "text": "The product of the roots is -15"
+                    },
+                    {
+                      "label": "C",
+                      "text": "The discriminant is 64"
+                    },
+                    {
+                      "label": "D",
+                      "text": "The roots are rational"
+                    }
+                  ],
+                  "correct_options": [
+                    "B",
+                    "C",
+                    "D"
+                  ],
+                  "explanation": "The roots are 3 and -5. Their sum is -2 (not 2), product -15, D = 4 + 60 = 64 = 8^2, and the roots are rational.",
+                  "question_type": "MULTI_CORRECT",
+                  "display_order": 10
+                },
+                {
+                  "question_text": "For which of the following values of k does x^2 + kx + 9 = 0 have real roots?",
+                  "options": [
+                    {
+                      "label": "A",
+                      "text": "k = 6"
+                    },
+                    {
+                      "label": "B",
+                      "text": "k = -7"
+                    },
+                    {
+                      "label": "C",
+                      "text": "k = 5"
+                    },
+                    {
+                      "label": "D",
+                      "text": "k = 0"
+                    }
+                  ],
+                  "correct_options": [
+                    "A",
+                    "B"
+                  ],
+                  "explanation": "Real roots need D = k^2 - 36 >= 0, i.e. |k| >= 6. So k = 6 (equal roots) and k = -7 work; k = 5 and k = 0 give D < 0.",
+                  "question_type": "MULTI_CORRECT",
+                  "display_order": 11
+                },
+                {
+                  "question_text": "If alpha and beta are the roots of x^2 - 5x + 3 = 0, find alpha^2 + beta^2.",
+                  "options": [],
+                  "numeric_answer": 19,
+                  "explanation": "alpha + beta = 5 and alpha*beta = 3, so alpha^2 + beta^2 = 25 - 6 = 19.",
+                  "question_type": "NUMERICAL",
+                  "display_order": 12
+                },
+                {
+                  "question_text": "If x = 2 is a root of x^2 + kx - 10 = 0, find k.",
+                  "options": [],
+                  "numeric_answer": 3,
+                  "explanation": "Substituting x = 2: 4 + 2k - 10 = 0, so k = 3.",
+                  "question_type": "NUMERICAL",
+                  "display_order": 13
+                },
+                {
+                  "question_text": "If alpha and beta are the roots of x^2 - 5x + 6 = 0, find 1/alpha + 1/beta (correct to 2 decimal places).",
+                  "options": [],
+                  "numeric_answer": 0.83,
+                  "explanation": "1/alpha + 1/beta = (alpha + beta)/(alpha*beta) = 5/6 = 0.8333..., which is 0.83 to two decimal places.",
+                  "question_type": "NUMERICAL",
+                  "numeric_tolerance": 0.005,
+                  "display_order": 14
+                },
+                {
+                  "question_text": "Find the minimum value of x^2 - 6x + 4 for real x.",
+                  "options": [],
+                  "numeric_answer": -5,
+                  "explanation": "x^2 - 6x + 4 = (x - 3)^2 - 5, whose minimum is -5 at x = 3.",
+                  "question_type": "NUMERICAL",
+                  "display_order": 15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

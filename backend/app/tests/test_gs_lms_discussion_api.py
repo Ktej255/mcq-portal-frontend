@@ -74,6 +74,9 @@ def test_engine():
         if any(name.startswith(p) for p in relevant_prefixes)
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
+    # AI endpoints count each request against the learner's daily allowance.
+    from app.core.usage.models import DailyUsage
+    DailyUsage.__table__.create(engine, checkfirst=True)
     
     # Seed subject
     SessionLocal = sessionmaker(bind=engine)

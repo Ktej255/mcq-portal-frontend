@@ -41,6 +41,10 @@ test("free diagnostic shows a plan and saves the lead", async ({ page, request }
 
   await expect(page.getByRole("heading", { name: /Asha, here's your plan for the 2027 attempt/ })).toBeVisible();
 
+  // The page says the lead got through, and does not claim an email was sent to the visitor.
+  await expect(page.getByText("your details have reached the Sarit Classes team")).toBeVisible();
+  await expect(page.getByText(/was sent to/)).toHaveCount(0);
+
   // The lead must be in the database, not only emailed.
   await expect
     .poll(async () => {
@@ -51,4 +55,27 @@ test("free diagnostic shows a plan and saves the lead", async ({ page, request }
       return body.items?.find((lead: { email: string }) => lead.email === email) ?? null;
     })
     .toMatchObject({ name: "Asha Test", source: "diagnostic" });
+});
+
+test("contact form saves the note where the team reads it", async ({ page, request }) => {
+  const email = `contact-${Date.now()}@example.com`;
+  const note = "Please tell me when Environment content will open.";
+  await page.goto("/contact");
+
+  await page.getByLabel("Name").fill("Ravi Test");
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Message").fill(note);
+  await page.getByRole("button", { name: "Send note" }).click();
+
+  await expect(page.getByTestId("contact-sent")).toContainText(email);
+
+  await expect
+    .poll(async () => {
+      const res = await request.get(`${BACKEND_URL}/api/v1/leads?page_size=200`, {
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      });
+      const body = await res.json();
+      return body.items?.find((lead: { email: string }) => lead.email === email) ?? null;
+    })
+    .toMatchObject({ name: "Ravi Test", source: "contact", answers: { message: note } });
 });

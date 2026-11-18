@@ -7,9 +7,11 @@ import { useEffect } from "react";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'STUDENT' | 'ADMIN';
+  /** Where a signed-in user without the required role is sent. */
+  fallbackHref?: string;
 }
 
-export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requiredRole, fallbackHref = '/dashboard' }: ProtectedRouteProps) => {
   const { user, loading, role, roleLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -30,14 +32,14 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
       }, 0);
     } else if (requiredRole && role !== requiredRole) {
       timeoutId = window.setTimeout(() => {
-        router.push('/dashboard'); // Unauthorized
+        router.replace(fallbackHref); // Unauthorized
       }, 0);
     }
 
     return () => {
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [user, loading, role, rolePending, router, pathname, requiredRole]);
+  }, [user, loading, role, rolePending, router, pathname, requiredRole, fallbackHref]);
 
   if (loading || rolePending) {
     return <div className="flex h-screen items-center justify-center">Loading session...</div>;

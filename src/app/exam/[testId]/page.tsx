@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useExamStore, ConfidenceLevel } from '@/lib/store/useExamStore';
 import { useTimerStore } from '@/lib/store/useTimerStore';
 import { useAutoSave } from '@/lib/hooks/useAutoSave';
+import { useQuestionTimer } from '@/lib/hooks/useQuestionTimer';
 import { useSessionRecovery } from '@/lib/hooks/useSessionRecovery';
 import { ExamHeader } from '@/components/exam/ExamHeader';
 import { QuestionPalette } from '@/components/exam/QuestionPalette';
@@ -17,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Target, Cloud, CloudOff, AlertTriangle, CheckCircle2, Menu, RefreshCw } from 'lucide-react';
 
 import { useExamIntegrity } from '@/lib/hooks/useExamIntegrity';
-import { examService, ExamQuestionResponseError, QuestionData, TestMetadata } from '@/services/api/examService';
+import { examService, AttemptState, ExamQuestionResponseError, isAttemptClosedError, QuestionData, TestMetadata } from '@/services/api/examService';
 import { dashboardService, PerformanceReport } from '@/services/api/dashboardService';
 import { revisionService } from '@/services/api/revisionService';
 import { eventsService } from '@/services/api/eventsService';
@@ -34,13 +35,14 @@ function ExamInterface() {
   const { testId } = params;
   const attemptId = searchParams.get('attemptId');
 
-  const { testId: storeTestId, attemptId: storeAttemptId, initializeTest, currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
+  const { currentQuestionIndex, setCurrentQuestion, visitQuestion, answers, setAnswer, markForReview, clearResponse } = useExamStore();
   const { timeLeft } = useTimerStore();
 
   const attemptIdNum = attemptId ? parseInt(attemptId, 10) : null;
+  const timerKey = attemptId ? `attempt-${attemptId}` : `test-${String(testId)}`;
   const { warningsCount, isWarningVisible, lastViolation, dismissWarning, requestFullscreen } = useExamIntegrity();
-  const { detectRecovery, clearSnapshot } = useSessionRecovery(attemptIdNum);
-  const [recoveryBannerShown, setRecoveryBannerShown] = useState(false);
+  const { clearSnapshot } = useSessionRecovery(attemptIdNum);
+  const submitInFlight = useRef(false);
   const [reportProcessingAttemptId, setReportProcessingAttemptId] = useState<string | null>(null);
   const [reportProcessingStatus, setReportProcessingStatus] = useState('Scoring reconciliation queued');
   const [reportProcessingError, setReportProcessingError] = useState<string | null>(null);
@@ -54,14 +56,18 @@ function ExamInterface() {
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
+  // Load once per test and attempt. The attempt's state (time left on the
+  // server's clock, answers already saved) is loaded with the questions, so a
+  // reload or another device continues the same exam.
   useEffect(() => {
+    if (!testId) return;
+    let cancelled = false;
+
     const fetchExamData = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
         let qData: QuestionData[];
         let tData: TestMetadata;
+        let attemptState: AttemptState | null = null;
 
         if (testId === 'revision') {
           // Priority 2: Revision Drill Mode
@@ -77,18 +83,23 @@ function ExamInterface() {
             is_active: true,
             created_at: new Date().toISOString()
           };
-          
-          // If no attemptId, we might need to create a 'revision attempt' 
-          // or handle it differently in the backend. 
-          // For now, let's assume the backend handles submission via completion API.
         } else {
           // Standard Exam Mode
-          const [resQ, resT] = await Promise.all([
+          const [resQ, resT, resState] = await Promise.all([
             examService.getQuestions(testId as string),
-            examService.getTestById(testId as string)
+            examService.getTestById(testId as string),
+            attemptId ? examService.getAttemptState(attemptId) : Promise.resolve(null),
           ]);
           qData = resQ;
           tData = resT;
+          attemptState = resState;
+        }
+        if (cancelled) return;
+
+        if (attemptState?.status === 'CLOSED') {
+          // Already submitted (here, on another device, or closed when its time ran out).
+          router.replace(`/reports?attemptId=${attemptId}`);
+          return;
         }
 
         if (!Array.isArray(qData)) {
@@ -98,46 +109,79 @@ function ExamInterface() {
           throw new ExamQuestionResponseError('EMPTY_QUESTION_BANK');
         }
 
-        setQuestions(qData);
-        setTestMetadata(tData);
-        
+        const store = useExamStore.getState();
         const questionIds = qData.map(q => q.id);
-        const storeQuestionIds = Object.keys(answers);
+        const storeQuestionIds = Object.keys(store.answers);
         const isStale = questionIds.some(id => !storeQuestionIds.includes(id));
         const activeAttemptId = attemptId || null;
-        
-        if (storeTestId !== testId || storeAttemptId !== activeAttemptId || isStale) {
-          initializeTest(testId as string, questionIds, activeAttemptId);
+
+        if (store.testId !== testId || store.attemptId !== activeAttemptId || isStale) {
+          store.initializeTest(testId as string, questionIds, activeAttemptId);
         }
+
+        if (attemptState) {
+          // The server stores the option letter; the screen uses the option's id.
+          const optionIdFor = (questionId: string, letter: string | null) => {
+            if (!letter) return null;
+            const options = qData.find(q => q.id === questionId)?.options ?? [];
+            return options.find(option => {
+              try {
+                return normalizeOptionId(option.id) === letter;
+              } catch {
+                return false;
+              }
+            })?.id ?? null;
+          };
+          const restored = useExamStore.getState().hydrateFromServer(
+            attemptState.answers.map(answer => ({
+              questionId: answer.questionId,
+              selectedOptionId: optionIdFor(answer.questionId, answer.selectedOption),
+              confidence: answer.confidence,
+              markedForReview: answer.markedForReview,
+              timeSpentSeconds: answer.timeSpentSeconds,
+            }))
+          );
+          if (restored > 0) {
+            toast.info(
+              `Welcome back. ${restored} saved ${restored === 1 ? 'answer was' : 'answers were'} restored.`,
+              { duration: 6000, icon: <RefreshCw className="w-4 h-4" /> }
+            );
+          }
+        }
+
+        const timer = useTimerStore.getState();
+        if (attemptState) {
+          if (attemptState.remainingSeconds !== null) {
+            timer.setDeadline(timerKey, attemptState.remainingSeconds);
+          } else {
+            timer.clear();
+          }
+        } else {
+          timer.setDeadline(timerKey, (tData.durationMinutes || 60) * 60);
+        }
+
+        setQuestions(qData);
+        setTestMetadata(tData);
       } catch (err) {
+        if (cancelled) return;
         console.error("Failed to fetch exam data:", err);
         setError(err instanceof ExamQuestionResponseError ? err.message : "Failed to load exam questions.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    if (testId) fetchExamData();
+    fetchExamData();
+    return () => {
+      cancelled = true;
+    };
+  }, [testId, attemptId, timerKey, router]);
 
-    // Priority 6: Detect session recovery on mount
-    if (attemptIdNum) {
-      const snapshot = detectRecovery();
-      if (snapshot && snapshot.attemptId === attemptIdNum && !recoveryBannerShown) {
-        window.setTimeout(() => {
-          setRecoveryBannerShown(true);
-          toast.info(
-            `Session recovered: ${Object.keys(snapshot.pendingAnswers).length} answers restored from local backup.`,
-            { duration: 6000, icon: <RefreshCw className="w-4 h-4" /> }
-          );
-        }, 0);
-      }
-    }
-
-    if (attemptId) {
-      eventsService.init(attemptId);
-      return () => eventsService.stop(attemptId);
-    }
-  }, [testId, storeTestId, storeAttemptId, initializeTest, attemptId, attemptIdNum, detectRecovery, recoveryBannerShown, answers]);
+  useEffect(() => {
+    if (!attemptId) return;
+    eventsService.init(attemptId);
+    return () => eventsService.stop(attemptId);
+  }, [attemptId]);
 
   // Record QUESTION_VIEWED when currentQuestionIndex changes
   useEffect(() => {
@@ -167,6 +211,9 @@ function ExamInterface() {
       visitQuestion(question.id);
     }
   }, [question?.id, visitQuestion]);
+
+  // Time on the question in view. Stops once the attempt is being submitted.
+  const flushQuestionTime = useQuestionTimer(question?.id, Boolean(reportProcessingAttemptId));
 
   if (loading) return (
     <div className="flex flex-col h-screen items-center justify-center space-y-4">
@@ -201,7 +248,9 @@ function ExamInterface() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async ({ timeUp = false }: { timeUp?: boolean } = {}) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     try {
       if (testId === 'revision') {
         const payload = questions.map(q => {
@@ -222,11 +271,20 @@ function ExamInterface() {
       if (attemptId) {
         setShowReview(false);
         setReportProcessingAttemptId(attemptId);
-        setReportProcessingStatus('Final answer sync in progress');
+        setReportProcessingStatus(timeUp ? 'Time is up. Submitting your answers' : 'Final answer sync in progress');
         setReportProcessingError(null);
-        await examService.saveAnswers(attemptId, Object.values(answers));
+        try {
+          flushQuestionTime();
+          await examService.saveAnswers(attemptId, Object.values(useExamStore.getState().answers));
+        } catch (saveErr) {
+          // The attempt is already over on the server (time ran out a while
+          // ago, or it was submitted elsewhere). Submitting still works and
+          // uses the answers saved in time; anything else is a real failure.
+          if (!isAttemptClosedError(saveErr)) throw saveErr;
+          toast.info("Time was already up, so the answers saved before the deadline were submitted.");
+        }
         await examService.submitTest(attemptId);
-        setReportProcessingStatus('Forensic pipeline running');
+        setReportProcessingStatus('Preparing your report');
         await dashboardService.waitForReportReady(attemptId, {
           onStatus: (report: PerformanceReport) => {
             const processingStatus = report.processingStatus ?? report.processing_status ?? 'PENDING';
@@ -239,31 +297,25 @@ function ExamInterface() {
         });
         // Priority 6: Clear recovery snapshot on successful submit
         clearSnapshot();
-        toast.success("Forensic report generated.");
+        toast.success(timeUp ? "Time is up. Your test was submitted." : "Forensic report generated.");
         router.push(`/reports?attemptId=${attemptId}`);
       } else {
         router.push('/dashboard');
       }
     } catch (err: unknown) {
       console.error("Submission failed:", err);
-      const responseStatus = typeof err === 'object' && err !== null && 'response' in err
-        ? (err as { response?: { status?: number } }).response?.status
-        : undefined;
-      // Priority 2: Surface idempotent submit gracefully
-      if (responseStatus === 409) {
-        if (attemptId) {
-          setReportProcessingAttemptId(attemptId);
-          setReportProcessingStatus('Checking finalized report state');
-          await dashboardService.waitForReportReady(attemptId);
-        }
-        toast.info("Already submitted — redirecting to your report.");
-        clearSnapshot();
-        router.push(`/reports?attemptId=${attemptId}`);
-      } else {
-        setReportProcessingError("Report generation did not complete. Please retry from this screen.");
-        toast.error("Failed to submit test. Please check your connection and try again.");
-      }
+      setReportProcessingError("Report generation did not complete. Please retry from this screen.");
+      toast.error("Failed to submit test. Please check your connection and try again.");
+    } finally {
+      submitInFlight.current = false;
     }
+  };
+
+  const handleTimeUp = () => {
+    if (testId !== 'revision') {
+      toast.warning("Time is up. Submitting your answers now.");
+    }
+    void handleSubmit({ timeUp: true });
   };
 
   const handleOptionChange = (optionId: string) => {
@@ -298,7 +350,7 @@ function ExamInterface() {
         error={reportProcessingError}
         onRetry={() => {
           setReportProcessingError(null);
-          handleSubmit();
+          void handleSubmit();
         }}
       />
     );
@@ -324,11 +376,11 @@ function ExamInterface() {
         )}
 
         <ExamHeader 
-          testId={testId as string}
+          timerKey={timerKey}
           testName={testMetadata?.title || "Exam in Progress"} 
           totalQuestions={questions.length} 
-          durationSeconds={(testMetadata?.durationMinutes || 60) * 60} 
           onSubmit={() => setShowReview(true)}
+          onTimeUp={handleTimeUp}
           onRequestFullscreen={requestFullscreen}
         />
       </div>
@@ -597,7 +649,7 @@ function ExamInterface() {
             setCurrentQuestion(idx);
             setShowReview(false);
           }}
-          onSubmit={handleSubmit}
+          onSubmit={() => handleSubmit()}
         />
       )}
 

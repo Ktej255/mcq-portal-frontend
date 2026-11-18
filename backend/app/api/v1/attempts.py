@@ -1,18 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
 from app.db.session import get_db
-from app.models.domain import User, Attempt, AttemptStatusEnum, Question, WorkflowStatusEnum
+from app.models.domain import User, Attempt, AttemptAnswer, AttemptStatusEnum, Question, Report, WorkflowStatusEnum
 from app.api.dependencies import get_current_user
 from app.schemas.test_engine import (
     StartAttemptRequest, StartAttemptResponse, QuestionResponse, 
-    SaveAnswerRequest, SaveAnswerResponse, ReportResponse, HistoryItemResponse,
+    SaveAnswerRequest, SaveAnswersRequest, SaveAnswerResponse, ReportResponse, HistoryItemResponse,
     EventBatchRequest
 )
 from app.schemas.common import StandardResponse
-from app.services.test_engine_service import start_attempt, get_attempt_questions, save_answer, count_published_questions
-from app.services.report_service import generate_report
+from app.services.test_engine_service import start_attempt, get_attempt_questions, save_answer, save_answers, count_published_questions
+from app.services.report_service import generate_report, run_cognitive_pipeline
 from app.services.event_auditor import event_auditor
 from app.services.domain_contracts import CanonicalExamEvent
 from app.services.attempt_lock_manager import AttemptLockManager, AttemptLockError
@@ -108,6 +108,54 @@ def fetch_questions(
     questions = get_attempt_questions(db, attempt_id, current_user.id)
     return StandardResponse(success=True, message="Questions retrieved successfully", data=questions)
 
+def _lock_for_save(db: Session, attempt_id: int, user_id: int) -> None:
+    # Priority 2: Lock governance before any write
+    try:
+        AttemptLockManager.lock_for_save(db, attempt_id, user_id)
+    except AttemptLockError as e:
+        raise HTTPException(status_code=409, detail={"code": e.code, "message": e.detail})
+
+
+@router.get("/{attempt_id}/state", response_model=StandardResponse[dict])
+def get_attempt_state(
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Everything the exam screen needs to open or reopen an attempt.
+
+    The clock comes from the server (time left, not a client countdown), and
+    the answers already saved come back so an interrupted exam continues on
+    any device.
+    """
+    attempt = _get_owned_attempt(db, attempt_id, current_user.id)
+    test = attempt.test
+    in_progress = attempt.status == AttemptStatusEnum.IN_PROGRESS
+    remaining = AttemptLockManager.get_remaining_seconds(attempt, db) if in_progress else 0
+    answers = db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id == attempt_id).all()
+    return StandardResponse(success=True, message="Attempt state retrieved", data={
+        "attempt_id": attempt.id,
+        "test_id": attempt.test_id,
+        "status": attempt.status.value,
+        "start_time": attempt.start_time.isoformat() if attempt.start_time else None,
+        "server_time": datetime.now(timezone.utc).isoformat(),
+        "duration_seconds": (test.duration_minutes or 0) * 60 if test else 0,
+        "remaining_seconds": remaining,
+        "time_up": in_progress and remaining == 0,
+        "answers": [
+            {
+                "question_id": answer.question_id,
+                "selected_option": answer.selected_option,
+                "confidence_level": answer.confidence_level.value if answer.confidence_level else None,
+                "marked_for_review": bool(answer.marked_for_review),
+                "is_skipped": bool(answer.is_skipped),
+                "time_taken_seconds": answer.time_taken_seconds or 0,
+            }
+            for answer in answers
+        ],
+    })
+
+
 @router.put("/{attempt_id}/answers", response_model=StandardResponse[SaveAnswerResponse])
 def save_test_answer(
     attempt_id: int,
@@ -116,75 +164,89 @@ def save_test_answer(
     current_user: User = Depends(get_current_user)
 ):
     _get_owned_attempt(db, attempt_id, current_user.id)
-    # Priority 2: Lock governance before any write
-    try:
-        AttemptLockManager.lock_for_save(db, attempt_id, current_user.id)
-    except AttemptLockError as e:
-        raise HTTPException(status_code=409, detail={"code": e.code, "message": e.detail})
+    _lock_for_save(db, attempt_id, current_user.id)
 
     success = save_answer(db, attempt_id, current_user.id, request)
     return StandardResponse(success=True, message="Answer saved successfully", data={"success": success, "message": "Answer saved successfully"})
 
+
+@router.put("/{attempt_id}/answers/bulk", response_model=StandardResponse[dict])
+def save_test_answers(
+    attempt_id: int,
+    request: SaveAnswersRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Save several answers in one request (all or none)."""
+    _get_owned_attempt(db, attempt_id, current_user.id)
+    _lock_for_save(db, attempt_id, current_user.id)
+
+    saved = save_answers(db, attempt_id, current_user.id, request.answers)
+    return StandardResponse(success=True, message="Answers saved successfully", data={"saved": saved})
+
+
+def _finish_report(db: Session, attempt_id: int, user_id: int) -> None:
+    """Reconciliation audit, then the report pipeline, inside this request.
+
+    This used to be handed to a background task. On serverless hosting work
+    after the response is not guaranteed to run, which left reports stuck on
+    "pending" and the revision queue empty.
+    """
+    try:
+        rec = AttemptReconciliationEngine.reconcile(db, attempt_id)
+        if rec.status == "FORENSIC_DIVERGENCE":
+            logger.warning(
+                f"FORENSIC_DIVERGENCE on attempt {attempt_id}: "
+                f"{len(rec.divergences)} divergences detected. "
+                f"Summary: {rec.summary} | "
+                f"Divergences: {rec.divergences}"
+            )
+        elif rec.status == "INSUFFICIENT_DATA":
+            logger.info(f"Reconciliation INSUFFICIENT_DATA for attempt {attempt_id}: {rec.summary}")
+        else:
+            logger.info(f"Reconciliation CLEAN for attempt {attempt_id}: {rec.summary}")
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Reconciliation failed for attempt {attempt_id}: {exc}")
+    run_cognitive_pipeline(db, attempt_id, user_id)
+
+
 @router.post("/{attempt_id}/submit", response_model=StandardResponse[ReportResponse])
 def submit_test(
     attempt_id: int,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     _get_owned_attempt(db, attempt_id, current_user.id)
-    from app.services.report_service import generate_report, run_async_cognitive_pipeline
-    
-    # Priority 2: Idempotent submit — if already submitted, return existing report
+
+    # Priority 2: Idempotent submit — a repeat returns the existing report
     try:
         locked_attempt = AttemptLockManager.lock_for_submit(db, attempt_id, current_user.id)
     except AttemptLockError as e:
         raise HTTPException(status_code=409, detail={"code": e.code, "message": e.detail})
-    
-    from app.models.domain import Report, AttemptStatusEnum
+
     if locked_attempt.status == AttemptStatusEnum.SUBMITTED:
         existing_report = db.query(Report).filter(
             Report.attempt_id == attempt_id,
             Report.is_deleted.is_(False),
         ).first()
         if existing_report:
-            logger.info(f"Idempotent submit: attempt {attempt_id} already submitted, returning existing report")
-            return StandardResponse(success=True, message="Already submitted — returning existing report.", data=existing_report)
-    
-    # Priority 1: Run reconciliation as background audit before pipeline
-    def reconcile_and_pipeline(attempt_id: int, user_id: int):
-        from app.db.session import SessionLocal
-        _db = SessionLocal()
-        try:
-            rec = AttemptReconciliationEngine.reconcile(_db, attempt_id)
-            if rec.status == "FORENSIC_DIVERGENCE":
-                logger.warning(
-                    f"FORENSIC_DIVERGENCE on attempt {attempt_id}: "
-                    f"{len(rec.divergences)} divergences detected. "
-                    f"Summary: {rec.summary} | "
-                    f"Divergences: {rec.divergences}"
-                )
-            elif rec.status == "INSUFFICIENT_DATA":
-                logger.info(
-                    f"Reconciliation INSUFFICIENT_DATA for attempt {attempt_id}: {rec.summary}"
-                )
+            if existing_report.processing_status != "COMPLETED":
+                # An earlier run did not finish; a retry completes it.
+                logger.info(f"Submit retry: finishing report for attempt {attempt_id}")
+                _finish_report(db, attempt_id, current_user.id)
+                db.refresh(existing_report)
             else:
-                logger.info(
-                    f"Reconciliation CLEAN for attempt {attempt_id}: {rec.summary}"
-                )
-            run_async_cognitive_pipeline(attempt_id, user_id)
-        except Exception as exc:
-            logger.error(f"reconcile_and_pipeline failed for attempt {attempt_id}: {exc}")
-        finally:
-            _db.close()
+                logger.info(f"Idempotent submit: attempt {attempt_id} already submitted, returning existing report")
+            return StandardResponse(success=True, message="Already submitted — returning existing report.", data=existing_report)
 
-    
     report = generate_report(db, attempt_id, current_user.id)
     if report.is_deleted:
         raise HTTPException(status_code=404, detail="Report not found")
-    background_tasks.add_task(reconcile_and_pipeline, attempt_id, current_user.id)
-    
-    return StandardResponse(success=True, message="Test submitted. Primary analysis complete. AI Insight is being generated.", data=report)
+    _finish_report(db, attempt_id, current_user.id)
+    db.refresh(report)
+
+    return StandardResponse(success=True, message="Test submitted. Your report is ready.", data=report)
 
 @router.post("/{attempt_id}/events", response_model=StandardResponse[dict])
 def record_exam_events(

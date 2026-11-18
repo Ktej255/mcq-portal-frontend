@@ -1,79 +1,70 @@
-import google.generativeai as genai
-from .contracts import IInferenceProvider, InferenceRequest, InferenceResponse
-from app.core.config import settings
+from typing import Optional
+
+from google.genai import types
+
+from .contracts import (
+    IInferenceProvider,
+    InferenceRequest,
+    InferenceResponse,
+    sniff_image_mime,
+)
+from .gemini_client import build_gemini_client, gemini_model
+
 
 class GeminiProvider(IInferenceProvider):
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
-        self.model_name = model_name
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel(model_name)
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = model_name or gemini_model()
+        self.client = build_gemini_client()
+
+    def _config(self, request: InferenceRequest) -> types.GenerateContentConfig:
+        options = {"temperature": request.temperature}
+        if request.system_instruction:
+            options["system_instruction"] = request.system_instruction
+        if request.response_mime_type and request.response_mime_type != "text/plain":
+            options["response_mime_type"] = request.response_mime_type
+        if request.max_tokens:
+            options["max_output_tokens"] = request.max_tokens
+        return types.GenerateContentConfig(**options)
 
     def generate(self, request: InferenceRequest) -> InferenceResponse:
-        # Note: In a production gateway, we would map InferenceRequest fields to Gemini fields
+        contents: list = [request.prompt]
+        provider = "google/gemini"
         if request.audio is not None:
-            # Multimodal (audio) path — e.g. speech-to-text. Gemini 1.5 accepts
-            # inline audio blobs alongside a text prompt. This branch is only
-            # ever taken when a caller supplies ``audio``; text-only and vision
-            # calls fall through to the unchanged paths below (backward-compatible).
-            generation_config = {"temperature": request.temperature}
-            if request.response_mime_type and request.response_mime_type != "text/plain":
-                generation_config["response_mime_type"] = request.response_mime_type
-            if request.max_tokens:
-                generation_config["max_output_tokens"] = request.max_tokens
-            parts = [
-                request.prompt,
-                {
-                    "mime_type": request.audio_mime_type or "audio/wav",
-                    "data": request.audio,
-                },
-            ]
-            response = self.model.generate_content(
-                parts, generation_config=generation_config
+            # Audio alongside the prompt, for example speech to text.
+            contents.append(
+                types.Part.from_bytes(
+                    data=request.audio, mime_type=request.audio_mime_type or "audio/wav"
+                )
             )
-            return InferenceResponse(
-                text=response.text,
-                raw_response=response,
-                provider="google/gemini-audio",
-            )
+            provider = "google/gemini-audio"
+        else:
+            images = list(request.images or [])
+            if not images and request.image is not None:
+                images = [request.image]
+            # Images in order after the prompt: reading handwriting, or
+            # grading every page of an answer in one call.
+            for data in images:
+                contents.append(
+                    types.Part.from_bytes(
+                        data=data,
+                        mime_type=sniff_image_mime(data, request.image_mime_type or "image/png"),
+                    )
+                )
+            if images:
+                provider = "google/gemini-vision"
 
-        if request.image is not None:
-            # Multimodal (vision) path — e.g. handwriting OCR. The image is sent
-            # as an inline blob part alongside the text prompt. This branch is
-            # only ever taken when a caller supplies ``image``; text-only calls
-            # fall through to the unchanged path below (backward-compatible).
-            generation_config = {"temperature": request.temperature}
-            if request.response_mime_type and request.response_mime_type != "text/plain":
-                generation_config["response_mime_type"] = request.response_mime_type
-            if request.max_tokens:
-                generation_config["max_output_tokens"] = request.max_tokens
-            parts = [
-                request.prompt,
-                {
-                    "mime_type": request.image_mime_type or "image/png",
-                    "data": request.image,
-                },
-            ]
-            response = self.model.generate_content(
-                parts, generation_config=generation_config
-            )
-            return InferenceResponse(
-                text=response.text,
-                raw_response=response,
-                provider="google/gemini-vision",
-            )
-
-        # Text-only path (unchanged).
-        response = self.model.generate_content(request.prompt)
-        return InferenceResponse(
-            text=response.text,
-            raw_response=response,
-            provider="google/gemini"
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=contents,
+            config=self._config(request),
         )
+        text = response.text
+        if not isinstance(text, str) or not text.strip():
+            # A blocked or empty reply must not travel on as if it were an answer.
+            raise ValueError("Gemini returned an empty response")
+        return InferenceResponse(text=text, raw_response=response, provider=provider)
 
     async def generate_async(self, request: InferenceRequest) -> InferenceResponse:
-        # Gemini Python SDK doesn't have a direct async generate_content in standard sync client
-        # but for this architectural shell, we wrap it or use the async client if available.
-        # For now, we'll implement the sync-wrapper pattern to maintain the interface.
         import asyncio
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.generate, request)
+
+        return await asyncio.get_running_loop().run_in_executor(None, self.generate, request)

@@ -94,3 +94,19 @@ def test_list_requires_admin(env):
     app.dependency_overrides[get_current_user] = lambda: User(id=2, email="a@example.com", role=RoleEnum.ADMIN)
     body = client.get("/leads").json()
     assert body["total"] == 1 and body["items"][0]["email"] == "asha@example.com"
+
+
+def test_a_contact_note_is_kept_in_full_and_other_answers_stay_short(env):
+    _, client, SessionLocal = env
+    note = "I need help choosing an optional. " * 40
+    resp = client.post(
+        "/leads",
+        json={"email": "ravi@example.com", "source": "contact", "answers": {"message": note, "stage": "x" * 500}},
+    )
+    assert resp.status_code == 201
+    with SessionLocal() as db:
+        row = db.query(MarketingLead).one()
+        assert row.source == "contact"
+        assert row.answers["message"] == note[:2000]
+        assert len(row.answers["message"]) > 1000
+        assert len(row.answers["stage"]) == 200

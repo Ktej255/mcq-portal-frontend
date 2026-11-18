@@ -10,9 +10,9 @@ Subject-neutral.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
-from app.core.inference.contracts import InferenceRequest
+from app.core.inference.contracts import InferenceRequest, sniff_image_mime
 from app.core.evaluation.providers.config import ProviderConfig
 
 
@@ -21,23 +21,29 @@ def should_use_vision(config: ProviderConfig, images: List[bytes]) -> bool:
     return bool(images) and config.supports_vision
 
 
+# Cap on pages sent to the model in one grading call (cost / payload size).
+MAX_VISION_PAGES = 8
+
+
 def apply_vision(
     request: InferenceRequest,
     images: List[bytes],
     config: ProviderConfig,
     *,
-    mime_type: str = "image/png",
+    mime_type: Optional[str] = None,
 ) -> InferenceRequest:
-    """Attach the first answer-sheet page to ``request`` for direct grading.
+    """Attach the answer-sheet pages (in order, up to ``MAX_VISION_PAGES``).
 
-    The shared :class:`InferenceRequest` carries a single image; the first page
-    is attached and the assembled OCR text (already in the prompt) covers the
-    remaining pages. Returns the same request for chaining.
+    ``request.images`` carries every attached page; ``request.image`` keeps the
+    first page so single-image providers behave as before. Returns the same
+    request for chaining.
     """
     if should_use_vision(config, images):
-        request.image = images[0]
-        request.image_mime_type = mime_type
+        pages = images[:MAX_VISION_PAGES]
+        request.image = pages[0]
+        request.images = list(pages)
+        request.image_mime_type = mime_type or sniff_image_mime(pages[0])
     return request
 
 
-__all__ = ["should_use_vision", "apply_vision"]
+__all__ = ["should_use_vision", "apply_vision", "MAX_VISION_PAGES"]

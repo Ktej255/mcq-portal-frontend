@@ -184,9 +184,16 @@ def seeded_engine():
             "gs_lms_onboarding",
             "gs_lms_pyq_reveals",
             "gs_lms_video_watches",
+            # The tree now reports mastered/locked per leaf (progression.py).
+            "gs_lms_funnel_progress",
+            "gs_lms_mcq_lab_sessions",
+            "gs_lms_checkpoints",
         )
     ]
     Base.metadata.create_all(engine, tables=relevant_tables)
+    # AI endpoints count each request against the learner's daily allowance.
+    from app.core.usage.models import DailyUsage
+    DailyUsage.__table__.create(engine, checkfirst=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
     session = SessionLocal()

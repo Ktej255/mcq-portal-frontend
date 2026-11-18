@@ -1,5 +1,6 @@
 "use client";
 
+import { buildInternalApiHeaders } from "@/lib/auth/internal-api-headers";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -107,7 +108,10 @@ export function UpscSyllabusPyqLibrary() {
   const loadArchiveIntake = async () => {
     setArchiveStatus("loading");
     try {
-      const response = await fetch("/api/upsc/source-archive", { cache: "no-store" });
+      const response = await fetch("/api/upsc/source-archive", {
+          cache: "no-store",
+          headers: await buildInternalApiHeaders(),
+        });
       const payload = (await response.json()) as SourceArchiveIntakeResponse;
       setArchiveIntake(payload);
       setArchiveStatus(

@@ -1,3 +1,5 @@
+import type { ExamCode } from "@/lib/exams/examRoutes";
+
 export const SUPPORTED_GS_LMS_SUBJECTS = {
   geography: {
     slug: "geography",
@@ -18,8 +20,9 @@ export function getSupportedGsLmsSubject(
     : null;
 }
 
-export function lmsBaseForSlug(subject: SupportedGsLmsSubject): string {
-  return `/upsc/${subject}/lms`;
+/** The LMS route base for a subject. Other exams reuse the same pages under their own prefix. */
+export function lmsBaseForSlug(subject: string, exam: ExamCode = "upsc"): string {
+  return `/${exam}/${subject}/lms`;
 }
 
 export function parsePositiveRouteId(

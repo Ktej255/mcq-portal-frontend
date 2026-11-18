@@ -128,6 +128,9 @@ def seeded_engine():
         t for name, t in Base.metadata.tables.items() if name.startswith("optional_")
     ]
     Base.metadata.create_all(engine, tables=optional_tables)
+    # AI endpoints count each request against the learner's daily allowance.
+    from app.core.usage.models import DailyUsage
+    DailyUsage.__table__.create(engine, checkfirst=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
     seed = SessionLocal()

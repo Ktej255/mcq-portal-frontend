@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
@@ -570,13 +571,13 @@ export function PrelimsAuditPageClient({
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span>{archiveNotice}</span>
-                  <a
+                  <Link
                     href="/admin/prelims-audit-v2"
                     className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-[#d69b2d] bg-white px-3 text-xs font-black uppercase tracking-[0.14em] text-[#5d3a05] transition hover:bg-[#fff3d4]"
                   >
                     Active V2
                     <ArrowRight className="h-4 w-4" />
-                  </a>
+                  </Link>
                 </div>
               </div>
             )}

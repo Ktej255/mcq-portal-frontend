@@ -10,9 +10,12 @@ from app.schemas.admin import (
     SubjectCreate, SubjectUpdate, SubjectOut,
     TopicCreate, TopicUpdate, TopicOut,
     QuestionCreate, QuestionUpdate, QuestionOut, BulkQuestionCreate,
+    QuestionImportRequest, QuestionImportOut, QuestionImportRow,
     TestCreate, TestUpdate, TestOut
 )
 from app.crud import admin as crud_admin
+from app.models.domain import WorkflowStatusEnum
+from app.services.question_import_service import ImportTargetNotFound, run_question_import
 from app.services.observability import observability_service
 
 router = APIRouter()
@@ -88,14 +91,38 @@ def update_topic(
     return StandardResponse(success=True, message="Topic updated successfully", data=topic)
 
 # --- Questions ---
+def _row_problems(result) -> list[dict]:
+    return [
+        {"row": row.row, "problems": row.problems}
+        for row in result.rows
+        if row.outcome in ("invalid", "duplicate")
+    ]
+
+
+def _import_or_404(db: Session, **kwargs):
+    try:
+        return run_question_import(db, **kwargs)
+    except ImportTargetNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("/questions", response_model=StandardResponse[QuestionOut])
 def create_question(
     question_in: QuestionCreate,
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ) -> Any:
-    question = crud_admin.create_question(db=db, obj_in=question_in)
-    return StandardResponse(success=True, message="Question created successfully", data=question)
+    result = _import_or_404(
+        db,
+        test_id=question_in.test_id,
+        rows=[question_in.model_dump(mode="json")],
+        dry_run=False,
+        reject_duplicates=True,
+    )
+    if not result.saved:
+        raise HTTPException(status_code=422, detail={"code": "QUESTION_REJECTED", "rows": _row_problems(result)})
+    return StandardResponse(success=True, message="Question created successfully", data=result.questions[0])
+
 
 @router.post("/questions/bulk", response_model=StandardResponse[list[QuestionOut]])
 def bulk_create_questions(
@@ -103,8 +130,66 @@ def bulk_create_questions(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ) -> Any:
-    questions = crud_admin.bulk_create_questions(db=db, obj_in=questions_in)
-    return StandardResponse(success=True, message=f"{len(questions)} questions created successfully", data=questions)
+    """Older bulk route: all rows go to the test named on the first row, and
+    questions already in the test are skipped. Prefer ``/questions/import``."""
+    if not questions_in.questions:
+        raise HTTPException(status_code=422, detail="No questions given")
+    test_ids = {question.test_id for question in questions_in.questions}
+    if len(test_ids) != 1:
+        raise HTTPException(status_code=422, detail="Upload questions for one test at a time")
+    result = _import_or_404(
+        db,
+        test_id=test_ids.pop(),
+        rows=[question.model_dump(mode="json") for question in questions_in.questions],
+        dry_run=False,
+    )
+    if any(row.outcome == "invalid" for row in result.rows):
+        raise HTTPException(status_code=422, detail={"code": "QUESTIONS_REJECTED", "rows": _row_problems(result)})
+    return StandardResponse(
+        success=True,
+        message=f"{len(result.questions)} questions created, {result.count('duplicate')} duplicates skipped",
+        data=result.questions,
+    )
+
+
+@router.post("/questions/import", response_model=StandardResponse[QuestionImportOut])
+def import_questions(
+    request: QuestionImportRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin)
+) -> Any:
+    """Check an upload row by row and, when ``dry_run`` is false and no row is
+    invalid, save it in one transaction. Duplicates are skipped, not saved."""
+    result = _import_or_404(
+        db,
+        test_id=request.test_id,
+        rows=request.questions,
+        dry_run=request.dry_run,
+        default_topic_id=request.default_topic_id,
+        default_status=(WorkflowStatusEnum.PUBLISHED if request.publish else WorkflowStatusEnum.DRAFT).value,
+        create_missing_topics=request.create_missing_topics,
+    )
+    summary = QuestionImportOut(
+        dry_run=result.dry_run,
+        saved=result.saved,
+        total=len(result.rows),
+        ready=result.count("ready"),
+        created=result.count("created"),
+        duplicates=result.count("duplicate"),
+        invalid=result.count("invalid"),
+        topics_created=result.topics_created,
+        rows=[QuestionImportRow(**vars(row)) for row in result.rows],
+    )
+    if result.saved:
+        message = f"{summary.created} questions saved"
+    elif result.dry_run:
+        message = f"{summary.ready} questions ready to save"
+    elif summary.invalid:
+        message = "Nothing saved: fix the rows marked invalid"
+    else:
+        message = "Nothing to save: every question is already in this test"
+    return StandardResponse(success=True, message=message, data=summary)
+
 
 @router.get("/questions", response_model=PaginatedResponse[QuestionOut])
 def get_questions(
@@ -173,21 +258,45 @@ def update_test(
     test = crud_admin.update_test(db=db, test_id=test_id, obj_in=test_in)
     return StandardResponse(success=True, message="Test updated successfully", data=test)
 
-@router.post("/recalibrate-batches")
-def recalibrate_batches(
+@router.get("/overview")
+def get_overview(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin)
-):
-    """
-    Priority 3: Batch Calibration.
-    Recalculates batch difficulty and student alignment based on latest performance data.
-    """
-    if current_admin.role != 'ADMIN':
-        raise HTTPException(status_code=403, detail="Admin access required")
-        
-    # Logic to iterate through batches and update their metadata
-    # For now, we simulate a heavy background job
-    return {"status": "CALIBRATION_STARTED", "job_id": "batch-recal-123", "target": "ALL_BATCHES"}
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    """Live counts for the operator dashboard, read from the database."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func
+
+    from app.core.leads.models import MarketingLead
+    from app.models.domain import Attempt, AttemptStatusEnum, RoleEnum, Test
+
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    live_questions = db.query(Question).filter(Question.is_deleted.is_(False))
+    attempts = db.query(Attempt).filter(Attempt.is_deleted.is_(False))
+    data = {
+        "students": db.query(func.count(User.id)).filter(User.role == RoleEnum.STUDENT).scalar() or 0,
+        "tests": db.query(func.count(Test.id)).filter(Test.is_active.is_(True)).scalar() or 0,
+        "questions_published": live_questions.filter(
+            Question.status == WorkflowStatusEnum.PUBLISHED
+        ).count(),
+        "questions_draft": live_questions.filter(
+            Question.status != WorkflowStatusEnum.PUBLISHED
+        ).count(),
+        "attempts_submitted": attempts.filter(
+            Attempt.status == AttemptStatusEnum.SUBMITTED
+        ).count(),
+        "attempts_in_progress": attempts.filter(
+            Attempt.status == AttemptStatusEnum.IN_PROGRESS
+        ).count(),
+        "attempts_last_7_days": attempts.filter(Attempt.start_time >= week_ago).count(),
+        "leads": db.query(func.count(MarketingLead.id)).scalar() or 0,
+        "leads_last_7_days": db.query(func.count(MarketingLead.id))
+        .filter(MarketingLead.created_at >= week_ago)
+        .scalar()
+        or 0,
+    }
+    return StandardResponse(success=True, message="Overview retrieved", data=data)
 
 @router.get("/pipeline-observability")
 def get_pipeline_observability(

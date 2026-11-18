@@ -85,7 +85,9 @@ or `*`). Provided values are merged with the defaults.
 | `ALLOW_MOCK_AUTH` | Accept `MOCK_TOKEN` for local/e2e testing only. Must be `false` in production | `false` |
 | `AI_RATE_LIMIT_PER_MINUTE` / `AI_RATE_LIMIT_PER_DAY` | Per-user caps on AI endpoints | `30` / `500` |
 | `PAYWALL_ENABLED`, `TRIAL_DAYS`, `PAYWALL_LAUNCH_DATE` | Free trial and plan limits (off by default) | `false`, `7`, _unset_ |
-| `GOOGLE_API_KEY` | Google Generative AI (Gemini) key | _unset_ |
+| `GEMINI_API_KEY` | Gemini key for every AI feature (`GOOGLE_API_KEY` is still accepted) | _unset_ |
+| `GEMINI_MODEL` | Gemini model name | `gemini-3.8-flash` |
+| `AI_REQUEST_TIMEOUT_SECONDS` | Longest a single Gemini call may take | `30` |
 | `ADMIN_EMAILS` | Bootstrap admin email(s) | _configured in `config.py`_ |
 | `SCHEMA_CHECK_STRICT` | Strict schema checks | `false` |
 

@@ -106,8 +106,4 @@ export const adminService = {
     const response = await apiClient.post('admin/questions/bulk', { questions });
     return response.data?.data;
   },
-  recalibrateBatches: async () => {
-    const response = await apiClient.post('admin/recalibrate-batches');
-    return response.data;
-  }
 };

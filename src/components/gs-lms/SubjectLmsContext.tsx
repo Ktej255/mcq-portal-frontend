@@ -1,13 +1,14 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import {
-  lmsBaseForSlug,
-  type SupportedGsLmsSubject,
-} from "@/lib/gsLmsRoutePolicy";
+import { examFromPathname } from "@/lib/exams/examRoutes";
+import { lmsBaseForSlug } from "@/lib/gsLmsRoutePolicy";
 
 export type SubjectLmsContextValue = {
-  subject: SupportedGsLmsSubject;
+  // The subject's URL slug. Any GS subject (the study page shows every subject);
+  // which subjects open their LMS pages is decided by the LMS layout.
+  subject: string;
   label: string;
   lmsBase: string;
 };
@@ -19,13 +20,14 @@ export function SubjectLmsProvider({
   label,
   children,
 }: {
-  subject: SupportedGsLmsSubject;
+  subject: string;
   label: string;
   children: ReactNode;
 }) {
+  const exam = examFromPathname(usePathname());
   const value = useMemo<SubjectLmsContextValue>(
-    () => ({ subject, label, lmsBase: lmsBaseForSlug(subject) }),
-    [subject, label],
+    () => ({ subject, label, lmsBase: lmsBaseForSlug(subject, exam) }),
+    [subject, label, exam],
   );
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { buildInternalApiHeaders } from "@/lib/auth/internal-api-headers";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -97,7 +98,8 @@ export function UpscPrelimsReviewCommand() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/upsc/source-archive", { cache: "no-store" })
+    buildInternalApiHeaders()
+      .then((headers) => fetch("/api/upsc/source-archive", { cache: "no-store", headers }))
       .then(async (response) => {
         const payload = (await response.json()) as SourceArchiveIntakeResponse;
         if (!response.ok || !payload.ok || !payload.scanComplete) {

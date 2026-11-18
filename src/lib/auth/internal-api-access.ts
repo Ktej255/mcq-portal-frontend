@@ -1,18 +1,21 @@
 import type { NextRequest } from "next/server";
 
 import { env } from "@/env";
+import { API_VERSION_PATH, stripApiVersion } from "@/services/api/base-url.mjs";
 
 function readBearerToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? "";
   return authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
 }
 
-function backendBaseUrl() {
+export function backendBaseUrl() {
   const configured = (process.env.BACKEND_API_URL || env.NEXT_PUBLIC_API_BASE_URL || "")
     .trim()
     .replace(/\/+$/, "");
 
-  if (/^https?:\/\//i.test(configured)) return configured;
+  // Accept the backend URL with or without a trailing /api/v1, like the
+  // API client and the rewrite do.
+  if (/^https?:\/\//i.test(configured)) return `${stripApiVersion(configured)}${API_VERSION_PATH}`;
 
   // Local development uses a relative public API path; the Next server route
   // talks to the local FastAPI process directly. Production must configure an
