@@ -587,6 +587,7 @@ function ResolvedSubjectShell({
               treeStatus={treeStatus}
               onRetryAvailability={() => setTreeNonce((n) => n + 1)}
               onOpenRead={status === "available" ? setReadTopic : undefined}
+              staticNotes={slug === "geography"}
             />
           </section>
         ) : null}
@@ -613,6 +614,7 @@ function ResolvedSubjectShell({
               treeStatus={treeStatus}
               onRetryAvailability={() => setTreeNonce((n) => n + 1)}
               onOpenRead={status === "available" ? setReadTopic : undefined}
+              staticNotes={slug === "geography"}
             />
           </section>
         ) : null}
@@ -684,6 +686,7 @@ function SectionPanel({
   treeStatus,
   onRetryAvailability,
   onOpenRead,
+  staticNotes = false,
 }: {
   section: SubjectSection;
   authored: boolean;
@@ -691,6 +694,7 @@ function SectionPanel({
   treeStatus: AvailabilityStatus;
   onRetryAvailability?: () => void;
   onOpenRead?: (topic: string) => void;
+  staticNotes?: boolean;
 }) {
   return (
     <div
@@ -713,6 +717,7 @@ function SectionPanel({
         treeStatus={treeStatus}
         onRetryAvailability={onRetryAvailability}
         onOpenRead={onOpenRead}
+        staticNotes={staticNotes}
       />
     </div>
   );
@@ -742,6 +747,7 @@ function TopicList({
   onRetryAvailability,
   testid,
   onOpenRead,
+  staticNotes = false,
 }: {
   topics: readonly string[];
   authored: boolean;
@@ -750,6 +756,8 @@ function TopicList({
   onRetryAvailability?: () => void;
   testid: string;
   onOpenRead?: (topic: string) => void;
+  /** Geography only: link rows to the hand-written notes when the backend has none for them. */
+  staticNotes?: boolean;
 }) {
   const availability: TopicAvailability =
     treeStatus === "loaded"
@@ -809,6 +817,10 @@ function TopicList({
               : null;
           const isAuthored = availability === "unknown" ? false : (liveAuthored ?? authored);
           const canRead = isAuthored && Boolean(onOpenRead);
+          const staticNote =
+            !canRead && staticNotes
+              ? readyTopics.find((note) => normalizeTitle(note.title) === normalizeTitle(topic))
+              : undefined;
 
           return (
             <li
@@ -830,6 +842,15 @@ function TopicList({
                   <BookOpen className="h-3.5 w-3.5" />
                   Read
                 </button>
+              ) : staticNote ? (
+                <Link
+                  href={`${GEOGRAPHY_NOTES_ROUTE}/read/${staticNote.slug}`}
+                  data-testid={`${testid}-static-notes`}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Read notes
+                </Link>
               ) : availability === "unknown" ? (
                 <span
                   data-testid={`${testid}-availability-badge`}
