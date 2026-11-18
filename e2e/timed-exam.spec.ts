@@ -65,6 +65,9 @@ test("a timed test keeps its clock and answers across a reload, then submits its
   // The finished test is listed on Reports from the account, ready to reopen.
   const history = page.getByTestId("reports-mock-test-history");
   await expect(history.getByRole("button", { name: /Showing above|Open report/ }).first()).toBeVisible();
+  // A new student has no evidence in the old subject rooms, so Reports points to Readiness instead.
+  await expect(page.getByTestId("reports-student-gaps-pointer")).toBeVisible();
+  await expect(page.getByTestId("upsc-all-subject-report")).toHaveCount(0);
 
   // Opening the exam again goes to the report; the attempt cannot be reopened.
   await page.goto(examUrl);

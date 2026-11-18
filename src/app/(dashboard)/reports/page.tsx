@@ -226,6 +226,10 @@ export default function ReportsPage() {
       }).sessionReadiness,
     [activeReportDay, activeReportSubject.sessions, activeReportSubject.slug, progressBySubject, questionBankAttemptsBySubject]
   );
+  const showLegacyReport =
+    isAdmin ||
+    allSubjectReport.totals.startedDays > 0 ||
+    Object.values(questionBankAttemptsBySubject).some((attempts) => (attempts?.length ?? 0) > 0);
   const headline = allSubjectReport.totals.recoveryItems > 0
     ? `${allSubjectReport.totals.recoveryItems} recovery item${allSubjectReport.totals.recoveryItems === 1 ? "" : "s"} need attention`
     : allSubjectReport.totals.startedDays > 0
@@ -431,6 +435,10 @@ export default function ReportsPage() {
           onOpen={loadAttemptReport}
         />
 
+        {/* These sections are built from the older subject rooms, which students can no longer open.
+            Students see them only if they have saved evidence there; otherwise they get a pointer to Readiness. */}
+        {showLegacyReport ? (
+        <>
         <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -979,6 +987,10 @@ export default function ReportsPage() {
             </div>
           </div>
         </section>
+        </>
+        ) : (
+          <StudentGapsPointer />
+        )}
       </div>
     </div>
   );
@@ -1152,6 +1164,36 @@ function MockTestHistory({
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+function StudentGapsPointer() {
+  return (
+    <section
+      data-testid="reports-student-gaps-pointer"
+      className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7"
+    >
+      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Learning gaps</p>
+      <h2 className="mt-2 text-2xl font-black tracking-tight">Your gaps are measured topic by topic</h2>
+      <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
+        Each Geography topic you study and practise adds to your readiness. Open Readiness to see which topics are
+        strong, which need revision and what to do next.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          href="/upsc/geography/lms/gaps"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-sm font-black text-white transition hover:bg-[#10291d]"
+        >
+          Open Readiness <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+        <Link
+          href="/upsc/geography/lms/syllabus"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-[#1a3a2a] px-4 text-sm font-black text-[#1a3a2a] transition hover:bg-[#f1ece2]"
+        >
+          Go to the syllabus
+        </Link>
+      </div>
     </section>
   );
 }
