@@ -1,12 +1,42 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { buildPrelims2026SourceArchiveSummary } from "@/lib/upsc/prelims2026SourceArchiveSummary";
+import { hasInternalApiAccess } from "@/lib/auth/internal-api-access";
+import {
+  buildPrelims2026SourceArchiveSummary,
+  buildPrelims2026SourceArchiveSummaryFromScan,
+} from "@/lib/upsc/prelims2026SourceArchiveSummary";
+import {
+  sourceArchiveTrackRules,
+  type SourceArchiveIntakeResponse,
+} from "@/lib/upsc/sourceArchiveIntake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const response = NextResponse.json(await buildPrelims2026SourceArchiveSummary(process.env.UPSC_SOURCE_ARCHIVE_ROOT));
+function buildUnconnectedArchiveScan(): SourceArchiveIntakeResponse {
+  return {
+    ok: false,
+    rootPath: "",
+    rootExists: false,
+    scanComplete: false,
+    scanErrorCount: 0,
+    generatedAt: new Date().toISOString(),
+    totalFiles: 0,
+    totalDirectories: 0,
+    totalBytes: 0,
+    extensions: [],
+    topFolders: [],
+    recentFiles: [],
+    tracks: sourceArchiveTrackRules.map((rule) => ({ ...rule, hitCount: 0, sampleFiles: [] })),
+    message: "Live source archive metrics require operator authentication.",
+  };
+}
+
+export async function GET(request: NextRequest) {
+  const payload = (await hasInternalApiAccess(request))
+    ? await buildPrelims2026SourceArchiveSummary(process.env.UPSC_SOURCE_ARCHIVE_ROOT)
+    : buildPrelims2026SourceArchiveSummaryFromScan(buildUnconnectedArchiveScan());
+  const response = NextResponse.json(payload);
   response.headers.set("Cache-Control", "no-store");
   return response;
 }

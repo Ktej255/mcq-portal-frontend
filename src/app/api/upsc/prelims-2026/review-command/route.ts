@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   if (!(await hasInternalApiAccess(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    unauthorized.headers.set("Cache-Control", "no-store");
+    return unauthorized;
   }
 
   const response = NextResponse.json(await buildPrelims2026ReviewCommand(process.env.UPSC_SOURCE_ARCHIVE_ROOT));

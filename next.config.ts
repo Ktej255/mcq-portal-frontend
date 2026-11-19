@@ -4,6 +4,35 @@ import { buildApiRewriteDestination } from "./src/services/api/base-url.mjs";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  experimental: {
+    // The jest-worker build pool intermittently deadlocks on this Windows
+    // host (main process and worker both idle at "Creating an optimized
+    // production build…"). Building in-process is slower but deterministic.
+    webpackBuildWorker: false,
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
+        ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source:
+          "/upsc/:subject(disaster-management|economy|environment|history|internal-security-society|polity-governance|science-tech)/:room(watch|talk|track|retro|revisit|mcq-readiness|lab)",
+        destination: "/upsc/:subject/lms",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     const configuredBackendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
     const isLocalDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";

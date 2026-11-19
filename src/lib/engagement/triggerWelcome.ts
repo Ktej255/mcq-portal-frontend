@@ -32,18 +32,18 @@ export async function triggerWelcomeEngagement(
   data: WelcomeEngagementData
 ): Promise<void> {
   try {
-    // apiClient adds the learner's token; the backend only emails the
-    // signed-in account's own address.
-    const response = await apiClient.post<WelcomeEngagementResponse>("engagement/welcome", {
-      name: data.name,
-      email: data.email,
-      phone: data.phone || null,
-      target_year: data.targetYear,
-      first_topic_url: data.firstTopicUrl,
-      first_topic_title: extractTopicTitle(data.firstTopicUrl),
-    });
+    const { data: result } = await apiClient.post<WelcomeEngagementResponse>(
+      "engagement/welcome",
+      {
+        name: data.name,
+        email: data.email,
+        phone: data.phone || null,
+        target_year: data.targetYear,
+        first_topic_url: data.firstTopicUrl,
+        first_topic_title: extractTopicTitle(data.firstTopicUrl),
+      }
+    );
 
-    const result = response.data;
     console.info(`[engagement] Welcome ${result.status}`, {
       email: result.email_queued,
       whatsapp: result.whatsapp_queued,
