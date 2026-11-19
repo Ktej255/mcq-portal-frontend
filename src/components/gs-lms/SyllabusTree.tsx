@@ -85,7 +85,7 @@ export function SyllabusTree({ tree, onLeafClick, reviewTestHref }: SyllabusTree
   const isAllExpanded = allParentIds.length > 0 && expandedIds.size >= allParentIds.length;
 
   return (
-    <div className="bg-[#fffdf8] rounded-xl border border-[#dcd5c7] p-2.5 sm:p-3.5 shadow-2xs space-y-2" role="tree">
+    <div className="bg-[#fffdf8] rounded-xl border border-[#dcd5c7] p-2.5 sm:p-3.5 shadow-2xs space-y-2">
       {/* Quick Tree Controls */}
       <div className="flex items-center justify-between pb-2 border-b border-[#dcd5c7]/60 px-1">
         <span className="text-[11px] sm:text-xs font-semibold text-[#13251d]/60">
@@ -108,7 +108,9 @@ export function SyllabusTree({ tree, onLeafClick, reviewTestHref }: SyllabusTree
         </div>
       ) : (
         <div className="space-y-0.5">
-          {renderNodes(tree, 0)}
+          <div role="tree" aria-label="Syllabus topic tree">
+        {renderNodes(tree, 0)}
+      </div>
         </div>
       )}
     </div>

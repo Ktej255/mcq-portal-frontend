@@ -25,12 +25,13 @@ export default function TestsClient() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f7f4ee] text-[#13251d]">
+      <main className="flex h-screen items-center justify-center bg-[#f7f4ee] text-[#13251d]">
+        <h1 className="sr-only">UPSC Tests &amp; Daily Practice</h1>
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1d9e75]"></div>
           <p className="font-semibold animate-pulse">Loading tests portal...</p>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -112,46 +113,50 @@ function StudentTestsView() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+    <div className="text-[#13251d]">
+      <div className="mx-auto max-w-6xl space-y-5">
+        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm sm:p-6 md:p-7">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">Practice</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">UPSC Practice and MCQs</h1>
+          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl md:text-4xl">UPSC Practice and MCQs</h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#5d675f]">
             Start an authoritative test attempt or continue with topic-linked Geography LMS practice.
           </p>
         </section>
 
         {error && (
-          <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
             {error}
           </div>
         )}
         {testsLoadError && (
-          <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
             <span>{testsLoadError}</span>
             <button
               type="button"
               onClick={retryLoadTests}
               disabled={loading}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-red-300 bg-white px-4 py-2 text-xs font-black transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Retrying…" : "Retry"}
             </button>
           </div>
         )}
 
-        <section className="mt-5 rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm md:p-7">
+        <section className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 shadow-sm sm:p-6 md:p-7">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black tracking-tight">Available tests</h2>
               <p className="mt-1 text-sm font-medium text-[#657066]">Published questions and attempt availability come from the server.</p>
             </div>
-            <ClipboardCheck className="h-5 w-5 text-[#085041]" />
+            <ClipboardCheck className="h-5 w-5 shrink-0 text-[#085041]" />
           </div>
 
           {loading ? (
             <p className="mt-6 text-sm font-semibold text-[#657066]">Loading available tests…</p>
+          ) : testsLoadError ? (
+            <p className="mt-6 text-sm font-semibold text-red-800">
+              Unable to load published tests right now. Use Retry above to try again.
+            </p>
           ) : tests.length === 0 ? (
             <p className="mt-6 text-sm font-semibold text-[#657066]">No published tests are available yet.</p>
           ) : (
@@ -160,20 +165,20 @@ function StudentTestsView() {
                 const canStart = test.canStart !== false && Boolean(test.totalQuestions);
                 const isStarting = startingTestId === test.id;
                 return (
-                  <article key={test.id} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-5">
+                  <article key={test.id} className="rounded-lg border border-[#dcd5c7] bg-[#f7f4ee] p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-black">{test.title}</h3>
                         <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[#1d9e75]">{test.subject}</p>
                       </div>
-                      <span className="text-xs font-bold text-[#657066]">{test.totalQuestions ?? 0} questions</span>
+                      <span className="shrink-0 text-xs font-bold text-[#657066]">{test.totalQuestions ?? 0} questions</span>
                     </div>
                     <p className="mt-3 text-sm font-medium leading-6 text-[#657066]">{test.description || "Server-published practice test."}</p>
                     <button
                       type="button"
                       disabled={!canStart || isStarting}
                       onClick={() => startTest(test)}
-                      className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mt-4 inline-flex min-h-11 w-full sm:w-auto items-center justify-center rounded-md bg-[#1a3a2a] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#10291d] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isStarting ? "Starting…" : canStart ? "Start test" : "Unavailable"}
                       {canStart && !isStarting ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}
@@ -185,18 +190,26 @@ function StudentTestsView() {
           )}
         </section>
 
-        <section className="mt-5 grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-5 shadow-sm">
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 sm:p-5 shadow-sm">
             <ClipboardCheck className="h-5 w-5 text-[#085041]" />
             <h2 className="mt-4 text-xl font-black tracking-tight">Geography LMS Practice</h2>
             <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">Complete daily topic checks and practice sets sequentially on the LMS.</p>
-            <Link href="/upsc/geography/lms/practice" className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#1a3a2a] px-4 text-xs font-black text-white transition hover:bg-[#10291d]">
+            <Link href="/upsc/geography/lms/practice" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#10291d]">
               Open LMS Practice <ArrowRight className="ml-2 h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="rounded-lg border border-[#dcd5c7] bg-[#fffdf8] p-4 sm:p-5 shadow-sm">
+            <ClipboardCheck className="h-5 w-5 text-[#085041]" />
+            <h2 className="mt-4 text-xl font-black tracking-tight">Question Bank</h2>
+            <p className="mt-2 text-sm font-medium leading-6 text-[#657066]">Build custom MCQ practice sets from your accumulated learning evidence.</p>
+            <Link href="/upsc/question-bank" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md bg-[#1a3a2a] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#10291d]">
+              Open Question Bank <ArrowRight className="ml-2 h-3.5 w-3.5" />
             </Link>
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

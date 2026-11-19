@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeIndianRupee,
@@ -36,36 +36,55 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [reloadKey, setReloadKey] = useState(0);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [subRes, ordersRes] = await Promise.all([
+        paymentService.getSubscription(),
+        paymentService.getOrders(1),
+      ]);
+      setSubscription(subRes);
+      setOrders(ordersRes);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load billing data.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchData() {
+    let cancelled = false;
+    async function init() {
       try {
         const [subRes, ordersRes] = await Promise.all([
           paymentService.getSubscription(),
           paymentService.getOrders(1),
         ]);
-        setSubscription(subRes);
-        setOrders(ordersRes);
+        if (!cancelled) {
+          setSubscription(subRes);
+          setOrders(ordersRes);
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load billing data.");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load billing data.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
-    void fetchData();
-  }, [reloadKey]);
-
-  const retryFetch = () => {
-    setLoading(true);
-    setError(null);
-    setReloadKey((key) => key + 1);
-  };
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-        <div className="mx-auto flex max-w-4xl items-center justify-center px-4 py-20 sm:px-6 md:px-8">
+        <div className="mx-auto flex max-w-4xl items-center justify-center px-0 py-20 sm:px-6 md:px-8">
           <Loader2 className="h-6 w-6 animate-spin text-[#1d9e75]" />
           <span className="ml-3 text-sm font-black">Loading billing…</span>
         </div>
@@ -76,7 +95,7 @@ export default function BillingPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:px-8">
+        <div className="mx-auto max-w-4xl px-0 py-10 sm:px-6 md:px-8">
           <div
             data-testid="billing-fetch-error"
             role="alert"
@@ -88,7 +107,9 @@ export default function BillingPage() {
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={retryFetch}
+                onClick={() => {
+                  void fetchData();
+                }}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1a3a2a] px-5 text-sm font-black text-white hover:bg-[#10291d] transition"
               >
                 Retry
@@ -110,7 +131,7 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#13251d]">
-      <div className="mx-auto flex max-w-4xl flex-col gap-5 px-4 py-5 sm:px-6 md:px-8">
+      <div className="mx-auto flex max-w-4xl flex-col gap-5 px-0 py-5 sm:px-6 md:px-8">
         {/* Header */}
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
@@ -228,13 +249,12 @@ export default function BillingPage() {
                       {money(order.amount)}
                     </span>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
-                        order.status === "paid"
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${order.status === "paid"
                           ? "bg-[#e7f5ee] text-[#085041]"
                           : order.status === "failed"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-[#f7f4ee] text-[#746f66]"
-                      }`}
+                            ? "bg-red-50 text-red-700"
+                            : "bg-[#f7f4ee] text-[#746f66]"
+                        }`}
                     >
                       {order.status}
                     </span>

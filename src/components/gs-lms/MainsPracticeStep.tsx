@@ -43,19 +43,22 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
     }
 
     const draftKey = `gs-lms:mains-draft:${subject}:${nodeId}`;
+    let parsedDraft: { intro?: string; body?: string; conclusion?: string } | null = null;
     try {
       const rawDraft = window.sessionStorage.getItem(draftKey);
       if (rawDraft) {
-        const draft = JSON.parse(rawDraft);
-        queueMicrotask(() => {
-          if (!active) return;
-          if (draft.intro) setIntroduction(draft.intro);
-          if (draft.body) setBody(draft.body);
-          if (draft.conclusion) setConclusion(draft.conclusion);
-        });
+        parsedDraft = JSON.parse(rawDraft);
       }
     } catch {
       // Storage may be unavailable
+    }
+    if (parsedDraft) {
+      queueMicrotask(() => {
+        if (!active) return;
+        if (parsedDraft.intro) setIntroduction(parsedDraft.intro);
+        if (parsedDraft.body) setBody(parsedDraft.body);
+        if (parsedDraft.conclusion) setConclusion(parsedDraft.conclusion);
+      });
     }
 
     if (savedJobId) {
@@ -85,11 +88,39 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
 
   const activeQuestion = questions[activeQIdx] || null;
 
-  // Auto-save draft to sessionStorage
-  const draftKey = `gs-lms:mains-draft:${subject}:${nodeId}`;
+  // Auto-save draft to sessionStorage (scoped by question)
+  const draftKey = `gs-lms:mains-draft:${subject}:${nodeId}:${activeQuestion?.question_id ?? 'default'}`;
+
+  // Restore draft when active question changes
+  useEffect(() => {
+    if (!activeQuestion) return;
+    let active = true;
+    let parsedDraft: { intro?: string; body?: string; conclusion?: string } | null = null;
+    try {
+      const qDraftKey = `gs-lms:mains-draft:${subject}:${nodeId}:${activeQuestion.question_id}`;
+      const rawDraft = window.sessionStorage.getItem(qDraftKey);
+      if (rawDraft) {
+        parsedDraft = JSON.parse(rawDraft);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    if (parsedDraft) {
+      queueMicrotask(() => {
+        if (!active) return;
+        setIntroduction(parsedDraft.intro || '');
+        setBody(parsedDraft.body || '');
+        setConclusion(parsedDraft.conclusion || '');
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [activeQIdx, activeQuestion, nodeId, subject]);
+
   useEffect(() => {
     if (mode === 'result') {
-      try { window.sessionStorage.removeItem(draftKey); } catch { /* ignore */ }
+      // Retain draft in sessionStorage so student can rewrite integrating insights
       return;
     }
     if (introduction || body || conclusion) {
@@ -188,7 +219,27 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
   if (mode === 'error') {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="text-sm text-red-800">{error}</p>
+        <p className="text-sm font-bold text-red-800">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setMode('loading');
+            funnelService
+              .getMainsQuestions(subject, nodeId)
+              .then((qs) => {
+                setQuestions(qs);
+                setMode('writing');
+              })
+              .catch(() => {
+                setError('Failed to load Mains questions');
+                setMode('error');
+              });
+          }}
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1a3a2a] px-4 py-2 text-xs sm:text-sm font-bold text-white transition hover:bg-[#10291d]"
+        >
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry Loading Questions
+        </button>
       </div>
     );
   }
@@ -216,9 +267,18 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
                 </div>
               </div>
               {Object.entries(report.sections).map(([key, section]) => (
-                <div key={key} className="border-t border-[#dcd5c7] pt-2">
-                  <p className="text-xs font-black text-[#1a3a2a] capitalize">{key}</p>
-                  <p className="text-xs text-[#49675e] mt-0.5">{section.feedback}</p>
+                <div key={key} className="border-t border-[#dcd5c7] pt-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black text-[#1a3a2a] capitalize">
+                      {key.replace(/_/g, ' ')}
+                    </p>
+                    {typeof section.score === 'number' && (
+                      <span className="rounded-md bg-[#e7f5ee] px-2 py-0.5 text-[11px] font-bold text-[#085041]">
+                        {section.score}/10
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#49675e] mt-1 leading-relaxed">{section.feedback}</p>
                 </div>
               ))}
               {report.incomplete_sections.length > 0 && (
@@ -281,6 +341,7 @@ export function MainsPracticeStep({ nodeId, subject = "geography", onComplete }:
             onClick={() => {
               try {
                 window.sessionStorage.removeItem(jobStorageKey);
+                window.sessionStorage.removeItem(draftKey);
               } catch {
                 // Ignore unavailable browser storage.
               }
