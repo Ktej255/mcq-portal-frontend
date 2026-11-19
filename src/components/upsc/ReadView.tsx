@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
+  CheckCircle2,
   Languages,
   Lightbulb,
   Loader2,
@@ -89,6 +90,10 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
   const [treeState, setTreeState] = useState<LoadState>("idle");
   const [contentState, setContentState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [readProgressState, setReadProgressState] = useState<
+    "idle" | "saving" | "recorded" | "error"
+  >("idle");
+  const [readProgressError, setReadProgressError] = useState<string | null>(null);
   // Bumped by "Retry" so a failed request re-runs; both effects depend on it.
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -149,6 +154,8 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
       if (cancelled) return;
       setContentState("loading");
       setError(null);
+      setReadProgressState("idle");
+      setReadProgressError(null);
       optionalService
         .getTopicContent(slug, activeNodeId)
         .then((data) => {
@@ -172,14 +179,29 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
 
   const overview = useMemo(() => extractOverview(node?.content ?? null), [node]);
 
+  const handleMarkTopicRead = async () => {
+    if (!node || readProgressState === "saving") return;
+    setReadProgressState("saving");
+    setReadProgressError(null);
+    try {
+      await optionalService.recordProgressEvent(slug, {
+        syllabus_node_id: node.node_id,
+        event_type: "READ_COMPLETE",
+      });
+      setReadProgressState("recorded");
+    } catch (err: unknown) {
+      setReadProgressError(messageFromError(err));
+      setReadProgressState("error");
+    }
+  };
+
   return (
-    <main
+    <div
       data-testid="read-view"
       data-slug={slug}
-      className="min-h-screen text-[#13251d]"
-      style={{ backgroundColor: PALETTE.bg }}
+      className="space-y-5 text-[#13251d]"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 md:px-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
         {/* Header */}
         <section
           className="rounded-2xl border p-5 shadow-sm md:p-6"
@@ -190,7 +212,7 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
               type="button"
               onClick={onClose}
               data-testid="read-view-back"
-              className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
+              className="inline-flex min-h-11 items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Back to subject
             </button>
@@ -221,7 +243,7 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
                 onClick={() => setActiveNodeId(t.node_id)}
                 data-testid="read-view-topic-chip"
                 aria-pressed={t.node_id === activeNodeId}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] transition-all ${
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] transition-all ${
                   t.node_id === activeNodeId
                     ? "border-[#1a3a2a] bg-[#1a3a2a] text-white"
                     : "border-[#dcd5c7] bg-[#fffdf8] text-[#31443a] hover:border-[#1d9e75]"
@@ -258,7 +280,59 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
 
         {contentState === "loaded" && node ? (
           node.authored && node.content ? (
-            <TopicContent node={node} overview={overview} />
+            <>
+              <TopicContent node={node} overview={overview} />
+              <section
+                className="flex flex-col gap-3 rounded-2xl border p-5 shadow-sm md:p-6"
+                style={{ borderColor: PALETTE.border, backgroundColor: PALETTE.card }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1d9e75]">
+                      Syllabus coverage
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[#31443a]">
+                      Record this topic as read to update your weighted syllabus coverage.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="read-view-mark-complete"
+                    onClick={() => void handleMarkTopicRead()}
+                    disabled={readProgressState === "saving" || readProgressState === "recorded"}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black uppercase tracking-[0.1em] transition-colors ${
+                      readProgressState === "recorded"
+                        ? "border-[#1d9e75] bg-[#e7f5ee] text-[#085041]"
+                        : "border-[#1a3a2a] bg-[#1a3a2a] text-white hover:bg-[#10291d] disabled:cursor-wait disabled:opacity-60"
+                    }`}
+                  >
+                    {readProgressState === "saving" ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Recording...
+                      </>
+                    ) : readProgressState === "recorded" ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" /> Marked as read · Syllabus coverage updated
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" /> Mark Topic Read · Update Coverage
+                      </>
+                    )}
+                  </button>
+                </div>
+                {readProgressState === "error" && readProgressError ? (
+                  <div
+                    role="alert"
+                    data-testid="read-view-progress-error"
+                    className="flex items-start gap-2 rounded-xl border border-[#e6c2c2] bg-[#fbf0ee] px-3.5 py-2.5 text-xs font-semibold text-[#8a4b52]"
+                  >
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{readProgressError}</span>
+                  </div>
+                ) : null}
+              </section>
+            </>
           ) : (
             <NotYetAuthored title={node.title} testid="read-view-not-authored" />
           )
@@ -268,7 +342,7 @@ export function ReadView({ slug, topicTitle, onClose }: ReadViewProps) {
           <NotYetAuthored title={topicTitle ?? slug} testid="read-view-not-authored" />
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -538,6 +612,7 @@ function LoadingPanel() {
 function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div
+      role="alert"
       data-testid="read-view-error"
       className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-[#e6c2c2] bg-[#fbf0ee] px-4 py-5 text-sm font-semibold text-[#8a4b52]"
     >
@@ -549,7 +624,7 @@ function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => voi
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-xl border border-[#d29b9b] bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wider text-[#8a4b52] hover:bg-[#faf4f4]"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d29b9b] bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-[#8a4b52] hover:bg-[#faf4f4]"
         >
           Retry
         </button>
