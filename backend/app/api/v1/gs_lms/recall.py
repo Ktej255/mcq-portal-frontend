@@ -30,6 +30,7 @@ from app.core.gs_lms.recall_scoring import (
     extract_key_concepts,
     score_recall,
 )
+from app.core.gs_lms.revisit import schedule_adaptive_revisit
 from app.core.gs_lms.stt_provider import get_stt_provider, STT_CONFIDENCE_THRESHOLD
 from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
@@ -145,6 +146,8 @@ def submit_recall_text(
         attempt_number=attempt_count + 1,
     )
     db.add(recall_attempt)
+    if result.recall_score < 0.8:
+        schedule_adaptive_revisit(db, current_user.id, node_id, result.recall_score)
     db.commit()
 
     return RecallCheckOut(
@@ -287,6 +290,8 @@ async def submit_recall_audio(
         attempt_number=attempt_count + 1,
     )
     db.add(recall_attempt)
+    if result.recall_score < 0.8:
+        schedule_adaptive_revisit(db, current_user.id, node_id, result.recall_score)
     db.commit()
 
     return RecallCheckOut(

@@ -27,6 +27,9 @@ import type {
   EvaluationReportOut,
 } from "@/services/api/optionalService";
 
+// Lowest overall score (out of 100) that counts as a practice pass.
+const PRACTICE_PASS_MIN_SCORE = 40;
+
 /**
  * AnswerWorkspace — the student-facing answer-writing surface for an optional
  * subject (spec task 9.1, Phase 1E, R8.1).
@@ -550,6 +553,25 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
         pyq_id: prompt.pyqId ?? null,
       });
       setEvaluation(result);
+      // Only a passing answer counts toward coverage: the first progress event
+      // for a topic marks it covered for good, so a weak attempt must not.
+      const overallScore = result.report?.overall_score;
+      if (
+        !result.review_required &&
+        prompt.topicNodeId != null &&
+        typeof overallScore === "number" &&
+        overallScore >= PRACTICE_PASS_MIN_SCORE
+      ) {
+        try {
+          await optionalService.recordProgressEvent(slug, {
+            syllabus_node_id: prompt.topicNodeId,
+            event_type: "PRACTICE_PASS",
+            value: overallScore,
+          });
+        } catch {
+          /* best-effort coverage sync after evaluation is persisted */
+        }
+      }
     } catch (error: unknown) {
       const unavailable =
         error && typeof error === "object" && "response" in error &&
@@ -568,16 +590,15 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
     prompt.questionText ?? prompt.topicTitle ?? "Compose your answer";
 
   return (
-    <main
+    <div
       data-testid="answer-workspace"
       data-slug={slug}
       data-pyq-id={prompt.pyqId ?? ""}
       data-topic-node-id={prompt.topicNodeId ?? ""}
       data-total-words={totalWords}
-      className="min-h-screen text-[#13251d]"
-      style={{ backgroundColor: PALETTE.bg }}
+      className="space-y-5 text-[#13251d]"
     >
-      <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-5 md:px-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-5">
         {/* Header + prompt */}
         <section
           className="rounded-2xl border p-5 shadow-sm md:p-6"
@@ -588,7 +609,7 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
               type="button"
               onClick={onClose}
               data-testid="answer-workspace-back"
-              className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
+              className="inline-flex min-h-11 items-center gap-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#2e7d4f] hover:text-[#1a3a2a]"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Back
             </button>
@@ -756,7 +777,7 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
             onClick={handleSubmit}
             disabled={!hasContent || evaluating}
             aria-busy={evaluating}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2.5 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[#1d9e75] bg-[#e7f5ee] px-4 py-2.5 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {evaluating ? (
               <>
@@ -804,7 +825,7 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
             when a low-confidence input was not auto-graded (Property 6 / P7). */}
         {evaluation ? <EvaluationResult result={evaluation} /> : null}
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -901,7 +922,7 @@ function SegmentEditor({
             aria-label={micLabel}
             aria-pressed={isRecording}
             title={micLabel}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-40 ${
               isRecording
                 ? "border-[#c0392b] bg-[#fdecea] text-[#a5281b]"
                 : "border-[#1d9e75] bg-[#e7f5ee] text-[#085041] hover:bg-[#1d9e75] hover:text-white"
@@ -944,7 +965,7 @@ function SegmentEditor({
             disabled={ocrDisabled || isExtracting}
             aria-label={uploadLabel}
             title={uploadLabel}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-2.5 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isExtracting ? (
               <>
@@ -1005,7 +1026,7 @@ function SegmentEditor({
         rows={meta.rows}
         placeholder={meta.placeholder}
         aria-describedby={`${helperId} ${countId}`}
-        className="mt-3 w-full resize-y rounded-xl border border-[#dcd5c7] bg-[#faf6ee] px-3.5 py-3 text-sm font-medium leading-7 text-[#13251d] placeholder:text-[#a99f86] focus:border-[#1d9e75] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+        className="mt-3 w-full resize-y rounded-xl border border-[#dcd5c7] bg-[#faf6ee] px-3.5 py-3 text-base sm:text-sm font-medium leading-7 text-[#13251d] placeholder:text-[#a99f86] focus:border-[#1d9e75] focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
       />
 
       {/* Low-confidence review/correct step (R8.4 / R20.3). The transcript is
@@ -1054,14 +1075,14 @@ function SegmentEditor({
             value={review.text}
             onChange={(e) => onReviewChange(e.target.value)}
             rows={3}
-            className="mt-2 w-full resize-y rounded-lg border border-[#e7c79a] bg-white px-3 py-2 text-sm font-medium leading-6 text-[#13251d] focus:border-[#b9831f] focus:outline-none focus:ring-2 focus:ring-[#b9831f]/30"
+            className="mt-2 w-full resize-y rounded-lg border border-[#e7c79a] bg-white px-3 py-2 text-base sm:text-sm font-medium leading-6 text-[#13251d] focus:border-[#b9831f] focus:outline-none focus:ring-2 focus:ring-[#b9831f]/30"
           />
           <div className="mt-3 flex items-center gap-2">
             <button
               type="button"
               data-testid={`${meta.testid}-review-accept`}
               onClick={onAcceptReview}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#1d9e75] bg-[#e7f5ee] px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#085041] transition-colors hover:bg-[#1d9e75] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#1d9e75]/40"
             >
               <Check className="h-3.5 w-3.5" aria-hidden="true" /> Use this text
             </button>
@@ -1069,7 +1090,7 @@ function SegmentEditor({
               type="button"
               data-testid={`${meta.testid}-review-discard`}
               onClick={onDiscardReview}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#dcd5c7] bg-[#faf6ee] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[#7a5a1e] transition-colors hover:bg-[#f0e6d2] focus:outline-none focus:ring-2 focus:ring-[#b9831f]/30"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#dcd5c7] bg-[#faf6ee] px-3.5 py-2 text-xs font-black uppercase tracking-[0.1em] text-[#7a5a1e] transition-colors hover:bg-[#f0e6d2] focus:outline-none focus:ring-2 focus:ring-[#b9831f]/30"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" /> Discard
             </button>

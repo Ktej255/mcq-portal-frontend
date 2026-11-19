@@ -13,7 +13,8 @@
     "verify:auth-role": "node scripts/validate-auth-role-hardening.mjs",
     "verify:optional-honest-failure": "node scripts/validate-optional-honest-failure.mjs",
     "verify:upsc-wiring": "node scripts/validate-upsc-feature-wiring.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:srtr-stabilization": "node scripts/validate-srtr-stabilization.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

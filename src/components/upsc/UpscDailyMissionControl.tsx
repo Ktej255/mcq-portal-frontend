@@ -2063,6 +2063,8 @@ export function UpscDailyMissionControl() {
                       { label: "Mains Uploader", href: "/upsc/answer-upload", gated: true },
                       // The timed mock-test lobby had no link anywhere.
                       { label: "Timed Mock Test", href: "/simulation/lobby", gated: false },
+                      { label: "Unified Revision OS", href: "/revision", gated: false },
+                      { label: "Overconfidence Trap Drill", href: "/exam/revision?mode=high_confidence_mistake", gated: false },
                     ]
                 ).map((item) => {
                   const isLocked = item.gated && profile && !profile.inductionCompleted;

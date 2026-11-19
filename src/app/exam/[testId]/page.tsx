@@ -70,12 +70,43 @@ function ExamInterface() {
         let attemptState: AttemptState | null = null;
 
         if (testId === 'revision') {
-          // Priority 2: Revision Drill Mode
-          qData = await revisionService.getRapidDrill() as unknown as QuestionData[];
+          // Priority 2: Revision Drill Mode — parse ?mode= safely on client
+          const rawMode =
+            typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('mode')
+              : null;
+          const allowedModes = new Set([
+            'recovery',
+            'mistakes',
+            'weak_topic',
+            'high_confidence_mistake',
+          ]);
+          const drillMode =
+            rawMode && allowedModes.has(rawMode) ? rawMode : 'recovery';
+          const drillMeta: Record<string, { title: string; description: string }> = {
+            high_confidence_mistake: {
+              title: 'Overconfidence Trap Drill',
+              description: 'Targeted drill on questions missed with high confidence.',
+            },
+            mistakes: {
+              title: 'Mistake Recovery Drill',
+              description: 'Focused reinforcement of recent exam mistakes.',
+            },
+            weak_topic: {
+              title: 'Weak Topic Drill',
+              description: 'Targeted reinforcement of priority weak topics.',
+            },
+            recovery: {
+              title: 'Rapid Recovery Drill',
+              description: 'Focused reinforcement of recent mistakes.',
+            },
+          };
+          const selectedMeta = drillMeta[drillMode] ?? drillMeta.recovery;
+          qData = await revisionService.getRapidDrill(drillMode) as unknown as QuestionData[];
           tData = {
             id: 'revision',
-            title: 'Rapid Recovery Drill',
-            description: 'Focused reinforcement of recent mistakes.',
+            title: selectedMeta.title,
+            description: selectedMeta.description,
             durationMinutes: 10,
             subject: 'General',
             correct_marks: 1.0,
@@ -110,9 +141,11 @@ function ExamInterface() {
         }
 
         const store = useExamStore.getState();
-        const questionIds = qData.map(q => q.id);
+        const questionIds = qData.map(q => String(q.id));
         const storeQuestionIds = Object.keys(store.answers);
-        const isStale = questionIds.some(id => !storeQuestionIds.includes(id));
+        const isStale =
+          questionIds.some(id => !storeQuestionIds.includes(id)) ||
+          (testId === 'revision' && storeQuestionIds.length !== questionIds.length);
         const activeAttemptId = attemptId || null;
 
         if (store.testId !== testId || store.attemptId !== activeAttemptId || isStale) {
@@ -255,7 +288,9 @@ function ExamInterface() {
       if (testId === 'revision') {
         const payload = questions.map(q => {
           const ans = answers[q.id];
-          const isCorrect = ans?.selectedOptionId === q.correct_option;
+          const sel = normalizeOptionId(ans?.selectedOptionId);
+          const exp = normalizeOptionId(q.correct_option);
+          const isCorrect = Boolean(sel && exp && sel === exp);
           return {
             question_id: parseInt(q.id, 10),
             is_correct: isCorrect

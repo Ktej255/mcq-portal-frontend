@@ -61,37 +61,12 @@ function grepSrc(pattern) {
 }
 
 /**
- * Components that are imported by nothing outside their own cluster are the
- * retired legacy-room cluster. They are pending a founder dead-code decision,
- * so their internal links are not a live defect and are excluded here.
+ * The retired legacy-room cluster (Subject*Room, *SubjectRoutes, ZenDashboard,
+ * UpscCurrentAffairsBridge, subjectGuidedStudy) has been deleted.
+ * Both arrays are empty so Check 1 enforces zero retired day-room hrefs across all of src/.
  */
-const RETIRED_CLUSTER = [
-  'components/upsc/SubjectCommandRoom.tsx',
-  'components/upsc/SubjectLabRoom.tsx',
-  'components/upsc/SubjectLoopActions.tsx',
-  'components/upsc/SubjectMcqReadinessRoom.tsx',
-  'components/upsc/SubjectRetroRoom.tsx',
-  'components/upsc/SubjectRevisitRoom.tsx',
-  'components/upsc/SubjectTalkRoom.tsx',
-  'components/upsc/SubjectTrackRoom.tsx',
-  'components/upsc/SubjectWatchRoom.tsx',
-  'components/dashboard/ZenDashboard.tsx',
-  'components/upsc/UpscCurrentAffairsBridge.tsx',
-];
-const RETIRED_ROUTES = [
-  ...RETIRED_CLUSTER,
-  // Guided-study hrefs consumed only by the legacy rooms above.
-  'lib/upsc/subjectGuidedStudy.ts',
-  ...[
-    'EnvironmentSubjectRoutes',
-    'EconomySubjectRoutes',
-    'HistorySubjectRoutes',
-    'DisasterManagementSubjectRoutes',
-    'InternalSecuritySocietySubjectRoutes',
-    'PolityGovernanceSubjectRoutes',
-    'ScienceTechSubjectRoutes',
-  ].map((name) => `components/upsc/${name}.tsx`),
-];
+const RETIRED_CLUSTER = [];
+const RETIRED_ROUTES = [...RETIRED_CLUSTER];
 
 function isRetired(line) {
   return RETIRED_ROUTES.some((file) => line.includes(file));
@@ -103,7 +78,7 @@ const LEGACY_ROOM =
 check('no live surface links to a retired day room', () => {
   const hits = grepSrc(LEGACY_ROOM).filter((line) => !isRetired(line));
   if (hits.length) throw new Error(`${hits.length} link(s) remain:\n  ${hits.join('\n  ')}`);
-  return 'retired day-room hrefs only remain inside the unreferenced legacy cluster';
+  return 'zero retired day-room hrefs remain across all of src/';
 });
 
 check('the planner routes rooms onto real LMS tabs', () => {

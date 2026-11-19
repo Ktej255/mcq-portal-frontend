@@ -34,7 +34,7 @@ export default function ContactPage() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#e7f5ee] text-[#085041]">
                   <Icon className="h-5 w-5" />
                 </span>
-                <h3 className="mt-4 text-base font-black text-[#13251d]">{c.title}</h3>
+                <h2 className="mt-4 text-base font-black text-[#13251d]">{c.title}</h2>
                 <p className="mt-1.5 text-sm font-semibold leading-6 text-[#536259]">{c.detail}</p>
               </>
             );

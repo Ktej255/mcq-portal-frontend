@@ -15,9 +15,15 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.gs_lms.spaced_repetition import (
+    SHORT_INTERVAL_MAX,
+    compute_initial_interval,
+    compute_next_interval,
+)
 from app.core.gs_lms.student_models import GsLmsRevisitSchedule
 
 
@@ -84,3 +90,100 @@ def schedule_revisits(
             db.rollback()
 
     return created
+
+
+def schedule_adaptive_revisit(
+    db: Session,
+    student_id: int,
+    syllabus_node_id: int,
+    recall_score: float,
+    previous_score: float | None = None,
+) -> GsLmsRevisitSchedule | None:
+    """Create or update an adaptive spaced-repetition revisit for a topic.
+
+    Checks table presence via ``sa_inspect(db.get_bind())`` first so unit tests
+    using partial SQLite schemas never fail.
+
+    Interval rules:
+    - If an existing ``"adaptive"`` row exists and ``previous_score is not None``,
+      uses ``compute_next_interval(current_interval, recall_score, previous_score)``.
+    - Otherwise uses ``compute_initial_interval`` mapped to adaptive recall buckets:
+      ``+1d`` when ``recall_score < 0.6``, ``+3d`` when ``0.6 <= recall_score < 0.8``,
+      and ``compute_initial_interval(recall_score)`` (5–7d) when ``recall_score >= 0.8``.
+    """
+    try:
+        bind = db.get_bind()
+        if "gs_lms_revisit_schedule" not in sa_inspect(bind).get_table_names():
+            return None
+    except Exception:
+        return None
+
+    today = date.today()
+    clamped_score = max(0.0, min(1.0, float(recall_score)))
+
+    existing = (
+        db.query(GsLmsRevisitSchedule)
+        .filter(
+            GsLmsRevisitSchedule.student_id == student_id,
+            GsLmsRevisitSchedule.syllabus_node_id == syllabus_node_id,
+            GsLmsRevisitSchedule.revisit_type == "adaptive",
+        )
+        .one_or_none()
+    )
+
+    if existing is not None and previous_score is not None:
+        delta_from_today = (existing.due_date - today).days if existing.due_date else 0
+        if delta_from_today >= 1:
+            current_interval = delta_from_today
+        elif existing.created_at is not None and existing.due_date is not None:
+            created_d = (
+                existing.created_at.date()
+                if hasattr(existing.created_at, "date")
+                else today
+            )
+            current_interval = max(1, (existing.due_date - created_d).days)
+        else:
+            current_interval = 1
+        interval_days = compute_next_interval(
+            current_interval=current_interval,
+            current_score=clamped_score,
+            previous_score=previous_score,
+        )
+    elif clamped_score < 0.6:
+        interval_days = compute_initial_interval(0.0)
+    elif clamped_score < 0.8:
+        interval_days = min(SHORT_INTERVAL_MAX, compute_initial_interval(clamped_score))
+    else:
+        interval_days = compute_initial_interval(clamped_score)
+
+    target_due = today + timedelta(days=interval_days)
+
+    if existing is not None:
+        existing.due_date = target_due
+        existing.completed = False
+        existing.completed_at = None
+        db.flush()
+        return existing
+
+    record = GsLmsRevisitSchedule(
+        student_id=student_id,
+        syllabus_node_id=syllabus_node_id,
+        due_date=target_due,
+        revisit_type="adaptive",
+        completed=False,
+    )
+    try:
+        with db.begin_nested():
+            db.add(record)
+            db.flush()
+        return record
+    except IntegrityError:
+        return (
+            db.query(GsLmsRevisitSchedule)
+            .filter(
+                GsLmsRevisitSchedule.student_id == student_id,
+                GsLmsRevisitSchedule.syllabus_node_id == syllabus_node_id,
+                GsLmsRevisitSchedule.revisit_type == "adaptive",
+            )
+            .one_or_none()
+        )

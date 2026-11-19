@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from app.schemas.common import StandardResponse
 from app.core.gs.models import GsSubject
 from app.core.gs_lms.models import GsLmsSyllabusNode
 from app.core.gs_lms.beta_scope import beta_scope_enabled, compute_loop_ready_ids
+from app.core.gs_lms.revisit import schedule_adaptive_revisit
 from app.core.gs_lms.student_models import GsLmsRevisitSchedule
 from app.api.v1.gs_lms.dependencies import resolve_subject
 
@@ -145,6 +146,7 @@ def get_due_revisits(
 @router.post("/revisits/{revisit_id}/complete")
 def complete_revisit(
     revisit_id: int,
+    recall_score: float | None = Query(default=None, ge=0.0, le=1.0),
     subject: GsSubject = Depends(resolve_subject),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -153,6 +155,8 @@ def complete_revisit(
 
     Finds the revisit by ID, verifies ownership (student_id matches),
     sets completed = True and completed_at = now().
+    When an optional ``recall_score`` (0.0–1.0) is supplied, schedules or
+    updates an adaptive revisit for the topic.
 
     Returns 404 if not found or not owned by the current user.
 
@@ -181,6 +185,13 @@ def complete_revisit(
     now = datetime.now(timezone.utc)
     revisit.completed = True
     revisit.completed_at = now
+    if recall_score is not None:
+        schedule_adaptive_revisit(
+            db,
+            current_user.id,
+            revisit.syllabus_node_id,
+            recall_score,
+        )
     db.commit()
 
     return StandardResponse(

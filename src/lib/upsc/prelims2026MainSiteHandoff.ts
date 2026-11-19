@@ -10,19 +10,25 @@ import {
 import { buildPrelims2026ShowcaseManifest } from "@/lib/upsc/prelims2026ShowcaseManifest";
 import { buildPrelims2026SourceArchiveSummaryFromScan } from "@/lib/upsc/prelims2026SourceArchiveSummary";
 import { buildPrelims2027CourseActionPublic } from "@/lib/upsc/prelims2027CourseActionPublic";
-import { defaultUpscSourceArchiveRoot } from "@/lib/upsc/sourceArchiveIntake";
+import {
+  defaultUpscSourceArchiveRoot,
+  type SourceArchiveIntakeResponse,
+} from "@/lib/upsc/sourceArchiveIntake";
 import { scanSourceArchive } from "@/lib/upsc/sourceArchiveScanner";
 
 export const prelims2026MainSiteHandoffVersion = "upsc-prelims-2026-main-site-handoff-v1";
 
-export async function buildPrelims2026MainSiteHandoff(rootPath = defaultUpscSourceArchiveRoot) {
+export async function buildPrelims2026MainSiteHandoff(
+  rootPath = defaultUpscSourceArchiveRoot,
+  archiveScanInput?: SourceArchiveIntakeResponse
+) {
   const manifest = buildPrelims2026ShowcaseManifest();
   const readiness = buildPrelims2026BuildReadiness();
   const matchAccountability = buildPrelims2026MatchAccountability();
   const questionLedger = buildPrelims2026QuestionLedgerPublic();
   const courseAction = buildPrelims2027CourseActionPublic();
   const questionFormat = buildPrelims2026QuestionFormatStats();
-  const archiveScan = await scanSourceArchive(rootPath);
+  const archiveScan = archiveScanInput ?? (await scanSourceArchive(rootPath));
   const archiveProofReadiness = buildPrelims2026ArchiveProofReadiness(archiveScan);
   const sourceArchive = buildPrelims2026SourceArchiveSummaryFromScan(archiveScan);
   const releaseDecision = await buildPrelims2026ReleaseDecision(rootPath, archiveScan);
