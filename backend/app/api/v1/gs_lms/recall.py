@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.domain import User
-from app.api.dependencies import ai_rate_limit, get_current_user
+from app.api.dependencies import get_current_user
 from app.core.gs.models import GsSubject, GsReviewStatusEnum
 from app.core.gs_lms.models import GsLmsSyllabusNode, GsLmsContentSection
 from app.core.gs_lms.funnel_models import GsLmsRecallAttempt
@@ -30,6 +30,7 @@ from app.core.gs_lms.recall_scoring import (
     extract_key_concepts,
     score_recall,
 )
+from app.core.gs_lms.revisit import schedule_adaptive_revisit
 from app.core.gs_lms.stt_provider import get_stt_provider, STT_CONFIDENCE_THRESHOLD
 from app.api.v1.gs_lms.dependencies import ensure_leaf_unlocked, resolve_subject
 
@@ -81,7 +82,7 @@ class RecallCheckOut(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/funnel/{node_id}/recall/text", response_model=RecallCheckOut, dependencies=[Depends(ai_rate_limit)])
+@router.post("/funnel/{node_id}/recall/text", response_model=RecallCheckOut)
 def submit_recall_text(
     node_id: int,
     body: RecallTextIn,
@@ -145,6 +146,8 @@ def submit_recall_text(
         attempt_number=attempt_count + 1,
     )
     db.add(recall_attempt)
+    if result.recall_score < 0.8:
+        schedule_adaptive_revisit(db, current_user.id, node_id, result.recall_score)
     db.commit()
 
     return RecallCheckOut(
@@ -164,7 +167,7 @@ def submit_recall_text(
     )
 
 
-@router.post("/funnel/{node_id}/recall/audio", response_model=RecallCheckOut, dependencies=[Depends(ai_rate_limit)])
+@router.post("/funnel/{node_id}/recall/audio", response_model=RecallCheckOut)
 async def submit_recall_audio(
     node_id: int,
     section_label: str = Form(...),
@@ -287,6 +290,8 @@ async def submit_recall_audio(
         attempt_number=attempt_count + 1,
     )
     db.add(recall_attempt)
+    if result.recall_score < 0.8:
+        schedule_adaptive_revisit(db, current_user.id, node_id, result.recall_score)
     db.commit()
 
     return RecallCheckOut(

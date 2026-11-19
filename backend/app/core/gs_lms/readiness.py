@@ -29,31 +29,27 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Iterable, Mapping, Sequence
 
+from app.core.exam_profiles import UPSC_CSE_PROFILE, ExamProfile
+
 
 # ---------------------------------------------------------------------------
 # Constants (documented in DOCS/beta-2027/PRODUCTION_BLUEPRINT.md)
 # ---------------------------------------------------------------------------
 
-DEMAND_PRIOR = 0.25
-RECENCY_HALF_LIFE_YEARS = 6.0
-PRELIMS_EXAM_WEIGHT = 1.0
-MAINS_EXAM_WEIGHT = 0.15
-PRIOR_STRENGTH = 6.0
-RECALL_PSEUDO_OBSERVATIONS = 4.0
-GEOGRAPHY_BLOCK_QUESTIONS = 20
-GEOGRAPHY_BLOCK_MARKS = 40.0
-CORRECT_MARKS = 2.0
-WRONG_MARKS = 2.0 / 3.0
-BAND_SUPPRESSION_ASSESSED_SHARE = 0.25
-Z_80 = 1.28
+DEMAND_PRIOR = UPSC_CSE_PROFILE.demand_prior
+RECENCY_HALF_LIFE_YEARS = UPSC_CSE_PROFILE.recency_half_life_years
+PRELIMS_EXAM_WEIGHT = UPSC_CSE_PROFILE.prelims_exam_weight
+MAINS_EXAM_WEIGHT = UPSC_CSE_PROFILE.mains_exam_weight
+PRIOR_STRENGTH = UPSC_CSE_PROFILE.prior_strength
+RECALL_PSEUDO_OBSERVATIONS = UPSC_CSE_PROFILE.recall_pseudo_observations
+GEOGRAPHY_BLOCK_QUESTIONS = UPSC_CSE_PROFILE.block_questions
+GEOGRAPHY_BLOCK_MARKS = UPSC_CSE_PROFILE.block_marks
+CORRECT_MARKS = UPSC_CSE_PROFILE.correct_marks
+WRONG_MARKS = UPSC_CSE_PROFILE.wrong_marks
+BAND_SUPPRESSION_ASSESSED_SHARE = UPSC_CSE_PROFILE.band_suppression_assessed_share
+Z_80 = UPSC_CSE_PROFILE.z_80
 
-DEPTH_WEIGHTS: Mapping[str, float] = {
-    "BASIC": 0.10,
-    "NCERT_LEVEL": 0.20,
-    "ADVANCED": 0.30,
-    "CURRENT_AFFAIRS": 0.15,
-    "EXAMINER_TRAPS": 0.25,
-}
+DEPTH_WEIGHTS: Mapping[str, float] = dict(UPSC_CSE_PROFILE.depth_weights)
 
 STATUS_UNTOUCHED = "UNTOUCHED"
 STATUS_IN_PROGRESS = "IN_PROGRESS"
@@ -213,9 +209,13 @@ def _is_prelims(exam_type: str) -> bool:
     return str(exam_type).upper() == "PRELIMS"
 
 
-def _recency_weight(year: int, as_of_year: int) -> float:
+def _recency_weight(
+    year: int,
+    as_of_year: int,
+    half_life_years: float = RECENCY_HALF_LIFE_YEARS,
+) -> float:
     age = max(0, as_of_year - int(year))
-    return 0.5 ** (age / RECENCY_HALF_LIFE_YEARS)
+    return 0.5 ** (age / half_life_years)
 
 
 def _required_sections(
@@ -233,6 +233,7 @@ def _required_sections(
 def compute_demand_weights(
     topics: Sequence[TopicEvidence],
     as_of_year: int,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> dict[int, DemandWeight]:
     """Compute normalised demand weights for a set of leaf topics.
 
@@ -274,13 +275,17 @@ def compute_demand_weights(
 
             marks = pyq.marks if pyq.marks is not None else 10
             if prelims:
-                exam_weight = PRELIMS_EXAM_WEIGHT
+                exam_weight = profile.prelims_exam_weight
                 marks_factor = 1.0
             else:
-                exam_weight = MAINS_EXAM_WEIGHT
+                exam_weight = profile.mains_exam_weight
                 marks_factor = min(3.0, max(0.0, marks / 10.0))
 
-            contribution = _recency_weight(year, as_of_year) * exam_weight * marks_factor
+            contribution = (
+                _recency_weight(year, as_of_year, profile.recency_half_life_years)
+                * exam_weight
+                * marks_factor
+            )
             weighted += contribution
             components.append({
                 "year": year,
@@ -289,7 +294,7 @@ def compute_demand_weights(
                 "contribution": round(contribution, 6),
             })
 
-        raw = weighted + DEMAND_PRIOR
+        raw = weighted + profile.demand_prior
         confidence = min(
             0.90,
             0.25 + 0.25 * prelims_count + 0.15 * len(prelims_years),
@@ -337,7 +342,10 @@ def compute_demand_weights(
 # Topic readiness
 # ---------------------------------------------------------------------------
 
-def _coverage_and_depth(topic: TopicEvidence) -> tuple[float, float, list[SectionEvidence]]:
+def _coverage_and_depth(
+    topic: TopicEvidence,
+    depth_weights: Mapping[str, float] = DEPTH_WEIGHTS,
+) -> tuple[float, float, list[SectionEvidence]]:
     required = _required_sections(topic.sections, topic.skippable_section_ids)
     if not required:
         if topic.sections:
@@ -348,10 +356,10 @@ def _coverage_and_depth(topic: TopicEvidence) -> tuple[float, float, list[Sectio
 
     completed = sum(1 for section in required if section.completed)
     coverage = completed / len(required)
-    weight_total = sum(DEPTH_WEIGHTS.get(section.label, 0.10) for section in required)
+    weight_total = sum(depth_weights.get(section.label, 0.10) for section in required)
     depth = (
         sum(
-            DEPTH_WEIGHTS.get(section.label, 0.10)
+            depth_weights.get(section.label, 0.10)
             for section in required
             if section.completed
         )
@@ -444,8 +452,9 @@ def _reason(
 def compute_topic_readiness(
     topic: TopicEvidence,
     demand: DemandWeight,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> TopicReadiness:
-    coverage, depth, required = _coverage_and_depth(topic)
+    coverage, depth, required = _coverage_and_depth(topic, profile.depth_weights)
     prep = 0.50 * coverage + 0.50 * depth
 
     attempts = max(0, int(topic.practice_attempts))
@@ -455,11 +464,11 @@ def compute_topic_readiness(
     n_eff = float(attempts)
     k_eff = float(correct)
     if recall is not None:
-        n_eff += RECALL_PSEUDO_OBSERVATIONS
-        k_eff += RECALL_PSEUDO_OBSERVATIONS * recall
+        n_eff += profile.recall_pseudo_observations
+        k_eff += profile.recall_pseudo_observations * recall
 
     prior = 0.35 + 0.25 * prep
-    performance = (k_eff + PRIOR_STRENGTH * prior) / (n_eff + PRIOR_STRENGTH)
+    performance = (k_eff + profile.prior_strength * prior) / (n_eff + profile.prior_strength)
     has_evidence = attempts > 0 or recall is not None
 
     if has_evidence:
@@ -499,7 +508,7 @@ def compute_topic_readiness(
         confidence=confidence,
         status=status,
         gap_share=gap_share,
-        marks_at_stake=GEOGRAPHY_BLOCK_MARKS * gap_share,
+        marks_at_stake=profile.block_marks * gap_share,
         has_evidence=has_evidence,
         practice_attempts=attempts,
         practice_correct=correct,
@@ -527,8 +536,12 @@ def compute_topic_readiness(
 # Report
 # ---------------------------------------------------------------------------
 
-def _band(score: float, assessed_share: float) -> tuple[str, bool]:
-    if assessed_share < BAND_SUPPRESSION_ASSESSED_SHARE:
+def _band(
+    score: float,
+    assessed_share: float,
+    band_suppression_assessed_share: float = BAND_SUPPRESSION_ASSESSED_SHARE,
+) -> tuple[str, bool]:
+    if assessed_share < band_suppression_assessed_share:
         return BAND_INSUFFICIENT, True
     if score < 45.0:
         return BAND_FOUNDATION, False
@@ -553,13 +566,14 @@ def _confidence_level(assessed_share: float, weighted_confidence: float) -> str:
 def _projection(
     topics: Sequence[TopicReadiness],
     assessed_share: float,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> Projection:
     expected_accuracy = sum(t.demand_share * t.performance for t in topics)
     variance = 0.0
     for topic in topics:
         n_eff = float(topic.practice_attempts)
         if topic.recall_score is not None:
-            n_eff += RECALL_PSEUDO_OBSERVATIONS
+            n_eff += profile.recall_pseudo_observations
         p = clamp(topic.performance)
         variance += (topic.demand_share ** 2) * p * (1.0 - p) / (n_eff + 7.0)
 
@@ -567,24 +581,45 @@ def _projection(
     if assessed_share < 0.40:
         se *= 1.5
 
-    low = clamp(expected_accuracy - Z_80 * se)
-    high = clamp(expected_accuracy + Z_80 * se)
+    low = clamp(expected_accuracy - profile.z_80 * se)
+    high = clamp(expected_accuracy + profile.z_80 * se)
 
     def correct(accuracy: float) -> float:
-        return round(GEOGRAPHY_BLOCK_QUESTIONS * accuracy, 1)
+        return round(profile.block_questions * accuracy, 1)
 
     def net(accuracy: float) -> float:
-        per_question = CORRECT_MARKS * accuracy - WRONG_MARKS * (1.0 - accuracy)
-        return round(GEOGRAPHY_BLOCK_QUESTIONS * per_question, 1)
+        per_question = (
+            profile.correct_marks * accuracy
+            - profile.wrong_marks * (1.0 - accuracy)
+        )
+        return round(profile.block_questions * per_question, 1)
 
+    if profile == UPSC_CSE_PROFILE:
+        return Projection(
+            questions=profile.block_questions,
+            correct_low=correct(low),
+            correct_expected=correct(expected_accuracy),
+            correct_high=correct(high),
+            net_low=net(low),
+            net_expected=net(expected_accuracy),
+            net_high=net(high),
+        )
+
+    assumptions = (
+        f"{profile.block_questions} {profile.display_name} questions",
+        "All questions attempted",
+        f"+{profile.correct_marks:g} for correct, -{profile.wrong_marks:.3g} for wrong",
+        "Estimate, not a score guarantee",
+    )
     return Projection(
-        questions=GEOGRAPHY_BLOCK_QUESTIONS,
+        questions=profile.block_questions,
         correct_low=correct(low),
         correct_expected=correct(expected_accuracy),
         correct_high=correct(high),
         net_low=net(low),
         net_expected=net(expected_accuracy),
         net_high=net(high),
+        assumptions=assumptions,
     )
 
 
@@ -592,13 +627,14 @@ def build_readiness_report(
     topics: Sequence[TopicEvidence],
     as_of: date,
     as_of_year: int | None = None,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> ReadinessReport:
     """Build the full demand-weighted readiness report."""
     year = as_of_year if as_of_year is not None else as_of.year
-    demands = compute_demand_weights(topics, year)
+    demands = compute_demand_weights(topics, year, profile=profile)
 
     rows = tuple(
-        compute_topic_readiness(topic, demands[topic.node_id])
+        compute_topic_readiness(topic, demands[topic.node_id], profile=profile)
         for topic in topics
     )
 
@@ -627,9 +663,13 @@ def build_readiness_report(
         row.demand_share * row.depth for row in normalised
     )
 
-    band, suppressed = _band(readiness_score, assessed_share)
+    band, suppressed = _band(
+        readiness_score,
+        assessed_share,
+        profile.band_suppression_assessed_share,
+    )
     confidence_level = _confidence_level(assessed_share, weighted_confidence)
-    projection = _projection(normalised, assessed_share)
+    projection = _projection(normalised, assessed_share, profile=profile)
 
     topics_with_pyq = sum(1 for row in normalised if row.pyq_count > 0)
     topics_with_mcq = sum(1 for row in normalised if row.mcq_count > 0)

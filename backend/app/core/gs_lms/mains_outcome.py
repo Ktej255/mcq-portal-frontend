@@ -27,6 +27,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.exam_profiles import UPSC_CSE_PROFILE, ExamProfile
 from app.core.gs_lms.models import (
     GsLmsAnswerAttempt,
     GsLmsAnswerAttemptStatusEnum,
@@ -35,14 +36,14 @@ from app.core.gs_lms.models import (
     GsLmsPyq,
 )
 
-MIN_DISTINCT_QUESTIONS = 3
+MIN_DISTINCT_QUESTIONS = UPSC_CSE_PROFILE.min_distinct_written_questions
 
 # UPSC Mains GS papers carry 250 marks each (GS1–GS4). Essay (250) is a separate
 # paper and is not evaluated by this platform, so it is never projected.
-MARKS_PER_GS_PAPER = 250
+MARKS_PER_GS_PAPER = UPSC_CSE_PROFILE.marks_per_written_paper
 
 # Small-sample padding applied to each side of the observed score range.
-BAND_PADDING_PCT = 5.0
+BAND_PADDING_PCT = UPSC_CSE_PROFILE.band_padding_pct
 
 _CONFIDENCE_LABELS: dict[str, str] = {
     "moderate": "Moderate — still an estimate",
@@ -56,10 +57,13 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _band_from_scores(scores: list[float]) -> dict[str, float]:
-    """Observed range widened by ``BAND_PADDING_PCT`` on each side."""
-    low = max(0.0, min(scores) - BAND_PADDING_PCT)
-    high = min(100.0, max(scores) + BAND_PADDING_PCT)
+def _band_from_scores(
+    scores: list[float],
+    band_padding_pct: float = BAND_PADDING_PCT,
+) -> dict[str, float]:
+    """Observed range widened by ``band_padding_pct`` on each side."""
+    low = max(0.0, min(scores) - band_padding_pct)
+    high = min(100.0, max(scores) + band_padding_pct)
     expected = max(low, min(high, fmean(scores)))
     return {
         "low_pct": round(low, 1),
@@ -91,6 +95,7 @@ def build_mains_outcome(
     *,
     submitted_answers: int,
     excluded_incomplete: int,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> dict[str, Any]:
     """Build the outcome payload from (attempt, report) pairs.
 
@@ -144,7 +149,7 @@ def build_mains_outcome(
     )
     caveats.append(
         "The band is the observed score range widened by "
-        f"{BAND_PADDING_PCT:.0f} percentage points each side to reflect "
+        f"{profile.band_padding_pct:.0f} percentage points each side to reflect "
         "small-sample uncertainty."
     )
     caveats.append(
@@ -156,7 +161,7 @@ def build_mains_outcome(
     base: dict[str, Any] = {
         "generated_at": _utcnow().isoformat(),
         "available": False,
-        "minimum_questions": MIN_DISTINCT_QUESTIONS,
+        "minimum_questions": profile.min_distinct_written_questions,
         "answers_evaluated": distinct_questions,
         "submitted_answers": submitted_answers,
         "excluded_incomplete_reports": excluded_incomplete,
@@ -175,8 +180,9 @@ def build_mains_outcome(
         "caveats": caveats,
     }
 
-    if distinct_questions < MIN_DISTINCT_QUESTIONS:
-        remaining = MIN_DISTINCT_QUESTIONS - distinct_questions
+    min_questions = profile.min_distinct_written_questions
+    if distinct_questions < min_questions:
+        remaining = min_questions - distinct_questions
         base["reason"] = (
             "No outcome band is shown yet. "
             f"{remaining} more scored Mains answer"
@@ -184,22 +190,23 @@ def build_mains_outcome(
             "reach the minimum evidence threshold. Insufficient evidence is "
             "reported as such — never as zero marks."
         )
+        min_word = "three" if min_questions == 3 else str(min_questions)
         base["next_step"] = (
-            "Write full answers to at least three different Mains questions on "
+            f"Write full answers to at least {min_word} different Mains questions on "
             "this subject and submit them for evaluation."
         )
         return base
 
     percentages = [percentage for _paper, percentage, _max_marks in scored]
     spread_pct = stdev(percentages) if len(percentages) >= 2 else 0.0
-    band = _band_from_scores(percentages)
+    band = _band_from_scores(percentages, profile.band_padding_pct)
 
     per_paper: list[dict[str, Any]] = []
     covered_marks = 0
     for paper in sorted(papers):
         scores = papers[paper]
-        paper_band = _band_from_scores(scores)
-        out_of = MARKS_PER_GS_PAPER
+        paper_band = _band_from_scores(scores, profile.band_padding_pct)
+        out_of = profile.marks_per_written_paper
         covered_marks += out_of
         per_paper.append(
             {
@@ -277,6 +284,7 @@ def get_mains_outcome(
     db: Session,
     student_id: int,
     subject_id: int,
+    profile: ExamProfile = UPSC_CSE_PROFILE,
 ) -> dict[str, Any]:
     """Return the learner's Mains outcome estimate for one subject."""
     rows = (
@@ -311,6 +319,7 @@ def get_mains_outcome(
         complete,
         submitted_answers=len(rows),
         excluded_incomplete=excluded_incomplete,
+        profile=profile,
     )
 
 
