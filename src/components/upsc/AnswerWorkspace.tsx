@@ -27,6 +27,9 @@ import type {
   EvaluationReportOut,
 } from "@/services/api/optionalService";
 
+// Lowest overall score (out of 100) that counts as a practice pass.
+const PRACTICE_PASS_MIN_SCORE = 40;
+
 /**
  * AnswerWorkspace — the student-facing answer-writing surface for an optional
  * subject (spec task 9.1, Phase 1E, R8.1).
@@ -550,12 +553,20 @@ export function AnswerWorkspace({ slug, prompt, onClose, onSubmit }: AnswerWorks
         pyq_id: prompt.pyqId ?? null,
       });
       setEvaluation(result);
-      if (!result.review_required && prompt.topicNodeId != null) {
+      // Only a passing answer counts toward coverage: the first progress event
+      // for a topic marks it covered for good, so a weak attempt must not.
+      const overallScore = result.report?.overall_score;
+      if (
+        !result.review_required &&
+        prompt.topicNodeId != null &&
+        typeof overallScore === "number" &&
+        overallScore >= PRACTICE_PASS_MIN_SCORE
+      ) {
         try {
           await optionalService.recordProgressEvent(slug, {
             syllabus_node_id: prompt.topicNodeId,
             event_type: "PRACTICE_PASS",
-            value: result.report?.overall_score ?? null,
+            value: overallScore,
           });
         } catch {
           /* best-effort coverage sync after evaluation is persisted */

@@ -690,7 +690,7 @@ def evaluate_triage(
 @router.post("/{item_id}/complete")
 def complete_revision(
     item_id: int,
-    mastery_delta: float = 0.0,
+    mastery_delta: Optional[float] = None,
     rating: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -719,8 +719,14 @@ def complete_revision(
                 detail="Invalid rating. Expected one of: blank, shaky, solid",
             )
         effective_delta = _RATING_DELTAS[normalized_rating]
-    else:
+    elif mastery_delta is not None:
         effective_delta = mastery_delta
+    else:
+        # Neither signal sent: refuse rather than count it as a correct review.
+        raise HTTPException(
+            status_code=422,
+            detail="Send mastery_delta or rating (blank, shaky, solid).",
+        )
 
     now = datetime.now(timezone.utc)
     current_mastery = float(item.mastery_level or 0.0)
