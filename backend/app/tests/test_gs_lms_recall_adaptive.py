@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import ai_rate_limit, get_current_user
 from app.core.gs.models import GsReviewStatusEnum, GsSubject
 from app.core.gs_lms.funnel_models import GsLmsRecallAttempt
 from app.core.gs_lms.models import (
@@ -217,11 +217,14 @@ def client(adaptive_engine):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: FakeUser()
+    # The daily AI allowance is covered by its own tests; skip it here.
+    app.dependency_overrides[ai_rate_limit] = lambda: None
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(ai_rate_limit, None)
 
 
 class TestAdaptiveRevisitScheduling:
