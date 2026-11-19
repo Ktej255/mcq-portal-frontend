@@ -51,6 +51,13 @@ ARTICULATION_WEIGHT = 0.3
 # Minimum words in a sentence for it to count as articulate
 MIN_ARTICULATE_SENTENCE_WORDS = 5
 
+# Stopwords excluded when extracting content stems for paraphrase matching
+_STOPWORDS: set[str] = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+    "in", "into", "is", "it", "of", "on", "or", "that", "the", "their",
+    "this", "to", "was", "were", "with",
+}
+
 
 # ---------------------------------------------------------------------------
 # Key Concept Extraction
@@ -145,6 +152,7 @@ def score_recall(transcript: str, key_concepts: list[str]) -> RecallResult:
     transcript_lower = transcript.lower()
     sentences = _split_sentences(transcript_lower)
     transcript_tokens = set(_tokenize(transcript_lower))
+    transcript_stems = {_stem_token(t) for t in transcript_tokens}
 
     # Match each concept
     concept_matches: list[ConceptMatch] = []
@@ -177,6 +185,28 @@ def score_recall(transcript: str, key_concepts: list[str]) -> RecallResult:
                 if len(overlap) / len(concept_tokens) >= MATCH_THRESHOLD:
                     matched = True
                     matched_fragment = " ".join(sorted(overlap))
+
+            # Strategy 4: Stemmed content-token paraphrase match
+            if not matched and concept_tokens:
+                concept_stems = {
+                    _stem_token(t)
+                    for t in concept_tokens
+                    if t not in _STOPWORDS and len(t) > 2
+                }
+                if not concept_stems:
+                    concept_stems = {_stem_token(t) for t in concept_tokens}
+
+                stem_overlap = concept_stems & transcript_stems
+                if len(concept_stems) == 1:
+                    single_stem = next(iter(concept_stems))
+                    if len(single_stem) >= 4 and single_stem in transcript_stems:
+                        matched = True
+                        matched_fragment = " ".join(sorted(stem_overlap))
+                elif len(concept_stems) >= 2:
+                    threshold = 0.6 if len(concept_stems) >= 4 else 0.7
+                    if len(stem_overlap) / len(concept_stems) >= threshold:
+                        matched = True
+                        matched_fragment = " ".join(sorted(stem_overlap))
 
         if matched:
             matched_count += 1
@@ -273,6 +303,58 @@ def _tokenize(text: str) -> list[str]:
     return re.findall(r'\b[a-z0-9]+\b', text.lower())
 
 
+_SUFFIX_RULES: tuple[tuple[str, str], ...] = (
+    ("ational", "ate"),
+    ("tional", "tion"),
+    ("ization", "ize"),
+    ("ising", "ise"),
+    ("izing", "ize"),
+    ("ised", "ise"),
+    ("ized", "ize"),
+    ("ments", "ment"),
+    ("ment", ""),
+    ("ions", "ion"),
+    ("ction", "ct"),
+    ("ption", "pt"),
+    ("tion", ""),
+    ("sion", ""),
+    ("ings", ""),
+    ("ing", ""),
+    ("ed", ""),
+    ("ies", "y"),
+    ("es", ""),
+    ("s", ""),
+    ("ly", ""),
+    ("al", ""),
+    ("fall", ""),
+)
+
+
+def _stem_token(token: str) -> str:
+    """Strip common English suffixes when the resulting root has len >= 3."""
+    word = token.lower().strip()
+    if len(word) <= 3:
+        return word
+
+    for suffix, replacement in _SUFFIX_RULES:
+        if not word.endswith(suffix):
+            continue
+        if suffix == "es":
+            prefix = word[:-2]
+            if not prefix.endswith(("ss", "sh", "ch", "x", "z", "o")):
+                continue
+        elif suffix == "s":
+            if word.endswith(("ss", "us", "is")):
+                continue
+        root = word[: len(word) - len(suffix)] + replacement
+        if len(root) >= 3:
+            word = root
+            if suffix not in ("tional", "ments", "ions", "s", "es", "ly"):
+                break
+
+    return word
+
+
 def _split_sentences(text: str) -> list[str]:
     """Split text into sentences."""
     # Split on period, question mark, exclamation, or newline
@@ -316,4 +398,6 @@ __all__ = [
     "score_recall",
     "compute_confidence_score",
     "MATCH_THRESHOLD",
+    "_STOPWORDS",
+    "_stem_token",
 ]

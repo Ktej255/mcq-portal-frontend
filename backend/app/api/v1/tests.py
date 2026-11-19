@@ -101,7 +101,7 @@ def get_test_questions(test_id: int, db: Session = Depends(get_db), current_user
                     opt_key = opt_item.get("id", str(idx))
                     opt_text = opt_item.get("text", "")
                 else:
-                    opt_key = str(idx)
+                    opt_key = chr(65 + idx) if 0 <= idx < 26 else str(idx)
                     opt_text = opt_item
                 
                 opt_id = f"{q.id}_opt_{opt_key}"
